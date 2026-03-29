@@ -1,6 +1,6 @@
 # Facets — Agent Context Reference
 
-Gemstone-themed match-3 merge roguelike built in Godot 4.6 (GDScript). Portrait mobile layout (1080x1920). The player swaps tiles to form matches of 3+; matched tiles merge into higher-tier gems (3 Quartz → 1 Amethyst). The goal is to forge high-tier gems within a limited number of moves across roguelike floor progression.
+Gemstone-themed match-3 merge roguelike built in Godot 4.6 (GDScript). Landscape desktop layout (1920x1080), with future portrait mobile pivot planned. The player swaps tiles to form matches of 3+; matched tiles merge into higher-tier gems (3 Quartz → 1 Amethyst). The goal is to forge high-tier gems within a limited number of moves across roguelike floor progression.
 
 ---
 
@@ -49,9 +49,11 @@ Never hardcode gravity direction. The `BoardPhysics` iterative settling algorith
 core/board/     Simulation: board grid, tiles, matching, effects, gravity, spawning
 core/rules/     Simulation: RNG, event logging, event timeline
 core/run/       Simulation: run lifecycle, turn pipeline orchestration
+core/visuals/   Procedural gem rendering: cut generators, lighting math (no scene dependency)
 resources/      Resource class definitions (data schemas)
 data/tiles/     Tile definition .tres files (the 8-gem merge ladder)
-autoloads/      Global singletons (config, replay, save, debug, tile registry)
+data/visuals/   GemVisualResource .tres files (per-gem colour, material, cut assignment)
+autoloads/      Global singletons (config, replay, save, debug, tile registry, gem visuals)
 scenes/         Rendering: board display, tile views, animation, input, HUD
 tools/          Design-time utilities (board layout validator)
 tests/          Headless smoke tests (godot --headless --script tests/test_smoke.gd)
@@ -64,6 +66,7 @@ plans/          Design documents (not code — reference only)
 |---|---|---|
 | `core/board/` | Other `core/` classes, `SeededRng` | Scenes, autoloads (except `TileRegistry` in `EffectResolver` for merge chain lookup) |
 | `core/run/` | `core/board/`, `core/rules/`, autoloads (`ReplayService`) | Scenes |
+| `core/visuals/` | `resources/visuals/` (resource classes only) | Scenes, autoloads, `core/board/` |
 | `scenes/` | `core/` (read-only), autoloads | Must not mutate board state directly |
 | `autoloads/` | `core/` classes, `resources/` | Scenes |
 | `resources/` | Nothing (pure data schemas) | Everything |
@@ -229,6 +232,87 @@ Loads all `.tres` tile definitions from `data/tiles/` at startup. Provides:
 
 ---
 
+## Procedural Gem Rendering
+
+Gems are rendered procedurally using 2D polygon facets with pseudo-3D lighting. No sprite atlas is required. The system has four layers:
+
+### GemCutResource (geometry)
+
+Defines the 2D facet layout of a cut type. All vertices are in unit `[0,1]` space centred at `(0.5, 0.5)`. Contains:
+- `facet_vertices: Array[PackedVector2Array]` — one polygon per facet
+- `facet_normals: Array[Vector3]` — pseudo-3D normal per facet (for lighting)
+- `facet_zones: PackedStringArray` — zone tag per facet ("table", "star", "bezel", "girdle")
+- `silhouette: PackedVector2Array` — outer boundary for outline rendering
+- `edge_segments: Array[PackedVector2Array]` — visible facet boundary lines (currently hidden by default)
+
+Generated at startup by `GemCutGenerators` — parametric functions that produce correct facet topology for each shape. All generated cuts are auto-normalized via `_normalize_to_fit()` to guarantee consistent cell margin regardless of aspect ratio.
+
+### GemVisualResource (appearance config)
+
+`.tres` files in `data/visuals/`, one per gem type. References a `cut_id` and configures:
+- `base_color` — primary gem colour
+- `shininess` / `specular_intensity` — Blinn-Phong specular parameters
+- `contrast` (0–1) — blends between Half-Lambert (soft, flat) and standard Lambert (dramatic shadows). Low tiers use low contrast; high tiers use high contrast.
+- `depth_tint` — colour shift for facets facing away from the viewer (simulates transparency)
+- `hue_dispersion` (0–0.5) — prismatic "fire" effect. Each facet shifts hue based on its normal angle. Used primarily for Diamond.
+- `saturation_boost` — post-process saturation adjustment
+- `use_texture` / `color_texture` — for patterned gems like opals (samples texture at facet centroid)
+
+### GemRenderer (lighting math)
+
+Pure `RefCounted`, no scene dependency. Computes flat-shaded colour per facet:
+1. **Diffuse:** `lerp(half_lambert, standard_lambert, contrast)` — blends soft/dramatic shading
+2. **Specular:** Blinn-Phong with configurable shininess and intensity
+3. **Depth tint:** Back-facing facets shift toward the depth tint colour
+4. **Per-facet jitter:** ±4% deterministic brightness variation from centroid hash — ensures neighbouring facets are always distinguishable even without visible edge lines
+5. **Hue dispersion:** Optional prismatic hue shift per facet based on normal angle
+
+### GemVisualRegistry (autoload)
+
+Loads `GemVisualResource` files from `data/visuals/` and generates `GemCutResource` instances via `GemCutGenerators` at startup. Provides:
+- `get_visual(tile_id)` → `GemVisualResource`
+- `get_visual_for_tier(tier)` → `GemVisualResource` (resolved via TileRegistry)
+- `get_cut(cut_id)` → `GemCutResource`
+
+### TileView integration
+
+`TileView._draw()` renders gems using Godot's `draw_colored_polygon()`. Priority order:
+1. Procedural gem (if `GemVisualRegistry` has a visual for this tile)
+2. Atlas sprite (concept art fallback)
+3. Coloured rectangle (headless/debug fallback)
+
+Silhouette outline toggled via `DebugFlags.gem_silhouette_outline`.
+
+### Shape-to-Tier Mapping
+
+Each tier has a distinct silhouette shape for instant visual identification:
+
+| Tier | Gem | Shape | Cut ID | Facet Count |
+|------|-----|-------|--------|-------------|
+| T1 | Quartz | Circle | `classic_round` | 33 |
+| T2 | Amethyst | Square (rounded) | `cushion` | 33 |
+| T3 | Peridot | Triangle (bowed edges) | `trillion` | 19 |
+| T4 | Topaz | Rotated Square ◆ | `radiant_diamond` | 13 |
+| T5 | Sapphire | Hexagon | `hex_brilliant` | 25 |
+| T6 | Emerald | Rectangle (portrait) | `emerald_step` | 17 |
+| T7 | Ruby | Oval (portrait) | `oval_brilliant` | 33 |
+| T8 | Diamond | Pear/Teardrop | `pear_brilliant` | 41 |
+
+### Progressive Visual Hierarchy
+
+| Tier | Contrast | Specular | Depth Tint | Dispersion | Visual Feel |
+|------|----------|----------|------------|------------|-------------|
+| T1 | 0.15 | 0.25 | none | none | Flat, chalky |
+| T2 | 0.25 | 0.3 | subtle | none | Slightly defined |
+| T3 | 0.3 | 0.3 | subtle | none | Moderate depth |
+| T4 | 0.4 | 0.35 | light | none | Warm shadows |
+| T5 | 0.5 | 0.45 | moderate | none | Rich, deep |
+| T6 | 0.55 | 0.35 | moderate | none | Deep with body |
+| T7 | 0.65 | 0.5 | strong | none | Dramatic, intense |
+| T8 | 0.5 | 0.8 | icy blue | 0.2 | Brilliant, prismatic fire |
+
+---
+
 ## SpawnTableResource
 
 Defines which tiers can spawn and with what probability:
@@ -306,6 +390,10 @@ These systems are designed but intentionally excluded from the current scaffold.
 | What you want to change | File(s) to modify |
 |---|---|
 | Add a new gem type | Create `.tres` in `data/tiles/`, `TileRegistry` auto-loads it |
+| Change a gem's visual appearance | Edit its `.tres` in `data/visuals/` (colour, shininess, cut assignment) |
+| Add a new gem cut shape | Add a generator in `core/visuals/gem_cut_generators.gd`, reference its `cut_id` from a `GemVisualResource` |
+| Change the lighting model | `core/visuals/gem_renderer.gd` — `compute_facet_color()` |
+| Add a visual modifier effect | Add parameter handling in `GemRenderer.compute_all_facet_colors()` modifiers dict |
 | Change merge behavior (what happens on 4-match, 5-match) | `core/board/effect_planner.gd` — `_plan_match_4()`, `_plan_match_5_plus()` |
 | Add a new effect type | Add const in `EffectPlanner`, handle in `EffectResolver.apply()` |
 | Change gravity behavior | `core/board/board_physics.gd` |

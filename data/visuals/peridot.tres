@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"peridot"
+cut_id = &"trillion"
+base_color = Color(0.45, 0.75, 0.08, 1)
+shininess = 28.0
+specular_intensity = 0.3
+contrast = 0.3
+depth_tint = Color(0.2, 0.4, 0.0, 0.15)

@@ -14,12 +14,12 @@ func _ready() -> void:
 
 	board_scene.swap_requested.connect(_on_swap_requested)
 
-	# Debug panel — toggle with F1
+	# Debug panel — toggle with F1 (full-screen overlay)
 	_debug_panel = DebugPanel.new()
 	_debug_panel.anchor_right = 1.0
 	_debug_panel.anchor_bottom = 1.0
 	_debug_panel.offset_left = 16.0
-	_debug_panel.offset_top = 64.0
+	_debug_panel.offset_top = 40.0
 	_debug_panel.offset_right = -16.0
 	_debug_panel.offset_bottom = -16.0
 	add_child(_debug_panel)

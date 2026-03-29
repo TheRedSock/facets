@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"diamond"
+cut_id = &"pear_brilliant"
+base_color = Color(0.93, 0.94, 0.98, 1)
+shininess = 160.0
+specular_intensity = 0.8
+contrast = 0.5
+depth_tint = Color(0.75, 0.78, 0.95, 0.25)
+saturation_boost = 0.03
+hue_dispersion = 0.2

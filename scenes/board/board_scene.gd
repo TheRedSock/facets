@@ -142,15 +142,18 @@ func _compute_layout() -> void:
 	var cols := _board_state.size.x
 	var rows := _board_state.size.y
 
-	var padding := 16.0
+	var padding := 8.0
 	var usable_w := available.x - padding * 2.0
 	var usable_h := available.y - padding * 2.0
 
+	# Width-primary sizing: use the widest cell that fits horizontally,
+	# then clamp to what fits vertically.  This ensures the board fills
+	# the available width on widescreen/landscape displays instead of
+	# being bottlenecked by a small vertical dimension.
 	var cell_w := int((usable_w - (cols - 1) * _spacing) / cols)
 	var cell_h := int((usable_h - (rows - 1) * _spacing) / rows)
 	var cell_dim := mini(cell_w, cell_h)
-	cell_dim = mini(cell_dim, 120)
-	cell_dim = maxi(cell_dim, 40)
+	cell_dim = clampi(cell_dim, 40, 200)
 	_cell_size = Vector2i(cell_dim, cell_dim)
 
 	var board_pixel_w := cols * (_cell_size.x + _spacing) - _spacing

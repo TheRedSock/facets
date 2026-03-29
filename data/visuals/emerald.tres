@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"emerald"
+cut_id = &"emerald_step"
+base_color = Color(0.05, 0.6, 0.35, 1)
+shininess = 36.0
+specular_intensity = 0.35
+contrast = 0.55
+depth_tint = Color(0.0, 0.25, 0.1, 0.3)
+saturation_boost = 0.05

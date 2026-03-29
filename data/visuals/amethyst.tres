@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"amethyst"
+cut_id = &"cushion"
+base_color = Color(0.58, 0.25, 0.88, 1)
+shininess = 24.0
+specular_intensity = 0.3
+contrast = 0.25
+depth_tint = Color(0.3, 0.1, 0.5, 0.15)
