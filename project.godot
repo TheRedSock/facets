@@ -1,0 +1,41 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
+[application]
+
+config/name="Facets"
+config/description="Match-3 merge roguelike prototype scaffold."
+run/main_scene="res://scenes/main/main.tscn"
+config/features=PackedStringArray("4.6")
+config/icon="res://icon.svg"
+
+[autoload]
+
+GameConfig="*res://autoloads/game_config.gd"
+SaveService="*res://autoloads/save_service.gd"
+ReplayService="*res://autoloads/replay_service.gd"
+DebugFlags="*res://autoloads/debug_flags.gd"
+TileRegistry="*res://autoloads/tile_registry.gd"
+
+[display]
+
+window/size/viewport_width=1080
+window/size/viewport_height=1920
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+renderer/rendering_method="mobile"

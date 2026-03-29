@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TileDefinitionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/definitions/tile_definition_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tile_id = &"quartz"
+display_name = "Quartz"
+tier = 1
+debug_color = Color(0.973, 0.984, 0.988, 1)
+merge_target_id = &"amethyst"

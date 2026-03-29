@@ -1,0 +1,73 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/ui/debug_overlay.gd" id="1"]
+
+[node name="DebugOverlay" type="PanelContainer"]
+custom_minimum_size = Vector2(280, 0)
+script = ExtResource("1")
+
+[node name="Margin" type="MarginContainer" parent="."]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Margin/VBox"]
+text = "Prototype Debug"
+
+[node name="SeedRow" type="HBoxContainer" parent="Margin/VBox"]
+
+[node name="SeedLabel" type="Label" parent="Margin/VBox/SeedRow"]
+text = "Seed:"
+
+[node name="SeedValue" type="Label" parent="Margin/VBox/SeedRow"]
+unique_name_in_owner = true
+text = "-"
+
+[node name="MovesRow" type="HBoxContainer" parent="Margin/VBox"]
+
+[node name="MovesLabel" type="Label" parent="Margin/VBox/MovesRow"]
+text = "Moves:"
+
+[node name="MovesValue" type="Label" parent="Margin/VBox/MovesRow"]
+unique_name_in_owner = true
+text = "-"
+
+[node name="BoardRow" type="HBoxContainer" parent="Margin/VBox"]
+
+[node name="BoardLabel" type="Label" parent="Margin/VBox/BoardRow"]
+text = "Board:"
+
+[node name="BoardValue" type="Label" parent="Margin/VBox/BoardRow"]
+unique_name_in_owner = true
+text = "-"
+
+[node name="CoordinatesToggle" type="CheckButton" parent="Margin/VBox"]
+unique_name_in_owner = true
+text = "Show coordinates"
+button_pressed = true
+
+[node name="RerollButton" type="Button" parent="Margin/VBox"]
+text = "Reroll seed"
+
+[node name="EvaluateButton" type="Button" parent="Margin/VBox"]
+text = "Evaluate board"
+
+[node name="ResolveButton" type="Button" parent="Margin/VBox"]
+text = "Resolve matches"
+
+[node name="LastActionLabel" type="Label" parent="Margin/VBox"]
+text = "Last action:"
+
+[node name="LastActionValue" type="Label" parent="Margin/VBox"]
+unique_name_in_owner = true
+text = "None yet"
+autowrap_mode = 3
+
+[connection signal="pressed" from="Margin/VBox/RerollButton" to="." method="_on_reroll_button_pressed"]
+[connection signal="pressed" from="Margin/VBox/EvaluateButton" to="." method="_on_evaluate_button_pressed"]
+[connection signal="pressed" from="Margin/VBox/ResolveButton" to="." method="_on_resolve_button_pressed"]
+[connection signal="toggled" from="Margin/VBox/CoordinatesToggle" to="." method="_on_coordinates_toggle_toggled"]
