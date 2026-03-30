@@ -214,36 +214,53 @@ func _play_cascade_step(step: Dictionary) -> void:
 			true,
 		)
 
-	# Phase 3: Unified gravity + spawn fall.
-	# Spawn tiles are pre-created above the board and stacked per-column so they
-	# slide in from beyond the clip boundary together with existing falling tiles.
+	# Phase 3: Unified gravity + spawn fall with stagger and landing bounce.
+	# Gravity events are consolidated per tile (multi-step -> single move) so
+	# fall duration is computed from full travel distance. Tiles closer to the
+	# destination start falling first, creating a cascading ripple.
 	var gravity_events: Array = step.get("gravity_events", [])
 	var spawn_events: Array = step.get("spawn_events", [])
 
 	if not gravity_events.is_empty() or not spawn_events.is_empty():
-		# Pre-create spawn tiles above the board, stacked per column.
-		# Sort spawns per column by target row (topmost first) so they stack
-		# at row -1, -2, -3, etc.
-		var spawns_by_col: Dictionary = {}  # int (col) -> Array of spawn events
+		# --- Consolidate gravity events per tile ---
+		# Physics produces per-round single-cell moves; merge into one
+		# (original_from -> final_to) entry per tile for correct distance.
+		var gravity_moves: Array[Dictionary] = []
+		var grav_index: Dictionary = {}  # view instance_id -> index in gravity_moves
+		for event in gravity_events:
+			var from: Vector2i = event.get("from", Vector2i(-1, -1))
+			var to: Vector2i = event.get("to", Vector2i(-1, -1))
+			if _tile_views.has(from):
+				var view: TileView = _tile_views[from]
+				var vid := view.get_instance_id()
+				if grav_index.has(vid):
+					gravity_moves[grav_index[vid]]["final_to"] = to
+				else:
+					grav_index[vid] = gravity_moves.size()
+					gravity_moves.append({
+						"view": view,
+						"original_from": from,
+						"final_to": to,
+					})
+				_tile_views.erase(from)
+				_tile_views[to] = view
+				view.cell = to
+
+		# --- Pre-create spawn tiles above the board, stacked per column ---
+		var spawns_by_col: Dictionary = {}
 		for event in spawn_events:
 			var cell: Vector2i = event.get("cell", Vector2i(-1, -1))
 			if not spawns_by_col.has(cell.x):
 				spawns_by_col[cell.x] = []
 			spawns_by_col[cell.x].append(event)
 
-		# Sort each column's spawns by target row (descending = deepest first).
-		# The deepest target gets start row -1 (closest to the board edge) so
-		# tiles maintain their column order as they fall — no crossing.
 		for col in spawns_by_col:
 			var col_spawns: Array = spawns_by_col[col]
 			col_spawns.sort_custom(func(a, b):
 				return a.get("cell", Vector2i.ZERO).y > b.get("cell", Vector2i.ZERO).y
 			)
 
-		# Create spawn views at stacked positions above the board.
-		# Use untracked creation so they don't overwrite existing tile entries
-		# that gravity events still need to look up by their 'from' cell.
-		var spawn_views: Array[Dictionary] = []  # {view, target_cell, start_row}
+		var spawn_moves: Array[Dictionary] = []
 		for col in spawns_by_col:
 			var col_spawns: Array = spawns_by_col[col]
 			for i in col_spawns.size():
@@ -251,52 +268,65 @@ func _play_cascade_step(step: Dictionary) -> void:
 				var cell: Vector2i = event.get("cell", Vector2i(-1, -1))
 				var spawn_tile_id: StringName = event.get("tile_id", &"")
 				var spawn_tier: int = event.get("tier", 1)
-				var start_row := -(i + 1)  # -1, -2, -3, ...
+				var start_row := -(i + 1)
 				var view := _create_tile_view_untracked(spawn_tile_id, spawn_tier, cell)
 				view.position = _cell_to_pixel(Vector2i(cell.x, start_row))
-				spawn_views.append({
+				spawn_moves.append({
 					"view": view,
-					"target_cell": cell,
-					"start_row": start_row,
+					"original_from": Vector2i(cell.x, start_row),
+					"final_to": cell,
 				})
+				_tile_views[cell] = view
+				view.cell = cell
 
-		# Build a single tween for all gravity moves + spawn falls
+		# --- Compute per-column stagger delays ---
+		# Group by destination column, sort bottom-first so tiles closest to
+		# the gap start falling first.
+		var all_moves: Array[Dictionary] = []
+		all_moves.append_array(gravity_moves)
+		all_moves.append_array(spawn_moves)
+
+		var stagger_cols: Dictionary = {}
+		for move in all_moves:
+			var col: int = move["final_to"].x
+			if not stagger_cols.has(col):
+				stagger_cols[col] = []
+			stagger_cols[col].append(move)
+
+		for col in stagger_cols:
+			var col_moves: Array = stagger_cols[col]
+			col_moves.sort_custom(func(a, b):
+				return a["final_to"].y > b["final_to"].y
+			)
+			for i in col_moves.size():
+				col_moves[i]["stagger"] = minf(
+					float(i) * AnimationSequencer.gravity_stagger_delay,
+					AnimationSequencer.gravity_stagger_max)
+
+		# --- Build parallel tween with stagger ---
 		var tween := create_tween().set_parallel(true)
 		var has_targets := false
 
-		for event in gravity_events:
-			var from: Vector2i = event.get("from", Vector2i(-1, -1))
-			var to: Vector2i = event.get("to", Vector2i(-1, -1))
-			if _tile_views.has(from):
-				var view: TileView = _tile_views[from]
-				var distance := AnimationSequencer.cell_distance(from, to)
-				var duration := AnimationSequencer.fall_duration(distance)
-				tween.tween_property(view, "position",
-					_cell_to_pixel(to), duration) \
-					.set_ease(Tween.EASE_IN) \
-					.set_trans(Tween.TRANS_QUAD)
-				_tile_views.erase(from)
-				_tile_views[to] = view
-				view.cell = to
-				has_targets = true
-
-		for spawn_data in spawn_views:
-			var view: TileView = spawn_data["view"]
-			var target_cell: Vector2i = spawn_data["target_cell"]
-			var start_row: int = spawn_data["start_row"]
-			var distance := target_cell.y - start_row
+		for move in all_moves:
+			var view: TileView = move["view"]
+			var orig_from: Vector2i = move["original_from"]
+			var final_to: Vector2i = move["final_to"]
+			var distance := AnimationSequencer.cell_distance(orig_from, final_to)
 			var duration := AnimationSequencer.fall_duration(distance)
+			var stagger: float = move.get("stagger", 0.0)
 			tween.tween_property(view, "position",
-				_cell_to_pixel(target_cell), duration) \
+				_cell_to_pixel(final_to), duration) \
 				.set_ease(Tween.EASE_IN) \
-				.set_trans(Tween.TRANS_QUAD)
-			# Register in _tile_views now that gravity has updated existing tile tracking
-			_tile_views[target_cell] = view
-			view.cell = target_cell
+				.set_trans(AnimationSequencer.gravity_trans) \
+				.set_delay(stagger)
+			move["distance"] = distance
 			has_targets = true
 
 		if has_targets:
 			await tween.finished
+
+		# --- Fire-and-forget landing bounce ---
+		_start_landing_bounces(all_moves)
 
 	# Ensure last remove/upgrade phase is fully done before the next cascade step
 	if last_phase2_tween != null and last_phase2_tween.is_running():
@@ -384,6 +414,33 @@ func _play_match_remove_upgrade(
 				_tile_views[cell].modulate = Color.WHITE
 
 	return phase2_tween
+
+
+## Starts async landing bounce tweens for tiles that just fell.
+## Fire-and-forget — not awaited, so the cascade continues immediately.
+## Bounce magnitude scales slightly with fall distance but stays within grid borders.
+func _start_landing_bounces(moves: Array[Dictionary]) -> void:
+	if AnimationSequencer.landing_bounce_duration <= 0.0:
+		return
+	var cell_step := float(_cell_size.y + _spacing)
+	for move in moves:
+		var view: TileView = move["view"]
+		var distance: int = move.get("distance", 1)
+		if not is_instance_valid(view) or distance <= 0:
+			continue
+		var orig_from: Vector2i = move["original_from"]
+		var final_to: Vector2i = move["final_to"]
+		var fall_dir := Vector2(final_to - orig_from).normalized()
+		# Bounce between 3.5% and 5% of cell step, scaling with fall distance
+		var bounce_px := clampf(float(distance) * 0.01, 0.01, 0.05) * cell_step
+		var target_pos := _cell_to_pixel(final_to)
+		var overshoot_pos := target_pos - fall_dir * bounce_px
+		var dur := AnimationSequencer.landing_bounce_duration
+		var bounce_tween := create_tween()
+		bounce_tween.tween_property(view, "position", overshoot_pos, dur * 0.35) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		bounce_tween.tween_property(view, "position", target_pos, dur * 0.65) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
 
 
 # ---- Input Handling ----

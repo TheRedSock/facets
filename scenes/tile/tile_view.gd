@@ -47,6 +47,10 @@ func _ready() -> void:
 	_label.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_label)
 
+	# Scale and rotation pivot at the tile centre so animations grow symmetrically.
+	pivot_offset = size * 0.5
+	resized.connect(func(): pivot_offset = size * 0.5)
+
 	_update_visual()
 
 

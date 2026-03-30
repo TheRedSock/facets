@@ -40,6 +40,21 @@ static var swap_duration := 0.15
 ## Duration of the invalid swap bounce animation (each direction).
 static var invalid_swap_duration := 0.12
 
+## Transition curve for gravity falls.
+## TRANS_CUBIC provides a more pronounced slow-start / fast-finish than TRANS_QUAD.
+static var gravity_trans := Tween.TRANS_CUBIC
+
+## Per-position stagger delay for column falls (seconds).
+## Tiles closer to the destination start falling first; each subsequent tile
+## in the same column starts this much later, creating a cascading ripple.
+static var gravity_stagger_delay := 0.012
+
+## Maximum total stagger delay per column (seconds).
+static var gravity_stagger_max := 0.06
+
+## Duration of the async landing bounce (seconds). Fire-and-forget.
+static var landing_bounce_duration := 0.12
+
 
 ## Computes fall duration from distance using physics-based formula.
 ## t = sqrt(2 * distance / gravity_accel)
