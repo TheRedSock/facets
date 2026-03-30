@@ -17,6 +17,7 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 	last_remove_events.clear()
 	last_upgrade_events.clear()
 	var tiles_removed := 0
+	var tile_registry: Node = _get_tile_registry()
 
 	for entry in effect_plan:
 		var effect: StringName = entry.get("effect", &"")
@@ -53,8 +54,8 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 					# If tile has merge_target_id, resolve it through TileRegistry
 					# to get the full target definition (new tile_id, tier, match_group, etc.).
 					# Falls back to simple tier+1 if no merge chain is defined.
-					if tile.merge_target_id != &"" and TileRegistry.has_definitions():
-						var target_def: TileDefinitionResource = TileRegistry.get_definition(tile.merge_target_id)
+					if tile.merge_target_id != &"" and tile_registry != null and tile_registry.has_definitions():
+						var target_def: TileDefinitionResource = tile_registry.get_definition(tile.merge_target_id)
 						if target_def != null:
 							tile.tile_id = target_def.tile_id
 							tile.tier = target_def.tier
@@ -94,3 +95,10 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 				event_log.push(&"unhandled_effect", entry)
 
 	return tiles_removed
+
+
+func _get_tile_registry() -> Node:
+	var main_loop := Engine.get_main_loop()
+	if main_loop is SceneTree:
+		return main_loop.root.get_node_or_null("/root/TileRegistry")
+	return null

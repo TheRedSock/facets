@@ -66,8 +66,9 @@ func refill_empty_cells(board: BoardState, rng: SeededRng, spawn_table: SpawnTab
 func _spawn_tile(rng: SeededRng, spawn_table: SpawnTableResource) -> TileState:
 	var tier := _weighted_pick_int(rng, spawn_table.allowed_tiers, spawn_table.weights)
 	# Use TileRegistry for proper named tiles if definitions are loaded
-	if TileRegistry.has_definitions():
-		return TileRegistry.create_tile_for_tier(tier, rng)
+	var tile_registry: Node = _get_tile_registry()
+	if tile_registry != null and tile_registry.has_definitions():
+		return tile_registry.create_tile_for_tier(tier, rng)
 	return TileState.from_debug_tier(tier)
 
 
@@ -103,3 +104,10 @@ func _weighted_pick_int(rng: SeededRng, values: Array[int], weights: Array[int])
 func populate_debug_board(board: BoardState, rng: SeededRng, visible_tiers: int) -> void:
 	for cell in board.all_cells():
 		board.set_tile(cell, TileState.from_debug_tier(rng.randi_range(1, max(1, visible_tiers))))
+
+
+func _get_tile_registry() -> Node:
+	var main_loop := Engine.get_main_loop()
+	if main_loop is SceneTree:
+		return main_loop.root.get_node_or_null("/root/TileRegistry")
+	return null

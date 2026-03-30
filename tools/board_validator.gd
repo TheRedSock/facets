@@ -32,10 +32,14 @@ func _check_gravity_cycles(board: BoardState, issues: Array[String]) -> void:
 		var cursor := pos
 		var steps := 0
 
-		while cursor != Vector2i(-1, -1) and steps < max_steps:
+		while cursor != Vector2i(-1, -1):
 			if visited.has(cursor):
 				issues.append("[ERROR] Gravity cycle detected: cell (%d,%d) eventually loops back to (%d,%d)" % [
 					pos.x, pos.y, cursor.x, cursor.y])
+				break
+			if steps >= max_steps:
+				issues.append("[ERROR] Gravity path from (%d,%d) exceeds max length — possible unbounded path" % [
+					pos.x, pos.y])
 				break
 			visited[cursor] = true
 			var gravity: Vector2i = board.get_effective_gravity(cursor)
@@ -43,10 +47,6 @@ func _check_gravity_cycles(board: BoardState, issues: Array[String]) -> void:
 				break  # No gravity — tile rests here
 			cursor = board.get_neighbor(cursor, gravity)
 			steps += 1
-
-		if steps >= max_steps:
-			issues.append("[ERROR] Gravity path from (%d,%d) exceeds max length — possible unbounded path" % [
-				pos.x, pos.y])
 
 
 ## Checks whether every non-blocked cell can be reached from at least one spawn entry.

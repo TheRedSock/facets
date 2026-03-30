@@ -10,7 +10,6 @@ var tier: int = 0
 
 var _label: Label
 var _background: ColorRect
-var _sprite: TextureRect
 
 ## Cached procedural gem data (set by _update_visual, consumed by _draw).
 var _gem_cut: GemCutResource = null
@@ -29,14 +28,6 @@ func _ready() -> void:
 	_background.color = Color("94a3b8")
 	_background.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_background)
-
-	_sprite = TextureRect.new()
-	_sprite.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_sprite.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_sprite.visible = false
-	_sprite.mouse_filter = MOUSE_FILTER_IGNORE
-	add_child(_sprite)
 
 	_label = Label.new()
 	_label.set_anchors_and_offsets_preset(PRESET_CENTER)
@@ -96,43 +87,19 @@ func _update_visual() -> void:
 	if _try_procedural_visual():
 		return
 
-	# ---- Priority 2: Atlas sprite (concept art) ----
+	# ---- Priority 2: Coloured rectangle fallback ----
 	_use_procedural = false
-	var has_sprite := false
-	if _sprite != null and TileRegistry != null and TileRegistry.get_atlas_texture() != null:
-		var atlas_tex := TileRegistry.get_atlas_texture()
-		var region := TileRegistry.get_atlas_region(tier)
-		if region.size.x > 0:
-			var atlas := AtlasTexture.new()
-			atlas.atlas = atlas_tex
-			atlas.region = region
-			_sprite.texture = atlas
-			_sprite.visible = true
-			has_sprite = true
-
-	if has_sprite:
-		# With sprite: hide background, show small tier label in corner
-		_background.visible = false
-		_label.text = "T%d" % tier
-		_label.add_theme_font_size_override("font_size", 14)
-		_label.set_anchors_and_offsets_preset(PRESET_BOTTOM_RIGHT)
-		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		_label.add_theme_color_override("font_color", Color.BLACK)
-		_label.add_theme_color_override("font_shadow_color", Color(1, 1, 1, 0.8))
-		_label.add_theme_constant_override("shadow_offset_x", 1)
-		_label.add_theme_constant_override("shadow_offset_y", 1)
-	else:
-		# ---- Priority 3: Coloured rectangle fallback ----
-		if _sprite != null:
-			_sprite.visible = false
-		_background.visible = true
-		_background.color = _get_color()
-		_label.text = "T%d" % tier
-		_label.set_anchors_and_offsets_preset(PRESET_CENTER)
-		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_label.remove_theme_font_size_override("font_size")
-		_label.remove_theme_color_override("font_color")
-		_label.remove_theme_color_override("font_shadow_color")
+	_background.visible = true
+	_background.color = _get_color()
+	_label.text = "T%d" % tier
+	_label.set_anchors_and_offsets_preset(PRESET_CENTER)
+	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label.remove_theme_font_size_override("font_size")
+	_label.remove_theme_color_override("font_color")
+	_label.remove_theme_color_override("font_shadow_color")
+	_label.remove_theme_constant_override("shadow_offset_x")
+	_label.remove_theme_constant_override("shadow_offset_y")
+	queue_redraw()
 
 
 ## Attempts to set up procedural gem rendering.  Returns true on success.
@@ -155,9 +122,7 @@ func _try_procedural_visual() -> bool:
 	_gem_colors = GemRenderer.compute_all_facet_colors(cut, visual)
 	_use_procedural = true
 
-	# Hide the sprite and background — _draw() handles rendering.
-	if _sprite != null:
-		_sprite.visible = false
+	# Hide the background — _draw() handles rendering.
 	_background.visible = false
 
 	# Small tier label in the bottom-right corner.

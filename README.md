@@ -12,7 +12,7 @@ core/
   board/            # Simulation: board grid, tiles, matching, effects, gravity, spawning
   rules/            # Simulation: SeededRng, EventLog, EventTimeline
   run/              # Simulation: run lifecycle, turn pipeline orchestration
-  visuals/          # Procedural gem rendering: cut generators, lighting math (no scene dependency)
+  visuals/          # Procedural gem rendering: profiles, builders, primitives, lighting math
 data/
   tiles/            # Tile definition .tres files (8-gem merge ladder)
   visuals/          # GemVisualResource .tres files (per-gem colour, material, cut assignment)
@@ -50,11 +50,14 @@ The simulation completes instantly and produces an `EventTimeline`. The renderer
 
 ## Procedural Gem Rendering
 
-Gems are rendered procedurally — no sprite atlas required. Each gem type is defined by:
+Gems are rendered procedurally — there is no sprite atlas fallback in the main render path. Each gem type is defined by:
 
-- **`GemCutResource`** — 2D polygon geometry defining the facet layout (generated at startup by parametric generators in `core/visuals/gem_cut_generators.gd`)
+- **`GemCutResource`** — 2D polygon geometry defining the facet layout (generated at startup from profile-driven cut builders)
 - **`GemVisualResource`** (`.tres` in `data/visuals/`) — Per-gem colour, material properties (shininess, contrast, specular intensity, depth tint, hue dispersion)
 - **`GemRenderer`** — Pure-math lighting: Half-Lambert/Lambert diffuse blend, Blinn-Phong specular, per-facet brightness jitter, prismatic hue dispersion
+- **`core/visuals/gem_cut_profiles.gd`** — declarative cut library
+- **`core/visuals/gem_cut_builders.gd`** — reusable facet topology builders
+- **`core/visuals/gem_cut_primitives.gd`** — shared outline math and curve sampling helpers
 
 Each tier has a distinct **silhouette shape** for instant visual identification:
 
@@ -69,9 +72,11 @@ Each tier has a distinct **silhouette shape** for instant visual identification:
 | T7 | Ruby | Oval (portrait) | Oval Brilliant |
 | T8 | Diamond | Pear/Teardrop | Pear Brilliant |
 
-Higher tiers have progressively more dramatic shading (higher contrast), brighter specular highlights, and deeper depth tints. Diamond features prismatic hue dispersion ("fire").
+The profile base now also includes alternate cuts such as Asscher, baguette, tapered baguette, octagon step, marquise, heart, old European round, princess square, radiant octagon, and a rose-cut family for future use.
 
-`TileView._draw()` renders gems directly using Godot's `draw_colored_polygon()` — no texture generation needed. Silhouette outlines are toggled via `DebugFlags.gem_silhouette_outline`.
+Higher tiers have progressively more dramatic shading, brighter specular highlights, and deeper depth tints. Diamond features prismatic hue dispersion ("fire").
+
+`TileView._draw()` renders gems directly using Godot's `draw_colored_polygon()`. If no procedural visual can be resolved, the remaining fallback is a coloured debug rectangle. Silhouette outlines are toggled via `DebugFlags.gem_silhouette_outline`.
 
 ## Playing
 
@@ -85,7 +90,13 @@ The HUD shows remaining moves and the current seed.
 godot --headless --script tests/test_smoke.gd
 ```
 
-40+ tests cover topology, match detection, merge mechanics, gravity (standard, custom direction, portals, diagonal fill, immovable tiles), the full cascade pipeline, spawn distribution, event timeline structure, and deterministic replay verification.
+Focused cut regression coverage:
+
+```bash
+godot --headless --script tests/test_gem_cuts.gd
+```
+
+The test suites cover topology, match detection, merge mechanics, gravity, the full cascade pipeline, deterministic replay verification, cut generation, normalized geometry bounds, facet counts, and silhouette stability.
 
 Cross-platform RNG verification:
 ```bash
@@ -103,6 +114,7 @@ godot --headless --script tests/test_rng_cross_platform.gd
 ## Documentation
 
 - [AGENTS.md](AGENTS.md) — Full architectural reference for AI agents and contributors
+- [core/visuals/README.md](core/visuals/README.md) — Procedural cut-system architecture and extension guide
 - [Gem Engine Proposal](plans/gem-engine-proposal.md) — Game design and architecture proposal
 - [Executive Analysis](plans/executive-analysis.md) — Proposal review and scaffolding audit
 - [Getting Started Guide](plans/getting-started-guide.md) — Godot overview and phased prototyping plan

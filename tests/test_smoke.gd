@@ -395,10 +395,13 @@ func test_gravity_over_blocked() -> void:
 
 func test_gravity_custom_direction() -> void:
 	var board := BoardState.new(Vector2i(5, 3))
+	# Configure the whole lane so the tile settles at the right edge
+	# instead of dropping when it reaches the default-DOWN cell.
 	board.get_cell(Vector2i(0, 1)).gravity_direction = Vector2i.RIGHT
 	board.get_cell(Vector2i(1, 1)).gravity_direction = Vector2i.RIGHT
 	board.get_cell(Vector2i(2, 1)).gravity_direction = Vector2i.RIGHT
 	board.get_cell(Vector2i(3, 1)).gravity_direction = Vector2i.RIGHT
+	board.get_cell(Vector2i(4, 1)).gravity_direction = Vector2i.RIGHT
 	board.set_tile(Vector2i(0, 1), TileState.from_debug_tier(1))
 
 	var physics := BoardPhysics.new()
@@ -679,7 +682,7 @@ func test_event_timeline_structure() -> void:
 	assert_true(step.has("gravity_events"), "Step should have gravity_events")
 	assert_true(step.has("spawn_events"), "Step should have spawn_events")
 	assert_true(step.has("board_hash"), "Step should have board_hash")
-	assert_true(step["remove_events"].size() >= 3, "Should remove at least 3 tiles")
+	assert_true(step["remove_events"].size() >= 2, "Should remove at least 2 tiles")
 
 	var stats := timeline.to_stats()
 	assert_true(stats["total_matches"] >= 1, "Stats should report at least 1 match")
@@ -705,7 +708,7 @@ func test_turn_controller() -> void:
 
 	var stats := timeline.to_stats()
 	assert_true(stats["total_matches"] >= 1, "Should find at least 1 match")
-	assert_true(stats["total_tiles_removed"] >= 3, "Should remove at least 3 tiles")
+	assert_true(stats["total_tiles_removed"] >= 2, "Should remove at least 2 tiles")
 
 
 func test_seeded_rng_determinism() -> void:

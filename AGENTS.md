@@ -49,7 +49,7 @@ Never hardcode gravity direction. The `BoardPhysics` iterative settling algorith
 core/board/     Simulation: board grid, tiles, matching, effects, gravity, spawning
 core/rules/     Simulation: RNG, event logging, event timeline
 core/run/       Simulation: run lifecycle, turn pipeline orchestration
-core/visuals/   Procedural gem rendering: cut generators, lighting math (no scene dependency)
+core/visuals/   Procedural gem rendering: cut profiles, builders, primitives, lighting math
 resources/      Resource class definitions (data schemas)
 data/tiles/     Tile definition .tres files (the 8-gem merge ladder)
 data/visuals/   GemVisualResource .tres files (per-gem colour, material, cut assignment)
@@ -225,7 +225,7 @@ Loads all `.tres` tile definitions from `data/tiles/` at startup. Provides:
 - `get_ids_for_tier(tier)` → `Array[StringName]`
 - `create_tile(tile_id)` → `TileState` with all fields populated from definition
 - `create_tile_for_tier(tier, rng)` → random tile at that tier
-- `get_atlas_region(tier)` → `Rect2` for the gem sprite atlas (2x4 grid, 384x384px cells)
+- `get_tier_color(tier)` → `Color` for debug or fallback rendering
 - `has_definitions()` → `bool` (false in headless tests that skip autoloads)
 
 `SpawnResolver` uses `TileRegistry` to create named tiles instead of anonymous debug tiles. `EffectResolver` uses it to resolve merge chains. Both fall back gracefully when the registry is unavailable.
@@ -234,7 +234,7 @@ Loads all `.tres` tile definitions from `data/tiles/` at startup. Provides:
 
 ## Procedural Gem Rendering
 
-Gems are rendered procedurally using 2D polygon facets with pseudo-3D lighting. No sprite atlas is required. The system has four layers:
+Gems are rendered procedurally using 2D polygon facets with pseudo-3D lighting. There is no sprite-atlas fallback in the main render path. The system has five layers:
 
 ### GemCutResource (geometry)
 
@@ -246,6 +246,15 @@ Defines the 2D facet layout of a cut type. All vertices are in unit `[0,1]` spac
 - `edge_segments: Array[PackedVector2Array]` — visible facet boundary lines (currently hidden by default)
 
 Generated at startup by `GemCutGenerators` — parametric functions that produce correct facet topology for each shape. All generated cuts are auto-normalized via `_normalize_to_fit()` to guarantee consistent cell margin regardless of aspect ratio.
+
+### GemCutProfiles / GemCutBuilders / GemCutPrimitives
+
+The generator stack is split so new cuts are mostly data rather than bespoke geometry code:
+- `GemCutProfiles` — declarative cut dictionaries keyed by `cut_id`
+- `GemCutBuilders` — reusable topology assembly (`build_radial_brilliant`, `build_step_cut`, `build_fan_cut`, `build_radiant_cut`, `build_rose_cut`)
+- `GemCutPrimitives` — shared outline math, polygon helpers, curve samplers, and silhouette helpers
+
+When adding a cut, prefer a new profile first. Only add new primitive math or a new builder when an existing profile+builder combination cannot express the cut family cleanly.
 
 ### GemVisualResource (appearance config)
 
@@ -278,8 +287,7 @@ Loads `GemVisualResource` files from `data/visuals/` and generates `GemCutResour
 
 `TileView._draw()` renders gems using Godot's `draw_colored_polygon()`. Priority order:
 1. Procedural gem (if `GemVisualRegistry` has a visual for this tile)
-2. Atlas sprite (concept art fallback)
-3. Coloured rectangle (headless/debug fallback)
+2. Coloured rectangle (headless/debug fallback)
 
 Silhouette outline toggled via `DebugFlags.gem_silhouette_outline`.
 
@@ -349,7 +357,9 @@ Run headlessly for level design QA. Warnings are informational; errors indicate 
 
 Run headless smoke tests: `godot --headless --script tests/test_smoke.gd`
 
-40+ tests cover: board creation, topology (neighbors, portals, gravity), match detection (including unmatchable/holes), merge mechanic (remove count, upgrade, max tier), gravity (standard, custom direction, tile override, immovable, iterative convergence, diagonal fill, portals, cycle safety), pipeline (effect planning, conflict resolution, spawning, timeline structure), and deterministic replay verification.
+Focused cut regression test: `godot --headless --script tests/test_gem_cuts.gd`
+
+The test suites cover: board creation, topology (neighbors, portals, gravity), match detection (including unmatchable/holes), merge mechanic (remove count, upgrade, max tier), gravity (standard, custom direction, tile override, immovable, iterative convergence, diagonal fill, portals, cycle safety), pipeline (effect planning, conflict resolution, spawning, timeline structure), deterministic replay verification, and procedural cut generation invariants.
 
 Cross-platform RNG test: `godot --headless --script tests/test_rng_cross_platform.gd` — prints reference values to compare across platforms.
 
@@ -391,7 +401,9 @@ These systems are designed but intentionally excluded from the current scaffold.
 |---|---|
 | Add a new gem type | Create `.tres` in `data/tiles/`, `TileRegistry` auto-loads it |
 | Change a gem's visual appearance | Edit its `.tres` in `data/visuals/` (colour, shininess, cut assignment) |
-| Add a new gem cut shape | Add a generator in `core/visuals/gem_cut_generators.gd`, reference its `cut_id` from a `GemVisualResource` |
+| Add a new gem cut profile | Add a profile in `core/visuals/gem_cut_profiles.gd`, wire its `cut_id` in `core/visuals/gem_cut_generators.gd`, reference it from a `GemVisualResource` |
+| Add shared cut outline math | `core/visuals/gem_cut_primitives.gd` |
+| Add a new cut topology family | `core/visuals/gem_cut_builders.gd` |
 | Change the lighting model | `core/visuals/gem_renderer.gd` — `compute_facet_color()` |
 | Add a visual modifier effect | Add parameter handling in `GemRenderer.compute_all_facet_colors()` modifiers dict |
 | Change merge behavior (what happens on 4-match, 5-match) | `core/board/effect_planner.gd` — `_plan_match_4()`, `_plan_match_5_plus()` |
