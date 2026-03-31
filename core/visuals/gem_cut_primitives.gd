@@ -263,3 +263,88 @@ static func pva(points: Array) -> PackedVector2Array:
 	for i in points.size():
 		packed[i] = points[i]
 	return packed
+
+
+# ===========================================================================
+#  Polygon clipping (Sutherland-Hodgman)
+# ===========================================================================
+
+
+## Clips the subject polygon to the interior of the clip polygon.
+## Returns the intersection, or an empty array if they don't overlap.
+## Both polygons must be convex (or at least the clip polygon must be).
+static func clip_polygon(subject: PackedVector2Array, clip: PackedVector2Array) -> PackedVector2Array:
+	var clean_subject := _sanitize_polygon(subject)
+	var clean_clip := _sanitize_polygon(clip)
+	if clean_subject.size() < 3 or clean_clip.size() < 3:
+		return PackedVector2Array()
+	var clip_area := polygon_signed_area(clean_clip)
+	if absf(clip_area) < 0.000001:
+		return PackedVector2Array()
+	var clip_winding := 1.0 if clip_area >= 0.0 else -1.0
+	var output := clean_subject
+	for i in clean_clip.size():
+		if output.size() < 3:
+			return PackedVector2Array()
+		var input := output
+		output = PackedVector2Array()
+		var edge_a := clean_clip[i]
+		var edge_b := clean_clip[(i + 1) % clean_clip.size()]
+		for j in input.size():
+			var current := input[j]
+			var previous := input[(j - 1 + input.size()) % input.size()]
+			var curr_in := _inside_edge(current, edge_a, edge_b, clip_winding)
+			var prev_in := _inside_edge(previous, edge_a, edge_b, clip_winding)
+			if curr_in:
+				if not prev_in:
+					_append_unique_point(output, _edge_intersect(previous, current, edge_a, edge_b))
+				_append_unique_point(output, current)
+			elif prev_in:
+				_append_unique_point(output, _edge_intersect(previous, current, edge_a, edge_b))
+		output = _sanitize_polygon(output)
+	if output.size() < 3 or absf(polygon_signed_area(output)) < 0.000001:
+		return PackedVector2Array()
+	return output
+
+
+## Returns true if the point is on the interior side of the directed edge a→b.
+static func _inside_edge(point: Vector2, a: Vector2, b: Vector2, winding: float) -> bool:
+	var cross := (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x)
+	return cross * winding >= -0.00001
+
+
+## Returns the intersection point of line segments a→b and c→d.
+static func _edge_intersect(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> Vector2:
+	var a1 := b.y - a.y
+	var b1 := a.x - b.x
+	var c1 := a1 * a.x + b1 * a.y
+	var a2 := d.y - c.y
+	var b2 := c.x - d.x
+	var c2 := a2 * c.x + b2 * c.y
+	var det := a1 * b2 - a2 * b1
+	if absf(det) < 0.00001:
+		return (a + b) * 0.5
+	return Vector2((c1 * b2 - c2 * b1) / det, (a1 * c2 - a2 * c1) / det)
+
+
+static func polygon_signed_area(points: PackedVector2Array) -> float:
+	var area := 0.0
+	for i in points.size():
+		var next_index := (i + 1) % points.size()
+		area += points[i].x * points[next_index].y - points[next_index].x * points[i].y
+	return area * 0.5
+
+
+static func _sanitize_polygon(points: PackedVector2Array) -> PackedVector2Array:
+	var cleaned := PackedVector2Array()
+	for point in points:
+		_append_unique_point(cleaned, point)
+	if cleaned.size() >= 2 and cleaned[0].distance_squared_to(cleaned[cleaned.size() - 1]) <= 0.00000001:
+		cleaned.remove_at(cleaned.size() - 1)
+	return cleaned
+
+
+static func _append_unique_point(points: PackedVector2Array, point: Vector2) -> void:
+	if not points.is_empty() and points[points.size() - 1].distance_squared_to(point) <= 0.00000001:
+		return
+	points.append(point)

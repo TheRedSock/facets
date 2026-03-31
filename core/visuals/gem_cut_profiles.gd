@@ -3,8 +3,6 @@ extends RefCounted
 
 ## Shape profile definitions for all built-in gem cuts.
 
-const GemCutPrimitives = preload("res://core/visuals/gem_cut_primitives.gd")
-
 
 # ===========================================================================
 #  Radial Brilliant Family
@@ -94,7 +92,9 @@ static func trillion() -> Dictionary:
 	var side_midpoints: Array[Vector2] = []
 	var boundary_sides: Array = []
 	var silhouette := PackedVector2Array()
-	var silhouette_segments := GemCutPrimitives.detail_sample_count(3, GemCutPrimitives.DETAIL_HIGH, 48) / 3
+	var silhouette_segments := int(
+		GemCutPrimitives.detail_sample_count(3, GemCutPrimitives.DETAIL_HIGH, 48) / 3.0
+	)
 
 	for i in corners.size():
 		var next_index := (i + 1) % corners.size()

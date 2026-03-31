@@ -71,6 +71,9 @@ func _init() -> void:
 	test_geometry_bounds_and_alignment()
 	test_no_degenerate_facets()
 	test_outline_sampling_stability()
+	test_pavilion_overlay_integrity()
+	test_pavilion_symmetry_metadata()
+	test_clip_polygon_winding_independence()
 	test_profile_distinctiveness()
 
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
@@ -86,6 +89,9 @@ func test_generate_all_cuts() -> void:
 		assert_eq(cut.cut_id, cut_id, "%s should preserve its cut_id" % str(cut_id))
 		assert_eq(cut.facet_vertices.size(), cut.facet_normals.size(), "%s facet normals align" % str(cut_id))
 		assert_eq(cut.facet_vertices.size(), cut.facet_zones.size(), "%s facet zones align" % str(cut_id))
+		assert_eq(cut.pavilion_vertices.size(), cut.pavilion_normals.size(), "%s pavilion normals align" % str(cut_id))
+		assert_eq(cut.pavilion_vertices.size(), cut.pavilion_source_indices.size(), "%s pavilion source indices align" % str(cut_id))
+		assert_eq(cut.pavilion_vertices.size(), cut.pavilion_target_indices.size(), "%s pavilion target indices align" % str(cut_id))
 
 
 func test_expected_facet_counts() -> void:
@@ -140,6 +146,70 @@ func test_outline_sampling_stability() -> void:
 		var aspect_delta: float = absf(float(low_bounds["aspect"]) - float(high_bounds["aspect"]))
 		assert_true(area_delta < 0.035, "%s outline area stays stable across sampling densities" % profile["cut_id"])
 		assert_true(aspect_delta < 0.03, "%s outline aspect stays stable across sampling densities" % profile["cut_id"])
+
+
+func test_pavilion_overlay_integrity() -> void:
+	var min_bound := GemCutPrimitives.FIT_MARGIN - 0.001
+	var max_bound := 1.0 - GemCutPrimitives.FIT_MARGIN + 0.001
+	for cut_id in CUT_IDS:
+		var cut := GemCutGenerators.generate(cut_id)
+		assert_true(cut.pavilion_count() > 0, "%s should generate pavilion overlay fragments" % str(cut_id))
+		for i in cut.pavilion_count():
+			var fragment: PackedVector2Array = cut.pavilion_vertices[i]
+			assert_true(fragment.size() >= 3, "%s pavilion fragment has at least 3 vertices" % str(cut_id))
+			assert_true(_polygon_area(fragment) > 0.000005, "%s pavilion fragment area is non-zero" % str(cut_id))
+			var target_index := cut.pavilion_target_indices[i]
+			assert_true(target_index >= 0 and target_index < cut.facet_count(),
+				"%s pavilion fragment target index is valid" % str(cut_id))
+			assert_true(cut.facet_zones[target_index] != "table",
+				"%s pavilion fragment should not clip onto the table" % str(cut_id))
+			var bounds := _points_bounds(fragment)
+			assert_true(bounds["min_x"] >= min_bound, "%s pavilion min_x stays in fit box" % str(cut_id))
+			assert_true(bounds["min_y"] >= min_bound, "%s pavilion min_y stays in fit box" % str(cut_id))
+			assert_true(bounds["max_x"] <= max_bound, "%s pavilion max_x stays in fit box" % str(cut_id))
+			assert_true(bounds["max_y"] <= max_bound, "%s pavilion max_y stays in fit box" % str(cut_id))
+
+
+func test_pavilion_symmetry_metadata() -> void:
+	assert_eq(GemCutGenerators.generate(&"old_european_round").pavilion_sector_count, 10,
+		"Old European pavilion should follow its 10-sector profile")
+	assert_eq(GemCutGenerators.generate(&"heart_brilliant").pavilion_sector_count, 10,
+		"Heart pavilion should follow its 10-sector profile")
+	assert_eq(GemCutGenerators.generate(&"pear_brilliant").pavilion_sector_count, 10,
+		"Pear pavilion should follow its 10-sector profile")
+	assert_eq(GemCutGenerators.generate(&"marquise_brilliant").pavilion_sector_count, 10,
+		"Marquise pavilion should follow its 10-sector profile")
+	assert_eq(GemCutGenerators.generate(&"radiant_octagon").pavilion_sector_count, 8,
+		"Radiant octagon pavilion should follow its outer-point count")
+	assert_eq(GemCutGenerators.generate(&"emerald_step").pavilion_sector_count, 8,
+		"Emerald step pavilion should follow its ring point count")
+
+
+func test_clip_polygon_winding_independence() -> void:
+	var subject := GemCutPrimitives.pva([
+		Vector2(0.10, 0.10),
+		Vector2(0.90, 0.10),
+		Vector2(0.90, 0.90),
+		Vector2(0.10, 0.90),
+	])
+	var clip_ccw := GemCutPrimitives.pva([
+		Vector2(0.25, 0.20),
+		Vector2(0.75, 0.20),
+		Vector2(0.75, 0.80),
+		Vector2(0.25, 0.80),
+	])
+	var clip_cw := GemCutPrimitives.pva([
+		Vector2(0.25, 0.80),
+		Vector2(0.75, 0.80),
+		Vector2(0.75, 0.20),
+		Vector2(0.25, 0.20),
+	])
+	var clipped_ccw := GemCutPrimitives.clip_polygon(subject, clip_ccw)
+	var clipped_cw := GemCutPrimitives.clip_polygon(subject, clip_cw)
+	assert_true(clipped_ccw.size() >= 3, "clip_polygon should work for CCW clip polygons")
+	assert_true(clipped_cw.size() >= 3, "clip_polygon should work for CW clip polygons")
+	assert_near(_polygon_area(clipped_ccw), _polygon_area(clipped_cw), 0.00001,
+		"clip_polygon should be winding-independent")
 
 
 func test_profile_distinctiveness() -> void:

@@ -69,3 +69,11 @@ godot --headless --script tests/test_rng_cross_platform.gd
 ```
 
 Prints 100 reference RNG values for seed 42. Run on each target platform (Windows, Android, iOS, web) and compare outputs. If they match, integer RNG is cross-platform safe.
+
+## Optional Simulation Harness
+
+For longer balance / throughput runs with a simple greedy swap picker:
+
+```bash
+godot --headless res://tests/test_simulation.tscn
+```

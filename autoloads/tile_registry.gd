@@ -14,6 +14,13 @@ func _ready() -> void:
 	_load_definitions()
 
 
+## Explicit gameplay preload hook.  Definitions are still loaded eagerly, but
+## this gives the run bootstrap a single place to ensure tile data is ready.
+func preload_runtime_assets() -> void:
+	if not _loaded:
+		_load_definitions()
+
+
 ## Returns the definition for a tile_id, or null if not found.
 func get_definition(tile_id: StringName) -> TileDefinitionResource:
 	return _definitions.get(tile_id, null)

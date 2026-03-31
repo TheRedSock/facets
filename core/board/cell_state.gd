@@ -52,11 +52,14 @@ func clear_tile() -> void:
 
 
 func to_dict() -> Dictionary:
+	var tile_data: Variant = null
+	if tile != null:
+		tile_data = tile.to_dict()
 	return {
 		"blocked": blocked,
 		"gravity_direction": {"x": gravity_direction.x, "y": gravity_direction.y},
 		"is_spawn_entry": is_spawn_entry,
 		"fill_sources": fill_sources.duplicate(),
 		"tags": tags.duplicate(),
-		"tile": tile.to_dict() if tile != null else null,
+		"tile": tile_data,
 	}

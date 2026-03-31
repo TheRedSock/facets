@@ -10,12 +10,26 @@ var tier: int = 0
 
 var _label: Label
 var _background: ColorRect
+var _sprite_texture: TextureRect
+var _outline_overlay: Control
 
 ## Cached procedural gem data (set by _update_visual, consumed by _draw).
 var _gem_cut: GemCutResource = null
 var _gem_visual: GemVisualResource = null
+var _visual_cache_key: StringName = &""
 var _gem_colors: PackedColorArray = PackedColorArray()
+var _pavilion_colors: PackedColorArray = PackedColorArray()
+var _edge_aa_colors: PackedColorArray = PackedColorArray()
 var _use_procedural: bool = false
+
+## Shared scaled geometry bundle from GemVisualRegistry.
+var _render_geometry: Dictionary = {}
+var use_gameplay_texture_cache := false
+var _outline_visual: GemVisualResource = null
+var _outline_cut: GemCutResource = null
+var _outline_geometry: Dictionary = {}
+var _outline_cache_key: StringName = &""
+var _use_runtime_outline := false
 
 
 func _ready() -> void:
@@ -29,6 +43,15 @@ func _ready() -> void:
 	_background.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_background)
 
+	_sprite_texture = TextureRect.new()
+	_sprite_texture.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_sprite_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_sprite_texture.stretch_mode = TextureRect.STRETCH_SCALE
+	_sprite_texture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_sprite_texture.mouse_filter = MOUSE_FILTER_IGNORE
+	_sprite_texture.visible = false
+	add_child(_sprite_texture)
+
 	_label = Label.new()
 	_label.set_anchors_and_offsets_preset(PRESET_CENTER)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -38,11 +61,28 @@ func _ready() -> void:
 	_label.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_label)
 
+	_outline_overlay = Control.new()
+	_outline_overlay.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_outline_overlay.mouse_filter = MOUSE_FILTER_IGNORE
+	_outline_overlay.draw.connect(_draw_outline_overlay)
+	add_child(_outline_overlay)
+
 	# Scale and rotation pivot at the tile centre so animations grow symmetrically.
 	pivot_offset = size * 0.5
-	resized.connect(func(): pivot_offset = size * 0.5)
+	resized.connect(_on_resized)
+	if GemVisualRegistry != null:
+		GemVisualRegistry.gameplay_texture_cache_rebuilt.connect(_on_gameplay_texture_cache_rebuilt)
 
 	_update_visual()
+
+
+func _exit_tree() -> void:
+	if GemVisualRegistry != null and GemVisualRegistry.gameplay_texture_cache_rebuilt.is_connected(_on_gameplay_texture_cache_rebuilt):
+		GemVisualRegistry.gameplay_texture_cache_rebuilt.disconnect(_on_gameplay_texture_cache_rebuilt)
+	_clear_procedural_state()
+	_clear_runtime_outline()
+	if _sprite_texture != null:
+		_sprite_texture.texture = null
 
 
 func configure(tile: TileState, new_cell: Vector2i) -> void:
@@ -61,17 +101,6 @@ func configure_from_data(p_tile_id: StringName, p_tier: int, p_cell: Vector2i) -
 		_update_visual()
 
 
-func show_upgrade(new_tier: int) -> void:
-	tier = new_tier
-	# When upgrading via merge, update tile_id to match the new tier
-	if TileRegistry.has_definitions():
-		var ids := TileRegistry.get_ids_for_tier(new_tier)
-		if not ids.is_empty():
-			tile_id = ids[0]
-	if is_inside_tree():
-		_update_visual()
-
-
 func show_upgrade_full(new_tier: int, new_tile_id: StringName) -> void:
 	tier = new_tier
 	tile_id = new_tile_id
@@ -83,97 +112,247 @@ func _update_visual() -> void:
 	if _label == null:
 		return
 
+	if _try_gameplay_texture_visual():
+		return
+
 	# ---- Priority 1: Procedural gem rendering ----
 	if _try_procedural_visual():
 		return
 
 	# ---- Priority 2: Coloured rectangle fallback ----
+	_clear_procedural_state()
+	_clear_runtime_outline()
 	_use_procedural = false
 	_background.visible = true
+	_sprite_texture.visible = false
+	_sprite_texture.texture = null
 	_background.color = _get_color()
-	_label.text = "T%d" % tier
-	_label.set_anchors_and_offsets_preset(PRESET_CENTER)
-	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.remove_theme_font_size_override("font_size")
-	_label.remove_theme_color_override("font_color")
-	_label.remove_theme_color_override("font_shadow_color")
-	_label.remove_theme_constant_override("shadow_offset_x")
-	_label.remove_theme_constant_override("shadow_offset_y")
+	_label.visible = false
 	queue_redraw()
+
+
+func _try_gameplay_texture_visual() -> bool:
+	if not use_gameplay_texture_cache or GemVisualRegistry == null:
+		return false
+	var texture := GemVisualRegistry.get_gameplay_texture(tile_id, tier)
+	if texture == null:
+		return false
+
+	var visual_bundle := _resolve_visual_bundle()
+	_clear_procedural_state()
+	_use_procedural = false
+	_background.visible = false
+	_label.visible = false
+	_sprite_texture.texture = texture
+	_sprite_texture.visible = true
+	if not visual_bundle.is_empty():
+		_setup_runtime_outline(
+			visual_bundle["cache_key"],
+			visual_bundle["visual"],
+			visual_bundle["cut"],
+		)
+	else:
+		_clear_runtime_outline()
+	return true
 
 
 ## Attempts to set up procedural gem rendering.  Returns true on success.
 func _try_procedural_visual() -> bool:
-	if GemVisualRegistry == null or not GemVisualRegistry.has_visuals():
+	var visual_bundle := _resolve_visual_bundle()
+	if visual_bundle.is_empty():
 		return false
 
-	var visual := GemVisualRegistry.get_visual(tile_id)
-	if visual == null:
-		visual = GemVisualRegistry.get_visual_for_tier(tier)
-	if visual == null:
-		return false
+	var cache_key: StringName = visual_bundle["cache_key"]
+	var visual: GemVisualResource = visual_bundle["visual"]
+	var cut: GemCutResource = visual_bundle["cut"]
 
-	var cut := GemVisualRegistry.get_cut(visual.cut_id)
-	if cut == null:
-		return false
+	# Track whether the cut changed — if recycling as the same gem type,
+	# the scaled geometry is still valid and we can skip the expensive rebuild.
+	var cut_changed := (_gem_cut != cut)
+	var cache_key_changed := (_visual_cache_key != cache_key)
 
+	_visual_cache_key = cache_key
 	_gem_visual = visual
 	_gem_cut = cut
-	_gem_colors = GemRenderer.compute_all_facet_colors(cut, visual)
+
 	_use_procedural = true
+	_clear_runtime_outline()
 
 	# Hide the background — _draw() handles rendering.
 	_background.visible = false
+	_sprite_texture.visible = false
+	_sprite_texture.texture = null
 
-	# Small tier label in the bottom-right corner.
-	_label.text = "T%d" % tier
-	_label.add_theme_font_size_override("font_size", 12)
-	_label.set_anchors_and_offsets_preset(PRESET_BOTTOM_RIGHT)
-	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
-	_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
-	_label.add_theme_constant_override("shadow_offset_x", 1)
-	_label.add_theme_constant_override("shadow_offset_y", 1)
+	# Hide label — procedural gems need no text overlay.
+	_label.visible = false
 
-	queue_redraw()
+	_refresh_render_cache(cut_changed or cache_key_changed)
 	return true
+
+
+func _clear_procedural_state() -> void:
+	_gem_cut = null
+	_gem_visual = null
+	_visual_cache_key = &""
+	_render_geometry = {}
+	_gem_colors = PackedColorArray()
+	_pavilion_colors = PackedColorArray()
+	_edge_aa_colors = PackedColorArray()
+
+
+func _clear_runtime_outline() -> void:
+	_outline_visual = null
+	_outline_cut = null
+	_outline_geometry = {}
+	_outline_cache_key = &""
+	_use_runtime_outline = false
+	if _outline_overlay != null:
+		_outline_overlay.queue_redraw()
+
+
+func _setup_runtime_outline(
+	cache_key: StringName,
+	visual: GemVisualResource,
+	cut: GemCutResource,
+) -> void:
+	_outline_visual = visual
+	_outline_cut = cut
+	_outline_cache_key = cache_key
+	_use_runtime_outline = true
+	_refresh_runtime_outline()
+
+
+func _resolve_visual_bundle() -> Dictionary:
+	if GemVisualRegistry == null or not GemVisualRegistry.has_visuals():
+		return {}
+	var cache_key: StringName = tile_id
+	var visual := GemVisualRegistry.get_visual(tile_id)
+	if visual == null:
+		visual = GemVisualRegistry.get_visual_for_tier(tier)
+		cache_key = StringName("_tier_%d" % tier)
+	if visual == null:
+		return {}
+	var cut := GemVisualRegistry.get_cut(visual.cut_id)
+	if cut == null:
+		return {}
+	return {
+		"cache_key": cache_key,
+		"visual": visual,
+		"cut": cut,
+	}
 
 
 func _draw() -> void:
 	if not _use_procedural or _gem_cut == null or _gem_visual == null:
 		return
 
-	var s := minf(size.x, size.y)
-	var offset := (size - Vector2(s, s)) * 0.5  # centre the gem if non-square
+	var facets: Array = _render_geometry.get("facets", [])
+	var pavilion: Array = _render_geometry.get("pavilion", [])
+	var silhouette: PackedVector2Array = _render_geometry.get("silhouette", PackedVector2Array())
+	var edges: PackedVector2Array = _render_geometry.get("edges", PackedVector2Array())
+	var edge_aa_a: PackedVector2Array = _render_geometry.get("edge_aa_a", PackedVector2Array())
+	var edge_aa_b: PackedVector2Array = _render_geometry.get("edge_aa_b", PackedVector2Array())
+	var low_detail := _is_low_detail_enabled()
 
 	# ---- Draw filled facets ----
-	for i in _gem_cut.facet_count():
-		var verts := _gem_cut.facet_vertices[i]
-		var scaled := PackedVector2Array()
-		scaled.resize(verts.size())
-		for j in verts.size():
-			scaled[j] = verts[j] * s + offset
+	for i in facets.size():
 		if i < _gem_colors.size():
-			draw_colored_polygon(scaled, _gem_colors[i])
+			draw_colored_polygon(facets[i], _gem_colors[i])
+
+	# ---- Draw pavilion extinction overlay ----
+	if not low_detail and _pavilion_colors.size() > 0:
+		for i in pavilion.size():
+			if i < _pavilion_colors.size():
+				draw_colored_polygon(pavilion[i], _pavilion_colors[i])
+
+	# ---- Draw facet anti-aliasing edge lines ----
+	if not low_detail:
+		for i in edge_aa_a.size():
+			draw_line(edge_aa_a[i], edge_aa_b[i], _edge_aa_colors[i], 0.5, true)
 
 	# ---- Draw silhouette outline ----
-	if DebugFlags.gem_silhouette_outline and _gem_cut.silhouette.size() >= 3:
-		var sil := _gem_cut.silhouette
-		var scaled_sil := PackedVector2Array()
-		scaled_sil.resize(sil.size())
-		for j in sil.size():
-			scaled_sil[j] = sil[j] * s + offset
-		scaled_sil.append(scaled_sil[0])
-		draw_polyline(scaled_sil, Color(0, 0, 0, 0.5), 1.5, true)
+	if DebugFlags.gem_silhouette_outline and silhouette.size() >= 4:
+		var ol_color := _gem_visual.outline_color
+		if ol_color.a < 0.2:
+			ol_color = Color(0, 0, 0, 0.5)
+		var ol_width := _gem_visual.outline_width
+		if DebugFlags.gem_outline_width_override >= 0:
+			ol_width = DebugFlags.gem_outline_width_override
+		elif ol_width < 0.1:
+			ol_width = 0.5
+		draw_polyline(silhouette, ol_color, ol_width, true)
 
 	# ---- Draw internal edge lines ----
-	if _gem_visual.edge_width > 0.01:
-		for seg in _gem_cut.edge_segments:
-			if seg.size() >= 2:
-				var a := seg[0] * s + offset
-				var b := seg[1] * s + offset
-				draw_line(a, b, _gem_visual.edge_color,
-					_gem_visual.edge_width, true)
+	if not low_detail and _gem_visual.edge_width > 0.01:
+		var edge_count := int(edges.size() / 2.0)
+		for i in edge_count:
+			draw_line(edges[i * 2], edges[i * 2 + 1],
+				_gem_visual.edge_color, _gem_visual.edge_width, true)
+
+
+func _on_resized() -> void:
+	pivot_offset = size * 0.5
+	if _use_procedural:
+		_refresh_render_cache()
+	elif _use_runtime_outline:
+		_refresh_runtime_outline()
+
+
+func _refresh_render_cache(force_redraw: bool = true) -> void:
+	if not _use_procedural or _gem_cut == null or _gem_visual == null:
+		return
+	var draw_size := Vector2i(maxi(int(round(size.x)), 1), maxi(int(round(size.y)), 1))
+	var render_data := GemVisualRegistry.get_cached_render_data(
+		_visual_cache_key, _gem_cut, _gem_visual, draw_size)
+	_render_geometry = render_data.get("geometry", {})
+	_gem_colors = render_data.get("facet_colors", PackedColorArray())
+	_pavilion_colors = render_data.get("pavilion_colors", PackedColorArray())
+	_edge_aa_colors = render_data.get("edge_aa_colors", PackedColorArray())
+	if force_redraw:
+		queue_redraw()
+
+
+func _refresh_runtime_outline() -> void:
+	if not _use_runtime_outline or _outline_cut == null or _outline_visual == null:
+		return
+	var draw_size := Vector2i(maxi(int(round(size.x)), 1), maxi(int(round(size.y)), 1))
+	_outline_geometry = GemVisualRegistry.get_cached_scaled_geometry(_outline_cut, draw_size)
+	if _outline_overlay != null:
+		_outline_overlay.queue_redraw()
+
+
+func _draw_outline_overlay() -> void:
+	if not _use_runtime_outline or _outline_visual == null:
+		return
+	if not DebugFlags.gem_silhouette_outline:
+		return
+	var silhouette: PackedVector2Array = _outline_geometry.get("silhouette", PackedVector2Array())
+	if silhouette.size() < 4:
+		return
+	var outline_color := _outline_visual.outline_color
+	if outline_color.a < 0.2:
+		outline_color = Color(0, 0, 0, 0.5)
+	var outline_width := _outline_visual.outline_width
+	if DebugFlags.gem_outline_width_override >= 0:
+		outline_width = DebugFlags.gem_outline_width_override
+	elif outline_width < 0.1:
+		outline_width = 0.5
+	_outline_overlay.draw_polyline(silhouette, outline_color, outline_width, true)
+
+
+func refresh_debug_visuals() -> void:
+	queue_redraw()
+	if _outline_overlay != null:
+		_outline_overlay.queue_redraw()
+
+
+func _is_low_detail_enabled() -> bool:
+	return DebugFlags != null and DebugFlags.gem_low_detail_gameplay
+
+
+func _on_gameplay_texture_cache_rebuilt(_profile: Dictionary) -> void:
+	if use_gameplay_texture_cache and is_inside_tree():
+		_update_visual()
 
 
 func _get_color() -> Color:

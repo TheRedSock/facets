@@ -16,7 +16,7 @@ The simulation layer (`core/`) is pure data — all classes extend `RefCounted`,
 - The simulation runs a complete turn instantly and produces an `EventTimeline` (structured list of what happened: matches, removals, upgrades, gravity moves, spawns).
 - The renderer reads the `EventTimeline` and plays it back as animations using Godot Tweens.
 - The simulation DOES NOT wait for animations. The board state is already final when the timeline is handed to the renderer.
-- `board_changed` signal triggers a full visual rebuild (only on run start / reroll). It must NOT fire after `attempt_swap` — the timeline animation handles the visual transition.
+- `board_changed` signal triggers a full visual rebuild (only on run start / reroll). It must NOT fire after a player swap begins — the timeline animation handles the visual transition.
 
 ### 2. All Randomness Must Use SeededRng
 
@@ -53,8 +53,14 @@ core/visuals/   Procedural gem rendering: cut profiles, builders, primitives, li
 resources/      Resource class definitions (data schemas)
 data/tiles/     Tile definition .tres files (the 8-gem merge ladder)
 data/visuals/   GemVisualResource .tres files (per-gem colour, material, cut assignment)
-autoloads/      Global singletons (config, replay, save, debug, tile registry, gem visuals)
-scenes/         Rendering: board display, tile views, animation, input, HUD
+autoloads/      Global singletons (config, replay, save, debug, tile registry, gem visuals, perf monitor)
+scenes/menu/    Main menu screen (Play + Gem Designer navigation)
+scenes/design/  Gem Designer tool (interactive visual editor with real-time preview + export)
+scenes/run/     Run gameplay scene (wires simulation to rendering)
+scenes/board/   Board rendering, animation sequencer, input handling
+scenes/tile/    Tile visuals (gameplay texture cache + procedural fallback)
+scenes/main/    Run entry point scene (hosts RunScene)
+scenes/debug/   Debug panel (F1 toggle)
 tools/          Design-time utilities (board layout validator)
 tests/          Headless smoke tests (godot --headless --script tests/test_smoke.gd)
 plans/          Design documents (not code — reference only)
@@ -81,10 +87,16 @@ When the player swaps two tiles, this exact sequence executes:
 
 ```
 RunScene._on_swap_requested(cell_a, cell_b)
-  → RunController.attempt_swap(cell_a, cell_b)
+  → board_scene input lock
+  → RunController.begin_swap(cell_a, cell_b)
       1. board.swap_cells(a, b)
-      2. match_detector.find_matches(board) — if empty, revert swap, return null
-      3. TurnController.execute_turn(board, rng, spawn_table, event_log, [a, b])
+      2. match_detector.find_matches(board) — if empty, revert swap, return false
+      3. ReplayService.record_action("swap", ...)
+      4. TurnController.prepare_turn(board, rng, spawn_table, event_log, [a, b])
+  → await BoardScene.animate_swap(cell_a, cell_b)   — visual swap first
+  → await process_frame
+  → RunController.resolve_remaining_cascades()
+      5. Repeatedly call TurnController.step_cascade() until it returns null:
            CASCADE LOOP (max 50 iterations):
              a. MatchDetector.find_matches(board)         — find 3+ runs
              b. MatchClassifier.classify(matches)         — tag as base/4/5+/L-T
@@ -100,23 +112,24 @@ RunScene._on_swap_requested(cell_a, cell_b)
                e4. Classify → plan → resolve → apply       — resolve chain matches before gravity
              f. BoardPhysics.resolve_gravity(board)        — iterative settling
              g. SpawnResolver.refill_spawn_entries(...)     — fill empty cells
-             h. Collect events into EventTimeline cascade step
+             h. Collect one cascade step into EventTimeline
                 (chain rounds stored in chain_steps[] for sequential animation)
            UNTIL no matches found
-      5. Return EventTimeline
+  → await BoardScene.play_authoritative_async_timeline(timeline)
       6. Adjust moves based on best match across all cascades + chains:
          — base_match (3): -1 move
          — match_4 (4): free (no cost)
          — match_5_plus / match_lt (5+): +1 move
-  → await BoardScene.animate_swap(cell_a, cell_b)   — visual swap
-  → await BoardScene.play_timeline(timeline)         — animate cascade
+      7. ReplayService.record_checkpoint(final_hash)
+      8. Emit run_state_changed
   → Unlock input
 ```
 
 Key points:
-- The simulation completes entirely before any animation starts
-- `attempt_swap` does NOT emit `board_changed` — only `run_state_changed`
+- The authoritative timeline is fully resolved after the swap animation but before cascade playback begins
+- `begin_swap` / `resolve_remaining_cascades` do NOT emit `board_changed` — only `run_state_changed` after `finalize_swap()`
 - `board_changed` only fires from `start_new_run()` and `reroll_board()` (causes full tile rebuild)
+- `BoardScene` may split the authoritative timeline into dependency-safe async groups for playback, but it never feeds results back into simulation
 - Input is locked by `RunScene` for the entire swap+cascade duration
 
 ---
@@ -206,13 +219,13 @@ This supports: uniform gravity, per-cell gravity directions, per-tile gravity ov
 
 `BoardScene` maintains a persistent `Dictionary[Vector2i, TileView]` mapping grid cells to visual nodes. Tile views are NOT rebuilt each frame — they persist and are animated in place.
 
-Each cascade step is animated in 4 sequential phases:
+Each cascade step is animated in four ordered chunks, with optional async overlap between independent groups:
 1. **Match highlight** — matched tiles flash bright (`modulate = 1.5`)
-2. **Remove + Upgrade** — removed tiles fade/shrink; survivor resets modulate then shows upgrade visual with scale pulse
-3. **Gravity** — tiles tween to new positions with `EASE_IN` + `TRANS_QUAD` (accelerating fall). Duration scales with distance: `sqrt(2 * distance / 45.0)`
-4. **Spawn** — new tiles fade in and fall from above the board
+2. **Remove + Upgrade** — removed tiles converge/fade; survivor swaps to the upgraded gem visual and plays a scale pulse
+3. **Gravity** — physics move events are consolidated per tile, then tweened with `AnimationSequencer.gravity_trans` and `AnimationSequencer.fall_duration()` plus per-column stagger
+4. **Spawn** — new tiles are pre-created above the board and join the same fall wave as gravity tiles
 
-Each phase awaits its tween's `finished` signal before starting the next. Cascade steps play sequentially with a brief pause between them.
+Upgrade-chain rounds inside one cascade step are played sequentially before gravity/spawn. Independent touched-cell regions can be split into async groups and played in parallel when their dependencies are already complete.
 
 **Swap animations** happen BEFORE the cascade: `animate_swap()` slides the two tiles to each other's positions over 0.15s. Invalid swaps use `animate_invalid_swap()` which slides tiles partway then bounces back.
 
@@ -234,7 +247,7 @@ Loads all `.tres` tile definitions from `data/tiles/` at startup. Provides:
 
 ## Procedural Gem Rendering
 
-Gems are rendered procedurally using 2D polygon facets with pseudo-3D lighting. There is no sprite-atlas fallback in the main render path. The system has five layers:
+Gems are authored procedurally using 2D polygon facets with pseudo-3D lighting. Gameplay usually shows runtime-baked textures generated from that procedural source data rather than hand-authored sprites. The source-of-truth system has five layers:
 
 ### GemCutResource (geometry)
 
@@ -244,15 +257,19 @@ Defines the 2D facet layout of a cut type. All vertices are in unit `[0,1]` spac
 - `facet_zones: PackedStringArray` — zone tag per facet ("table", "star", "bezel", "girdle")
 - `silhouette: PackedVector2Array` — outer boundary for outline rendering
 - `edge_segments: Array[PackedVector2Array]` — visible facet boundary lines (currently hidden by default)
+- `pavilion_sector_count` / `pavilion_rotation_fraction` / `pavilion_scale` / `pavilion_normal_z_scale` — cut-specific pavilion overlay metadata copied from the generation profile
+- `pavilion_vertices: Array[PackedVector2Array]` — clipped pavilion extinction overlay fragments
+- `pavilion_normals: Array[Vector3]` — normals for pavilion fragments (steep tilt for darkening)
+- `pavilion_source_indices` / `pavilion_target_indices` — which mirrored crown facet produced each fragment and which crown facet it clips into
 
-Generated at startup by `GemCutGenerators` — parametric functions that produce correct facet topology for each shape. All generated cuts are auto-normalized via `_normalize_to_fit()` to guarantee consistent cell margin regardless of aspect ratio.
+Generated at startup by `GemCutGenerators` — parametric functions that produce correct facet topology for each shape. All generated cuts are auto-normalized via `_normalize_to_fit()` to guarantee consistent cell margin regardless of aspect ratio. After normalization, `generate_pavilion_overlay()` computes the pavilion extinction fragments by mirroring crown facets and transforming them with cut-specific pavilion metadata rather than inferring symmetry from `shape_category`.
 
 ### GemCutProfiles / GemCutBuilders / GemCutPrimitives
 
 The generator stack is split so new cuts are mostly data rather than bespoke geometry code:
 - `GemCutProfiles` — declarative cut dictionaries keyed by `cut_id`
-- `GemCutBuilders` — reusable topology assembly (`build_radial_brilliant`, `build_step_cut`, `build_fan_cut`, `build_radiant_cut`, `build_rose_cut`)
-- `GemCutPrimitives` — shared outline math, polygon helpers, curve samplers, and silhouette helpers
+- `GemCutBuilders` — reusable topology assembly (`build_radial_brilliant`, `build_step_cut`, `build_fan_cut`, `build_radiant_cut`, `build_rose_cut`) and pavilion overlay generation
+- `GemCutPrimitives` — shared outline math, polygon helpers, curve samplers, silhouette helpers, and winding-safe Sutherland-Hodgman polygon clipping
 
 When adding a cut, prefer a new profile first. Only add new primitive math or a new builder when an existing profile+builder combination cannot express the cut family cleanly.
 
@@ -265,6 +282,14 @@ When adding a cut, prefer a new profile first. Only add new primitive math or a 
 - `depth_tint` — colour shift for facets facing away from the viewer (simulates transparency)
 - `hue_dispersion` (0–0.5) — prismatic "fire" effect. Each facet shifts hue based on its normal angle. Used primarily for Diamond.
 - `saturation_boost` — post-process saturation adjustment
+- `transparency` (0–1) — reduces alpha across all facets
+- `rim_intensity` / `rim_color` / `rim_power` — Fresnel edge glow on tilted facets
+- `translucency` / `translucency_color` — subsurface scattering approximation; fills shadow areas with transmitted light
+- `secondary_specular` / `secondary_light_angle` — second Blinn-Phong highlight from a rotated light direction
+- `sparkle_intensity` / `sparkle_threshold` — dramatic brightness boost on highly specular-aligned facets
+- `gradient_color` / `gradient_strength` — vertical colour zoning (top-to-bottom blend)
+- `brilliance_contrast` (0–1) — zone-based brightness: brightens table/star, darkens girdle
+- `extinction` (0–1) — pavilion extinction intensity; controls the pavilion overlay opacity only
 - `use_texture` / `color_texture` — for patterned gems like opals (samples texture at facet centroid)
 
 ### GemRenderer (lighting math)
@@ -273,8 +298,18 @@ Pure `RefCounted`, no scene dependency. Computes flat-shaded colour per facet:
 1. **Diffuse:** `lerp(half_lambert, standard_lambert, contrast)` — blends soft/dramatic shading
 2. **Specular:** Blinn-Phong with configurable shininess and intensity
 3. **Depth tint:** Back-facing facets shift toward the depth tint colour
-4. **Per-facet jitter:** ±4% deterministic brightness variation from centroid hash — ensures neighbouring facets are always distinguishable even without visible edge lines
-5. **Hue dispersion:** Optional prismatic hue shift per facet based on normal angle
+4. **Color gradient:** Optional vertical colour zoning from top to bottom of gem
+5. **Translucency:** Fills shadow areas with transmitted light colour (subsurface scattering approximation)
+6. **Rim lighting:** Fresnel edge glow on tilted facets, remapped for pseudo-3D normal range
+7. **Secondary specular:** Second Blinn-Phong from rotated light direction
+8. **Hue dispersion:** Optional prismatic hue shift per facet based on normal angle
+9. **Sparkle boost:** Dramatic additive brightness on facets exceeding specular alignment threshold
+10. **Per-facet jitter:** ±4% deterministic brightness variation from centroid hash — ensures neighbouring facets are always distinguishable even without visible edge lines
+11. **Saturation boost:** Post-process saturation adjustment
+12. **Zone brilliance:** Table/star brightened, girdle darkened, scaled by brilliance_contrast
+13. **Transparency:** Reduces alpha across all facets
+
+Also provides `compute_pavilion_colors()` for the pavilion extinction overlay — semi-transparent dark colours for each clipped pavilion fragment, with opacity based on `extinction` intensity and the fragment's light-return score.
 
 ### GemVisualRegistry (autoload)
 
@@ -282,12 +317,18 @@ Loads `GemVisualResource` files from `data/visuals/` and generates `GemCutResour
 - `get_visual(tile_id)` → `GemVisualResource`
 - `get_visual_for_tier(tier)` → `GemVisualResource` (resolved via TileRegistry)
 - `get_cut(cut_id)` → `GemCutResource`
+- shared color / geometry / render-bundle caches used by both direct drawing and gameplay baking
+- `ensure_gameplay_texture_cache(draw_size)` / `get_gameplay_texture(...)` for board-ready baked textures
+- `gameplay_texture_cache_rebuilt` signal so `BoardScene` can await the correct cell-size bake before rebuilding views
 
 ### TileView integration
 
-`TileView._draw()` renders gems using Godot's `draw_colored_polygon()`. Priority order:
-1. Procedural gem (if `GemVisualRegistry` has a visual for this tile)
-2. Coloured rectangle (headless/debug fallback)
+`TileView` resolves visuals in this priority order:
+1. Gameplay-baked texture (when `use_gameplay_texture_cache` is enabled and the registry has a baked texture for this tile/tier)
+2. Procedural gem via `_draw()` using shared cached render data
+3. Coloured rectangle (headless/debug fallback)
+
+The procedural draw pass renders: filled crown facets, pavilion extinction overlay (semi-transparent dark fragments), silhouette outline, and internal edge lines. Gameplay textures are baked from the same render bundles via `GameplayGemBakeView`, so the sprite-backed board path stays aligned with the procedural fallback.
 
 Silhouette outline toggled via `DebugFlags.gem_silhouette_outline`.
 
@@ -310,14 +351,16 @@ Each tier has a distinct silhouette shape for instant visual identification:
 
 | Tier | Contrast | Specular | Depth Tint | Dispersion | Visual Feel |
 |------|----------|----------|------------|------------|-------------|
-| T1 | 0.15 | 0.25 | none | none | Flat, chalky |
-| T2 | 0.25 | 0.3 | subtle | none | Slightly defined |
-| T3 | 0.3 | 0.3 | subtle | none | Moderate depth |
-| T4 | 0.4 | 0.35 | light | none | Warm shadows |
-| T5 | 0.5 | 0.45 | moderate | none | Rich, deep |
-| T6 | 0.55 | 0.35 | moderate | none | Deep with body |
-| T7 | 0.65 | 0.5 | strong | none | Dramatic, intense |
-| T8 | 0.5 | 0.8 | icy blue | 0.2 | Brilliant, prismatic fire |
+| T1 | 0.18 | 0.3 | warm amber | none | Soft, warm, translucent |
+| T2 | 0.55 | 0.5 | deep violet | none | Vivid, dramatic |
+| T3 | 0.35 | 0.4 | yellow-green | none | Bright, highly translucent |
+| T4 | 0.5 | 0.4 | deep amber | none | Warm, golden shadows |
+| T5 | 0.7 | 0.55 | near-black blue | none | Intense, deep |
+| T6 | 0.6 | 0.4 | blue-teal | none | Rich, window effect |
+| T7 | 0.7 | 0.55 | dark red-black | none | Dramatic, intense |
+| T8 | 0.6 | 0.9 | icy blue | 0.25 | Brilliant, prismatic fire |
+
+All gems additionally use rim lighting, zone brilliance, and pavilion extinction at tier-appropriate intensities. Higher tiers feature secondary specular, sparkle, and stronger extinction for increased visual complexity.
 
 ---
 
@@ -359,7 +402,7 @@ Run headless smoke tests: `godot --headless --script tests/test_smoke.gd`
 
 Focused cut regression test: `godot --headless --script tests/test_gem_cuts.gd`
 
-The test suites cover: board creation, topology (neighbors, portals, gravity), match detection (including unmatchable/holes), merge mechanic (remove count, upgrade, max tier), gravity (standard, custom direction, tile override, immovable, iterative convergence, diagonal fill, portals, cycle safety), pipeline (effect planning, conflict resolution, spawning, timeline structure), deterministic replay verification, and procedural cut generation invariants.
+The test suites cover: board creation, topology (neighbors, portals, gravity), match detection (including unmatchable/holes), merge mechanic (remove count, upgrade, max tier), gravity (standard, custom direction, tile override, immovable, iterative convergence, diagonal fill, portals, cycle safety), pipeline (effect planning, conflict resolution, spawning, timeline structure), deterministic replay verification, and procedural cut generation invariants including pavilion fragment integrity, pavilion symmetry metadata, and winding-independent clipping.
 
 Cross-platform RNG test: `godot --headless --script tests/test_rng_cross_platform.gd` — prints reference values to compare across platforms.
 
@@ -406,6 +449,10 @@ These systems are designed but intentionally excluded from the current scaffold.
 | Add a new cut topology family | `core/visuals/gem_cut_builders.gd` |
 | Change the lighting model | `core/visuals/gem_renderer.gd` — `compute_facet_color()` |
 | Add a visual modifier effect | Add parameter handling in `GemRenderer.compute_all_facet_colors()` modifiers dict |
+| Add a new visual property | Add `@export` to `resources/visuals/gem_visual_resource.gd`, handle in `GemRenderer`, add control in `scenes/design/gem_design.gd` |
+| Change pavilion extinction geometry | `core/visuals/gem_cut_builders.gd` — `generate_pavilion_overlay()` |
+| Change pavilion extinction rendering | `core/visuals/gem_renderer.gd` — `compute_pavilion_colors()` |
+| Design a gem visually | Run the Gem Designer scene (`scenes/design/gem_design.tscn`), export `.tres` or JSON |
 | Change merge behavior (what happens on 4-match, 5-match) | `core/board/effect_planner.gd` — `_plan_match_4()`, `_plan_match_5_plus()` |
 | Add a new effect type | Add const in `EffectPlanner`, handle in `EffectResolver.apply()` |
 | Change gravity behavior | `core/board/board_physics.gd` |

@@ -3,8 +3,6 @@ extends RefCounted
 
 ## Shared topology builders for procedural gem cuts.
 
-const GemCutPrimitives = preload("res://core/visuals/gem_cut_primitives.gd")
-
 
 static func build_radial_brilliant(profile: Dictionary) -> GemCutResource:
 	var cut := _make_cut(profile)
@@ -182,7 +180,130 @@ static func build_rose_cut(profile: Dictionary) -> GemCutResource:
 static func finalize_cut(cut: GemCutResource) -> GemCutResource:
 	_collect_edges(cut)
 	_normalize_to_fit(cut)
+	generate_pavilion_overlay(cut)
+	_precompute_facet_constants(cut)
 	return cut
+
+
+## Pre-computes per-facet constants that are derived purely from cut geometry:
+## centroids, deterministic jitter values, and zone brilliance weights.
+## These values never change once the cut is finalized, so computing them
+## once at startup eliminates redundant per-frame work in the renderer.
+static func _precompute_facet_constants(cut: GemCutResource) -> void:
+	var count := cut.facet_count()
+	cut.facet_centroids.resize(count)
+	cut.facet_jitter.resize(count)
+	cut.zone_brilliance_weights.resize(count)
+
+	for i in count:
+		var verts := cut.facet_vertices[i]
+		var cx := 0.0
+		var cy := 0.0
+		for v in verts:
+			cx += v.x
+			cy += v.y
+		cx /= verts.size()
+		cy /= verts.size()
+
+		# Centroid.
+		cut.facet_centroids[i] = Vector2(cx, cy)
+
+		# Deterministic jitter from centroid hash (±4% brightness variation).
+		var hash_val := sin(cx * 127.1 + cy * 311.7) * 43758.5453
+		hash_val = hash_val - floorf(hash_val)  # fractional part, 0..1
+		cut.facet_jitter[i] = (hash_val - 0.5) * 0.08
+
+		# Zone brilliance weight: encodes zone type as a float multiplier offset.
+		# Final multiplier = 1.0 + weight * brilliance_contrast.
+		var weight := 0.0
+		if i < cut.facet_zones.size():
+			match cut.facet_zones[i]:
+				"table":
+					weight = 0.5
+				"star":
+					weight = 0.25
+				"girdle":
+					weight = -0.4
+				"step":
+					weight = -0.2
+				# "bezel", "rose", "rose_center", and anything else: 0.0
+		cut.zone_brilliance_weights[i] = weight
+
+
+## Generates pavilion extinction overlay fragments for the cut.
+##
+## Mirrors all non-table crown facets through the gem centre, scales them
+## slightly smaller (simulating depth), and rotates by half a symmetry sector.
+## Each mirrored facet is then clipped against every crown facet — the
+## resulting intersection fragments are stored as pavilion overlay polygons.
+## Their normals are set to a steep outward tilt so the renderer can darken
+## them appropriately.
+static func generate_pavilion_overlay(
+	cut: GemCutResource,
+) -> void:
+	var crown_count := cut.facet_count()
+	if crown_count < 4:
+		return
+
+	cut.clear_pavilion()
+
+	# Rotate the mirrored pavilion by a cut-specific fraction of a symmetry sector.
+	var rotation_angle := 0.0
+	var sector_count := maxi(cut.pavilion_sector_count, 0)
+	if sector_count > 0:
+		rotation_angle = TAU / float(sector_count) * cut.pavilion_rotation_fraction
+
+	var pavilion_scale := cut.pavilion_scale
+	var pavilion_normal_z_scale := cut.pavilion_normal_z_scale
+	var center := GemCutPrimitives.CENTER
+	var cos_r := cos(rotation_angle)
+	var sin_r := sin(rotation_angle)
+
+	# Collect crown facet indices, skipping the table so extinction stays off it.
+	var crown_indices: Array[int] = []
+	for i in crown_count:
+		if i < cut.facet_zones.size() and cut.facet_zones[i] == "table":
+			continue
+		crown_indices.append(i)
+
+	# Build mirrored pavilion polygons.
+	var mirrored_polys: Array[PackedVector2Array] = []
+	var mirrored_normals: Array[Vector3] = []
+	for idx in crown_indices:
+		var src := cut.facet_vertices[idx]
+		var mir := PackedVector2Array()
+		mir.resize(src.size())
+		for j in src.size():
+			# Mirror through center, scale, rotate.
+			var v := src[j]
+			var dx := (v.x - center.x)
+			var dy := (v.y - center.y)
+			# Mirror (flip both axes).
+			dx = -dx
+			dy = -dy
+			# Scale.
+			dx *= pavilion_scale
+			dy *= pavilion_scale
+			# Rotate.
+			var rx := dx * cos_r - dy * sin_r
+			var ry := dx * sin_r + dy * cos_r
+			mir[j] = Vector2(center.x + rx, center.y + ry)
+		mirrored_polys.append(mir)
+		# Pavilion normal: steep outward tilt from the mirrored position.
+		var n := cut.facet_normals[idx]
+		mirrored_normals.append(Vector3(-n.x, -n.y, n.z * pavilion_normal_z_scale).normalized())
+
+	# Clip each mirrored pavilion polygon against each crown facet.
+	for m_idx in mirrored_polys.size():
+		var pav_poly := mirrored_polys[m_idx]
+		var pav_normal := mirrored_normals[m_idx]
+		var source_idx := crown_indices[m_idx]
+		for c_idx in crown_indices:
+			var crown_poly := cut.facet_vertices[c_idx]
+			var clipped := GemCutPrimitives.clip_polygon(pav_poly, crown_poly)
+			var clipped_area := absf(GemCutPrimitives.polygon_signed_area(clipped))
+			if clipped.size() >= 3 and clipped_area > 0.000005:
+				cut.add_pavilion_fragment(clipped, pav_normal, source_idx, c_idx)
 
 
 static func sample_profile_outline(profile: Dictionary, sample_count: int) -> PackedVector2Array:
@@ -199,7 +320,23 @@ static func _make_cut(profile: Dictionary) -> GemCutResource:
 	cut.cut_id = profile.get("cut_id", &"")
 	cut.display_name = profile.get("display_name", "")
 	cut.shape_category = profile.get("shape_category", &"")
+	cut.pavilion_sector_count = int(profile.get("pavilion_sector_count", _infer_pavilion_sector_count(profile)))
+	cut.pavilion_rotation_fraction = float(profile.get("pavilion_rotation_fraction", 0.5))
+	cut.pavilion_scale = float(profile.get("pavilion_scale", 0.88))
+	cut.pavilion_normal_z_scale = float(profile.get("pavilion_normal_z_scale", 0.6))
 	return cut
+
+
+static func _infer_pavilion_sector_count(profile: Dictionary) -> int:
+	if profile.has("sector_count"):
+		return int(profile["sector_count"])
+	if profile.has("outer_points"):
+		return profile["outer_points"].size()
+	if profile.has("rings") and not profile["rings"].is_empty():
+		return profile["rings"][0].size()
+	if profile.has("table"):
+		return profile["table"].size()
+	return 0
 
 
 static func _sample_radial_rings(profile: Dictionary, main_angles: Array[float], half_angles: Array[float]) -> Dictionary:
@@ -364,7 +501,7 @@ static func _normalize_to_fit(cut: GemCutResource) -> void:
 
 
 static func _collect_edges(cut: GemCutResource) -> void:
-	var seen := {}
+	var seen := {}  # edge_key -> index in edge_segments
 	for facet_index in cut.facet_count():
 		var vertices := cut.facet_vertices[facet_index]
 		for i in vertices.size():
@@ -372,8 +509,12 @@ static func _collect_edges(cut: GemCutResource) -> void:
 			var b := vertices[(i + 1) % vertices.size()]
 			var key := _edge_key(a, b)
 			if not seen.has(key):
-				seen[key] = true
-				cut.add_edge(a, b)
+				seen[key] = cut.edge_segments.size()
+				cut.add_edge(a, b, facet_index, -1)
+			else:
+				# Second facet sharing this edge — record adjacency.
+				var edge_idx: int = seen[key]
+				cut.edge_facet_b[edge_idx] = facet_index
 
 
 static func _edge_key(a: Vector2, b: Vector2) -> String:

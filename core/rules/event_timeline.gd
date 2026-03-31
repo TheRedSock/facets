@@ -8,9 +8,10 @@ extends RefCounted
 ## Structure:
 ##   cascade_steps: Array of cascade step Dictionaries, each containing:
 ##     - cascade_index: int
-##     - match_events: Array[Dict]   — matches formed
-##     - remove_events: Array[Dict]  — tiles removed
-##     - upgrade_events: Array[Dict] — tiles upgraded
+##     - chain_steps: Array[Dict]    — sequential match/remove/upgrade rounds
+##     - match_events: Array[Dict]   — flattened match events for the full step
+##     - remove_events: Array[Dict]  — flattened remove events for the full step
+##     - upgrade_events: Array[Dict] — flattened upgrade events for the full step
 ##     - gravity_events: Array[Dict] — tiles moved by gravity
 ##     - spawn_events: Array[Dict]   — new tiles spawned
 ##     - board_hash: int             — board state hash after this step

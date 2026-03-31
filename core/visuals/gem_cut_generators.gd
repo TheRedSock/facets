@@ -6,9 +6,6 @@ extends RefCounted
 ## Shared geometry math lives in `GemCutPrimitives`, reusable facet topology lives
 ## in `GemCutBuilders`, and per-cut tuning lives in `GemCutProfiles`.
 
-const GemCutBuilders = preload("res://core/visuals/gem_cut_builders.gd")
-const GemCutProfiles = preload("res://core/visuals/gem_cut_profiles.gd")
-
 
 # ===========================================================================
 #  Factory

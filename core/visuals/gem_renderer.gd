@@ -3,6 +3,9 @@ extends RefCounted
 
 ## Pure-math lighting calculations for faceted gem rendering.
 ## No scene-tree dependency — can run headlessly.
+##
+## Performance contract: facet normals in GemCutResource are pre-normalized at
+## cut generation time.  This renderer skips redundant normalization calls.
 
 const DEFAULT_LIGHT_DIR := Vector3(-0.4, -0.5, 0.75)
 const DEFAULT_VIEW_DIR := Vector3(0.0, 0.0, 1.0)
@@ -11,6 +14,9 @@ const AMBIENT := 0.15
 
 ## Computes the flat-shaded colour for a single facet.
 ## contrast: 0=flat Half-Lambert, 1=full standard Lambert (dramatic).
+##
+## Note: This is the public single-facet API.  The batch function
+## compute_all_facet_colors() inlines this logic to avoid per-facet overhead.
 static func compute_facet_color(
 	normal: Vector3,
 	base_color: Color,
@@ -46,16 +52,27 @@ static func compute_facet_color(
 ## Computes colours for every facet in a cut, respecting the visual's
 ## material properties and optional modifier overrides.
 ##
-## Adds per-facet shading variation so neighbouring facets are always
-## distinguishable, even when their normals are similar.
+## All effects are computed in a single per-facet pass to eliminate the overhead
+## of multiple array iterations.  Pre-computed cut constants (centroids, jitter,
+## zone weights) are used when available, with inline fallbacks for cuts that
+## were not finalized through the standard pipeline.
+##
+## Pipeline order (per facet):
+##   1. Modifier adjustments (darken/brighten/desaturate)
+##   2. Depth tint, texture sampling, colour gradient
+##   3. Inlined Blinn-Phong primary lighting
+##   4. Translucency, rim lighting, secondary specular
+##   5. Hue dispersion, sparkle boost
+##   6. Per-facet jitter, saturation boost, zone brilliance, transparency
 static func compute_all_facet_colors(
 	cut: GemCutResource,
 	visual: GemVisualResource,
 	light_dir: Vector3 = DEFAULT_LIGHT_DIR,
 	modifiers: Dictionary = {},
 ) -> PackedColorArray:
+	var count := cut.facet_count()
 	var colors := PackedColorArray()
-	colors.resize(cut.facet_count())
+	colors.resize(count)
 
 	var base := visual.base_color
 
@@ -68,93 +85,267 @@ static func compute_all_facet_colors(
 		var amount: float = modifiers["desaturate"]
 		base.s = clampf(base.s - amount, 0.0, 1.0)
 
-	# Optional depth tint for back-facing facets.
-	var has_depth_tint := visual.depth_tint.a > 0.01
-	var depth_color := visual.depth_tint
+	# ---- Pre-compute shared values ----
 
-	for i in cut.facet_count():
+	var l := light_dir.normalized()
+	var half_vec := (l + DEFAULT_VIEW_DIR).normalized()
+	var contrast := visual.contrast
+	var shininess := visual.shininess
+	var specular_intensity := visual.specular_intensity
+	var one_minus_ambient := 1.0 - AMBIENT
+
+	# Feature flags (avoid per-facet branching on disabled features).
+	var has_depth_tint := visual.depth_tint.a > 0.01
+	var has_gradient := visual.gradient_strength > 0.001 and visual.gradient_color.a > 0.001
+	var has_translucency := visual.translucency > 0.001
+	var has_rim := visual.rim_intensity > 0.001
+	var has_secondary := visual.secondary_specular > 0.001
+	var has_dispersion := visual.hue_dispersion > 0.001
+	var has_sparkle := visual.sparkle_intensity > 0.001
+	var has_saturation := not is_zero_approx(visual.saturation_boost)
+	var has_brilliance := visual.brilliance_contrast > 0.001
+	var has_transparency := visual.transparency > 0.001
+
+	# Pre-computed cut data availability flags.
+	var has_centroids := cut.facet_centroids.size() == count
+	var has_precomputed_jitter := cut.facet_jitter.size() == count
+	var has_zone_weights := cut.zone_brilliance_weights.size() == count
+	has_brilliance = has_brilliance and (has_zone_weights or cut.facet_zones.size() == count)
+
+	# Pre-compute texture image if needed (Fix #5: hoist get_image out of per-facet loop).
+	var tex_image: Image = null
+	if visual.use_texture and visual.color_texture != null:
+		tex_image = visual.color_texture.get_image()
+
+	# Secondary light direction: primary light rotated around Z by the offset angle.
+	var secondary_half := Vector3.ZERO
+	if has_secondary:
+		var angle_rad := deg_to_rad(visual.secondary_light_angle)
+		var cos_a := cos(angle_rad)
+		var sin_a := sin(angle_rad)
+		var secondary_l := Vector3(
+			l.x * cos_a - l.y * sin_a,
+			l.x * sin_a + l.y * cos_a,
+			l.z).normalized()
+		secondary_half = (secondary_l + DEFAULT_VIEW_DIR).normalized()
+
+	# Transparency pre-compute.
+	var alpha_mult := 1.0 - visual.transparency if has_transparency else 1.0
+
+	# ---- Single per-facet pass ----
+
+	for i in count:
+		# Normal is pre-normalized at cut generation time (see GemCutPrimitives.normal_for).
 		var n := cut.facet_normals[i]
 		var facet_base := base
 
 		# Depth-tint: mix in the tint colour for facets facing away from the viewer.
 		if has_depth_tint:
 			var facing := clampf(n.z, 0.0, 1.0)
-			facet_base = base.lerp(depth_color, (1.0 - facing) * depth_color.a)
+			facet_base = base.lerp(visual.depth_tint, (1.0 - facing) * visual.depth_tint.a)
 
 		# Texture sampling: use the colour at each facet's centroid.
-		if visual.use_texture and visual.color_texture != null:
-			facet_base = _sample_texture_at_facet(visual.color_texture, cut, i)
+		if tex_image != null:
+			var centroid: Vector2
+			if has_centroids:
+				centroid = cut.facet_centroids[i]
+			else:
+				centroid = _compute_facet_centroid(cut, i)
+			facet_base = _sample_texture_from_image(tex_image, centroid)
 
-		colors[i] = compute_facet_color(
-			n, facet_base, visual.shininess, visual.specular_intensity, light_dir,
-			visual.contrast)
+		# Color gradient: blend base toward gradient_color based on vertical position.
+		if has_gradient:
+			var cy: float
+			if has_centroids:
+				cy = cut.facet_centroids[i].y
+			else:
+				cy = _facet_centroid_y(cut, i)
+			var t := cy * visual.gradient_strength
+			facet_base = Color(
+				lerpf(facet_base.r, visual.gradient_color.r, t),
+				lerpf(facet_base.g, visual.gradient_color.g, t),
+				lerpf(facet_base.b, visual.gradient_color.b, t),
+				facet_base.a)
 
-	# Prismatic hue dispersion: shift each facet's hue based on its normal angle.
-	# Simulates light splitting into a spectrum ("fire") in high-refractive gems.
-	if visual.hue_dispersion > 0.001:
-		for i in cut.facet_count():
-			var n := cut.facet_normals[i]
-			# Use the normal's XY angle as the hue offset source.
-			# atan2 gives a smooth rotation around the gem.
-			var angle := atan2(n.y, n.x)  # -PI to PI
+		# ---- Inlined Blinn-Phong lighting (Fix #2) ----
+		var ndotl := n.dot(l)
+		var half_lambert := ndotl * 0.5 + 0.5
+		var standard_lambert := maxf(ndotl, 0.0)
+		var diffuse := lerpf(half_lambert, standard_lambert, contrast)
+		var spec := pow(maxf(n.dot(half_vec), 0.0), shininess)
+		var shade := AMBIENT + one_minus_ambient * diffuse
+		var spec_contrib := specular_intensity * spec
+
+		var cr := clampf(facet_base.r * shade + spec_contrib, 0.0, 1.0)
+		var cg := clampf(facet_base.g * shade + spec_contrib, 0.0, 1.0)
+		var cb := clampf(facet_base.b * shade + spec_contrib, 0.0, 1.0)
+		var ca := facet_base.a
+
+		# Translucency: fills in shadow areas with transmitted light.
+		if has_translucency:
+			var shadow := 1.0 - clampf(ndotl * 0.5 + 0.5, 0.0, 1.0)
+			var transmitted := visual.translucency * shadow * 2.0
+			cr = clampf(cr + visual.translucency_color.r * transmitted, 0.0, 1.0)
+			cg = clampf(cg + visual.translucency_color.g * transmitted, 0.0, 1.0)
+			cb = clampf(cb + visual.translucency_color.b * transmitted, 0.0, 1.0)
+
+		# Rim lighting: Fresnel-based edge glow on tilted facets.
+		if has_rim:
+			var edge_factor := 1.0 - clampf((n.z - 0.5) * 2.0, 0.0, 1.0)
+			var rim_factor := pow(edge_factor, visual.rim_power) * visual.rim_intensity
+			cr = clampf(cr + visual.rim_color.r * rim_factor, 0.0, 1.0)
+			cg = clampf(cg + visual.rim_color.g * rim_factor, 0.0, 1.0)
+			cb = clampf(cb + visual.rim_color.b * rim_factor, 0.0, 1.0)
+
+		# Secondary specular: second Blinn-Phong highlight from a rotated light angle.
+		if has_secondary:
+			var spec2 := pow(maxf(n.dot(secondary_half), 0.0), shininess) * visual.secondary_specular
+			cr = clampf(cr + spec2, 0.0, 1.0)
+			cg = clampf(cg + spec2, 0.0, 1.0)
+			cb = clampf(cb + spec2, 0.0, 1.0)
+
+		# Hue dispersion: prismatic hue shift per facet based on normal angle.
+		# Requires RGB→HSV→RGB round-trip, only when enabled.
+		if has_dispersion:
+			var angle := atan2(n.y, n.x)
 			var hue_shift := (angle / TAU) * visual.hue_dispersion
-			var c := colors[i]
+			var c := Color(cr, cg, cb, ca)
 			c.h = fmod(c.h + hue_shift + 1.0, 1.0)
-			# Boost saturation slightly so the hue shift is visible.
 			c.s = clampf(c.s + visual.hue_dispersion * 0.5, 0.0, 1.0)
-			colors[i] = c
+			cr = c.r
+			cg = c.g
+			cb = c.b
 
-	# Per-facet variation: add a subtle deterministic brightness jitter so
-	# neighbouring facets with near-identical normals remain distinguishable.
-	# The variation is based on the facet centroid position, producing a
-	# consistent, non-random pattern that alternates between adjacent facets.
-	for i in cut.facet_count():
-		var verts := cut.facet_vertices[i]
-		var cx := 0.0
-		var cy := 0.0
-		for v in verts:
-			cx += v.x
-			cy += v.y
-		cx /= verts.size()
-		cy /= verts.size()
+		# Sparkle boost: dramatic brightness on facets exceeding specular threshold.
+		if has_sparkle:
+			var alignment := maxf(n.dot(half_vec), 0.0)
+			if alignment > visual.sparkle_threshold:
+				var range_above := 1.0 - visual.sparkle_threshold
+				var sparkle := (alignment - visual.sparkle_threshold) / maxf(range_above, 0.001)
+				var boost := sparkle * visual.sparkle_intensity
+				cr = clampf(cr + boost, 0.0, 1.0)
+				cg = clampf(cg + boost, 0.0, 1.0)
+				cb = clampf(cb + boost, 0.0, 1.0)
 
-		# Hash-like variation from centroid: produces values that differ
-		# between nearby facets because their centroids differ.
-		var hash_val := sin(cx * 127.1 + cy * 311.7) * 43758.5453
-		hash_val = hash_val - floorf(hash_val)  # fractional part, 0..1
-		var jitter := (hash_val - 0.5) * 0.08   # ±4% brightness variation
+		# Per-facet jitter: deterministic brightness variation from pre-computed values.
+		var jitter := 0.0
+		if has_precomputed_jitter:
+			jitter = cut.facet_jitter[i]
+		else:
+			# Fallback: compute from vertices (for cuts not finalized via standard pipeline).
+			var centroid: Vector2
+			if has_centroids:
+				centroid = cut.facet_centroids[i]
+			else:
+				centroid = _compute_facet_centroid(cut, i)
+			var hash_val := sin(centroid.x * 127.1 + centroid.y * 311.7) * 43758.5453
+			hash_val = hash_val - floorf(hash_val)
+			jitter = (hash_val - 0.5) * 0.08
+		cr = clampf(cr + jitter, 0.0, 1.0)
+		cg = clampf(cg + jitter, 0.0, 1.0)
+		cb = clampf(cb + jitter, 0.0, 1.0)
 
-		var c := colors[i]
-		colors[i] = Color(
-			clampf(c.r + jitter, 0.0, 1.0),
-			clampf(c.g + jitter, 0.0, 1.0),
-			clampf(c.b + jitter, 0.0, 1.0),
-			c.a,
-		)
-
-	# Saturation boost.
-	if not is_zero_approx(visual.saturation_boost):
-		for i in colors.size():
-			var c := colors[i]
+		# Saturation boost: requires RGB→HSV→RGB round-trip, only when enabled.
+		if has_saturation:
+			var c := Color(cr, cg, cb, ca)
 			c.s = clampf(c.s + visual.saturation_boost, 0.0, 1.0)
-			colors[i] = c
+			cr = c.r
+			cg = c.g
+			cb = c.b
+
+		# Zone brilliance: brighten table/star, darken girdle using pre-computed weights.
+		if has_brilliance:
+			var weight := 0.0
+			if has_zone_weights:
+				weight = cut.zone_brilliance_weights[i]
+			else:
+				# Fallback: resolve from zone string.
+				var zone: String = cut.facet_zones[i]
+				match zone:
+					"table":
+						weight = 0.5
+					"star":
+						weight = 0.25
+					"girdle":
+						weight = -0.4
+					"step":
+						weight = -0.2
+			var mult := 1.0 + weight * visual.brilliance_contrast
+			if not is_equal_approx(mult, 1.0):
+				cr = clampf(cr * mult, 0.0, 1.0)
+				cg = clampf(cg * mult, 0.0, 1.0)
+				cb = clampf(cb * mult, 0.0, 1.0)
+
+		# Transparency: reduce alpha.
+		if has_transparency:
+			ca = clampf(ca * alpha_mult, 0.0, 1.0)
+
+		colors[i] = Color(cr, cg, cb, ca)
 
 	return colors
 
 
-## Samples a texture at the centroid of a facet (for patterned gems like opals).
-static func _sample_texture_at_facet(
-	tex: Texture2D, cut: GemCutResource, facet_index: int,
-) -> Color:
+## Returns the centroid of a facet's vertices in [0,1] unit space.
+static func _compute_facet_centroid(cut: GemCutResource, facet_index: int) -> Vector2:
 	var verts := cut.facet_vertices[facet_index]
 	var centroid := Vector2.ZERO
 	for v in verts:
 		centroid += v
-	centroid /= verts.size()
-	# centroid is in [0,1] unit space — use as UV directly.
-	var img := tex.get_image()
+	return centroid / verts.size()
+
+
+## Returns the Y coordinate of a facet's centroid in [0,1] unit space.
+## Kept as a lightweight fallback for gradient computation when centroids
+## are not pre-computed.
+static func _facet_centroid_y(cut: GemCutResource, facet_index: int) -> float:
+	var verts := cut.facet_vertices[facet_index]
+	var cy := 0.0
+	for v in verts:
+		cy += v.y
+	return cy / verts.size()
+
+
+## Samples a texture at the given centroid position (for patterned gems like opals).
+## The Image is passed in directly to avoid repeated get_image() calls per facet.
+static func _sample_texture_from_image(img: Image, centroid: Vector2) -> Color:
 	if img == null:
 		return Color.WHITE
 	var px := clampi(int(centroid.x * img.get_width()), 0, img.get_width() - 1)
 	var py := clampi(int(centroid.y * img.get_height()), 0, img.get_height() - 1)
 	return img.get_pixel(px, py)
+
+
+## Computes semi-transparent overlay colours for pavilion extinction fragments.
+## Each fragment gets a dark colour whose alpha scales with the visual's
+## extinction intensity and the fragment normal's light-return score.
+## Fragments that would reflect light poorly appear darker (more opaque).
+static func compute_pavilion_colors(
+	cut: GemCutResource,
+	visual: GemVisualResource,
+	light_dir: Vector3 = DEFAULT_LIGHT_DIR,
+) -> PackedColorArray:
+	var colors := PackedColorArray()
+	var count := cut.pavilion_count()
+	if count == 0 or visual.extinction < 0.001:
+		return colors
+	colors.resize(count)
+
+	var l := light_dir.normalized()
+
+	# Base extinction colour: use depth_tint if available, otherwise darkened base.
+	var ext_color := visual.base_color.darkened(0.7)
+	if visual.depth_tint.a > 0.01:
+		ext_color = visual.depth_tint.darkened(0.4)
+	ext_color.a = 1.0
+
+	for i in count:
+		# Pavilion normals are pre-normalized at generation time.
+		var n := cut.pavilion_normals[i]
+		# Light return: how well the pavilion fragment reflects light back.
+		var light_return := clampf(n.dot(l), 0.0, 1.0)
+		# Poor light return → stronger extinction (more opaque overlay).
+		var darkness := (1.0 - light_return)
+		var alpha := visual.extinction * darkness * 0.7
+		colors[i] = Color(ext_color.r, ext_color.g, ext_color.b, clampf(alpha, 0.0, 0.85))
+
+	return colors

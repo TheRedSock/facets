@@ -4,8 +4,8 @@ var _current_seed: int = 0
 var _actions: Array[Dictionary] = []
 
 
-func begin(seed: int) -> void:
-	_current_seed = seed
+func begin(replay_seed: int) -> void:
+	_current_seed = replay_seed
 	_actions.clear()
 
 
