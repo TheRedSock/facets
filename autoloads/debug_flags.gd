@@ -26,7 +26,7 @@ var gem_low_detail_gameplay: bool:
 		_gem_low_detail_gameplay = value
 		visual_flags_changed.emit()
 
-## Runtime override for outline width. Negative value means use per-gem resource value.
+## Runtime override for outline width. Negative value means use the default runtime width.
 var _gem_outline_width_override := -1.0
 var gem_outline_width_override: float:
 	get:

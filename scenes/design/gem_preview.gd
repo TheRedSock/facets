@@ -21,6 +21,28 @@ var _edge_aa_b: PackedVector2Array = PackedVector2Array()
 var _edge_aa_colors: PackedColorArray = PackedColorArray()
 var _cached_draw_size: Vector2 = Vector2.ZERO
 
+const GAME_OUTLINE_COLOR := Color(0.0, 0.0, 0.0, 0.5)
+const DEFAULT_GAME_OUTLINE_WIDTH := 0.5
+
+var _show_game_outline := true
+var show_game_outline := true:
+	set(value):
+		if _show_game_outline == value:
+			return
+		_show_game_outline = value
+		queue_redraw()
+	get:
+		return _show_game_outline
+var _show_facet_aa_lines := true
+var show_facet_aa_lines := true:
+	set(value):
+		if _show_facet_aa_lines == value:
+			return
+		_show_facet_aa_lines = value
+		queue_redraw()
+	get:
+		return _show_facet_aa_lines
+
 
 func update_preview(cut_id: StringName, visual: GemVisualResource) -> void:
 	_gem_cut = GemCutGenerators.generate(cut_id)
@@ -127,6 +149,13 @@ func _draw() -> void:
 	for i in _scaled_facets.size():
 		if i < _gem_colors.size():
 			draw_colored_polygon(_scaled_facets[i], _gem_colors[i])
+			if i < _gem_cut.facet_normals.size():
+				_draw_texture_overlay(
+					_scaled_facets[i],
+					_gem_cut.facet_vertices[i],
+					_gem_cut.facet_normals[i],
+					_gem_colors[i]
+				)
 
 	# ---- Pavilion extinction overlay ----
 	if _pavilion_colors.size() > 0:
@@ -135,18 +164,13 @@ func _draw() -> void:
 				draw_colored_polygon(_scaled_pavilion[i], _pavilion_colors[i])
 
 	# ---- Facet anti-aliasing edge lines ----
-	for i in _edge_aa_a.size():
-		draw_line(_edge_aa_a[i], _edge_aa_b[i], _edge_aa_colors[i], 0.5, true)
+	if show_facet_aa_lines:
+		for i in _edge_aa_a.size():
+			draw_line(_edge_aa_a[i], _edge_aa_b[i], _edge_aa_colors[i], 0.5, true)
 
-	# ---- Silhouette outline (always visible in designer) ----
-	if _scaled_silhouette.size() >= 4:
-		var ol_color := _gem_visual.outline_color
-		if ol_color.a < 0.2:
-			ol_color = Color(0, 0, 0, 0.5)
-		var ol_width := _gem_visual.outline_width
-		if ol_width < 0.1:
-			ol_width = 0.5
-		draw_polyline(_scaled_silhouette, ol_color, ol_width, true)
+	# ---- Game silhouette outline preview ----
+	if show_game_outline and _scaled_silhouette.size() >= 4:
+		draw_polyline(_scaled_silhouette, GAME_OUTLINE_COLOR, _get_game_outline_width(), true)
 
 	# ---- Internal edge lines ----
 	if _gem_visual.edge_width > 0.01:
@@ -154,3 +178,33 @@ func _draw() -> void:
 		for i in edge_count:
 			draw_line(_scaled_edges[i * 2], _scaled_edges[i * 2 + 1],
 				_gem_visual.edge_color, _gem_visual.edge_width, true)
+
+
+func _draw_texture_overlay(
+	facet_points: PackedVector2Array,
+	unit_points: PackedVector2Array,
+	facet_normal: Vector3,
+	facet_color: Color,
+) -> void:
+	if not _gem_visual.use_texture or _gem_visual.color_texture == null:
+		return
+	if unit_points.size() != facet_points.size():
+		return
+
+	var uvs := GemRenderer.build_texture_uvs(
+		unit_points,
+		facet_normal,
+		_gem_visual
+	)
+	var overlay_color := GemRenderer.compute_texture_overlay_color(facet_color, _gem_visual)
+	var colors := PackedColorArray()
+	colors.resize(facet_points.size())
+	for i in facet_points.size():
+		colors[i] = overlay_color
+	draw_polygon(facet_points, colors, uvs, _gem_visual.color_texture)
+
+
+func _get_game_outline_width() -> float:
+	if DebugFlags != null and DebugFlags.gem_outline_width_override >= 0.0:
+		return DebugFlags.gem_outline_width_override
+	return DEFAULT_GAME_OUTLINE_WIDTH

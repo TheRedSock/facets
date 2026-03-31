@@ -16,6 +16,10 @@ extends Resource
 ## Useful for opals, agates, and other patterned gems.
 @export var use_texture: bool = false
 @export var color_texture: Texture2D = null
+@export_range(0.0, 1.0) var texture_blend: float = 1.0
+@export_range(1.0, 4.0) var texture_zoom: float = 1.0
+@export var texture_offset: Vector2 = Vector2.ZERO
+@export_range(0.0, 1.0) var texture_facet_warp: float = 0.35
 
 # ---- Material properties ----
 
@@ -98,5 +102,3 @@ extends Resource
 
 @export var edge_color: Color = Color(1.0, 1.0, 1.0, 0.0)
 @export_range(0.0, 3.0) var edge_width: float = 0.0
-@export var outline_color: Color = Color(0.0, 0.0, 0.0, 0.15)
-@export_range(0.0, 4.0) var outline_width: float = 1.0

@@ -15,6 +15,8 @@ const CUT_IDS = [
 	&"oval_brilliant", &"marquise_brilliant", &"pear_brilliant",
 	&"rose_round", &"half_dutch_rose_hex", &"double_rose", &"cross_rose",
 ]
+const TEXTURE_DIR := "res://assets/textures"
+const TEXTURE_EXTENSIONS := ["png", "jpg", "jpeg", "webp"]
 
 # Built-in gem presets available from GemVisualRegistry.
 const PRESET_IDS = [
@@ -27,6 +29,20 @@ var _preview: GemPreview
 var _visual_id_input: LineEdit
 var _cut_dropdown: OptionButton
 var _preset_dropdown: OptionButton
+var _texture_dropdown: OptionButton
+var _texture_preview: TextureRect
+var _texture_blend_slider: HSlider
+var _texture_blend_value: Label
+var _texture_zoom_slider: HSlider
+var _texture_zoom_value: Label
+var _texture_offset_x_slider: HSlider
+var _texture_offset_x_value: Label
+var _texture_offset_y_slider: HSlider
+var _texture_offset_y_value: Label
+var _texture_warp_slider: HSlider
+var _texture_warp_value: Label
+var _preview_outline_toggle: CheckBox
+var _preview_facet_aa_toggle: CheckBox
 var _base_color_picker: ColorPickerButton
 var _depth_tint_picker: ColorPickerButton
 var _shininess_slider: HSlider
@@ -44,9 +60,6 @@ var _transparency_value: Label
 var _edge_color_picker: ColorPickerButton
 var _edge_width_slider: HSlider
 var _edge_width_value: Label
-var _outline_color_picker: ColorPickerButton
-var _outline_width_slider: HSlider
-var _outline_width_value: Label
 var _rim_intensity_slider: HSlider
 var _rim_intensity_value: Label
 var _rim_color_picker: ColorPickerButton
@@ -74,9 +87,14 @@ var _export_text: TextEdit
 
 # Suppress redundant refreshes during preset loading.
 var _loading_preset: bool = false
+var _texture_paths := PackedStringArray([""])
+var _texture_cache: Dictionary = {}
+var _rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	_rng.randomize()
+
 	# Dark background
 	var bg := ColorRect.new()
 	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
@@ -101,6 +119,8 @@ func _ready() -> void:
 
 	# === Right: Preview + Export ===
 	_build_preview_panel(hbox)
+
+	_reload_texture_options()
 
 	# Initial render
 	_refresh_preview()
@@ -136,6 +156,8 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 	vbox.add_theme_constant_override("separation", 6)
 	scroll.add_child(vbox)
 
+	var row: Array
+
 	# ---- Header ----
 	_add_header(vbox, "Gem Designer")
 	_add_separator(vbox)
@@ -149,6 +171,16 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 		_preset_dropdown.add_item(String(PRESET_IDS[i]).capitalize(), i + 1)
 	_preset_dropdown.item_selected.connect(_on_preset_selected)
 	vbox.add_child(_preset_dropdown)
+
+	var preset_actions := HBoxContainer.new()
+	preset_actions.add_theme_constant_override("separation", 8)
+	vbox.add_child(preset_actions)
+
+	var random_btn := Button.new()
+	random_btn.text = "Randomize Gem"
+	random_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	random_btn.pressed.connect(_on_randomize_pressed)
+	preset_actions.add_child(random_btn)
 
 	_add_separator(vbox)
 
@@ -172,6 +204,39 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 
 	_add_separator(vbox)
 
+	# ---- Texture sampling ----
+	_add_section_label(vbox, "Texture")
+	_texture_dropdown = OptionButton.new()
+	_texture_dropdown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_texture_dropdown.item_selected.connect(_on_texture_selected)
+	vbox.add_child(_texture_dropdown)
+
+	_texture_preview = TextureRect.new()
+	_texture_preview.custom_minimum_size = Vector2(0, 120)
+	_texture_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_texture_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_texture_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_texture_preview.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_texture_preview.visible = false
+	vbox.add_child(_texture_preview)
+
+	row = _add_slider_row(vbox, "Texture Blend", 0.0, 1.0, 1.0, 0.01)
+	_texture_blend_slider = row[0]; _texture_blend_value = row[1]
+
+	row = _add_slider_row(vbox, "Texture Zoom", 1.0, 4.0, 1.0, 0.01)
+	_texture_zoom_slider = row[0]; _texture_zoom_value = row[1]
+
+	row = _add_slider_row(vbox, "Texture Offset X", -0.5, 0.5, 0.0, 0.01)
+	_texture_offset_x_slider = row[0]; _texture_offset_x_value = row[1]
+
+	row = _add_slider_row(vbox, "Texture Offset Y", -0.5, 0.5, 0.0, 0.01)
+	_texture_offset_y_slider = row[0]; _texture_offset_y_value = row[1]
+
+	row = _add_slider_row(vbox, "Facet Warp", 0.0, 1.0, 0.35, 0.01)
+	_texture_warp_slider = row[0]; _texture_warp_value = row[1]
+
+	_add_separator(vbox)
+
 	# ---- Colours ----
 	_add_section_label(vbox, "Colours")
 
@@ -187,8 +252,6 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 
 	# ---- Material properties ----
 	_add_section_label(vbox, "Material")
-
-	var row: Array
 
 	row = _add_slider_row(vbox, "Shininess", 1.0, 256.0, 32.0, 0.5)
 	_shininess_slider = row[0]; _shininess_value = row[1]
@@ -219,13 +282,6 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 
 	row = _add_slider_row(vbox, "Edge Width", 0.0, 3.0, 0.0, 0.1)
 	_edge_width_slider = row[0]; _edge_width_value = row[1]
-
-	_add_field_label(vbox, "Outline Color")
-	_outline_color_picker = _create_color_picker(Color(0.0, 0.0, 0.0, 0.15))
-	vbox.add_child(_outline_color_picker)
-
-	row = _add_slider_row(vbox, "Outline Width", 0.0, 4.0, 1.0, 0.1)
-	_outline_width_slider = row[0]; _outline_width_value = row[1]
 
 	_add_separator(vbox)
 
@@ -357,6 +413,30 @@ func _build_preview_panel(parent: HBoxContainer) -> void:
 	_preview.custom_minimum_size = Vector2(400, 400)
 	preview_bg.add_child(_preview)
 
+	var preview_toggles := HBoxContainer.new()
+	preview_toggles.add_theme_constant_override("separation", 12)
+	vbox.add_child(preview_toggles)
+
+	_preview_outline_toggle = CheckBox.new()
+	_preview_outline_toggle.text = "Show Game Outline"
+	_preview_outline_toggle.button_pressed = true
+	_preview_outline_toggle.toggled.connect(func(pressed: bool):
+		if _preview != null:
+			_preview.show_game_outline = pressed
+			_preview.queue_redraw()
+	)
+	preview_toggles.add_child(_preview_outline_toggle)
+
+	_preview_facet_aa_toggle = CheckBox.new()
+	_preview_facet_aa_toggle.text = "Show Facet Smoothing"
+	_preview_facet_aa_toggle.button_pressed = true
+	_preview_facet_aa_toggle.toggled.connect(func(pressed: bool):
+		if _preview != null:
+			_preview.show_facet_aa_lines = pressed
+			_preview.queue_redraw()
+	)
+	preview_toggles.add_child(_preview_facet_aa_toggle)
+
 	# ---- Export section ----
 	_add_separator(vbox)
 
@@ -481,6 +561,141 @@ func _format_display(val: float) -> String:
 	return "%.2f" % val
 
 
+func _reload_texture_options() -> void:
+	if _texture_dropdown == null:
+		return
+
+	_texture_paths = PackedStringArray([""])
+	_texture_cache.clear()
+	_texture_dropdown.clear()
+	_texture_dropdown.add_item("(none)")
+
+	var dir := DirAccess.open(TEXTURE_DIR)
+	if dir != null:
+		var file_names := dir.get_files()
+		file_names.sort()
+		for file_name in file_names:
+			var extension := file_name.get_extension().to_lower()
+			if file_name.ends_with(".import") or not TEXTURE_EXTENSIONS.has(extension):
+				continue
+			var texture_path := TEXTURE_DIR.path_join(file_name)
+			var texture := ResourceLoader.load(texture_path) as Texture2D
+			if texture == null:
+				continue
+			_texture_paths.append(texture_path)
+			_texture_cache[texture_path] = texture
+			_texture_dropdown.add_item(file_name)
+
+	_texture_dropdown.select(0)
+	_update_texture_preview()
+
+
+func _on_texture_selected(_idx: int) -> void:
+	_update_texture_preview()
+	_refresh_preview()
+
+
+func _get_selected_texture_path() -> String:
+	if _texture_dropdown == null:
+		return ""
+	var selected_idx := _texture_dropdown.selected
+	if selected_idx < 0 or selected_idx >= _texture_paths.size():
+		return ""
+	return _texture_paths[selected_idx]
+
+
+func _get_selected_texture() -> Texture2D:
+	var texture_path := _get_selected_texture_path()
+	if texture_path.is_empty():
+		return null
+	if not _texture_cache.has(texture_path):
+		_texture_cache[texture_path] = ResourceLoader.load(texture_path)
+	return _texture_cache.get(texture_path, null) as Texture2D
+
+
+func _find_texture_index(texture_path: String) -> int:
+	for i in _texture_paths.size():
+		if _texture_paths[i] == texture_path:
+			return i
+	return -1
+
+
+func _ensure_texture_option(texture_path: String) -> int:
+	if texture_path.is_empty():
+		return 0
+	var existing_idx := _find_texture_index(texture_path)
+	if existing_idx >= 0:
+		return existing_idx
+	var texture := ResourceLoader.load(texture_path) as Texture2D
+	if texture == null:
+		return 0
+	_texture_paths.append(texture_path)
+	_texture_cache[texture_path] = texture
+	_texture_dropdown.add_item(texture_path.get_file())
+	return _texture_paths.size() - 1
+
+
+func _update_texture_preview() -> void:
+	if _texture_preview == null:
+		return
+	var texture := _get_selected_texture()
+	_texture_preview.texture = texture
+	_texture_preview.visible = texture != null
+
+
+func _set_slider_value(slider: HSlider, value_label: Label, value: float) -> void:
+	slider.value = value
+	value_label.text = _format_display(value)
+
+
+func _random_slider_value(slider: HSlider) -> float:
+	var value := _rng.randf_range(slider.min_value, slider.max_value)
+	return snappedf(value, slider.step) if slider.step > 0.0 else value
+
+
+func _random_color(include_alpha: bool) -> Color:
+	var alpha := _rng.randf() if include_alpha else 1.0
+	return Color(_rng.randf(), _rng.randf(), _rng.randf(), alpha)
+
+
+func _on_randomize_pressed() -> void:
+	_loading_preset = true
+
+	if _preset_dropdown != null:
+		_preset_dropdown.select(0)
+	_visual_id_input.text = "random_gem"
+	_cut_dropdown.select(_rng.randi_range(0, CUT_IDS.size() - 1))
+
+	_base_color_picker.color = _random_color(false)
+	_depth_tint_picker.color = _random_color(true)
+	_edge_color_picker.color = _random_color(true)
+	_rim_color_picker.color = _random_color(false)
+	_translucency_color_picker.color = _random_color(false)
+	_gradient_color_picker.color = _random_color(true)
+
+	_set_slider_value(_shininess_slider, _shininess_value, _random_slider_value(_shininess_slider))
+	_set_slider_value(_specular_slider, _specular_value, _random_slider_value(_specular_slider))
+	_set_slider_value(_contrast_slider, _contrast_value, _random_slider_value(_contrast_slider))
+	_set_slider_value(_saturation_slider, _saturation_value, _random_slider_value(_saturation_slider))
+	_set_slider_value(_dispersion_slider, _dispersion_value, _random_slider_value(_dispersion_slider))
+	_set_slider_value(_transparency_slider, _transparency_value, _random_slider_value(_transparency_slider))
+	_set_slider_value(_edge_width_slider, _edge_width_value, _random_slider_value(_edge_width_slider))
+	_set_slider_value(_rim_intensity_slider, _rim_intensity_value, _random_slider_value(_rim_intensity_slider))
+	_set_slider_value(_rim_power_slider, _rim_power_value, _random_slider_value(_rim_power_slider))
+	_set_slider_value(_translucency_slider, _translucency_value, _random_slider_value(_translucency_slider))
+	_set_slider_value(_secondary_spec_slider, _secondary_spec_value, _random_slider_value(_secondary_spec_slider))
+	_set_slider_value(_secondary_angle_slider, _secondary_angle_value, _random_slider_value(_secondary_angle_slider))
+	_set_slider_value(_sparkle_intensity_slider, _sparkle_intensity_value, _random_slider_value(_sparkle_intensity_slider))
+	_set_slider_value(_sparkle_threshold_slider, _sparkle_threshold_value, _random_slider_value(_sparkle_threshold_slider))
+	_set_slider_value(_gradient_strength_slider, _gradient_strength_value, _random_slider_value(_gradient_strength_slider))
+	_set_slider_value(_brilliance_slider, _brilliance_value, _random_slider_value(_brilliance_slider))
+	_set_slider_value(_extinction_slider, _extinction_value, _random_slider_value(_extinction_slider))
+
+	_loading_preset = false
+	_update_texture_preview()
+	_refresh_preview()
+
+
 # ===========================================================================
 #  Preview refresh
 # ===========================================================================
@@ -499,9 +714,16 @@ func _refresh_preview() -> void:
 
 func _build_visual() -> GemVisualResource:
 	var v := GemVisualResource.new()
+	var texture_path := _get_selected_texture_path()
 	v.visual_id = StringName(_visual_id_input.text) if _visual_id_input else &"custom_gem"
 	v.cut_id = CUT_IDS[_cut_dropdown.selected] if _cut_dropdown.selected >= 0 else &"classic_round"
 	v.base_color = _base_color_picker.color
+	v.use_texture = not texture_path.is_empty()
+	v.color_texture = _get_selected_texture() if v.use_texture else null
+	v.texture_blend = _texture_blend_slider.value
+	v.texture_zoom = _texture_zoom_slider.value
+	v.texture_offset = Vector2(_texture_offset_x_slider.value, _texture_offset_y_slider.value)
+	v.texture_facet_warp = _texture_warp_slider.value
 	v.depth_tint = _depth_tint_picker.color
 	v.shininess = _shininess_slider.value
 	v.specular_intensity = _specular_slider.value
@@ -511,8 +733,6 @@ func _build_visual() -> GemVisualResource:
 	v.transparency = _transparency_slider.value
 	v.edge_color = _edge_color_picker.color
 	v.edge_width = _edge_width_slider.value
-	v.outline_color = _outline_color_picker.color
-	v.outline_width = _outline_width_slider.value
 	v.rim_intensity = _rim_intensity_slider.value
 	v.rim_color = _rim_color_picker.color
 	v.rim_power = _rim_power_slider.value
@@ -556,6 +776,22 @@ func _load_from_visual(visual: GemVisualResource) -> void:
 	if cut_idx >= 0:
 		_cut_dropdown.select(cut_idx)
 
+	var texture_idx := 0
+	if visual.use_texture and visual.color_texture != null:
+		texture_idx = _ensure_texture_option(visual.color_texture.resource_path)
+	_texture_dropdown.select(texture_idx)
+	_texture_blend_slider.value = visual.texture_blend
+	_texture_blend_value.text = _format_display(visual.texture_blend)
+	_texture_zoom_slider.value = visual.texture_zoom
+	_texture_zoom_value.text = _format_display(visual.texture_zoom)
+	_texture_offset_x_slider.value = visual.texture_offset.x
+	_texture_offset_x_value.text = _format_display(visual.texture_offset.x)
+	_texture_offset_y_slider.value = visual.texture_offset.y
+	_texture_offset_y_value.text = _format_display(visual.texture_offset.y)
+	_texture_warp_slider.value = visual.texture_facet_warp
+	_texture_warp_value.text = _format_display(visual.texture_facet_warp)
+	_update_texture_preview()
+
 	_visual_id_input.text = String(visual.visual_id) if visual.visual_id != &"" else "custom_gem"
 	_base_color_picker.color = visual.base_color
 	_depth_tint_picker.color = visual.depth_tint
@@ -574,9 +810,6 @@ func _load_from_visual(visual: GemVisualResource) -> void:
 	_edge_color_picker.color = visual.edge_color
 	_edge_width_slider.value = visual.edge_width
 	_edge_width_value.text = _format_display(visual.edge_width)
-	_outline_color_picker.color = visual.outline_color
-	_outline_width_slider.value = visual.outline_width
-	_outline_width_value.text = _format_display(visual.outline_width)
 	_rim_intensity_slider.value = visual.rim_intensity
 	_rim_intensity_value.text = _format_display(visual.rim_intensity)
 	_rim_color_picker.color = visual.rim_color
@@ -624,15 +857,33 @@ func _on_export_json() -> void:
 
 func _generate_tres(v: GemVisualResource) -> String:
 	var lines := PackedStringArray()
-	lines.append('[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]')
+	var texture_path := _texture_path_for_visual(v)
+	var has_texture := v.use_texture and not texture_path.is_empty()
+	lines.append('[gd_resource type="Resource" script_class="GemVisualResource" load_steps=%d format=3]' % (3 if has_texture else 2))
 	lines.append("")
 	lines.append('[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]')
+	if has_texture:
+		lines.append('[ext_resource type="Texture2D" path="%s" id="2"]' % texture_path)
 	lines.append("")
 	lines.append("[resource]")
 	lines.append('script = ExtResource("1")')
 	lines.append('visual_id = &"%s"' % String(v.visual_id))
 	lines.append('cut_id = &"%s"' % String(v.cut_id))
 	lines.append("base_color = Color(%s)" % _fmt_color(v.base_color))
+	if has_texture:
+		lines.append("use_texture = true")
+		lines.append('color_texture = ExtResource("2")')
+		if not is_equal_approx(v.texture_blend, 1.0):
+			lines.append("texture_blend = %s" % _fmt_prop(v.texture_blend))
+		if not is_equal_approx(v.texture_zoom, 1.0):
+			lines.append("texture_zoom = %s" % _fmt_prop(v.texture_zoom))
+		if v.texture_offset.length_squared() > 0.000001:
+			lines.append("texture_offset = Vector2(%s, %s)" % [
+				_fmt_prop(v.texture_offset.x),
+				_fmt_prop(v.texture_offset.y),
+			])
+		if not is_equal_approx(v.texture_facet_warp, 0.35):
+			lines.append("texture_facet_warp = %s" % _fmt_prop(v.texture_facet_warp))
 
 	# Only include non-default properties (matches Godot serialisation behaviour).
 	if not is_equal_approx(v.shininess, 32.0):
@@ -652,9 +903,6 @@ func _generate_tres(v: GemVisualResource) -> String:
 	if v.edge_width > 0.001:
 		lines.append("edge_color = Color(%s)" % _fmt_color(v.edge_color))
 		lines.append("edge_width = %s" % _fmt_prop(v.edge_width))
-	if not is_equal_approx(v.outline_width, 1.0) or _color_differs(v.outline_color, Color(0, 0, 0, 0.15)):
-		lines.append("outline_color = Color(%s)" % _fmt_color(v.outline_color))
-		lines.append("outline_width = %s" % _fmt_prop(v.outline_width))
 	if v.rim_intensity > 0.001:
 		lines.append("rim_intensity = %s" % _fmt_prop(v.rim_intensity))
 		lines.append("rim_color = Color(%s)" % _fmt_color(v.rim_color))
@@ -687,6 +935,15 @@ func _generate_json(v: GemVisualResource) -> String:
 		"visual_id": String(v.visual_id),
 		"cut_id": String(v.cut_id),
 		"base_color": _color_array(v.base_color),
+		"use_texture": v.use_texture,
+		"color_texture_path": _texture_path_for_visual(v),
+		"texture_blend": snappedf(v.texture_blend, 0.001),
+		"texture_zoom": snappedf(v.texture_zoom, 0.001),
+		"texture_offset": [
+			snappedf(v.texture_offset.x, 0.001),
+			snappedf(v.texture_offset.y, 0.001),
+		],
+		"texture_facet_warp": snappedf(v.texture_facet_warp, 0.001),
 		"shininess": snappedf(v.shininess, 0.01),
 		"specular_intensity": snappedf(v.specular_intensity, 0.001),
 		"contrast": snappedf(v.contrast, 0.001),
@@ -696,8 +953,6 @@ func _generate_json(v: GemVisualResource) -> String:
 		"transparency": snappedf(v.transparency, 0.001),
 		"edge_color": _color_array(v.edge_color),
 		"edge_width": snappedf(v.edge_width, 0.01),
-		"outline_color": _color_array(v.outline_color),
-		"outline_width": snappedf(v.outline_width, 0.01),
 		"rim_intensity": snappedf(v.rim_intensity, 0.001),
 		"rim_color": _color_array(v.rim_color),
 		"rim_power": snappedf(v.rim_power, 0.01),
@@ -748,6 +1003,12 @@ func _fmt_prop(val: float) -> String:
 
 func _color_array(c: Color) -> Array:
 	return [snappedf(c.r, 0.001), snappedf(c.g, 0.001), snappedf(c.b, 0.001), snappedf(c.a, 0.001)]
+
+
+func _texture_path_for_visual(v: GemVisualResource) -> String:
+	if v == null or v.color_texture == null:
+		return ""
+	return v.color_texture.resource_path
 
 
 func _color_differs(a: Color, b: Color) -> bool:

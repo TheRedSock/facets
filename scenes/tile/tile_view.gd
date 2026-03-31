@@ -13,6 +13,9 @@ var _background: ColorRect
 var _sprite_texture: TextureRect
 var _outline_overlay: Control
 
+const GAME_OUTLINE_COLOR := Color(0.0, 0.0, 0.0, 0.5)
+const DEFAULT_GAME_OUTLINE_WIDTH := 0.5
+
 ## Cached procedural gem data (set by _update_visual, consumed by _draw).
 var _gem_cut: GemCutResource = null
 var _gem_visual: GemVisualResource = null
@@ -25,10 +28,8 @@ var _use_procedural: bool = false
 ## Shared scaled geometry bundle from GemVisualRegistry.
 var _render_geometry: Dictionary = {}
 var use_gameplay_texture_cache := false
-var _outline_visual: GemVisualResource = null
 var _outline_cut: GemCutResource = null
 var _outline_geometry: Dictionary = {}
-var _outline_cache_key: StringName = &""
 var _use_runtime_outline := false
 
 
@@ -146,11 +147,7 @@ func _try_gameplay_texture_visual() -> bool:
 	_sprite_texture.texture = texture
 	_sprite_texture.visible = true
 	if not visual_bundle.is_empty():
-		_setup_runtime_outline(
-			visual_bundle["cache_key"],
-			visual_bundle["visual"],
-			visual_bundle["cut"],
-		)
+		_setup_runtime_outline(visual_bundle["cut"])
 	else:
 		_clear_runtime_outline()
 	return true
@@ -201,23 +198,15 @@ func _clear_procedural_state() -> void:
 
 
 func _clear_runtime_outline() -> void:
-	_outline_visual = null
 	_outline_cut = null
 	_outline_geometry = {}
-	_outline_cache_key = &""
 	_use_runtime_outline = false
 	if _outline_overlay != null:
 		_outline_overlay.queue_redraw()
 
 
-func _setup_runtime_outline(
-	cache_key: StringName,
-	visual: GemVisualResource,
-	cut: GemCutResource,
-) -> void:
-	_outline_visual = visual
+func _setup_runtime_outline(cut: GemCutResource) -> void:
 	_outline_cut = cut
-	_outline_cache_key = cache_key
 	_use_runtime_outline = true
 	_refresh_runtime_outline()
 
@@ -247,6 +236,8 @@ func _draw() -> void:
 		return
 
 	var facets: Array = _render_geometry.get("facets", [])
+	var unit_facets: Array = _render_geometry.get("unit_facets", [])
+	var facet_normals: Array = _render_geometry.get("facet_normals", [])
 	var pavilion: Array = _render_geometry.get("pavilion", [])
 	var silhouette: PackedVector2Array = _render_geometry.get("silhouette", PackedVector2Array())
 	var edges: PackedVector2Array = _render_geometry.get("edges", PackedVector2Array())
@@ -258,6 +249,8 @@ func _draw() -> void:
 	for i in facets.size():
 		if i < _gem_colors.size():
 			draw_colored_polygon(facets[i], _gem_colors[i])
+			if i < unit_facets.size() and i < facet_normals.size():
+				_draw_texture_overlay(facets[i], unit_facets[i], facet_normals[i], _gem_colors[i])
 
 	# ---- Draw pavilion extinction overlay ----
 	if not low_detail and _pavilion_colors.size() > 0:
@@ -272,15 +265,7 @@ func _draw() -> void:
 
 	# ---- Draw silhouette outline ----
 	if DebugFlags.gem_silhouette_outline and silhouette.size() >= 4:
-		var ol_color := _gem_visual.outline_color
-		if ol_color.a < 0.2:
-			ol_color = Color(0, 0, 0, 0.5)
-		var ol_width := _gem_visual.outline_width
-		if DebugFlags.gem_outline_width_override >= 0:
-			ol_width = DebugFlags.gem_outline_width_override
-		elif ol_width < 0.1:
-			ol_width = 0.5
-		draw_polyline(silhouette, ol_color, ol_width, true)
+		draw_polyline(silhouette, GAME_OUTLINE_COLOR, _get_game_outline_width(), true)
 
 	# ---- Draw internal edge lines ----
 	if not low_detail and _gem_visual.edge_width > 0.01:
@@ -288,6 +273,30 @@ func _draw() -> void:
 		for i in edge_count:
 			draw_line(edges[i * 2], edges[i * 2 + 1],
 				_gem_visual.edge_color, _gem_visual.edge_width, true)
+
+
+func _draw_texture_overlay(
+	facet_points: PackedVector2Array,
+	unit_points: PackedVector2Array,
+	facet_normal: Vector3,
+	facet_color: Color,
+) -> void:
+	if not _gem_visual.use_texture or _gem_visual.color_texture == null:
+		return
+	if unit_points.size() != facet_points.size():
+		return
+
+	var uvs := GemRenderer.build_texture_uvs(
+		unit_points,
+		facet_normal,
+		_gem_visual
+	)
+	var overlay_color := GemRenderer.compute_texture_overlay_color(facet_color, _gem_visual)
+	var colors := PackedColorArray()
+	colors.resize(facet_points.size())
+	for i in facet_points.size():
+		colors[i] = overlay_color
+	draw_polygon(facet_points, colors, uvs, _gem_visual.color_texture)
 
 
 func _on_resized() -> void:
@@ -313,7 +322,7 @@ func _refresh_render_cache(force_redraw: bool = true) -> void:
 
 
 func _refresh_runtime_outline() -> void:
-	if not _use_runtime_outline or _outline_cut == null or _outline_visual == null:
+	if not _use_runtime_outline or _outline_cut == null:
 		return
 	var draw_size := Vector2i(maxi(int(round(size.x)), 1), maxi(int(round(size.y)), 1))
 	_outline_geometry = GemVisualRegistry.get_cached_scaled_geometry(_outline_cut, draw_size)
@@ -322,22 +331,14 @@ func _refresh_runtime_outline() -> void:
 
 
 func _draw_outline_overlay() -> void:
-	if not _use_runtime_outline or _outline_visual == null:
+	if not _use_runtime_outline:
 		return
 	if not DebugFlags.gem_silhouette_outline:
 		return
 	var silhouette: PackedVector2Array = _outline_geometry.get("silhouette", PackedVector2Array())
 	if silhouette.size() < 4:
 		return
-	var outline_color := _outline_visual.outline_color
-	if outline_color.a < 0.2:
-		outline_color = Color(0, 0, 0, 0.5)
-	var outline_width := _outline_visual.outline_width
-	if DebugFlags.gem_outline_width_override >= 0:
-		outline_width = DebugFlags.gem_outline_width_override
-	elif outline_width < 0.1:
-		outline_width = 0.5
-	_outline_overlay.draw_polyline(silhouette, outline_color, outline_width, true)
+	_outline_overlay.draw_polyline(silhouette, GAME_OUTLINE_COLOR, _get_game_outline_width(), true)
 
 
 func refresh_debug_visuals() -> void:
@@ -348,6 +349,12 @@ func refresh_debug_visuals() -> void:
 
 func _is_low_detail_enabled() -> bool:
 	return DebugFlags != null and DebugFlags.gem_low_detail_gameplay
+
+
+func _get_game_outline_width() -> float:
+	if DebugFlags != null and DebugFlags.gem_outline_width_override >= 0.0:
+		return DebugFlags.gem_outline_width_override
+	return DEFAULT_GAME_OUTLINE_WIDTH
 
 
 func _on_gameplay_texture_cache_rebuilt(_profile: Dictionary) -> void:

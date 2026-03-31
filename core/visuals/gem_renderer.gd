@@ -59,7 +59,7 @@ static func compute_facet_color(
 ##
 ## Pipeline order (per facet):
 ##   1. Modifier adjustments (darken/brighten/desaturate)
-##   2. Depth tint, texture sampling, colour gradient
+##   2. Depth tint, colour gradient
 ##   3. Inlined Blinn-Phong primary lighting
 ##   4. Translucency, rim lighting, secondary specular
 ##   5. Hue dispersion, sparkle boost
@@ -75,6 +75,9 @@ static func compute_all_facet_colors(
 	colors.resize(count)
 
 	var base := visual.base_color
+	var texture_overlay_mode := texture_uses_overlay_mode(visual)
+	if visual.use_texture and not texture_overlay_mode:
+		base = Color.WHITE
 
 	# Modifier adjustments.
 	if modifiers.has("darken"):
@@ -96,7 +99,11 @@ static func compute_all_facet_colors(
 
 	# Feature flags (avoid per-facet branching on disabled features).
 	var has_depth_tint := visual.depth_tint.a > 0.01
-	var has_gradient := visual.gradient_strength > 0.001 and visual.gradient_color.a > 0.001
+	var has_gradient := (
+		texture_overlay_mode
+		and visual.gradient_strength > 0.001
+		and visual.gradient_color.a > 0.001
+	)
 	var has_translucency := visual.translucency > 0.001
 	var has_rim := visual.rim_intensity > 0.001
 	var has_secondary := visual.secondary_specular > 0.001
@@ -111,11 +118,6 @@ static func compute_all_facet_colors(
 	var has_precomputed_jitter := cut.facet_jitter.size() == count
 	var has_zone_weights := cut.zone_brilliance_weights.size() == count
 	has_brilliance = has_brilliance and (has_zone_weights or cut.facet_zones.size() == count)
-
-	# Pre-compute texture image if needed (Fix #5: hoist get_image out of per-facet loop).
-	var tex_image: Image = null
-	if visual.use_texture and visual.color_texture != null:
-		tex_image = visual.color_texture.get_image()
 
 	# Secondary light direction: primary light rotated around Z by the offset angle.
 	var secondary_half := Vector3.ZERO
@@ -143,15 +145,6 @@ static func compute_all_facet_colors(
 		if has_depth_tint:
 			var facing := clampf(n.z, 0.0, 1.0)
 			facet_base = base.lerp(visual.depth_tint, (1.0 - facing) * visual.depth_tint.a)
-
-		# Texture sampling: use the colour at each facet's centroid.
-		if tex_image != null:
-			var centroid: Vector2
-			if has_centroids:
-				centroid = cut.facet_centroids[i]
-			else:
-				centroid = _compute_facet_centroid(cut, i)
-			facet_base = _sample_texture_from_image(tex_image, centroid)
 
 		# Color gradient: blend base toward gradient_color based on vertical position.
 		if has_gradient:
@@ -305,14 +298,136 @@ static func _facet_centroid_y(cut: GemCutResource, facet_index: int) -> float:
 	return cy / verts.size()
 
 
-## Samples a texture at the given centroid position (for patterned gems like opals).
-## The Image is passed in directly to avoid repeated get_image() calls per facet.
-static func _sample_texture_from_image(img: Image, centroid: Vector2) -> Color:
-	if img == null:
-		return Color.WHITE
-	var px := clampi(int(centroid.x * img.get_width()), 0, img.get_width() - 1)
-	var py := clampi(int(centroid.y * img.get_height()), 0, img.get_height() - 1)
-	return img.get_pixel(px, py)
+## Builds UVs so the texture reads as one continuous surface across all facets.
+## Higher texture_zoom uses a smaller region of the texture, while texture_offset
+## slides that sampled region around within the source image. The optional
+## facet warp then "unprojects" each facet locally based on its pseudo-3D normal
+## so the shared texture field bends with the gemstone planes.
+static func build_texture_uvs(
+	unit_vertices: PackedVector2Array,
+	facet_normal: Vector3,
+	visual: GemVisualResource,
+) -> PackedVector2Array:
+	var shared_uvs := _build_shared_texture_space_uvs(unit_vertices, visual)
+	if shared_uvs.is_empty() or visual.texture_facet_warp <= 0.001:
+		return shared_uvs
+	return _warp_texture_uvs_for_facet(shared_uvs, facet_normal, visual.texture_facet_warp)
+
+
+static func _build_shared_texture_space_uvs(
+	unit_vertices: PackedVector2Array,
+	visual: GemVisualResource,
+) -> PackedVector2Array:
+	var uvs := PackedVector2Array()
+	if unit_vertices.is_empty():
+		return uvs
+	uvs.resize(unit_vertices.size())
+
+	var zoom := maxf(visual.texture_zoom, 1.0)
+	var half_span := 0.5 / zoom
+	var center := Vector2(0.5, 0.5) + visual.texture_offset
+	var min_uv := center - Vector2.ONE * half_span
+	var max_uv := center + Vector2.ONE * half_span
+
+	if min_uv.x < 0.0:
+		max_uv.x -= min_uv.x
+		min_uv.x = 0.0
+	if min_uv.y < 0.0:
+		max_uv.y -= min_uv.y
+		min_uv.y = 0.0
+	if max_uv.x > 1.0:
+		min_uv.x -= max_uv.x - 1.0
+		max_uv.x = 1.0
+	if max_uv.y > 1.0:
+		min_uv.y -= max_uv.y - 1.0
+		max_uv.y = 1.0
+
+	min_uv.x = clampf(min_uv.x, 0.0, 1.0)
+	min_uv.y = clampf(min_uv.y, 0.0, 1.0)
+	max_uv.x = clampf(max_uv.x, 0.0, 1.0)
+	max_uv.y = clampf(max_uv.y, 0.0, 1.0)
+
+	var span := Vector2(
+		maxf(max_uv.x - min_uv.x, 0.0001),
+		maxf(max_uv.y - min_uv.y, 0.0001)
+	)
+
+	for i in unit_vertices.size():
+		var vertex := unit_vertices[i]
+		uvs[i] = Vector2(
+			min_uv.x + vertex.x * span.x,
+			min_uv.y + vertex.y * span.y
+		)
+	return uvs
+
+
+static func _warp_texture_uvs_for_facet(
+	shared_uvs: PackedVector2Array,
+	facet_normal: Vector3,
+	warp_strength: float,
+) -> PackedVector2Array:
+	if shared_uvs.is_empty():
+		return shared_uvs
+
+	var normal := facet_normal.normalized()
+	var tangent3 := Vector3(normal.z, 0.0, -normal.x)
+	if tangent3.length_squared() < 0.00001:
+		tangent3 = Vector3.RIGHT
+	else:
+		tangent3 = tangent3.normalized()
+
+	var bitangent3 := normal.cross(tangent3)
+	if bitangent3.length_squared() < 0.00001:
+		bitangent3 = Vector3.DOWN
+	else:
+		bitangent3 = bitangent3.normalized()
+
+	var proj_t := Vector2(tangent3.x, tangent3.y)
+	var proj_b := Vector2(bitangent3.x, bitangent3.y)
+	if proj_t.length_squared() < 0.00001 or proj_b.length_squared() < 0.00001:
+		return shared_uvs
+
+	# Prevent extreme near-edge-on normals from exploding the UV inverse.
+	proj_t = proj_t.normalized() * maxf(proj_t.length(), 0.35)
+	proj_b = proj_b.normalized() * maxf(proj_b.length(), 0.35)
+
+	var det := proj_t.x * proj_b.y - proj_t.y * proj_b.x
+	if absf(det) < 0.0001:
+		return shared_uvs
+
+	var centroid := Vector2.ZERO
+	for uv in shared_uvs:
+		centroid += uv
+	centroid /= shared_uvs.size()
+
+	var warped := PackedVector2Array()
+	warped.resize(shared_uvs.size())
+	var inv_det := 1.0 / det
+	for i in shared_uvs.size():
+		var local := shared_uvs[i] - centroid
+		var unprojected := Vector2(
+			(local.x * proj_b.y - local.y * proj_b.x) * inv_det,
+			(-local.x * proj_t.y + local.y * proj_t.x) * inv_det
+		)
+		warped[i] = centroid + local.lerp(unprojected, warp_strength)
+	return warped
+
+
+## Converts the facet's shaded colour into a grayscale texture modulate so the
+## texture follows the gem's light and shadow while preserving its own hues.
+static func compute_texture_overlay_color(facet_color: Color, visual: GemVisualResource) -> Color:
+	var brightness := clampf(facet_color.get_luminance() * 0.9 + 0.18, 0.0, 1.0)
+	var alpha := clampf(visual.texture_blend * facet_color.a, 0.0, 1.0)
+	return Color(brightness, brightness, brightness, alpha)
+
+
+static func texture_uses_overlay_mode(visual: GemVisualResource) -> bool:
+	if visual == null or not visual.use_texture or visual.color_texture == null:
+		return false
+	var image := visual.color_texture.get_image()
+	if image == null:
+		return false
+	return image.detect_alpha() != Image.ALPHA_NONE
 
 
 ## Computes semi-transparent overlay colours for pavilion extinction fragments.

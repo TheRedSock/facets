@@ -41,6 +41,8 @@ func _draw() -> void:
 		return
 
 	var facets: Array = _render_geometry.get("facets", [])
+	var unit_facets: Array = _render_geometry.get("unit_facets", [])
+	var facet_normals: Array = _render_geometry.get("facet_normals", [])
 	var pavilion: Array = _render_geometry.get("pavilion", [])
 	var silhouette: PackedVector2Array = _render_geometry.get("silhouette", PackedVector2Array())
 	var edges: PackedVector2Array = _render_geometry.get("edges", PackedVector2Array())
@@ -50,6 +52,8 @@ func _draw() -> void:
 	for i in facets.size():
 		if i < _gem_colors.size():
 			draw_colored_polygon(facets[i], _gem_colors[i])
+			if i < unit_facets.size() and i < facet_normals.size():
+				_draw_texture_overlay(facets[i], unit_facets[i], facet_normals[i], _gem_colors[i])
 
 	if _pavilion_colors.size() > 0:
 		for i in pavilion.size():
@@ -64,3 +68,27 @@ func _draw() -> void:
 		for i in edge_count:
 			draw_line(edges[i * 2], edges[i * 2 + 1],
 				_gem_visual.edge_color, _gem_visual.edge_width, true)
+
+
+func _draw_texture_overlay(
+	facet_points: PackedVector2Array,
+	unit_points: PackedVector2Array,
+	facet_normal: Vector3,
+	facet_color: Color,
+) -> void:
+	if not _gem_visual.use_texture or _gem_visual.color_texture == null:
+		return
+	if unit_points.size() != facet_points.size():
+		return
+
+	var uvs := GemRenderer.build_texture_uvs(
+		unit_points,
+		facet_normal,
+		_gem_visual
+	)
+	var modulate := GemRenderer.compute_texture_overlay_color(facet_color, _gem_visual)
+	var colors := PackedColorArray()
+	colors.resize(facet_points.size())
+	for i in facet_points.size():
+		colors[i] = modulate
+	draw_polygon(facet_points, colors, uvs, _gem_visual.color_texture)

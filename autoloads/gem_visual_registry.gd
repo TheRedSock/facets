@@ -351,6 +351,8 @@ func _build_scaled_geometry(cut: GemCutResource, draw_size: Vector2i) -> Diction
 
 	return {
 		"facets": scaled_facets,
+		"unit_facets": cut.facet_vertices,
+		"facet_normals": cut.facet_normals,
 		"pavilion": scaled_pavilion,
 		"silhouette": scaled_silhouette,
 		"edges": scaled_edges,
