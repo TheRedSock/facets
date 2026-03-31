@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"smoky_quartz"
+cut_id = &"asscher_step"
+base_color = Color(0.48, 0.4, 0.31, 1)
+shininess = 20.0
+specular_intensity = 0.22
+transparency = 0.1
+depth_tint = Color(0.18, 0.13, 0.08, 0.26)
+saturation_boost = -0.06
+contrast = 0.18
+rim_intensity = 0.04
+rim_color = Color(0.72, 0.64, 0.56, 1)
+rim_power = 2.2
+translucency = 0.3
+translucency_color = Color(0.66, 0.54, 0.4, 1)
+secondary_specular = 0.04
+secondary_light_angle = 135.0
+gradient_color = Color(0.26, 0.2, 0.16, 1)
+gradient_strength = 0.22
+brilliance_contrast = 0.1
+extinction = 0.08

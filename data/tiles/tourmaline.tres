@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TileDefinitionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/definitions/tile_definition_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tile_id = &"tourmaline"
+display_name = "Tourmaline"
+tier = 3
+debug_color = Color(0.82, 0.38, 0.52, 1)
+merge_target_id = &"rhodolite"

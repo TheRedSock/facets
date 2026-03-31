@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"tourmaline"
+cut_id = &"straight_trillion"
+base_color = Color(0.9, 0.42, 0.58, 1)
+shininess = 40.0
+specular_intensity = 0.34
+depth_tint = Color(0.16, 0.22, 0.12, 0.22)
+saturation_boost = 0.08
+contrast = 0.34
+hue_dispersion = 0.01
+rim_intensity = 0.14
+rim_color = Color(0.54, 0.92, 0.6, 1)
+rim_power = 1.9
+translucency = 0.18
+translucency_color = Color(0.98, 0.76, 0.6, 1)
+secondary_specular = 0.1
+secondary_light_angle = 136.0
+gradient_color = Color(0.2, 0.7, 0.44, 1)
+gradient_strength = 0.82
+gradient_mode = 1
+gradient_angle_degrees = 90.0
+brilliance_contrast = 0.28
+extinction = 0.12

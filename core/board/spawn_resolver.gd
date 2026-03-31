@@ -6,6 +6,9 @@ extends RefCounted
 ## Consumed by the EventTimeline for animation sequencing.
 var last_spawn_events: Array[Dictionary] = []
 
+## Optional per-run tier selection: tier -> tile_id.
+var tier_tile_overrides: Dictionary = {}
+
 
 ## Populates the entire board using a spawn table for weighted tier selection.
 func populate_board(board: BoardState, rng: SeededRng, spawn_table: SpawnTableResource) -> void:
@@ -68,6 +71,10 @@ func _spawn_tile(rng: SeededRng, spawn_table: SpawnTableResource) -> TileState:
 	# Use TileRegistry for proper named tiles if definitions are loaded
 	var tile_registry: Node = _get_tile_registry()
 	if tile_registry != null and tile_registry.has_definitions():
+		if tier_tile_overrides.has(tier):
+			var selected_tile_id: StringName = tier_tile_overrides[tier]
+			if tile_registry.get_definition(selected_tile_id) != null:
+				return tile_registry.create_tile(selected_tile_id)
 		return tile_registry.create_tile_for_tier(tier, rng)
 	return TileState.from_debug_tier(tier)
 

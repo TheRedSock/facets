@@ -59,7 +59,7 @@ static func compute_facet_color(
 ##
 ## Pipeline order (per facet):
 ##   1. Modifier adjustments (darken/brighten/desaturate)
-##   2. Depth tint, colour gradient
+##   2. Depth tint, colour zoning, phenomenon cue
 ##   3. Inlined Blinn-Phong primary lighting
 ##   4. Translucency, rim lighting, secondary specular
 ##   5. Hue dispersion, sparkle boost
@@ -100,9 +100,12 @@ static func compute_all_facet_colors(
 	# Feature flags (avoid per-facet branching on disabled features).
 	var has_depth_tint := visual.depth_tint.a > 0.01
 	var has_gradient := (
-		texture_overlay_mode
-		and visual.gradient_strength > 0.001
+		visual.gradient_strength > 0.001
 		and visual.gradient_color.a > 0.001
+	)
+	var has_phenomenon := (
+		visual.phenomenon_strength > 0.001
+		and visual.phenomenon_color.a > 0.001
 	)
 	var has_translucency := visual.translucency > 0.001
 	var has_rim := visual.rim_intensity > 0.001
@@ -121,6 +124,12 @@ static func compute_all_facet_colors(
 
 	# Secondary light direction: primary light rotated around Z by the offset angle.
 	var secondary_half := Vector3.ZERO
+	var gradient_axis := Vector2.RIGHT
+	var phenomenon_axis := Vector2.RIGHT
+	if has_gradient:
+		gradient_axis = Vector2.RIGHT.rotated(deg_to_rad(visual.gradient_angle_degrees)).normalized()
+	if has_phenomenon:
+		phenomenon_axis = Vector2.RIGHT.rotated(deg_to_rad(visual.phenomenon_angle_degrees)).normalized()
 	if has_secondary:
 		var angle_rad := deg_to_rad(visual.secondary_light_angle)
 		var cos_a := cos(angle_rad)
@@ -140,24 +149,34 @@ static func compute_all_facet_colors(
 		# Normal is pre-normalized at cut generation time (see GemCutPrimitives.normal_for).
 		var n := cut.facet_normals[i]
 		var facet_base := base
+		var centroid := Vector2.ZERO
+		if has_gradient:
+			if has_centroids:
+				centroid = cut.facet_centroids[i]
+			else:
+				centroid = _compute_facet_centroid(cut, i)
 
 		# Depth-tint: mix in the tint colour for facets facing away from the viewer.
 		if has_depth_tint:
 			var facing := clampf(n.z, 0.0, 1.0)
 			facet_base = base.lerp(visual.depth_tint, (1.0 - facing) * visual.depth_tint.a)
 
-		# Color gradient: blend base toward gradient_color based on vertical position.
+		# Color zoning: linear or radial blend toward gradient_color.
 		if has_gradient:
-			var cy: float
-			if has_centroids:
-				cy = cut.facet_centroids[i].y
-			else:
-				cy = _facet_centroid_y(cut, i)
-			var t := cy * visual.gradient_strength
+			var t := _compute_gradient_mix(centroid, visual, gradient_axis) * visual.gradient_strength
 			facet_base = Color(
 				lerpf(facet_base.r, visual.gradient_color.r, t),
 				lerpf(facet_base.g, visual.gradient_color.g, t),
 				lerpf(facet_base.b, visual.gradient_color.b, t),
+				facet_base.a)
+
+		if has_phenomenon:
+			var phenomenon_t := _compute_phenomenon_mix(n, phenomenon_axis, visual.phenomenon_sharpness)
+			var phenomenon_blend := phenomenon_t * visual.phenomenon_strength
+			facet_base = Color(
+				lerpf(facet_base.r, visual.phenomenon_color.r, phenomenon_blend),
+				lerpf(facet_base.g, visual.phenomenon_color.g, phenomenon_blend),
+				lerpf(facet_base.b, visual.phenomenon_color.b, phenomenon_blend),
 				facet_base.a)
 
 		# ---- Inlined Blinn-Phong lighting (Fix #2) ----
@@ -226,12 +245,12 @@ static func compute_all_facet_colors(
 			jitter = cut.facet_jitter[i]
 		else:
 			# Fallback: compute from vertices (for cuts not finalized via standard pipeline).
-			var centroid: Vector2
+			var jitter_centroid: Vector2
 			if has_centroids:
-				centroid = cut.facet_centroids[i]
+				jitter_centroid = cut.facet_centroids[i]
 			else:
-				centroid = _compute_facet_centroid(cut, i)
-			var hash_val := sin(centroid.x * 127.1 + centroid.y * 311.7) * 43758.5453
+				jitter_centroid = _compute_facet_centroid(cut, i)
+			var hash_val := sin(jitter_centroid.x * 127.1 + jitter_centroid.y * 311.7) * 43758.5453
 			hash_val = hash_val - floorf(hash_val)
 			jitter = (hash_val - 0.5) * 0.08
 		cr = clampf(cr + jitter, 0.0, 1.0)
@@ -296,6 +315,33 @@ static func _facet_centroid_y(cut: GemCutResource, facet_index: int) -> float:
 	for v in verts:
 		cy += v.y
 	return cy / verts.size()
+
+
+static func _compute_gradient_mix(
+	centroid: Vector2,
+	visual: GemVisualResource,
+	gradient_axis: Vector2,
+) -> float:
+	var centered := centroid - Vector2(0.5, 0.5)
+	match visual.gradient_mode:
+		GemVisualResource.GRADIENT_MODE_RADIAL:
+			return clampf(centered.length() / 0.70710678, 0.0, 1.0)
+		GemVisualResource.GRADIENT_MODE_RADIAL_INVERSE:
+			return 1.0 - clampf(centered.length() / 0.70710678, 0.0, 1.0)
+		_:
+			return clampf(0.5 + centered.dot(gradient_axis), 0.0, 1.0)
+
+
+static func _compute_phenomenon_mix(
+	normal: Vector3,
+	phenomenon_axis: Vector2,
+	sharpness: float,
+) -> float:
+	var planar := Vector2(normal.x, normal.y)
+	if planar.length_squared() < 0.00001:
+		return 0.5
+	var axis_alignment := planar.normalized().dot(phenomenon_axis)
+	return pow(clampf(axis_alignment * 0.5 + 0.5, 0.0, 1.0), sharpness)
 
 
 ## Builds UVs so the texture reads as one continuous surface across all facets.

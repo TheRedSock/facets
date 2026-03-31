@@ -29,6 +29,7 @@ var _use_procedural: bool = false
 var _render_geometry: Dictionary = {}
 var use_gameplay_texture_cache := false
 var _outline_cut: GemCutResource = null
+var _outline_cut_key: String = ""
 var _outline_geometry: Dictionary = {}
 var _use_runtime_outline := false
 
@@ -147,7 +148,10 @@ func _try_gameplay_texture_visual() -> bool:
 	_sprite_texture.texture = texture
 	_sprite_texture.visible = true
 	if not visual_bundle.is_empty():
-		_setup_runtime_outline(visual_bundle["cut"])
+		_setup_runtime_outline(
+			visual_bundle["cut"],
+			GemVisualRegistry.get_visual_cut_key(visual_bundle["visual"])
+		)
 	else:
 		_clear_runtime_outline()
 	return true
@@ -199,14 +203,16 @@ func _clear_procedural_state() -> void:
 
 func _clear_runtime_outline() -> void:
 	_outline_cut = null
+	_outline_cut_key = ""
 	_outline_geometry = {}
 	_use_runtime_outline = false
 	if _outline_overlay != null:
 		_outline_overlay.queue_redraw()
 
 
-func _setup_runtime_outline(cut: GemCutResource) -> void:
+func _setup_runtime_outline(cut: GemCutResource, cut_key: String = "") -> void:
 	_outline_cut = cut
+	_outline_cut_key = cut_key if not cut_key.is_empty() else String(cut.cut_id)
 	_use_runtime_outline = true
 	_refresh_runtime_outline()
 
@@ -221,7 +227,7 @@ func _resolve_visual_bundle() -> Dictionary:
 		cache_key = StringName("_tier_%d" % tier)
 	if visual == null:
 		return {}
-	var cut := GemVisualRegistry.get_cut(visual.cut_id)
+	var cut := GemVisualRegistry.get_visual_cut(visual)
 	if cut == null:
 		return {}
 	return {
@@ -325,7 +331,11 @@ func _refresh_runtime_outline() -> void:
 	if not _use_runtime_outline or _outline_cut == null:
 		return
 	var draw_size := Vector2i(maxi(int(round(size.x)), 1), maxi(int(round(size.y)), 1))
-	_outline_geometry = GemVisualRegistry.get_cached_scaled_geometry(_outline_cut, draw_size)
+	_outline_geometry = GemVisualRegistry.get_cached_scaled_geometry(
+		_outline_cut,
+		_outline_cut_key,
+		draw_size
+	)
 	if _outline_overlay != null:
 		_outline_overlay.queue_redraw()
 

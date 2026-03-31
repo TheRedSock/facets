@@ -15,8 +15,8 @@ const CUT_IDS: Array[StringName] = [
 	&"heart_brilliant",
 	&"trillion",
 	&"straight_trillion",
-	&"radiant_diamond",
 	&"princess_square",
+	&"radiant_square",
 	&"radiant_octagon",
 	&"hex_brilliant",
 	&"pentagon_brilliant",
@@ -26,6 +26,7 @@ const CUT_IDS: Array[StringName] = [
 	&"baguette_step",
 	&"tapered_baguette_step",
 	&"oval_brilliant",
+	&"antique_oval",
 	&"marquise_brilliant",
 	&"pear_brilliant",
 	&"rose_round",
@@ -41,8 +42,8 @@ const EXPECTED_FACET_COUNTS := {
 	&"heart_brilliant": 41,
 	&"trillion": 19,
 	&"straight_trillion": 16,
-	&"radiant_diamond": 13,
-	&"princess_square": 13,
+	&"princess_square": 17,
+	&"radiant_square": 25,
 	&"radiant_octagon": 25,
 	&"hex_brilliant": 25,
 	&"pentagon_brilliant": 21,
@@ -52,6 +53,7 @@ const EXPECTED_FACET_COUNTS := {
 	&"baguette_step": 9,
 	&"tapered_baguette_step": 9,
 	&"oval_brilliant": 33,
+	&"antique_oval": 41,
 	&"marquise_brilliant": 41,
 	&"pear_brilliant": 41,
 	&"rose_round": 17,
@@ -75,6 +77,7 @@ func _init() -> void:
 	test_pavilion_symmetry_metadata()
 	test_clip_polygon_winding_independence()
 	test_profile_distinctiveness()
+	test_rotation_variant_size_compensation()
 
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
 	quit(1 if _fail_count > 0 else 0)
@@ -128,6 +131,7 @@ func test_outline_sampling_stability() -> void:
 		GemCutProfiles.cushion(),
 		GemCutProfiles.heart_brilliant(),
 		GemCutProfiles.oval_brilliant(),
+		GemCutProfiles.antique_oval(),
 		GemCutProfiles.marquise_brilliant(),
 		GemCutProfiles.pear_brilliant(),
 	]
@@ -177,6 +181,8 @@ func test_pavilion_symmetry_metadata() -> void:
 		"Heart pavilion should follow its 10-sector profile")
 	assert_eq(GemCutGenerators.generate(&"pear_brilliant").pavilion_sector_count, 10,
 		"Pear pavilion should follow its 10-sector profile")
+	assert_eq(GemCutGenerators.generate(&"antique_oval").pavilion_sector_count, 10,
+		"Antique oval pavilion should follow its 10-sector profile")
 	assert_eq(GemCutGenerators.generate(&"marquise_brilliant").pavilion_sector_count, 10,
 		"Marquise pavilion should follow its 10-sector profile")
 	assert_eq(GemCutGenerators.generate(&"radiant_octagon").pavilion_sector_count, 8,
@@ -222,6 +228,18 @@ func test_profile_distinctiveness() -> void:
 	var marquise_tip_ratio := _tip_band_width_ratio(GemCutGenerators.generate(&"marquise_brilliant").silhouette, 0.16)
 	assert_true(marquise_tip_ratio < oval_tip_ratio * 0.72,
 		"Marquise should taper more sharply at the tips than Oval")
+
+
+func test_rotation_variant_size_compensation() -> void:
+	var princess := GemCutGenerators.generate(&"princess_square")
+	var straight := GemCutBuilders.create_visual_variant(princess, 0.0)
+	var diagonal := GemCutBuilders.create_visual_variant(princess, 45.0)
+	var straight_bounds := _cut_bounds(straight)
+	var diagonal_bounds := _cut_bounds(diagonal)
+	assert_true(straight_bounds["max_span"] < 1.0 - 2.0 * GemCutPrimitives.FIT_MARGIN - 0.01,
+		"Princess straight orientation should scale down slightly versus the fit box")
+	assert_near(diagonal_bounds["max_span"], 1.0 - 2.0 * GemCutPrimitives.FIT_MARGIN, 0.002,
+		"Princess diagonal orientation should keep the full normalized outer span")
 
 
 func assert_true(condition: bool, message: String) -> void:

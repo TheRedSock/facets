@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"rhodolite"
+cut_id = &"cushion"
+rotation_degrees = 45.0
+base_color = Color(0.68, 0.14, 0.42, 1)
+shininess = 54.0
+specular_intensity = 0.46
+depth_tint = Color(0.2, 0.06, 0.18, 0.42)
+saturation_boost = 0.08
+contrast = 0.58
+rim_intensity = 0.18
+rim_color = Color(0.9, 0.38, 0.7, 1)
+rim_power = 1.9
+translucency = 0.14
+translucency_color = Color(0.86, 0.28, 0.54, 1)
+secondary_specular = 0.22
+secondary_light_angle = 124.0
+sparkle_intensity = 0.22
+sparkle_threshold = 0.81
+gradient_color = Color(0.42, 0.08, 0.32, 1)
+gradient_strength = 0.24
+brilliance_contrast = 0.44
+extinction = 0.32

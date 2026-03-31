@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"painite"
+cut_id = &"antique_oval"
+base_color = Color(0.46, 0.2, 0.12, 1)
+shininess = 78.0
+specular_intensity = 0.5
+depth_tint = Color(0.12, 0.05, 0.03, 0.52)
+saturation_boost = 0.02
+contrast = 0.66
+rim_intensity = 0.14
+rim_color = Color(0.88, 0.54, 0.22, 1)
+rim_power = 2.3
+translucency = 0.08
+translucency_color = Color(0.78, 0.34, 0.18, 1)
+secondary_specular = 0.18
+secondary_light_angle = 128.0
+sparkle_intensity = 0.24
+sparkle_threshold = 0.8
+gradient_color = Color(0.68, 0.3, 0.18, 1)
+gradient_strength = 0.24
+brilliance_contrast = 0.42
+extinction = 0.44

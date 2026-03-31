@@ -190,26 +190,33 @@ static func straight_trillion() -> Dictionary:
 	}
 
 
-static func radiant_diamond() -> Dictionary:
-	return {
-		"cut_id": &"radiant_diamond",
-		"display_name": "Radiant Diamond",
-		"shape_category": &"rotated_square",
-		"table_ratio": 0.38,
-		"break_ratio": 0.5,
-		"tilts": {"star": 20.0, "bezel": 35.0},
-	}
-
-
 static func princess_square() -> Dictionary:
 	return {
 		"cut_id": &"princess_square",
 		"display_name": "Princess Square",
 		"shape_category": &"square",
-		"outer_points": GemCutPrimitives.polygon_points(4, 1.0, -PI * 0.25),
-		"table_ratio": 0.48,
-		"break_ratio": 0.5,
-		"tilts": {"star": 20.0, "bezel": 35.0},
+		"outer_points": GemCutPrimitives.rect_points(GemCutPrimitives.GEM_RADIUS, GemCutPrimitives.GEM_RADIUS),
+		"table_ratio": 0.38,
+		"edge_trim": 0.2,
+		"tilts": {"star": 18.0, "bezel": 35.0, "girdle": 42.0, "corner": 46.0},
+		"orientation_fit_axis_aligned_scale": 0.94,
+	}
+
+
+static func radiant_square() -> Dictionary:
+	return {
+		"cut_id": &"radiant_square",
+		"display_name": "Radiant Square",
+		"shape_category": &"square",
+		"outer_points": GemCutPrimitives.chamfered_rect_points(
+			GemCutPrimitives.GEM_RADIUS * 0.96,
+			GemCutPrimitives.GEM_RADIUS * 0.96,
+			0.14
+		),
+		"table_ratio": 0.44,
+		"break_ratio": 0.52,
+		"tilts": {"star": 18.0, "bezel": 35.0},
+		"orientation_fit_axis_aligned_scale": 0.95,
 	}
 
 
@@ -351,6 +358,24 @@ static func oval_brilliant() -> Dictionary:
 		"silhouette_symmetry": 8,
 		"silhouette_detail": GemCutPrimitives.DETAIL_HIGH,
 		"silhouette_min_points": 64,
+	}
+
+
+static func antique_oval() -> Dictionary:
+	return {
+		"cut_id": &"antique_oval",
+		"display_name": "Antique Oval",
+		"shape_category": &"oval",
+		"sector_count": 10,
+		"boundary_mode": &"ellipse",
+		"boundary_params": {"aspect_x": 0.76, "aspect_y": 1.14},
+		"table_ratio": 0.46,
+		"star_length": 0.44,
+		"tilts": {"star": 20.0, "bezel": 35.0, "girdle": 43.0},
+		"silhouette_mode": &"curve",
+		"silhouette_symmetry": 10,
+		"silhouette_detail": GemCutPrimitives.DETAIL_HIGH,
+		"silhouette_min_points": 72,
 	}
 
 

@@ -45,7 +45,8 @@ var show_facet_aa_lines := true:
 
 
 func update_preview(cut_id: StringName, visual: GemVisualResource) -> void:
-	_gem_cut = GemCutGenerators.generate(cut_id)
+	var base_cut := GemCutGenerators.generate(cut_id)
+	_gem_cut = GemCutBuilders.create_visual_variant(base_cut, visual.rotation_degrees)
 	if _gem_cut == null:
 		_valid = false
 		queue_redraw()

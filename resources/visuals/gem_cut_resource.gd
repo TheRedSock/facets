@@ -11,6 +11,11 @@ extends Resource
 @export var display_name: String = ""
 @export var shape_category: StringName = &""  # e.g., "round", "square", "triangle"
 
+## Optional axis-aligned size compensation used by create_visual_variant().
+## Values below 1.0 slightly shrink straight square-family presentations so
+## they do not read disproportionately larger than their 45-degree variants.
+var orientation_fit_axis_aligned_scale: float = 1.0
+
 ## Facet data — parallel arrays. Each index describes one polygon facet.
 var facet_vertices: Array[PackedVector2Array] = []
 var facet_normals: Array[Vector3] = []

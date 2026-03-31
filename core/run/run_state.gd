@@ -10,6 +10,9 @@ var board_size: Vector2i = Vector2i.ZERO
 ## The active spawn table for this run.
 var spawn_table: SpawnTableResource = null
 
+## Seeded per-run gem selection: tier -> tile_id.
+var tier_tile_ids: Dictionary = {}
+
 
 func to_dict() -> Dictionary:
 	return {
@@ -20,4 +23,5 @@ func to_dict() -> Dictionary:
 			"x": board_size.x,
 			"y": board_size.y,
 		},
+		"tier_tile_ids": tier_tile_ids.duplicate(),
 	}

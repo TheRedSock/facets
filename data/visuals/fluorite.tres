@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"fluorite"
+cut_id = &"rose_round"
+base_color = Color(0.6, 0.54, 0.8, 1)
+shininess = 14.0
+specular_intensity = 0.22
+transparency = 0.08
+depth_tint = Color(0.26, 0.34, 0.52, 0.16)
+saturation_boost = -0.02
+contrast = 0.16
+hue_dispersion = 0.0
+rim_intensity = 0.08
+rim_color = Color(0.8, 0.9, 0.96, 1)
+rim_power = 1.6
+translucency = 0.5
+translucency_color = Color(0.62, 0.86, 0.78, 1)
+gradient_color = Color(0.42, 0.78, 0.72, 1)
+gradient_strength = 0.46
+gradient_angle_degrees = 70.0
+brilliance_contrast = 0.05
+extinction = 0.04

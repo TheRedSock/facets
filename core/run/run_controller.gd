@@ -45,6 +45,9 @@ func start_new_run(config: Dictionary = {}) -> void:
 
 	rng.reseed(run_state.run_seed)
 	event_log.clear()
+	run_state.tier_tile_ids = _pick_run_tier_tiles()
+	turn_controller.spawn_resolver.tier_tile_overrides = run_state.tier_tile_ids.duplicate()
+	turn_controller.effect_resolver.tier_tile_overrides = run_state.tier_tile_ids.duplicate()
 
 	# Populate board using spawn table
 	turn_controller.spawn_resolver.populate_board(run_state.board, rng, spawn_table)
@@ -221,6 +224,20 @@ func _create_default_spawn_table() -> SpawnTableResource:
 	table.allowed_tiers = [1, 2, 3, 4]
 	table.weights = [4, 3, 2, 1]  # T1 is 4x more likely than T4
 	return table
+
+
+func _pick_run_tier_tiles() -> Dictionary:
+	var tier_tile_ids := {}
+	if TileRegistry == null or not TileRegistry.has_definitions():
+		return tier_tile_ids
+
+	for tier_index in 99:
+		var tier := tier_index + 1
+		var ids: Array[StringName] = TileRegistry.get_ids_for_tier(tier)
+		if ids.is_empty():
+			continue
+		tier_tile_ids[tier] = ids[rng.randi_range(0, ids.size() - 1)]
+	return tier_tile_ids
 
 
 ## Computes the move delta from the best match across all cascade steps.

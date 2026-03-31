@@ -4,17 +4,18 @@ extends Control
 ## Provides real-time preview with all GemVisualResource parameters exposed
 ## as controls, plus export to .tres or JSON for creating new gem variants.
 
-# All 23 available cut profiles from GemCutGenerators.
+# All available cut profiles from GemCutGenerators.
 const CUT_IDS = [
 	&"classic_round", &"old_european_round", &"cushion", &"heart_brilliant",
 	&"trillion", &"straight_trillion",
-	&"radiant_diamond", &"princess_square", &"radiant_octagon",
+	&"princess_square", &"radiant_square", &"radiant_octagon",
 	&"hex_brilliant", &"pentagon_brilliant",
 	&"emerald_step", &"asscher_step", &"octagon_step",
 	&"baguette_step", &"tapered_baguette_step",
-	&"oval_brilliant", &"marquise_brilliant", &"pear_brilliant",
+	&"oval_brilliant", &"antique_oval", &"marquise_brilliant", &"pear_brilliant",
 	&"rose_round", &"half_dutch_rose_hex", &"double_rose", &"cross_rose",
 ]
+const GRADIENT_MODE_LABELS := ["Linear", "Radial", "Radial Inverse"]
 const TEXTURE_DIR := "res://assets/textures"
 const TEXTURE_EXTENSIONS := ["png", "jpg", "jpeg", "webp"]
 
@@ -22,12 +23,16 @@ const TEXTURE_EXTENSIONS := ["png", "jpg", "jpeg", "webp"]
 const PRESET_IDS = [
 	&"quartz", &"amethyst", &"peridot", &"topaz",
 	&"sapphire", &"emerald", &"ruby", &"diamond",
+	&"fluorite", &"smoky_quartz", &"tourmaline", &"rhodolite",
+	&"aquamarine", &"alexandrite", &"painite", &"blue_garnet",
 ]
 
 # ---- UI references ----
 var _preview: GemPreview
 var _visual_id_input: LineEdit
 var _cut_dropdown: OptionButton
+var _rotation_slider: HSlider
+var _rotation_value: Label
 var _preset_dropdown: OptionButton
 var _texture_dropdown: OptionButton
 var _texture_preview: TextureRect
@@ -77,8 +82,18 @@ var _sparkle_intensity_value: Label
 var _sparkle_threshold_slider: HSlider
 var _sparkle_threshold_value: Label
 var _gradient_color_picker: ColorPickerButton
+var _gradient_mode_dropdown: OptionButton
+var _gradient_angle_slider: HSlider
+var _gradient_angle_value: Label
 var _gradient_strength_slider: HSlider
 var _gradient_strength_value: Label
+var _phenomenon_color_picker: ColorPickerButton
+var _phenomenon_strength_slider: HSlider
+var _phenomenon_strength_value: Label
+var _phenomenon_angle_slider: HSlider
+var _phenomenon_angle_value: Label
+var _phenomenon_sharpness_slider: HSlider
+var _phenomenon_sharpness_value: Label
 var _brilliance_slider: HSlider
 var _brilliance_value: Label
 var _extinction_slider: HSlider
@@ -168,7 +183,7 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 	_preset_dropdown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_preset_dropdown.add_item("(none)", 0)
 	for i in PRESET_IDS.size():
-		_preset_dropdown.add_item(String(PRESET_IDS[i]).capitalize(), i + 1)
+		_preset_dropdown.add_item(_titleize_id(PRESET_IDS[i]), i + 1)
 	_preset_dropdown.item_selected.connect(_on_preset_selected)
 	vbox.add_child(_preset_dropdown)
 
@@ -198,9 +213,12 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 	_cut_dropdown = OptionButton.new()
 	_cut_dropdown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for i in CUT_IDS.size():
-		_cut_dropdown.add_item(String(CUT_IDS[i]), i)
+		_cut_dropdown.add_item(_titleize_id(CUT_IDS[i]), i)
 	_cut_dropdown.item_selected.connect(func(_idx: int): _refresh_preview())
 	vbox.add_child(_cut_dropdown)
+
+	row = _add_slider_row(vbox, "Rotation", -180.0, 180.0, 0.0, 1.0)
+	_rotation_slider = row[0]; _rotation_value = row[1]
 
 	_add_separator(vbox)
 
@@ -253,7 +271,7 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 	# ---- Material properties ----
 	_add_section_label(vbox, "Material")
 
-	row = _add_slider_row(vbox, "Shininess", 1.0, 256.0, 32.0, 0.5)
+	row = _add_slider_row(vbox, "Shininess Exponent", 1.0, 256.0, 32.0, 0.5)
 	_shininess_slider = row[0]; _shininess_value = row[1]
 
 	row = _add_slider_row(vbox, "Specular Intensity", 0.0, 1.0, 0.4, 0.01)
@@ -334,15 +352,45 @@ func _build_settings_panel(parent: HBoxContainer) -> void:
 
 	_add_separator(vbox)
 
-	# ---- Color gradient ----
-	_add_section_label(vbox, "Color Gradient")
+	# ---- Color zoning ----
+	_add_section_label(vbox, "Color Zoning")
 
 	_add_field_label(vbox, "Gradient Color")
 	_gradient_color_picker = _create_color_picker(Color.TRANSPARENT)
 	vbox.add_child(_gradient_color_picker)
 
+	_add_field_label(vbox, "Gradient Mode")
+	_gradient_mode_dropdown = OptionButton.new()
+	_gradient_mode_dropdown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for i in GRADIENT_MODE_LABELS.size():
+		_gradient_mode_dropdown.add_item(GRADIENT_MODE_LABELS[i], i)
+	_gradient_mode_dropdown.select(0)
+	_gradient_mode_dropdown.item_selected.connect(func(_idx: int): _refresh_preview())
+	vbox.add_child(_gradient_mode_dropdown)
+
 	row = _add_slider_row(vbox, "Gradient Strength", 0.0, 1.0, 0.0, 0.01)
 	_gradient_strength_slider = row[0]; _gradient_strength_value = row[1]
+
+	row = _add_slider_row(vbox, "Gradient Angle", -180.0, 180.0, 90.0, 1.0)
+	_gradient_angle_slider = row[0]; _gradient_angle_value = row[1]
+
+	_add_separator(vbox)
+
+	# ---- Phenomenon cue ----
+	_add_section_label(vbox, "Phenomenon Cue")
+
+	_add_field_label(vbox, "Phenomenon Color")
+	_phenomenon_color_picker = _create_color_picker(Color.TRANSPARENT)
+	vbox.add_child(_phenomenon_color_picker)
+
+	row = _add_slider_row(vbox, "Phenomenon Strength", 0.0, 1.0, 0.0, 0.01)
+	_phenomenon_strength_slider = row[0]; _phenomenon_strength_value = row[1]
+
+	row = _add_slider_row(vbox, "Phenomenon Angle", -180.0, 180.0, 0.0, 1.0)
+	_phenomenon_angle_slider = row[0]; _phenomenon_angle_value = row[1]
+
+	row = _add_slider_row(vbox, "Phenomenon Sharpness", 0.5, 4.0, 1.0, 0.05)
+	_phenomenon_sharpness_slider = row[0]; _phenomenon_sharpness_value = row[1]
 
 	_add_separator(vbox)
 
@@ -381,6 +429,11 @@ func _build_preview_panel(parent: HBoxContainer) -> void:
 	back_btn.text = "< Back to Menu"
 	back_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn"))
 	top_bar.add_child(back_btn)
+
+	var gallery_btn := Button.new()
+	gallery_btn.text = "Preset Gallery"
+	gallery_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/design/gem_gallery.tscn"))
+	top_bar.add_child(gallery_btn)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -561,6 +614,11 @@ func _format_display(val: float) -> String:
 	return "%.2f" % val
 
 
+func _titleize_id(value: StringName) -> String:
+	var label := String(value).replace("_", " ")
+	return label.capitalize()
+
+
 func _reload_texture_options() -> void:
 	if _texture_dropdown == null:
 		return
@@ -665,6 +723,7 @@ func _on_randomize_pressed() -> void:
 		_preset_dropdown.select(0)
 	_visual_id_input.text = "random_gem"
 	_cut_dropdown.select(_rng.randi_range(0, CUT_IDS.size() - 1))
+	_set_slider_value(_rotation_slider, _rotation_value, _random_slider_value(_rotation_slider))
 
 	_base_color_picker.color = _random_color(false)
 	_depth_tint_picker.color = _random_color(true)
@@ -672,6 +731,8 @@ func _on_randomize_pressed() -> void:
 	_rim_color_picker.color = _random_color(false)
 	_translucency_color_picker.color = _random_color(false)
 	_gradient_color_picker.color = _random_color(true)
+	_phenomenon_color_picker.color = _random_color(true)
+	_gradient_mode_dropdown.select(_rng.randi_range(0, GRADIENT_MODE_LABELS.size() - 1))
 
 	_set_slider_value(_shininess_slider, _shininess_value, _random_slider_value(_shininess_slider))
 	_set_slider_value(_specular_slider, _specular_value, _random_slider_value(_specular_slider))
@@ -688,6 +749,10 @@ func _on_randomize_pressed() -> void:
 	_set_slider_value(_sparkle_intensity_slider, _sparkle_intensity_value, _random_slider_value(_sparkle_intensity_slider))
 	_set_slider_value(_sparkle_threshold_slider, _sparkle_threshold_value, _random_slider_value(_sparkle_threshold_slider))
 	_set_slider_value(_gradient_strength_slider, _gradient_strength_value, _random_slider_value(_gradient_strength_slider))
+	_set_slider_value(_gradient_angle_slider, _gradient_angle_value, _random_slider_value(_gradient_angle_slider))
+	_set_slider_value(_phenomenon_strength_slider, _phenomenon_strength_value, _random_slider_value(_phenomenon_strength_slider))
+	_set_slider_value(_phenomenon_angle_slider, _phenomenon_angle_value, _random_slider_value(_phenomenon_angle_slider))
+	_set_slider_value(_phenomenon_sharpness_slider, _phenomenon_sharpness_value, _random_slider_value(_phenomenon_sharpness_slider))
 	_set_slider_value(_brilliance_slider, _brilliance_value, _random_slider_value(_brilliance_slider))
 	_set_slider_value(_extinction_slider, _extinction_value, _random_slider_value(_extinction_slider))
 
@@ -717,6 +782,7 @@ func _build_visual() -> GemVisualResource:
 	var texture_path := _get_selected_texture_path()
 	v.visual_id = StringName(_visual_id_input.text) if _visual_id_input else &"custom_gem"
 	v.cut_id = CUT_IDS[_cut_dropdown.selected] if _cut_dropdown.selected >= 0 else &"classic_round"
+	v.rotation_degrees = _rotation_slider.value
 	v.base_color = _base_color_picker.color
 	v.use_texture = not texture_path.is_empty()
 	v.color_texture = _get_selected_texture() if v.use_texture else null
@@ -743,7 +809,13 @@ func _build_visual() -> GemVisualResource:
 	v.sparkle_intensity = _sparkle_intensity_slider.value
 	v.sparkle_threshold = _sparkle_threshold_slider.value
 	v.gradient_color = _gradient_color_picker.color
+	v.gradient_mode = _gradient_mode_dropdown.selected if _gradient_mode_dropdown.selected >= 0 else GemVisualResource.GRADIENT_MODE_LINEAR
 	v.gradient_strength = _gradient_strength_slider.value
+	v.gradient_angle_degrees = _gradient_angle_slider.value
+	v.phenomenon_color = _phenomenon_color_picker.color
+	v.phenomenon_strength = _phenomenon_strength_slider.value
+	v.phenomenon_angle_degrees = _phenomenon_angle_slider.value
+	v.phenomenon_sharpness = _phenomenon_sharpness_slider.value
 	v.brilliance_contrast = _brilliance_slider.value
 	v.extinction = _extinction_slider.value
 	return v
@@ -775,6 +847,8 @@ func _load_from_visual(visual: GemVisualResource) -> void:
 			break
 	if cut_idx >= 0:
 		_cut_dropdown.select(cut_idx)
+	_rotation_slider.value = visual.rotation_degrees
+	_rotation_value.text = _format_display(visual.rotation_degrees)
 
 	var texture_idx := 0
 	if visual.use_texture and visual.color_texture != null:
@@ -827,8 +901,21 @@ func _load_from_visual(visual: GemVisualResource) -> void:
 	_sparkle_threshold_slider.value = visual.sparkle_threshold
 	_sparkle_threshold_value.text = _format_display(visual.sparkle_threshold)
 	_gradient_color_picker.color = visual.gradient_color
+	if visual.gradient_mode >= 0 and visual.gradient_mode < GRADIENT_MODE_LABELS.size():
+		_gradient_mode_dropdown.select(visual.gradient_mode)
+	else:
+		_gradient_mode_dropdown.select(GemVisualResource.GRADIENT_MODE_LINEAR)
 	_gradient_strength_slider.value = visual.gradient_strength
 	_gradient_strength_value.text = _format_display(visual.gradient_strength)
+	_gradient_angle_slider.value = visual.gradient_angle_degrees
+	_gradient_angle_value.text = _format_display(visual.gradient_angle_degrees)
+	_phenomenon_color_picker.color = visual.phenomenon_color
+	_phenomenon_strength_slider.value = visual.phenomenon_strength
+	_phenomenon_strength_value.text = _format_display(visual.phenomenon_strength)
+	_phenomenon_angle_slider.value = visual.phenomenon_angle_degrees
+	_phenomenon_angle_value.text = _format_display(visual.phenomenon_angle_degrees)
+	_phenomenon_sharpness_slider.value = visual.phenomenon_sharpness
+	_phenomenon_sharpness_value.text = _format_display(visual.phenomenon_sharpness)
 	_brilliance_slider.value = visual.brilliance_contrast
 	_brilliance_value.text = _format_display(visual.brilliance_contrast)
 	_extinction_slider.value = visual.extinction
@@ -869,6 +956,8 @@ func _generate_tres(v: GemVisualResource) -> String:
 	lines.append('script = ExtResource("1")')
 	lines.append('visual_id = &"%s"' % String(v.visual_id))
 	lines.append('cut_id = &"%s"' % String(v.cut_id))
+	if not is_zero_approx(v.rotation_degrees):
+		lines.append("rotation_degrees = %s" % _fmt_prop(v.rotation_degrees))
 	lines.append("base_color = Color(%s)" % _fmt_color(v.base_color))
 	if has_texture:
 		lines.append("use_texture = true")
@@ -922,6 +1011,17 @@ func _generate_tres(v: GemVisualResource) -> String:
 	if v.gradient_strength > 0.001 and v.gradient_color.a > 0.001:
 		lines.append("gradient_color = Color(%s)" % _fmt_color(v.gradient_color))
 		lines.append("gradient_strength = %s" % _fmt_prop(v.gradient_strength))
+		if v.gradient_mode != GemVisualResource.GRADIENT_MODE_LINEAR:
+			lines.append("gradient_mode = %d" % v.gradient_mode)
+		if not is_equal_approx(v.gradient_angle_degrees, 90.0):
+			lines.append("gradient_angle_degrees = %s" % _fmt_prop(v.gradient_angle_degrees))
+	if v.phenomenon_strength > 0.001 and v.phenomenon_color.a > 0.001:
+		lines.append("phenomenon_color = Color(%s)" % _fmt_color(v.phenomenon_color))
+		lines.append("phenomenon_strength = %s" % _fmt_prop(v.phenomenon_strength))
+		if not is_zero_approx(v.phenomenon_angle_degrees):
+			lines.append("phenomenon_angle_degrees = %s" % _fmt_prop(v.phenomenon_angle_degrees))
+		if not is_equal_approx(v.phenomenon_sharpness, 1.0):
+			lines.append("phenomenon_sharpness = %s" % _fmt_prop(v.phenomenon_sharpness))
 	if v.brilliance_contrast > 0.001:
 		lines.append("brilliance_contrast = %s" % _fmt_prop(v.brilliance_contrast))
 	if v.extinction > 0.001:
@@ -934,6 +1034,7 @@ func _generate_json(v: GemVisualResource) -> String:
 	var data := {
 		"visual_id": String(v.visual_id),
 		"cut_id": String(v.cut_id),
+		"rotation_degrees": snappedf(v.rotation_degrees, 0.01),
 		"base_color": _color_array(v.base_color),
 		"use_texture": v.use_texture,
 		"color_texture_path": _texture_path_for_visual(v),
@@ -963,7 +1064,13 @@ func _generate_json(v: GemVisualResource) -> String:
 		"sparkle_intensity": snappedf(v.sparkle_intensity, 0.001),
 		"sparkle_threshold": snappedf(v.sparkle_threshold, 0.001),
 		"gradient_color": _color_array(v.gradient_color),
+		"gradient_mode": v.gradient_mode,
 		"gradient_strength": snappedf(v.gradient_strength, 0.001),
+		"gradient_angle_degrees": snappedf(v.gradient_angle_degrees, 0.1),
+		"phenomenon_color": _color_array(v.phenomenon_color),
+		"phenomenon_strength": snappedf(v.phenomenon_strength, 0.001),
+		"phenomenon_angle_degrees": snappedf(v.phenomenon_angle_degrees, 0.1),
+		"phenomenon_sharpness": snappedf(v.phenomenon_sharpness, 0.01),
 		"brilliance_contrast": snappedf(v.brilliance_contrast, 0.001),
 		"extinction": snappedf(v.extinction, 0.001),
 	}

@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"alexandrite"
+cut_id = &"octagon_step"
+base_color = Color(0.2, 0.54, 0.36, 1)
+shininess = 70.0
+specular_intensity = 0.52
+depth_tint = Color(0.16, 0.1, 0.16, 0.4)
+saturation_boost = 0.08
+contrast = 0.6
+hue_dispersion = 0.02
+rim_intensity = 0.12
+rim_color = Color(0.72, 0.9, 0.7, 1)
+rim_power = 2.1
+translucency = 0.16
+translucency_color = Color(0.78, 0.42, 0.52, 1)
+secondary_specular = 0.24
+secondary_light_angle = 118.0
+sparkle_intensity = 0.32
+sparkle_threshold = 0.8
+gradient_color = Color(0.42, 0.24, 0.54, 1)
+gradient_strength = 0.22
+gradient_angle_degrees = 30.0
+phenomenon_color = Color(0.74, 0.32, 0.7, 1)
+phenomenon_strength = 0.58
+phenomenon_angle_degrees = 18.0
+phenomenon_sharpness = 1.35
+brilliance_contrast = 0.42
+extinction = 0.32

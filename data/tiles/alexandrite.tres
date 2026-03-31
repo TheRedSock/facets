@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TileDefinitionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/definitions/tile_definition_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tile_id = &"alexandrite"
+display_name = "Alexandrite"
+tier = 6
+debug_color = Color(0.23, 0.56, 0.33, 1)
+merge_target_id = &"painite"

@@ -5,8 +5,16 @@ extends Resource
 ## References a cut_id (resolved at runtime by GemVisualRegistry)
 ## and specifies colour, material properties, and edge rendering.
 
+const GRADIENT_MODE_LINEAR := 0
+const GRADIENT_MODE_RADIAL := 1
+const GRADIENT_MODE_RADIAL_INVERSE := 2
+
 @export var visual_id: StringName = &""
 @export var cut_id: StringName = &""
+
+## Rotates the cut in degrees before lighting and fit normalization.
+## This keeps cut families axis-aligned while allowing per-gem orientation.
+@export_range(-180.0, 180.0) var rotation_degrees: float = 0.0
 
 # ---- Colour ----
 
@@ -77,10 +85,23 @@ extends Resource
 
 # ---- Color gradient ----
 
-## Blends the base colour toward this colour from top to bottom of the gem,
-## simulating natural colour zoning (e.g. amethyst purple-to-white).
+## Blends the base colour toward this colour using the selected zoning mode,
+## simulating natural colour zoning (e.g. amethyst purple-to-white or
+## tourmaline-style edge/core separation).
 @export var gradient_color: Color = Color.TRANSPARENT
 @export_range(0.0, 1.0) var gradient_strength: float = 0.0
+@export_enum("Linear", "Radial", "Radial Inverse") var gradient_mode: int = GRADIENT_MODE_LINEAR
+@export_range(-180.0, 180.0) var gradient_angle_degrees: float = 90.0
+
+# ---- Phenomenon cue ----
+
+## Static dual-tone cue for color-change stones (e.g. alexandrite, blue garnet).
+## The secondary colour is blended per facet based on facet orientation rather
+## than using prismatic dispersion intended for diamond-like fire.
+@export var phenomenon_color: Color = Color.TRANSPARENT
+@export_range(0.0, 1.0) var phenomenon_strength: float = 0.0
+@export_range(-180.0, 180.0) var phenomenon_angle_degrees: float = 0.0
+@export_range(0.5, 4.0) var phenomenon_sharpness: float = 1.0
 
 # ---- Zone brilliance ----
 

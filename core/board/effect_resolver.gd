@@ -7,6 +7,9 @@ var last_remove_events: Array[Dictionary] = []
 ## Per-tile upgrade events from the last apply() call.
 var last_upgrade_events: Array[Dictionary] = []
 
+## Optional per-run tier selection: tier -> tile_id.
+var tier_tile_overrides: Dictionary = {}
+
 
 ## Applies the approved effect plan to the board state.
 ## Emits structured events to the EventLog for animation, debug, and replay.
@@ -56,6 +59,11 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 					# Falls back to simple tier+1 if no merge chain is defined.
 					if tile.merge_target_id != &"" and tile_registry != null and tile_registry.has_definitions():
 						var target_def: TileDefinitionResource = tile_registry.get_definition(tile.merge_target_id)
+						if target_def != null and tier_tile_overrides.has(target_def.tier):
+							var selected_tile_id: StringName = tier_tile_overrides[target_def.tier]
+							var selected_def: TileDefinitionResource = tile_registry.get_definition(selected_tile_id)
+							if selected_def != null and selected_def.tier == target_def.tier:
+								target_def = selected_def
 						if target_def != null:
 							tile.tile_id = target_def.tile_id
 							tile.tier = target_def.tier

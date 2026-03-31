@@ -81,6 +81,60 @@ static func build_fan_cut(profile: Dictionary) -> GemCutResource:
 	return finalize_cut(cut)
 
 
+static func build_princess_cut(profile: Dictionary) -> GemCutResource:
+	var cut := _make_cut(profile)
+	var outer: Array[Vector2] = profile.get("outer_points", GemCutPrimitives.rect_points(
+		GemCutPrimitives.GEM_RADIUS,
+		GemCutPrimitives.GEM_RADIUS
+	))
+	if outer.size() != 4:
+		return cut
+
+	var table := GemCutPrimitives.scale_points(outer, profile.get("table_ratio", 0.36))
+	var edge_trim := clampf(profile.get("edge_trim", 0.2), 0.08, 0.36)
+	var trim_start: Array[Vector2] = []
+	var trim_end: Array[Vector2] = []
+	var tilts: Dictionary = profile.get("tilts", {})
+
+	for i in outer.size():
+		var next_index := (i + 1) % outer.size()
+		trim_start.append(GemCutPrimitives.point_on_segment(outer[i], outer[next_index], edge_trim))
+		trim_end.append(GemCutPrimitives.point_on_segment(outer[i], outer[next_index], 1.0 - edge_trim))
+
+	cut.add_facet(GemCutPrimitives.pva(table), Vector3(0, 0, 1), "table")
+
+	for i in outer.size():
+		var next_index := (i + 1) % outer.size()
+		var prev_side := (i - 1 + outer.size()) % outer.size()
+
+		var inner_corner := GemCutPrimitives.pva([table[i], trim_end[prev_side], trim_start[i]])
+		cut.add_facet(inner_corner, GemCutPrimitives.normal_for(
+			GemCutPrimitives.centroid_pva(inner_corner),
+			tilts.get("star", 18.0)
+		), "star")
+
+		var side_crown := GemCutPrimitives.pva([table[i], table[next_index], trim_end[i], trim_start[i]])
+		cut.add_facet(side_crown, GemCutPrimitives.normal_for(
+			GemCutPrimitives.centroid_pva(side_crown),
+			tilts.get("bezel", 34.0)
+		), "bezel")
+
+		var side_border := GemCutPrimitives.pva([trim_start[i], trim_end[i], outer[next_index], outer[i]])
+		cut.add_facet(side_border, GemCutPrimitives.normal_for(
+			GemCutPrimitives.centroid_pva(side_border),
+			tilts.get("girdle", 42.0)
+		), "girdle")
+
+		var outer_corner := GemCutPrimitives.pva([outer[i], trim_start[i], trim_end[prev_side]])
+		cut.add_facet(outer_corner, GemCutPrimitives.normal_for(
+			GemCutPrimitives.centroid_pva(outer_corner),
+			tilts.get("corner", tilts.get("girdle", 44.0))
+		), "girdle")
+
+	cut.silhouette = profile.get("silhouette", GemCutPrimitives.pva(outer))
+	return finalize_cut(cut)
+
+
 static func build_radiant_cut(profile: Dictionary) -> GemCutResource:
 	var cut := _make_cut(profile)
 	var outer: Array[Vector2] = []
@@ -181,6 +235,28 @@ static func finalize_cut(cut: GemCutResource) -> GemCutResource:
 	_collect_edges(cut)
 	_normalize_to_fit(cut)
 	generate_pavilion_overlay(cut)
+	_precompute_facet_constants(cut)
+	return cut
+
+
+## Creates a per-visual rotated variant of an existing cut.
+## Rotation is applied before fit normalization so a 45-degree square still
+## fills the same footprint as the base cut.
+static func create_visual_variant(base_cut: GemCutResource, rotation_degrees: float) -> GemCutResource:
+	if base_cut == null:
+		return null
+	var needs_rotation := not is_zero_approx(rotation_degrees)
+	var needs_fit_adjustment := _needs_orientation_fit_adjustment(base_cut)
+	if not needs_rotation and not needs_fit_adjustment:
+		return base_cut
+
+	var cut := _duplicate_cut(base_cut)
+	if needs_rotation:
+		var angle := deg_to_rad(rotation_degrees)
+		_rotate_cut_geometry(cut, angle)
+		_normalize_to_fit(cut)
+	if needs_fit_adjustment:
+		_apply_orientation_fit_scale(cut, rotation_degrees)
 	_precompute_facet_constants(cut)
 	return cut
 
@@ -320,6 +396,7 @@ static func _make_cut(profile: Dictionary) -> GemCutResource:
 	cut.cut_id = profile.get("cut_id", &"")
 	cut.display_name = profile.get("display_name", "")
 	cut.shape_category = profile.get("shape_category", &"")
+	cut.orientation_fit_axis_aligned_scale = float(profile.get("orientation_fit_axis_aligned_scale", 1.0))
 	cut.pavilion_sector_count = int(profile.get("pavilion_sector_count", _infer_pavilion_sector_count(profile)))
 	cut.pavilion_rotation_fraction = float(profile.get("pavilion_rotation_fraction", 0.5))
 	cut.pavilion_scale = float(profile.get("pavilion_scale", 0.88))
@@ -465,6 +542,10 @@ static func _normalize_to_fit(cut: GemCutResource) -> void:
 		for vertex in segment:
 			min_pt = Vector2(minf(min_pt.x, vertex.x), minf(min_pt.y, vertex.y))
 			max_pt = Vector2(maxf(max_pt.x, vertex.x), maxf(max_pt.y, vertex.y))
+	for poly in cut.pavilion_vertices:
+		for vertex in poly:
+			min_pt = Vector2(minf(min_pt.x, vertex.x), minf(min_pt.y, vertex.y))
+			max_pt = Vector2(maxf(max_pt.x, vertex.x), maxf(max_pt.y, vertex.y))
 
 	if min_pt.x >= max_pt.x or min_pt.y >= max_pt.y:
 		return
@@ -498,6 +579,149 @@ static func _normalize_to_fit(cut: GemCutResource) -> void:
 			new_segment[i] = transform.call(segment[i])
 		new_edges.append(new_segment)
 	cut.edge_segments = new_edges
+
+	var new_pavilion: Array[PackedVector2Array] = []
+	for poly in cut.pavilion_vertices:
+		var new_poly := PackedVector2Array()
+		new_poly.resize(poly.size())
+		for i in poly.size():
+			new_poly[i] = transform.call(poly[i])
+		new_pavilion.append(new_poly)
+	cut.pavilion_vertices = new_pavilion
+
+
+static func _duplicate_cut(source: GemCutResource) -> GemCutResource:
+	var cut := GemCutResource.new()
+	cut.cut_id = source.cut_id
+	cut.display_name = source.display_name
+	cut.shape_category = source.shape_category
+	cut.orientation_fit_axis_aligned_scale = source.orientation_fit_axis_aligned_scale
+	cut.pavilion_sector_count = source.pavilion_sector_count
+	cut.pavilion_rotation_fraction = source.pavilion_rotation_fraction
+	cut.pavilion_scale = source.pavilion_scale
+	cut.pavilion_normal_z_scale = source.pavilion_normal_z_scale
+
+	for poly in source.facet_vertices:
+		cut.facet_vertices.append(poly.duplicate())
+	cut.facet_normals = source.facet_normals.duplicate()
+	cut.facet_zones = source.facet_zones.duplicate()
+	cut.silhouette = source.silhouette.duplicate()
+	for segment in source.edge_segments:
+		cut.edge_segments.append(segment.duplicate())
+	cut.edge_facet_a = source.edge_facet_a.duplicate()
+	cut.edge_facet_b = source.edge_facet_b.duplicate()
+	for poly in source.pavilion_vertices:
+		cut.pavilion_vertices.append(poly.duplicate())
+	cut.pavilion_normals = source.pavilion_normals.duplicate()
+	cut.pavilion_source_indices = source.pavilion_source_indices.duplicate()
+	cut.pavilion_target_indices = source.pavilion_target_indices.duplicate()
+	return cut
+
+
+static func _rotate_cut_geometry(cut: GemCutResource, angle: float) -> void:
+	if is_zero_approx(angle):
+		return
+
+	var cos_a := cos(angle)
+	var sin_a := sin(angle)
+	var center := GemCutPrimitives.CENTER
+	var rotate_point := func(point: Vector2) -> Vector2:
+		var delta := point - center
+		return center + Vector2(
+			delta.x * cos_a - delta.y * sin_a,
+			delta.x * sin_a + delta.y * cos_a
+		)
+
+	for i in cut.facet_vertices.size():
+		var poly := cut.facet_vertices[i]
+		var rotated := PackedVector2Array()
+		rotated.resize(poly.size())
+		for j in poly.size():
+			rotated[j] = rotate_point.call(poly[j])
+		cut.facet_vertices[i] = rotated
+
+	for i in cut.silhouette.size():
+		cut.silhouette[i] = rotate_point.call(cut.silhouette[i])
+
+	for i in cut.edge_segments.size():
+		var segment := cut.edge_segments[i]
+		var rotated_segment := PackedVector2Array()
+		rotated_segment.resize(segment.size())
+		for j in segment.size():
+			rotated_segment[j] = rotate_point.call(segment[j])
+		cut.edge_segments[i] = rotated_segment
+
+	for i in cut.pavilion_vertices.size():
+		var poly := cut.pavilion_vertices[i]
+		var rotated := PackedVector2Array()
+		rotated.resize(poly.size())
+		for j in poly.size():
+			rotated[j] = rotate_point.call(poly[j])
+		cut.pavilion_vertices[i] = rotated
+
+	for i in cut.facet_normals.size():
+		var normal := cut.facet_normals[i]
+		cut.facet_normals[i] = Vector3(
+			normal.x * cos_a - normal.y * sin_a,
+			normal.x * sin_a + normal.y * cos_a,
+			normal.z
+		).normalized()
+
+	for i in cut.pavilion_normals.size():
+		var normal := cut.pavilion_normals[i]
+		cut.pavilion_normals[i] = Vector3(
+			normal.x * cos_a - normal.y * sin_a,
+			normal.x * sin_a + normal.y * cos_a,
+			normal.z
+		).normalized()
+
+
+static func _needs_orientation_fit_adjustment(cut: GemCutResource) -> bool:
+	return cut != null and cut.orientation_fit_axis_aligned_scale < 0.999
+
+
+static func _apply_orientation_fit_scale(cut: GemCutResource, rotation_degrees: float) -> void:
+	var axis_scale := clampf(cut.orientation_fit_axis_aligned_scale, 0.5, 1.0)
+	if axis_scale >= 0.999:
+		return
+	var axis_alignment := absf(cos(deg_to_rad(rotation_degrees) * 2.0))
+	var scale := lerpf(1.0, axis_scale, axis_alignment)
+	if scale >= 0.999:
+		return
+	_scale_cut_geometry(cut, scale)
+
+
+static func _scale_cut_geometry(cut: GemCutResource, scale_factor: float) -> void:
+	var center := GemCutPrimitives.CENTER
+	var scale_point := func(point: Vector2) -> Vector2:
+		return center + (point - center) * scale_factor
+
+	for i in cut.facet_vertices.size():
+		var poly := cut.facet_vertices[i]
+		var scaled := PackedVector2Array()
+		scaled.resize(poly.size())
+		for j in poly.size():
+			scaled[j] = scale_point.call(poly[j])
+		cut.facet_vertices[i] = scaled
+
+	for i in cut.silhouette.size():
+		cut.silhouette[i] = scale_point.call(cut.silhouette[i])
+
+	for i in cut.edge_segments.size():
+		var segment := cut.edge_segments[i]
+		var scaled_segment := PackedVector2Array()
+		scaled_segment.resize(segment.size())
+		for j in segment.size():
+			scaled_segment[j] = scale_point.call(segment[j])
+		cut.edge_segments[i] = scaled_segment
+
+	for i in cut.pavilion_vertices.size():
+		var poly := cut.pavilion_vertices[i]
+		var scaled := PackedVector2Array()
+		scaled.resize(poly.size())
+		for j in poly.size():
+			scaled[j] = scale_point.call(poly[j])
+		cut.pavilion_vertices[i] = scaled
 
 
 static func _collect_edges(cut: GemCutResource) -> void:

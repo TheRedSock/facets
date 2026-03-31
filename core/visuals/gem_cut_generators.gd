@@ -26,10 +26,10 @@ static func generate(cut_id: StringName) -> GemCutResource:
 			return GemCutBuilders.build_fan_cut(GemCutProfiles.trillion())
 		&"straight_trillion":
 			return GemCutBuilders.build_fan_cut(GemCutProfiles.straight_trillion())
-		&"radiant_diamond":
-			return GemCutBuilders.build_radiant_cut(GemCutProfiles.radiant_diamond())
 		&"princess_square":
-			return GemCutBuilders.build_radiant_cut(GemCutProfiles.princess_square())
+			return GemCutBuilders.build_princess_cut(GemCutProfiles.princess_square())
+		&"radiant_square":
+			return GemCutBuilders.build_radiant_cut(GemCutProfiles.radiant_square())
 		&"radiant_octagon":
 			return GemCutBuilders.build_radiant_cut(GemCutProfiles.radiant_octagon())
 		&"hex_brilliant":
@@ -48,6 +48,8 @@ static func generate(cut_id: StringName) -> GemCutResource:
 			return GemCutBuilders.build_step_cut(GemCutProfiles.tapered_baguette_step())
 		&"oval_brilliant":
 			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.oval_brilliant())
+		&"antique_oval":
+			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.antique_oval())
 		&"marquise_brilliant":
 			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.marquise_brilliant())
 		&"pear_brilliant":
