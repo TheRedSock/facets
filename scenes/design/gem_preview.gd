@@ -5,6 +5,8 @@ extends Control
 ## Renders a gem from a cut_id and GemVisualResource using the same
 ## pipeline as TileView: GemCutGenerators -> GemRenderer -> draw_colored_polygon.
 
+const GemCutBuildersScript = preload("res://core/visuals/gem_cut_builders.gd")
+
 var _gem_cut: GemCutResource = null
 var _gem_visual: GemVisualResource = null
 var _gem_colors: PackedColorArray = PackedColorArray()
@@ -46,7 +48,7 @@ var show_facet_aa_lines := true:
 
 func update_preview(cut_id: StringName, visual: GemVisualResource) -> void:
 	var base_cut := GemCutGenerators.generate(cut_id)
-	_gem_cut = GemCutBuilders.create_visual_variant(base_cut, visual.rotation_degrees)
+	_gem_cut = GemCutBuildersScript.create_visual_variant(base_cut, visual.rotation_degrees)
 	if _gem_cut == null:
 		_valid = false
 		queue_redraw()

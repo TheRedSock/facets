@@ -8,6 +8,8 @@ both `TileView._draw()` and the gameplay texture-bake path.
 - `gem_cut_generators.gd` — public facade from `cut_id` to generated `GemCutResource`
 - `gem_cut_profiles.gd` — declarative cut library; each profile is mostly parameters
 - `gem_cut_builders.gd` — reusable topology builders (`radial`, `step`, `fan`, `radiant`, `rose`) and cut-specific pavilion overlay generation
+- `gem_mesh_generators.gd` / `gem_mesh_builders.gd` — traced-bake mesh generation from cut data
+- `gem_optics_tracer.gd` — offline CPU tracer used to bake traced gameplay variants
 - `gem_cut_primitives.gd` — shared outline math, polygon helpers, curve sampling, normalization helpers, and winding-safe polygon clipping
 - `gem_renderer.gd` — pseudo-3D lighting, per-facet colour generation, and pavilion extinction overlay colouring
 
@@ -23,6 +25,8 @@ both `TileView._draw()` and the gameplay texture-bake path.
 At runtime, `GemVisualRegistry` reuses those render bundles in two ways:
 - `TileView._draw()` for direct procedural rendering and fallback paths
 - `GameplayGemBakeView` for board-ready baked textures used by gameplay `TileView`s
+
+The traced offline bake path is covered in [plans/traced-bake-pipeline-reference.md](../../plans/traced-bake-pipeline-reference.md).
 
 ### Pavilion Extinction Overlay
 
@@ -66,6 +70,7 @@ If the cut needs a different facet topology:
 - Prefer adding a profile over adding bespoke cut-specific assembly code
 - Keep `GemCutGenerators.generate()` as the stable facade for the rest of the project
 - Keep pavilion behavior cut-specific by setting metadata on the generated `GemCutResource`, not by inferring from `shape_category`
+- Use cut-specific pavilion mesh builders when possible; generic fallback mesh generation should still honor the cut silhouette rather than mirroring crown facets wholesale
 - Gameplay uses registry-baked textures generated from the same procedural source; the only non-gem fallback is the coloured debug rectangle in `TileView`
 - New visual properties should be added to `GemVisualResource` with zero-value defaults so existing `.tres` files render identically
 - The Gem Designer (`scenes/design/`) should expose all new visual properties for interactive tuning
@@ -79,6 +84,15 @@ godot --headless --script tests/test_gem_cuts.gd
 ```
 
 This suite now also checks pavilion fragment integrity, pavilion symmetry metadata, and winding-independent clipping.
+
+Run mesh and traced-bake coverage when touching traced geometry or optics:
+
+```bash
+godot --headless --script tests/test_gem_meshes.gd
+godot --headless --script tests/test_gem_optics_tracer.gd
+godot --headless --script tests/test_gameplay_bake_backends.gd
+godot --headless --script tests/test_gameplay_variant_math.gd
+```
 
 Run the broader smoke suite when changes may affect startup or resource loading:
 

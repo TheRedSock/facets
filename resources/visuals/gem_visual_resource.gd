@@ -8,6 +8,9 @@ extends Resource
 const GRADIENT_MODE_LINEAR := 0
 const GRADIENT_MODE_RADIAL := 1
 const GRADIENT_MODE_RADIAL_INVERSE := 2
+const OPTICS_ENVIRONMENT_NEUTRAL := 0
+const OPTICS_ENVIRONMENT_DARK_STUDIO := 1
+const OPTICS_ENVIRONMENT_GEM_BOOTH := 2
 
 @export var visual_id: StringName = &""
 @export var cut_id: StringName = &""
@@ -123,3 +126,84 @@ const GRADIENT_MODE_RADIAL_INVERSE := 2
 
 @export var edge_color: Color = Color(1.0, 1.0, 1.0, 0.0)
 @export_range(0.0, 3.0) var edge_width: float = 0.0
+
+# ---- Offline traced optics ----
+
+## Dielectric index of refraction used by the offline traced bake path.
+## Typical gemstones live roughly in the 1.45-2.45 range.
+@export_range(1.0, 3.0) var optics_ior: float = 1.62
+
+## Channel-to-channel IOR spread used for spectral splitting.
+## Blue gets a slightly higher IOR than red when this is non-zero.
+@export_range(0.0, 0.2) var optics_dispersion: float = 0.018
+
+## Beer-Lambert absorption tint for the traced path. If left transparent, the
+## traced bake derives a tint from base_color and depth_tint.
+@export var optics_absorption_color: Color = Color.TRANSPARENT
+@export_range(0.0, 8.0) var optics_absorption_strength: float = 1.1
+
+## Surface polish / microsurface roughness for the traced path.
+@export_range(0.0, 1.0) var optics_surface_roughness: float = 0.02
+
+## Forward-scattering approximation for cloudy or silky gems.
+@export_range(0.0, 1.0) var optics_scattering_strength: float = 0.0
+@export var optics_scattering_color: Color = Color.WHITE
+
+## Additional traced-bake framing scale applied after cut-specific fit compensation.
+## Increase for stones that read too small in the traced showroom camera.
+@export_range(0.5, 2.0) var optics_trace_view_scale: float = 1.0
+
+## Uniaxial birefringence amount for the traced path.
+## 0.0 disables double refraction. Corundum is roughly 0.008.
+@export_range(0.0, 0.05) var optics_birefringence_strength: float = 0.0
+@export var optics_optic_axis: Vector3 = Vector3.UP
+
+## Default traced showroom camera angles. Request-level overrides still win.
+@export_range(-89.0, 89.0) var optics_lighting_view_pitch_degrees: float = 0.0
+@export_range(-180.0, 180.0) var optics_lighting_view_yaw_degrees: float = 0.0
+@export_range(-89.0, 89.0) var optics_rotation_view_pitch_degrees: float = -26.0
+@export_range(-180.0, 180.0) var optics_rotation_view_yaw_degrees: float = 36.0
+
+## Scales the environment and direct light contribution used during traced baking.
+@export_enum("Neutral Sky", "Dark Studio", "Gem Booth") var optics_environment_preset: int = OPTICS_ENVIRONMENT_NEUTRAL
+@export_range(-180.0, 180.0) var optics_environment_rotation_degrees: float = 0.0
+@export_range(0.0, 4.0) var optics_environment_energy: float = 1.0
+@export_range(0.0, 8.0) var optics_light_energy: float = 2.4
+
+# ---- Offline bake stylization ----
+
+## Blends between the traced result and the gameplay stylization pass.
+## This keeps the traced output as the physical base while allowing
+## readability-driven shaping for board textures.
+@export_range(0.0, 1.0) var stylize_mix: float = 0.65
+
+## Strength of facet-edge crisping driven by image-space discontinuity guides.
+@export_range(0.0, 1.0) var stylize_facet_edge_gain: float = 0.55
+
+## Pushes lit planes brighter and dark planes deeper by compressing midtones.
+@export_range(0.0, 1.0) var stylize_plane_contrast: float = 0.35
+
+## Minimum light preserved inside dark regions after the stylized tone remap.
+@export_range(0.0, 0.35) var stylize_shadow_floor: float = 0.08
+
+## Strength of the tightly-thresholded internal bloom pass.
+@export_range(0.0, 1.0) var stylize_highlight_bloom_gain: float = 0.22
+
+## Brightness threshold where the stylized bloom starts to appear.
+@export_range(0.4, 1.0) var stylize_highlight_bloom_threshold: float = 0.8
+
+## Suppresses low-amplitude micro detail while preserving major facet edges.
+@export_range(0.0, 1.0) var stylize_microdetail_suppression: float = 0.28
+
+## Extra guided saturation for internal dispersion/absorption color structure.
+@export_range(0.0, 1.0) var stylize_internal_color_shift_gain: float = 0.2
+
+## Quantizes lighting into a small number of broad tone bands for a more
+## cel-shaded presentation while keeping the traced light response intact.
+@export_range(2, 8, 1) var stylize_tone_steps: int = 5
+
+## Darkens strong facet discontinuities with a tinted ink-like edge treatment.
+@export_range(0.0, 1.0) var stylize_edge_ink_strength: float = 0.16
+
+## Snaps very bright highlights into cleaner, more graphic specular shapes.
+@export_range(0.0, 1.0) var stylize_highlight_snap: float = 0.24

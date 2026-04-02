@@ -1,7 +1,7 @@
 extends Control
 
 ## Main Menu — entry point for the game.
-## Provides navigation to the Run scene (Play), Gem Designer, and Gem Gallery.
+## Provides navigation to the Run scene and offline baked gem gallery.
 
 
 func _ready() -> void:
@@ -54,17 +54,9 @@ func _ready() -> void:
 	play_btn.pressed.connect(_on_play)
 	vbox.add_child(play_btn)
 
-	# ---- Gem Designer button ----
-	var design_btn := Button.new()
-	design_btn.text = "Gem Designer"
-	design_btn.custom_minimum_size = Vector2(300, 56)
-	design_btn.add_theme_font_size_override("font_size", 24)
-	design_btn.pressed.connect(_on_design)
-	vbox.add_child(design_btn)
-
 	# ---- Gem Gallery button ----
 	var gallery_btn := Button.new()
-	gallery_btn.text = "Gem Gallery"
+	gallery_btn.text = "Offline Gem Gallery"
 	gallery_btn.custom_minimum_size = Vector2(300, 56)
 	gallery_btn.add_theme_font_size_override("font_size", 24)
 	gallery_btn.pressed.connect(_on_gallery)
@@ -73,10 +65,6 @@ func _ready() -> void:
 
 func _on_play() -> void:
 	get_tree().change_scene_to_file("res://scenes/main/main.tscn")
-
-
-func _on_design() -> void:
-	get_tree().change_scene_to_file("res://scenes/design/gem_design.tscn")
 
 
 func _on_gallery() -> void:

@@ -18,6 +18,8 @@ static func generate(cut_id: StringName) -> GemCutResource:
 			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.classic_round())
 		&"old_european_round":
 			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.old_european_round())
+		&"simple_octagon_step":
+			return GemCutBuilders.build_fan_cut(GemCutProfiles.simple_octagon_step())
 		&"cushion":
 			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.cushion())
 		&"heart_brilliant":
@@ -28,6 +30,8 @@ static func generate(cut_id: StringName) -> GemCutResource:
 			return GemCutBuilders.build_fan_cut(GemCutProfiles.straight_trillion())
 		&"princess_square":
 			return GemCutBuilders.build_princess_cut(GemCutProfiles.princess_square())
+		&"lozenge":
+			return GemCutBuilders.build_step_cut(GemCutProfiles.lozenge())
 		&"radiant_square":
 			return GemCutBuilders.build_radiant_cut(GemCutProfiles.radiant_square())
 		&"radiant_octagon":

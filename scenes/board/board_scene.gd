@@ -511,23 +511,9 @@ func _compute_layout() -> void:
 	var available := size
 	if available.x <= 0 or available.y <= 0:
 		available = get_viewport_rect().size
-
 	var cols := _board_state.size.x
 	var rows := _board_state.size.y
-
-	var padding := 8.0
-	var usable_w := available.x - padding * 2.0
-	var usable_h := available.y - padding * 2.0
-
-	# Width-primary sizing: use the widest cell that fits horizontally,
-	# then clamp to what fits vertically.  This ensures the board fills
-	# the available width on widescreen/landscape displays instead of
-	# being bottlenecked by a small vertical dimension.
-	var cell_w := int((usable_w - (cols - 1) * _spacing) / cols)
-	var cell_h := int((usable_h - (rows - 1) * _spacing) / rows)
-	var cell_dim := mini(cell_w, cell_h)
-	cell_dim = clampi(cell_dim, 40, 200)
-	_cell_size = Vector2i(cell_dim, cell_dim)
+	_cell_size = estimate_cell_size(_board_state.size)
 
 	var board_pixel_w := cols * (_cell_size.x + _spacing) - _spacing
 	var board_pixel_h := rows * (_cell_size.y + _spacing) - _spacing
@@ -546,6 +532,22 @@ func _compute_layout() -> void:
 	if tile_canvas != null:
 		tile_canvas.position = _board_offset
 		tile_canvas.size = Vector2(board_pixel_w, board_pixel_h)
+
+
+func estimate_cell_size(board_size: Vector2i) -> Vector2i:
+	if board_size.x <= 0 or board_size.y <= 0:
+		return Vector2i(80, 80)
+	var available := size
+	if available.x <= 0 or available.y <= 0:
+		available = get_viewport_rect().size
+	var padding := 8.0
+	var usable_w := available.x - padding * 2.0
+	var usable_h := available.y - padding * 2.0
+	var cell_w := int((usable_w - (board_size.x - 1) * _spacing) / board_size.x)
+	var cell_h := int((usable_h - (board_size.y - 1) * _spacing) / board_size.y)
+	var cell_dim := mini(cell_w, cell_h)
+	cell_dim = clampi(cell_dim, 40, 200)
+	return Vector2i(cell_dim, cell_dim)
 
 
 func _reposition_all() -> void:
@@ -790,6 +792,7 @@ func _play_match_remove_upgrade(
 				# Show the new gem visual immediately, then expand from zero
 				view.modulate = Color.WHITE
 				view.show_upgrade_full(new_tier, new_tile_id)
+				view.play_special_rotation_animation(upgrade_reset_delay, 1.0)
 				view.scale = Vector2.ZERO
 				if upgrade_pulse_duration <= 0.0:
 					view.scale = Vector2.ONE

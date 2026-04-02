@@ -7,6 +7,12 @@ extends Control
 var run_controller := RunController.new()
 var _debug_panel: DebugPanel
 var _back_button: Button
+var _loading_overlay: Control
+var _loading_title: Label
+var _loading_status: Label
+var _loading_progress: ProgressBar
+var _pending_run_config: Dictionary = {}
+var _runtime_preload_active := false
 
 ## Tracks the last swap's timing breakdown for the HUD perf line.
 var _last_sim_ms := 0.0
@@ -39,7 +45,14 @@ func _ready() -> void:
 	_back_button.pressed.connect(_on_back_pressed)
 	add_child(_back_button)
 
-	_begin_runtime_preload()
+	_build_loading_overlay()
+	board_scene.visible = false
+	call_deferred("_begin_runtime_preload")
+
+
+func _exit_tree() -> void:
+	if GemVisualRegistry != null and GemVisualRegistry.gameplay_texture_bake_progress.is_connected(_on_gameplay_texture_bake_progress):
+		GemVisualRegistry.gameplay_texture_bake_progress.disconnect(_on_gameplay_texture_bake_progress)
 
 
 func _process(_delta: float) -> void:
@@ -109,17 +122,32 @@ func _on_back_pressed() -> void:
 
 
 func _begin_runtime_preload() -> void:
+	_runtime_preload_active = true
+	_pending_run_config = GameConfig.default_run_config()
+	_pending_run_config["seed"] = randi_range(1, 999999)
+	var preload_cell_size := GameConfig.DEFAULT_CELL_SIZE
+	if board_scene != null:
+		preload_cell_size = board_scene.estimate_cell_size(
+			_pending_run_config.get("board_size", GameConfig.DEFAULT_BOARD_SIZE)
+		)
+	_set_loading_state("Loading offline gem textures...", "Scanning baked gem manifest", 0.02)
+	if GemVisualRegistry != null and not GemVisualRegistry.gameplay_texture_bake_progress.is_connected(_on_gameplay_texture_bake_progress):
+		GemVisualRegistry.gameplay_texture_bake_progress.connect(_on_gameplay_texture_bake_progress)
 	PerfMonitor.begin_span("runtime_preload")
 	if TileRegistry != null:
 		TileRegistry.preload_runtime_assets()
 	if GemVisualRegistry != null:
-		GemVisualRegistry.preload_runtime_assets([GameConfig.DEFAULT_CELL_SIZE])
-		if not GemVisualRegistry.is_gameplay_texture_cache_current(GameConfig.DEFAULT_CELL_SIZE):
+		GemVisualRegistry.set_gameplay_bake_backend_preference(
+			GemVisualRegistry.GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED
+		)
+		GemVisualRegistry.set_gameplay_runtime_bake_fallback_enabled(false)
+		GemVisualRegistry.preload_runtime_assets([preload_cell_size])
+		if not GemVisualRegistry.is_gameplay_texture_cache_current(preload_cell_size):
 			GemVisualRegistry.gameplay_texture_cache_rebuilt.connect(
 				_on_runtime_preload_ready,
 				CONNECT_ONE_SHOT
 			)
-			GemVisualRegistry.ensure_gameplay_texture_cache(GameConfig.DEFAULT_CELL_SIZE)
+			GemVisualRegistry.ensure_gameplay_texture_cache(preload_cell_size)
 			return
 	_finish_runtime_preload()
 
@@ -129,11 +157,103 @@ func _on_runtime_preload_ready(_profile: Dictionary) -> void:
 
 
 func _finish_runtime_preload() -> void:
+	_set_loading_state("Starting run...", "Offline gem textures ready", 1.0)
 	PerfMonitor.end_span("runtime_preload")
 	get_tree().process_frame.connect(_start_run_after_preload, CONNECT_ONE_SHOT)
 
 
 func _start_run_after_preload() -> void:
-	# Randomize seed each run.
-	var random_seed := randi_range(1, 999999)
-	run_controller.start_new_run({"seed": random_seed})
+	run_controller.start_new_run(_pending_run_config)
+	board_scene.visible = true
+	_runtime_preload_active = false
+	if _loading_overlay != null:
+		_loading_overlay.visible = false
+
+
+func _build_loading_overlay() -> void:
+	_loading_overlay = Control.new()
+	_loading_overlay.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_loading_overlay.mouse_filter = MOUSE_FILTER_STOP
+	add_child(_loading_overlay)
+
+	var shade := ColorRect.new()
+	shade.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	shade.color = Color(0.03, 0.04, 0.06, 0.92)
+	shade.mouse_filter = MOUSE_FILTER_STOP
+	_loading_overlay.add_child(shade)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	center.mouse_filter = MOUSE_FILTER_IGNORE
+	_loading_overlay.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(520, 180)
+	center.add_child(panel)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.11, 0.13, 0.18, 0.96)
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.border_color = Color(0.32, 0.44, 0.64, 0.9)
+	style.set_corner_radius_all(14)
+	style.content_margin_left = 28
+	style.content_margin_right = 28
+	style.content_margin_top = 24
+	style.content_margin_bottom = 24
+	panel.add_theme_stylebox_override("panel", style)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 14)
+	panel.add_child(content)
+
+	_loading_title = Label.new()
+	_loading_title.text = "Loading Run"
+	_loading_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading_title.add_theme_font_size_override("font_size", 28)
+	content.add_child(_loading_title)
+
+	_loading_status = Label.new()
+	_loading_status.text = "Loading offline gem textures"
+	_loading_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading_status.add_theme_font_size_override("font_size", 16)
+	content.add_child(_loading_status)
+
+	_loading_progress = ProgressBar.new()
+	_loading_progress.min_value = 0.0
+	_loading_progress.max_value = 1.0
+	_loading_progress.step = 0.001
+	_loading_progress.show_percentage = true
+	_loading_progress.value = 0.0
+	_loading_progress.custom_minimum_size = Vector2(0, 28)
+	content.add_child(_loading_progress)
+
+
+func _set_loading_state(title: String, status: String, progress: float) -> void:
+	if _loading_overlay == null:
+		return
+	_loading_overlay.visible = true
+	if _loading_title != null:
+		_loading_title.text = title
+	if _loading_status != null:
+		_loading_status.text = status
+	if _loading_progress != null:
+		_loading_progress.value = clampf(progress, 0.0, 1.0)
+
+
+func _on_gameplay_texture_bake_progress(progress_info: Dictionary) -> void:
+	if not _runtime_preload_active:
+		return
+	var total := maxi(int(progress_info.get("total", 0)), 1)
+	var completed := maxi(int(progress_info.get("completed", 0)), 0)
+	var tile_id := String(progress_info.get("tile_id", &"")).replace("_", " ").capitalize()
+	var stage := String(progress_info.get("stage", "baking"))
+	var progress := float(progress_info.get("progress", 0.0))
+	var status := "Loading offline gem textures %d/%d" % [completed, total]
+	if not tile_id.is_empty():
+		status += "  |  %s" % tile_id
+	if stage == "complete":
+		status = "Offline gem textures ready"
+	_set_loading_state("Loading Run", status, progress)

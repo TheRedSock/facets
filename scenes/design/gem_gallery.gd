@@ -2,6 +2,9 @@ extends Control
 
 ## Gem Gallery — renders all built-in gem presets side by side for art review.
 
+const TILE_VIEW_SCENE := preload("res://scenes/tile/tile_view.tscn")
+const PREVIEW_TILE_SIZE := Vector2(112, 112)
+
 const ALL_PRESET_IDS: Array[StringName] = [
 	&"quartz", &"amethyst", &"peridot", &"topaz",
 	&"sapphire", &"emerald", &"ruby", &"diamond",
@@ -9,12 +12,14 @@ const ALL_PRESET_IDS: Array[StringName] = [
 	&"aquamarine", &"alexandrite", &"painite", &"blue_garnet",
 ]
 
-var _show_outline := true
-var _show_facet_aa := true
-var _preview_cards: Array[GemPreview] = []
-
-
 func _ready() -> void:
+	if GemVisualRegistry != null:
+		GemVisualRegistry.set_gameplay_bake_backend_preference(
+			GemVisualRegistry.GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED
+		)
+		GemVisualRegistry.set_gameplay_runtime_bake_fallback_enabled(false)
+		GemVisualRegistry.ensure_gameplay_texture_cache(Vector2i(PREVIEW_TILE_SIZE), ALL_PRESET_IDS)
+
 	var bg := ColorRect.new()
 	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	bg.color = Color(0.08, 0.08, 0.11)
@@ -49,32 +54,14 @@ func _build_top_bar(parent: VBoxContainer) -> void:
 	menu_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn"))
 	top_bar.add_child(menu_btn)
 
-	var designer_btn := Button.new()
-	designer_btn.text = "Designer"
-	designer_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/design/gem_design.tscn"))
-	top_bar.add_child(designer_btn)
-
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top_bar.add_child(spacer)
 
-	var outline_toggle := CheckBox.new()
-	outline_toggle.text = "Show Game Outline"
-	outline_toggle.button_pressed = _show_outline
-	outline_toggle.toggled.connect(func(pressed: bool):
-		_show_outline = pressed
-		_apply_preview_toggles()
-	)
-	top_bar.add_child(outline_toggle)
-
-	var aa_toggle := CheckBox.new()
-	aa_toggle.text = "Show Facet Smoothing"
-	aa_toggle.button_pressed = _show_facet_aa
-	aa_toggle.toggled.connect(func(pressed: bool):
-		_show_facet_aa = pressed
-		_apply_preview_toggles()
-	)
-	top_bar.add_child(aa_toggle)
+	var note := Label.new()
+	note.text = "Offline traced presets"
+	note.add_theme_color_override("font_color", Color(0.62, 0.67, 0.76))
+	top_bar.add_child(note)
 
 
 func _build_gallery(parent: VBoxContainer) -> void:
@@ -136,13 +123,15 @@ func _build_preset_card(preset_id: StringName) -> Control:
 		preview_bg.add_theme_stylebox_override("panel", preview_style)
 		vbox.add_child(preview_bg)
 
-		var preview := GemPreview.new()
-		preview.custom_minimum_size = Vector2(132, 132)
-		preview.show_game_outline = _show_outline
-		preview.show_facet_aa_lines = _show_facet_aa
-		preview_bg.add_child(preview)
-		preview.update_preview(visual.cut_id, visual)
-		_preview_cards.append(preview)
+		var center := CenterContainer.new()
+		preview_bg.add_child(center)
+
+		var preview: TileView = TILE_VIEW_SCENE.instantiate()
+		preview.use_gameplay_texture_cache = true
+		preview.custom_minimum_size = PREVIEW_TILE_SIZE
+		preview.size = PREVIEW_TILE_SIZE
+		center.add_child(preview)
+		preview.configure_from_data(preset_id, _resolve_tier(preset_id), Vector2i.ZERO)
 	else:
 		var missing := Label.new()
 		missing.text = "Missing visual resource"
@@ -151,14 +140,6 @@ func _build_preset_card(preset_id: StringName) -> Control:
 		vbox.add_child(missing)
 
 	return card
-
-
-func _apply_preview_toggles() -> void:
-	for preview in _preview_cards:
-		if preview == null:
-			continue
-		preview.show_game_outline = _show_outline
-		preview.show_facet_aa_lines = _show_facet_aa
 
 
 func _build_meta_line(preset_id: StringName, visual: GemVisualResource) -> String:

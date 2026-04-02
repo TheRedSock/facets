@@ -106,6 +106,8 @@ static func build_princess_cut(profile: Dictionary) -> GemCutResource:
 	for i in outer.size():
 		var next_index := (i + 1) % outer.size()
 		var prev_side := (i - 1 + outer.size()) % outer.size()
+		var edge_mid := outer[i].lerp(outer[next_index], 0.5)
+		var edge_inner := edge_mid.lerp(GemCutPrimitives.CENTER, 0.16)
 
 		var inner_corner := GemCutPrimitives.pva([table[i], trim_end[prev_side], trim_start[i]])
 		cut.add_facet(inner_corner, GemCutPrimitives.normal_for(
@@ -119,7 +121,7 @@ static func build_princess_cut(profile: Dictionary) -> GemCutResource:
 			tilts.get("bezel", 34.0)
 		), "bezel")
 
-		var side_border := GemCutPrimitives.pva([trim_start[i], trim_end[i], outer[next_index], outer[i]])
+		var side_border := GemCutPrimitives.pva([trim_start[i], trim_end[i], edge_inner])
 		cut.add_facet(side_border, GemCutPrimitives.normal_for(
 			GemCutPrimitives.centroid_pva(side_border),
 			tilts.get("girdle", 42.0)
@@ -233,6 +235,7 @@ static func build_rose_cut(profile: Dictionary) -> GemCutResource:
 
 static func finalize_cut(cut: GemCutResource) -> GemCutResource:
 	_collect_edges(cut)
+	_rebuild_silhouette_from_boundary(cut)
 	_normalize_to_fit(cut)
 	generate_pavilion_overlay(cut)
 	_precompute_facet_constants(cut)
@@ -741,6 +744,72 @@ static func _collect_edges(cut: GemCutResource) -> void:
 				cut.edge_facet_b[edge_idx] = facet_index
 
 
+static func _rebuild_silhouette_from_boundary(cut: GemCutResource) -> void:
+	if cut == null or cut.edge_segments.is_empty():
+		return
+
+	var adjacency := {}
+	var boundary_points := {}
+	for i in cut.edge_segments.size():
+		if i >= cut.edge_facet_b.size() or cut.edge_facet_b[i] != -1:
+			continue
+		var edge: PackedVector2Array = cut.edge_segments[i]
+		if edge.size() < 2:
+			continue
+		var a := edge[0]
+		var b := edge[1]
+		var a_key := _point_key(a)
+		var b_key := _point_key(b)
+		boundary_points[a_key] = a
+		boundary_points[b_key] = b
+		if not adjacency.has(a_key):
+			adjacency[a_key] = PackedStringArray()
+		if not adjacency.has(b_key):
+			adjacency[b_key] = PackedStringArray()
+		var a_neighbors: PackedStringArray = adjacency[a_key]
+		if not a_neighbors.has(b_key):
+			a_neighbors.append(b_key)
+		adjacency[a_key] = a_neighbors
+		var b_neighbors: PackedStringArray = adjacency[b_key]
+		if not b_neighbors.has(a_key):
+			b_neighbors.append(a_key)
+		adjacency[b_key] = b_neighbors
+
+	if adjacency.is_empty():
+		return
+
+	var start_key := ""
+	for key in adjacency.keys():
+		start_key = String(key)
+		break
+	if start_key.is_empty():
+		return
+
+	var ordered := PackedVector2Array()
+	var current_key := start_key
+	var previous_key := ""
+	var max_steps := adjacency.size() + 2
+	for _step in max_steps:
+		ordered.append(boundary_points[current_key])
+		var neighbors: PackedStringArray = adjacency[current_key]
+		if neighbors.is_empty():
+			break
+		var next_key := ""
+		for neighbor in neighbors:
+			if String(neighbor) != previous_key:
+				next_key = String(neighbor)
+				break
+		if next_key.is_empty():
+			next_key = String(neighbors[0])
+		if next_key == start_key:
+			break
+		previous_key = current_key
+		current_key = next_key
+
+	if ordered.size() >= 3:
+		cut.silhouette = ordered
+
+
 static func _edge_key(a: Vector2, b: Vector2) -> String:
 	var ax: float = snapped(a.x, 0.0001)
 	var ay: float = snapped(a.y, 0.0001)
@@ -749,3 +818,7 @@ static func _edge_key(a: Vector2, b: Vector2) -> String:
 	if ax < bx or (ax == bx and ay < by):
 		return "%s,%s-%s,%s" % [ax, ay, bx, by]
 	return "%s,%s-%s,%s" % [bx, by, ax, ay]
+
+
+static func _point_key(point: Vector2) -> String:
+	return "%s,%s" % [snapped(point.x, 0.0001), snapped(point.y, 0.0001)]

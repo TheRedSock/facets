@@ -12,6 +12,8 @@ var _edge_aa_colors: PackedColorArray = PackedColorArray()
 var _render_geometry: Dictionary = {}
 var _valid := false
 
+const MIN_DRAWABLE_POLYGON_AREA := 0.5
+
 
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
@@ -51,14 +53,20 @@ func _draw() -> void:
 
 	for i in facets.size():
 		if i < _gem_colors.size():
-			draw_colored_polygon(facets[i], _gem_colors[i])
+			var safe_facet := _sanitize_polygon(facets[i])
+			if safe_facet.size() < 3:
+				continue
+			draw_colored_polygon(safe_facet, _gem_colors[i])
 			if i < unit_facets.size() and i < facet_normals.size():
 				_draw_texture_overlay(facets[i], unit_facets[i], facet_normals[i], _gem_colors[i])
 
 	if _pavilion_colors.size() > 0:
 		for i in pavilion.size():
 			if i < _pavilion_colors.size():
-				draw_colored_polygon(pavilion[i], _pavilion_colors[i])
+				var safe_pavilion := _sanitize_polygon(pavilion[i])
+				if safe_pavilion.size() < 3:
+					continue
+				draw_colored_polygon(safe_pavilion, _pavilion_colors[i])
 
 	for i in edge_aa_a.size():
 		draw_line(edge_aa_a[i], edge_aa_b[i], _edge_aa_colors[i], 0.5, true)
@@ -81,14 +89,75 @@ func _draw_texture_overlay(
 	if unit_points.size() != facet_points.size():
 		return
 
+	var sanitized := _sanitize_polygon_pair(facet_points, unit_points)
+	var safe_facet: PackedVector2Array = sanitized.get("facet_points", PackedVector2Array())
+	var safe_unit: PackedVector2Array = sanitized.get("unit_points", PackedVector2Array())
+	if safe_facet.size() < 3 or safe_unit.size() != safe_facet.size():
+		return
+
 	var uvs := GemRenderer.build_texture_uvs(
-		unit_points,
+		safe_unit,
 		facet_normal,
 		_gem_visual
 	)
 	var modulate := GemRenderer.compute_texture_overlay_color(facet_color, _gem_visual)
 	var colors := PackedColorArray()
-	colors.resize(facet_points.size())
-	for i in facet_points.size():
+	colors.resize(safe_facet.size())
+	for i in safe_facet.size():
 		colors[i] = modulate
-	draw_polygon(facet_points, colors, uvs, _gem_visual.color_texture)
+	draw_polygon(safe_facet, colors, uvs, _gem_visual.color_texture)
+
+
+func _sanitize_polygon(points: PackedVector2Array) -> PackedVector2Array:
+	if points.size() < 3:
+		return PackedVector2Array()
+	var cleaned := PackedVector2Array()
+	for point in points:
+		if cleaned.is_empty() or point.distance_squared_to(cleaned[cleaned.size() - 1]) > 0.0001:
+			cleaned.append(point)
+	if cleaned.size() >= 2 and cleaned[0].distance_squared_to(cleaned[cleaned.size() - 1]) <= 0.0001:
+		cleaned.remove_at(cleaned.size() - 1)
+	if cleaned.size() < 3:
+		return PackedVector2Array()
+	if _polygon_area_abs(cleaned) < MIN_DRAWABLE_POLYGON_AREA:
+		return PackedVector2Array()
+	if Geometry2D.triangulate_polygon(cleaned).size() < 3:
+		return PackedVector2Array()
+	return cleaned
+
+
+func _sanitize_polygon_pair(
+	facet_points: PackedVector2Array,
+	unit_points: PackedVector2Array,
+) -> Dictionary:
+	if facet_points.size() != unit_points.size() or facet_points.size() < 3:
+		return {}
+	var facet_clean := PackedVector2Array()
+	var unit_clean := PackedVector2Array()
+	for i in facet_points.size():
+		var facet_point := facet_points[i]
+		if facet_clean.is_empty() or facet_point.distance_squared_to(facet_clean[facet_clean.size() - 1]) > 0.0001:
+			facet_clean.append(facet_point)
+			unit_clean.append(unit_points[i])
+	if facet_clean.size() >= 2 and facet_clean[0].distance_squared_to(facet_clean[facet_clean.size() - 1]) <= 0.0001:
+		facet_clean.remove_at(facet_clean.size() - 1)
+		unit_clean.remove_at(unit_clean.size() - 1)
+	if facet_clean.size() < 3:
+		return {}
+	if _polygon_area_abs(facet_clean) < MIN_DRAWABLE_POLYGON_AREA:
+		return {}
+	if Geometry2D.triangulate_polygon(facet_clean).size() < 3:
+		return {}
+	return {
+		"facet_points": facet_clean,
+		"unit_points": unit_clean,
+	}
+
+
+func _polygon_area_abs(points: PackedVector2Array) -> float:
+	var doubled_area := 0.0
+	for i in points.size():
+		var a := points[i]
+		var b := points[(i + 1) % points.size()]
+		doubled_area += (a.x * b.y) - (b.x * a.y)
+	return absf(doubled_area) * 0.5

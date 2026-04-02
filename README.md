@@ -81,6 +81,8 @@ Higher tiers have progressively more dramatic shading, brighter specular highlig
 
 `TileView` now prefers a gameplay texture from `GemVisualRegistry` and falls back to procedural `_draw()` when the cache is unavailable. Both paths share the same cached render bundles, so the bake path and the direct path stay visually aligned. The procedural draw pass still renders filled crown facets, pavilion extinction overlay, silhouette outline, and internal edge lines. Pavilion overlays are derived from per-cut metadata on `GemCutResource`, and `extinction` controls only overlay strength rather than also darkening crown facets. If no gem visual can be resolved, the remaining fallback is a coloured debug rectangle. Silhouette outlines are toggled via `DebugFlags.gem_silhouette_outline`.
 
+The higher-fidelity offline traced path is documented in [Traced Bake Pipeline Reference](plans/traced-bake-pipeline-reference.md). That reference covers mesh generation, tracer configuration, manifest/runtime contract, and recommended bake settings.
+
 ## Gem Designer
 
 The Gem Designer (`scenes/design/gem_design.tscn`) is an interactive tool for designing gem visual configurations with real-time preview. It provides:
@@ -111,6 +113,15 @@ godot --headless --script tests/test_gem_cuts.gd
 
 The test suites cover topology, match detection, merge mechanics, gravity, the full cascade pipeline, deterministic replay verification, cut generation, normalized geometry bounds, facet counts, silhouette stability, pavilion fragment integrity, pavilion symmetry metadata, and winding-independent clipping.
 
+Additional traced/bake coverage:
+
+```bash
+godot --headless --script tests/test_gem_meshes.gd
+godot --headless --script tests/test_gem_optics_tracer.gd
+godot --headless --script tests/test_gameplay_bake_backends.gd
+godot --headless --script tests/test_gameplay_variant_math.gd
+```
+
 Optional long-run balance harness:
 
 ```bash
@@ -134,6 +145,7 @@ godot --headless --script tests/test_rng_cross_platform.gd
 
 - [AGENTS.md](AGENTS.md) — Full architectural reference for AI agents and contributors
 - [core/visuals/README.md](core/visuals/README.md) — Procedural cut-system architecture and extension guide
+- [Traced Bake Pipeline Reference](plans/traced-bake-pipeline-reference.md) — Offline traced bake architecture, parameter flow, and recommended settings
 - [Gem Engine Proposal](plans/gem-engine-proposal.md) — Game design and architecture proposal
 - [Executive Analysis](plans/executive-analysis.md) — Proposal review and scaffolding audit
 - [Getting Started Guide](plans/getting-started-guide.md) — Godot overview and phased prototyping plan

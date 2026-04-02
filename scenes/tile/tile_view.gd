@@ -11,10 +11,17 @@ var tier: int = 0
 var _label: Label
 var _background: ColorRect
 var _sprite_texture: TextureRect
+var _sprite_blend_material: ShaderMaterial
+var _transparent_sprite_texture: Texture2D
 var _outline_overlay: Control
 
+const GAMEPLAY_BLEND_SHADER := preload("res://scenes/tile/gameplay_sprite_blend.gdshader")
 const GAME_OUTLINE_COLOR := Color(0.0, 0.0, 0.0, 0.5)
 const DEFAULT_GAME_OUTLINE_WIDTH := 0.5
+const MAX_GAMEPLAY_SPRITE_LAYERS := 4
+const SPECIAL_ROTATION_DEFAULT_DURATION := 0.42
+const SPECIAL_ROTATION_DEFAULT_TURNS := 1.0
+const MISSING_BAKE_COLOR := Color(0.22, 0.08, 0.12, 1.0)
 
 ## Cached procedural gem data (set by _update_visual, consumed by _draw).
 var _gem_cut: GemCutResource = null
@@ -32,6 +39,14 @@ var _outline_cut: GemCutResource = null
 var _outline_cut_key: String = ""
 var _outline_geometry: Dictionary = {}
 var _use_runtime_outline := false
+var _last_lighting_uv := Vector2(-10.0, -10.0)
+var _debug_lighting_uv_override := Vector2(-1.0, -1.0)
+var _last_special_rotation_progress := -1.0
+var _last_applied_sprite_entries: Array[Dictionary] = []
+var _special_rotation_active := false
+var _special_rotation_elapsed := 0.0
+var _special_rotation_duration := 0.0
+var _special_rotation_turns := 1.0
 
 
 func _ready() -> void:
@@ -45,14 +60,20 @@ func _ready() -> void:
 	_background.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_background)
 
+	_transparent_sprite_texture = _make_transparent_sprite_texture()
 	_sprite_texture = TextureRect.new()
 	_sprite_texture.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	_sprite_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_sprite_texture.stretch_mode = TextureRect.STRETCH_SCALE
 	_sprite_texture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_sprite_texture.texture = _transparent_sprite_texture
 	_sprite_texture.mouse_filter = MOUSE_FILTER_IGNORE
 	_sprite_texture.visible = false
+	_sprite_blend_material = ShaderMaterial.new()
+	_sprite_blend_material.shader = GAMEPLAY_BLEND_SHADER
+	_sprite_texture.material = _sprite_blend_material
 	add_child(_sprite_texture)
+	_clear_sprite_layers()
 
 	_label = Label.new()
 	_label.set_anchors_and_offsets_preset(PRESET_CENTER)
@@ -72,6 +93,7 @@ func _ready() -> void:
 	# Scale and rotation pivot at the tile centre so animations grow symmetrically.
 	pivot_offset = size * 0.5
 	resized.connect(_on_resized)
+	set_process(true)
 	if GemVisualRegistry != null:
 		GemVisualRegistry.gameplay_texture_cache_rebuilt.connect(_on_gameplay_texture_cache_rebuilt)
 
@@ -83,14 +105,14 @@ func _exit_tree() -> void:
 		GemVisualRegistry.gameplay_texture_cache_rebuilt.disconnect(_on_gameplay_texture_cache_rebuilt)
 	_clear_procedural_state()
 	_clear_runtime_outline()
-	if _sprite_texture != null:
-		_sprite_texture.texture = null
+	_clear_sprite_layers()
 
 
 func configure(tile: TileState, new_cell: Vector2i) -> void:
 	cell = new_cell
 	tile_id = tile.tile_id
 	tier = tile.tier
+	_reset_special_rotation_state()
 	if is_inside_tree():
 		_update_visual()
 
@@ -99,6 +121,7 @@ func configure_from_data(p_tile_id: StringName, p_tier: int, p_cell: Vector2i) -
 	cell = p_cell
 	tile_id = p_tile_id
 	tier = p_tier
+	_reset_special_rotation_state()
 	if is_inside_tree():
 		_update_visual()
 
@@ -106,8 +129,42 @@ func configure_from_data(p_tile_id: StringName, p_tier: int, p_cell: Vector2i) -
 func show_upgrade_full(new_tier: int, new_tile_id: StringName) -> void:
 	tier = new_tier
 	tile_id = new_tile_id
+	_reset_special_rotation_state()
 	if is_inside_tree():
 		_update_visual()
+
+
+func _process(delta: float) -> void:
+	if not visible or not use_gameplay_texture_cache:
+		return
+	if not _special_rotation_active and not _has_visible_sprite_layers():
+		return
+	if _special_rotation_active:
+		_special_rotation_elapsed += delta
+		if _special_rotation_elapsed >= _special_rotation_duration:
+			_reset_special_rotation_state()
+	_refresh_gameplay_sprite_layers()
+
+
+func play_special_rotation_animation(
+	duration: float = SPECIAL_ROTATION_DEFAULT_DURATION,
+	turns: float = SPECIAL_ROTATION_DEFAULT_TURNS,
+) -> void:
+	if not use_gameplay_texture_cache or GemVisualRegistry == null:
+		return
+	_special_rotation_active = true
+	_special_rotation_elapsed = 0.0
+	_special_rotation_duration = maxf(duration, 0.001)
+	_special_rotation_turns = maxf(turns, 0.25)
+	_last_special_rotation_progress = -1.0
+	_refresh_gameplay_sprite_layers(true)
+
+
+func set_debug_lighting_uv_override(uv: Vector2) -> void:
+	_debug_lighting_uv_override = uv
+	_last_lighting_uv = Vector2(-10.0, -10.0)
+	if is_inside_tree() and use_gameplay_texture_cache and not _special_rotation_active:
+		_refresh_gameplay_sprite_layers(true)
 
 
 func _update_visual() -> void:
@@ -115,6 +172,9 @@ func _update_visual() -> void:
 		return
 
 	if _try_gameplay_texture_visual():
+		return
+	if use_gameplay_texture_cache:
+		_show_missing_bake_placeholder()
 		return
 
 	# ---- Priority 1: Procedural gem rendering ----
@@ -126,8 +186,7 @@ func _update_visual() -> void:
 	_clear_runtime_outline()
 	_use_procedural = false
 	_background.visible = true
-	_sprite_texture.visible = false
-	_sprite_texture.texture = null
+	_clear_sprite_layers()
 	_background.color = _get_color()
 	_label.visible = false
 	queue_redraw()
@@ -136,24 +195,14 @@ func _update_visual() -> void:
 func _try_gameplay_texture_visual() -> bool:
 	if not use_gameplay_texture_cache or GemVisualRegistry == null:
 		return false
-	var texture := GemVisualRegistry.get_gameplay_texture(tile_id, tier)
-	if texture == null:
+	if not _refresh_gameplay_sprite_layers(true):
 		return false
 
-	var visual_bundle := _resolve_visual_bundle()
 	_clear_procedural_state()
 	_use_procedural = false
 	_background.visible = false
 	_label.visible = false
-	_sprite_texture.texture = texture
-	_sprite_texture.visible = true
-	if not visual_bundle.is_empty():
-		_setup_runtime_outline(
-			visual_bundle["cut"],
-			GemVisualRegistry.get_visual_cut_key(visual_bundle["visual"])
-		)
-	else:
-		_clear_runtime_outline()
+	_clear_runtime_outline()
 	return true
 
 
@@ -181,8 +230,7 @@ func _try_procedural_visual() -> bool:
 
 	# Hide the background — _draw() handles rendering.
 	_background.visible = false
-	_sprite_texture.visible = false
-	_sprite_texture.texture = null
+	_clear_sprite_layers()
 
 	# Hide label — procedural gems need no text overlay.
 	_label.visible = false
@@ -208,6 +256,161 @@ func _clear_runtime_outline() -> void:
 	_use_runtime_outline = false
 	if _outline_overlay != null:
 		_outline_overlay.queue_redraw()
+
+
+func _clear_sprite_layers() -> void:
+	_last_applied_sprite_entries.clear()
+	if _sprite_texture != null:
+		_sprite_texture.visible = false
+	if _sprite_blend_material == null:
+		return
+	_sprite_blend_material.set_shader_parameter("weights", Vector4.ZERO)
+	_sprite_blend_material.set_shader_parameter("texture_a", _transparent_sprite_texture)
+	_sprite_blend_material.set_shader_parameter("texture_b", _transparent_sprite_texture)
+	_sprite_blend_material.set_shader_parameter("texture_c", _transparent_sprite_texture)
+	_sprite_blend_material.set_shader_parameter("texture_d", _transparent_sprite_texture)
+	_sprite_blend_material.set_shader_parameter("outline_enabled", false)
+	_sprite_blend_material.set_shader_parameter("outline_color", GAME_OUTLINE_COLOR)
+	_sprite_blend_material.set_shader_parameter("outline_width_pixels", _get_game_outline_width())
+	_sprite_blend_material.set_shader_parameter("texture_size_px", Vector2.ONE)
+
+
+func _refresh_gameplay_sprite_layers(force: bool = false) -> bool:
+	if not use_gameplay_texture_cache or GemVisualRegistry == null:
+		return false
+	var entries: Array[Dictionary] = []
+	if _special_rotation_active:
+		var duration := maxf(_special_rotation_duration, 0.001)
+		var progress := fposmod((_special_rotation_elapsed / duration) * _special_rotation_turns, 1.0)
+		if not force and absf(progress - _last_special_rotation_progress) < 0.001:
+			return _has_visible_sprite_layers()
+		_last_special_rotation_progress = progress
+		entries = GemVisualRegistry.get_gameplay_rotation_blend_set(tile_id, tier, progress)
+		if entries.is_empty():
+			_special_rotation_active = false
+	else:
+		var lighting_uv := _compute_board_lighting_uv()
+		if not force and lighting_uv.distance_squared_to(_last_lighting_uv) < 0.00002:
+			return _has_visible_sprite_layers()
+		_last_lighting_uv = lighting_uv
+		entries = GemVisualRegistry.get_gameplay_lighting_blend_set(tile_id, tier, lighting_uv)
+	if entries.is_empty() and not _special_rotation_active:
+		var lighting_uv := _compute_board_lighting_uv()
+		_last_lighting_uv = lighting_uv
+		entries = GemVisualRegistry.get_gameplay_lighting_blend_set(tile_id, tier, lighting_uv)
+	if entries.is_empty():
+		_clear_sprite_layers()
+		return false
+	_apply_sprite_entries(entries)
+	return true
+
+
+func _apply_sprite_entries(entries: Array[Dictionary]) -> void:
+	_last_applied_sprite_entries = []
+	if _sprite_blend_material == null:
+		return
+	var textures: Array = [
+		_transparent_sprite_texture,
+		_transparent_sprite_texture,
+		_transparent_sprite_texture,
+		_transparent_sprite_texture,
+	]
+	var weights := Vector4.ZERO
+	var has_visible_entry := false
+	for entry_index in mini(entries.size(), MAX_GAMEPLAY_SPRITE_LAYERS):
+		var entry: Dictionary = entries[entry_index]
+		var texture: Texture2D = entry.get("texture", null)
+		var weight := clampf(float(entry.get("weight", 0.0)), 0.0, 1.0)
+		if texture == null or weight <= 0.001:
+			continue
+		textures[entry_index] = texture
+		match entry_index:
+			0:
+				weights.x = weight
+			1:
+				weights.y = weight
+			2:
+				weights.z = weight
+			3:
+				weights.w = weight
+		has_visible_entry = true
+		_last_applied_sprite_entries.append(entry.duplicate(true))
+	_sprite_blend_material.set_shader_parameter("weights", weights)
+	_sprite_blend_material.set_shader_parameter("texture_a", textures[0])
+	_sprite_blend_material.set_shader_parameter("texture_b", textures[1])
+	_sprite_blend_material.set_shader_parameter("texture_c", textures[2])
+	_sprite_blend_material.set_shader_parameter("texture_d", textures[3])
+	_update_sprite_outline_shader(textures)
+	if _sprite_texture != null:
+		_sprite_texture.visible = has_visible_entry
+
+
+func _has_visible_sprite_layers() -> bool:
+	return _sprite_texture != null and _sprite_texture.visible
+
+
+func _update_sprite_outline_shader(textures: Array) -> void:
+	if _sprite_blend_material == null:
+		return
+	var texture_size := Vector2.ONE
+	for texture in textures:
+		if texture is Texture2D and texture != _transparent_sprite_texture:
+			texture_size = Vector2((texture as Texture2D).get_size())
+			break
+	_sprite_blend_material.set_shader_parameter(
+		"outline_enabled",
+		DebugFlags != null and DebugFlags.gem_silhouette_outline
+	)
+	_sprite_blend_material.set_shader_parameter("outline_color", GAME_OUTLINE_COLOR)
+	_sprite_blend_material.set_shader_parameter(
+		"outline_width_pixels",
+		maxf(_get_game_outline_width(), 0.75)
+	)
+	_sprite_blend_material.set_shader_parameter("texture_size_px", texture_size)
+
+
+func get_debug_gameplay_variant_state() -> Dictionary:
+	return {
+		"lighting_uv": _last_lighting_uv,
+		"debug_lighting_uv_override": _debug_lighting_uv_override,
+		"rotation_progress": _last_special_rotation_progress,
+		"special_rotation_active": _special_rotation_active,
+		"entries": _last_applied_sprite_entries.duplicate(true),
+	}
+
+
+func _compute_board_lighting_uv() -> Vector2:
+	if _debug_lighting_uv_override.x >= 0.0 and _debug_lighting_uv_override.y >= 0.0:
+		return Vector2(
+			clampf(_debug_lighting_uv_override.x, 0.0, 1.0),
+			clampf(_debug_lighting_uv_override.y, 0.0, 1.0)
+		)
+	var parent_control := get_parent() as Control
+	if parent_control == null:
+		return Vector2(0.5, 0.5)
+	var parent_size := parent_control.size
+	if parent_size.x <= 0.0 or parent_size.y <= 0.0:
+		return Vector2(0.5, 0.5)
+	var center := position + size * 0.5
+	return Vector2(
+		clampf(center.x / parent_size.x, 0.0, 1.0),
+		clampf(center.y / parent_size.y, 0.0, 1.0)
+	)
+
+
+func _reset_special_rotation_state() -> void:
+	_special_rotation_active = false
+	_special_rotation_elapsed = 0.0
+	_special_rotation_duration = 0.0
+	_special_rotation_turns = 1.0
+	_last_special_rotation_progress = -1.0
+	_last_lighting_uv = Vector2(-10.0, -10.0)
+
+
+func _make_transparent_sprite_texture() -> Texture2D:
+	var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	return ImageTexture.create_from_image(image)
 
 
 func _setup_runtime_outline(cut: GemCutResource, cut_key: String = "") -> void:
@@ -309,8 +512,10 @@ func _on_resized() -> void:
 	pivot_offset = size * 0.5
 	if _use_procedural:
 		_refresh_render_cache()
-	elif _use_runtime_outline:
-		_refresh_runtime_outline()
+	else:
+		if use_gameplay_texture_cache:
+			_last_lighting_uv = Vector2(-10.0, -10.0)
+			_refresh_gameplay_sprite_layers(true)
 
 
 func _refresh_render_cache(force_redraw: bool = true) -> void:
@@ -355,6 +560,13 @@ func refresh_debug_visuals() -> void:
 	queue_redraw()
 	if _outline_overlay != null:
 		_outline_overlay.queue_redraw()
+	if _has_visible_sprite_layers():
+		_update_sprite_outline_shader([
+			_sprite_blend_material.get_shader_parameter("texture_a"),
+			_sprite_blend_material.get_shader_parameter("texture_b"),
+			_sprite_blend_material.get_shader_parameter("texture_c"),
+			_sprite_blend_material.get_shader_parameter("texture_d"),
+		])
 
 
 func _is_low_detail_enabled() -> bool:
@@ -370,6 +582,20 @@ func _get_game_outline_width() -> float:
 func _on_gameplay_texture_cache_rebuilt(_profile: Dictionary) -> void:
 	if use_gameplay_texture_cache and is_inside_tree():
 		_update_visual()
+
+
+func _show_missing_bake_placeholder() -> void:
+	_clear_procedural_state()
+	_clear_runtime_outline()
+	_clear_sprite_layers()
+	_use_procedural = false
+	_background.visible = true
+	_background.color = MISSING_BAKE_COLOR
+	_label.visible = true
+	_label.text = "Bake\nMissing"
+	_label.add_theme_font_size_override("font_size", 14)
+	_label.modulate = Color(1.0, 0.88, 0.92, 0.95)
+	queue_redraw()
 
 
 func _get_color() -> Color:

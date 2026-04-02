@@ -16,6 +16,7 @@ const CUT_IDS: Array[StringName] = [
 	&"trillion",
 	&"straight_trillion",
 	&"princess_square",
+	&"lozenge",
 	&"radiant_square",
 	&"radiant_octagon",
 	&"hex_brilliant",
@@ -40,9 +41,10 @@ const EXPECTED_FACET_COUNTS := {
 	&"old_european_round": 41,
 	&"cushion": 33,
 	&"heart_brilliant": 41,
-	&"trillion": 19,
+	&"trillion": 31,
 	&"straight_trillion": 16,
 	&"princess_square": 17,
+	&"lozenge": 17,
 	&"radiant_square": 25,
 	&"radiant_octagon": 25,
 	&"hex_brilliant": 25,
@@ -187,6 +189,8 @@ func test_pavilion_symmetry_metadata() -> void:
 		"Marquise pavilion should follow its 10-sector profile")
 	assert_eq(GemCutGenerators.generate(&"radiant_octagon").pavilion_sector_count, 8,
 		"Radiant octagon pavilion should follow its outer-point count")
+	assert_eq(GemCutGenerators.generate(&"lozenge").pavilion_sector_count, 4,
+		"Lozenge pavilion should follow its 4-main profile")
 	assert_eq(GemCutGenerators.generate(&"emerald_step").pavilion_sector_count, 8,
 		"Emerald step pavilion should follow its ring point count")
 
@@ -228,6 +232,10 @@ func test_profile_distinctiveness() -> void:
 	var marquise_tip_ratio := _tip_band_width_ratio(GemCutGenerators.generate(&"marquise_brilliant").silhouette, 0.16)
 	assert_true(marquise_tip_ratio < oval_tip_ratio * 0.72,
 		"Marquise should taper more sharply at the tips than Oval")
+
+	var lozenge_bounds := _cut_bounds(GemCutGenerators.generate(&"lozenge"))
+	assert_true(float(lozenge_bounds["aspect"]) < 0.62,
+		"Lozenge should stay clearly more elongated than a square")
 
 
 func test_rotation_variant_size_compensation() -> void:

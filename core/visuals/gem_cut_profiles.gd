@@ -35,11 +35,56 @@ static func old_european_round() -> Dictionary:
 		"boundary_mode": &"circle",
 		"table_ratio": 0.44,
 		"star_length": 0.40,
+		"crown_height": 0.24,
+		"star_height_ratio": 0.68,
+		"pavilion_depth": 0.50,
+		"pavilion_ring_height_ratio": 0.56,
+		"pavilion_ring_radius_scale": 0.28,
 		"tilts": {"star": 22.0, "bezel": 37.0, "girdle": 44.0},
 		"silhouette_mode": &"curve",
 		"silhouette_symmetry": 10,
 		"silhouette_detail": GemCutPrimitives.DETAIL_HIGH,
 		"silhouette_min_points": 72,
+	}
+
+
+static func simple_octagon_step() -> Dictionary:
+	var sector_count := 8
+	var table := GemCutPrimitives.polygon_points(sector_count, 0.56, -PI * 0.375)
+	var outer_angles := GemCutPrimitives.regular_angles(sector_count, -PI * 0.375)
+	var arc_segments := 4
+	var bezel_facets: Array = []
+	var silhouette := GemCutPrimitives.sample_closed_curve(
+		GemCutPrimitives.detail_sample_count(sector_count, GemCutPrimitives.DETAIL_HIGH, 64),
+		func(angle: float) -> Vector2:
+			return GemCutPrimitives.radial_point(1.0, angle)
+	)
+
+	for i in sector_count:
+		var next_index := (i + 1) % sector_count
+		var start_angle: float = outer_angles[i]
+		var end_angle: float = outer_angles[next_index]
+		if end_angle <= start_angle:
+			end_angle += TAU
+		var arc_points: Array[Vector2] = []
+		for step in arc_segments + 1:
+			var t := float(step) / float(arc_segments)
+			var angle := start_angle + (end_angle - start_angle) * t
+			arc_points.append(GemCutPrimitives.radial_point(1.0, angle))
+		arc_points.reverse()
+		bezel_facets.append([table[i], table[next_index]] + arc_points)
+
+	return {
+		"cut_id": &"simple_octagon_step",
+		"display_name": "Simple Round Octagon",
+		"shape_category": &"round",
+		"table": table,
+		"star_facets": [],
+		"bezel_facets": bezel_facets,
+		"fans": [],
+		"tilts": {"bezel": 34.0},
+		"silhouette": silhouette,
+		"pavilion_rotation_fraction": 0.0,
 	}
 
 
@@ -86,7 +131,7 @@ static func trillion() -> Dictionary:
 	var corners := GemCutPrimitives.polygon_points(3)
 	var center := GemCutPrimitives.CENTER
 	var bow_distance := GemCutPrimitives.GEM_RADIUS * 0.22
-	var girdle_segments := 4
+	var girdle_segments := 8
 	var table_ratio := 0.36
 	var star_ratio := 0.64
 	var side_midpoints: Array[Vector2] = []
@@ -200,6 +245,28 @@ static func princess_square() -> Dictionary:
 		"edge_trim": 0.2,
 		"tilts": {"star": 18.0, "bezel": 35.0, "girdle": 42.0, "corner": 46.0},
 		"orientation_fit_axis_aligned_scale": 0.94,
+	}
+
+
+static func lozenge() -> Dictionary:
+	var x_radius := 0.48
+	var y_radius := 1.0
+	var rings := [
+		GemCutPrimitives.diamond_points(x_radius, y_radius),
+		GemCutPrimitives.diamond_points(x_radius * 0.78, y_radius * 0.78),
+		GemCutPrimitives.diamond_points(x_radius * 0.60, y_radius * 0.60),
+		GemCutPrimitives.diamond_points(x_radius * 0.42, y_radius * 0.42),
+		GemCutPrimitives.diamond_points(x_radius * 0.26, y_radius * 0.26),
+	]
+	return {
+		"cut_id": &"lozenge",
+		"display_name": "Lozenge",
+		"shape_category": &"diamond",
+		"rings": rings,
+		"ring_tilts": [41.0, 30.0, 20.0, 11.0, 0.0],
+		"ring_zones": ["girdle", "step", "step", "step", "table"],
+		"silhouette": GemCutPrimitives.pva(rings[0]),
+		"pavilion_rotation_fraction": 0.0,
 	}
 
 

@@ -4,6 +4,8 @@ extends Control
 ## Provides real-time preview with all GemVisualResource parameters exposed
 ## as controls, plus export to .tres or JSON for creating new gem variants.
 
+const TILE_VIEW_SCENE := preload("res://scenes/tile/tile_view.tscn")
+
 # All available cut profiles from GemCutGenerators.
 const CUT_IDS = [
 	&"classic_round", &"old_european_round", &"cushion", &"heart_brilliant",
@@ -99,6 +101,8 @@ var _brilliance_value: Label
 var _extinction_slider: HSlider
 var _extinction_value: Label
 var _export_text: TextEdit
+var _deprecated_preview_tile: TileView
+var _deprecated_status_label: Label
 
 # Suppress redundant refreshes during preset loading.
 var _loading_preset: bool = false
@@ -108,6 +112,9 @@ var _rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	_build_deprecated_offline_viewer()
+	return
+
 	_rng.randomize()
 
 	# Dark background
@@ -139,6 +146,116 @@ func _ready() -> void:
 
 	# Initial render
 	_refresh_preview()
+
+
+func _build_deprecated_offline_viewer() -> void:
+	if GemVisualRegistry != null:
+		GemVisualRegistry.set_gameplay_bake_backend_preference(
+			GemVisualRegistry.GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED
+		)
+		GemVisualRegistry.set_gameplay_runtime_bake_fallback_enabled(false)
+		GemVisualRegistry.ensure_gameplay_texture_cache(GameConfig.DEFAULT_CELL_SIZE, PRESET_IDS)
+
+	var bg := ColorRect.new()
+	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	bg.color = Color(0.1, 0.1, 0.14)
+	add_child(bg)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 24)
+	margin.add_theme_constant_override("margin_bottom", 24)
+	add_child(margin)
+
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 16)
+	root.size_flags_horizontal = SIZE_EXPAND_FILL
+	root.size_flags_vertical = SIZE_EXPAND_FILL
+	margin.add_child(root)
+
+	var top_bar := HBoxContainer.new()
+	top_bar.add_theme_constant_override("separation", 10)
+	root.add_child(top_bar)
+
+	var menu_btn := Button.new()
+	menu_btn.text = "< Menu"
+	menu_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn"))
+	top_bar.add_child(menu_btn)
+
+	var gallery_btn := Button.new()
+	gallery_btn.text = "Offline Gallery"
+	gallery_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/design/gem_gallery.tscn"))
+	top_bar.add_child(gallery_btn)
+
+	var title := Label.new()
+	title.text = "Gem Designer Deprecated"
+	title.add_theme_font_size_override("font_size", 30)
+	root.add_child(title)
+
+	var note := Label.new()
+	note.text = "The runtime now uses offline baked gem textures only. This scene remains as a preset viewer for traced resources."
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.add_theme_color_override("font_color", Color(0.72, 0.77, 0.87))
+	root.add_child(note)
+
+	var preset_row := HBoxContainer.new()
+	preset_row.add_theme_constant_override("separation", 10)
+	root.add_child(preset_row)
+
+	var preset_label := Label.new()
+	preset_label.text = "Preset"
+	preset_row.add_child(preset_label)
+
+	_preset_dropdown = OptionButton.new()
+	for i in PRESET_IDS.size():
+		_preset_dropdown.add_item(_titleize_id(PRESET_IDS[i]), i)
+	_preset_dropdown.item_selected.connect(_on_deprecated_preset_selected)
+	preset_row.add_child(_preset_dropdown)
+
+	_deprecated_status_label = Label.new()
+	_deprecated_status_label.text = "Showing offline baked preset preview"
+	_deprecated_status_label.add_theme_color_override("font_color", Color(0.62, 0.67, 0.76))
+	preset_row.add_child(_deprecated_status_label)
+
+	var center := CenterContainer.new()
+	center.size_flags_horizontal = SIZE_EXPAND_FILL
+	center.size_flags_vertical = SIZE_EXPAND_FILL
+	root.add_child(center)
+
+	var preview_panel := PanelContainer.new()
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.06, 0.06, 0.09)
+	panel_style.set_corner_radius_all(12)
+	panel_style.content_margin_left = 24
+	panel_style.content_margin_right = 24
+	panel_style.content_margin_top = 24
+	panel_style.content_margin_bottom = 24
+	preview_panel.add_theme_stylebox_override("panel", panel_style)
+	center.add_child(preview_panel)
+
+	_deprecated_preview_tile = TILE_VIEW_SCENE.instantiate()
+	_deprecated_preview_tile.use_gameplay_texture_cache = true
+	_deprecated_preview_tile.custom_minimum_size = Vector2(220, 220)
+	_deprecated_preview_tile.size = Vector2(220, 220)
+	preview_panel.add_child(_deprecated_preview_tile)
+
+	_on_deprecated_preset_selected(0)
+
+
+func _on_deprecated_preset_selected(index: int) -> void:
+	if _deprecated_preview_tile == null or index < 0 or index >= PRESET_IDS.size():
+		return
+	var tile_id := PRESET_IDS[index]
+	var tier := 1
+	if TileRegistry != null and TileRegistry.has_definitions():
+		var definition = TileRegistry.get_definition(tile_id)
+		if definition != null:
+			tier = int(definition.tier)
+	_deprecated_preview_tile.configure_from_data(tile_id, tier, Vector2i.ZERO)
+	if _deprecated_status_label != null:
+		_deprecated_status_label.text = "Showing offline baked preview for %s" % _titleize_id(tile_id)
 
 
 # ===========================================================================
