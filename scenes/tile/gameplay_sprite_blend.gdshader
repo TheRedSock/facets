@@ -27,28 +27,27 @@ void fragment() {
 	vec4 blended = sample_blended(UV);
 	if (!outline_enabled) {
 		COLOR = blended;
-		return;
-	}
+	} else {
+		vec2 texel = 1.0 / max(texture_size_px, vec2(1.0));
+		vec2 offset = texel * max(outline_width_pixels, 0.75);
+		float center_alpha = blended.a;
+		float neighbor_alpha = 0.0;
+		neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(offset.x, 0.0)).a);
+		neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(-offset.x, 0.0)).a);
+		neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(0.0, offset.y)).a);
+		neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(0.0, -offset.y)).a);
+		neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(offset.x, offset.y)).a);
+		neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(-offset.x, offset.y)).a);
+		neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(offset.x, -offset.y)).a);
+		neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(-offset.x, -offset.y)).a);
 
-	vec2 texel = 1.0 / max(texture_size_px, vec2(1.0));
-	vec2 offset = texel * max(outline_width_pixels, 0.75);
-	float center_alpha = blended.a;
-	float neighbor_alpha = 0.0;
-	neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(offset.x, 0.0)).a);
-	neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(-offset.x, 0.0)).a);
-	neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(0.0, offset.y)).a);
-	neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(0.0, -offset.y)).a);
-	neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(offset.x, offset.y)).a);
-	neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(-offset.x, offset.y)).a);
-	neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(offset.x, -offset.y)).a);
-	neighbor_alpha = max(neighbor_alpha, sample_blended(UV + vec2(-offset.x, -offset.y)).a);
-
-	float outline_alpha = clamp((neighbor_alpha - center_alpha) * outline_color.a, 0.0, 1.0);
-	float final_alpha = max(center_alpha, outline_alpha);
-	vec3 final_rgb = blended.rgb;
-	if (outline_alpha > 0.0001) {
-		float inside_mix = clamp(center_alpha * 3.5, 0.0, 1.0);
-		final_rgb = mix(outline_color.rgb, final_rgb, inside_mix);
+		float outline_alpha = clamp((neighbor_alpha - center_alpha) * outline_color.a, 0.0, 1.0);
+		float final_alpha = max(center_alpha, outline_alpha);
+		vec3 final_rgb = blended.rgb;
+		if (outline_alpha > 0.0001) {
+			float inside_mix = clamp(center_alpha * 3.5, 0.0, 1.0);
+			final_rgb = mix(outline_color.rgb, final_rgb, inside_mix);
+		}
+		COLOR = vec4(final_rgb, final_alpha);
 	}
-	COLOR = vec4(final_rgb, final_alpha);
 }

@@ -11,6 +11,21 @@ const GRADIENT_MODE_RADIAL_INVERSE := 2
 const OPTICS_ENVIRONMENT_NEUTRAL := 0
 const OPTICS_ENVIRONMENT_DARK_STUDIO := 1
 const OPTICS_ENVIRONMENT_GEM_BOOTH := 2
+const OPTICS_ENVIRONMENT_GAMEPLAY_STUDIO := 3
+const MATERIAL_MODE_FACETED_TRANSPARENT := 0
+const MATERIAL_MODE_PATTERNED_OPAQUE := 1
+const MATERIAL_MODE_PATTERNED_TRANSLUCENT := 2
+const MATERIAL_PATTERN_NONE := 0
+const MATERIAL_PATTERN_BANDS := 1
+const MATERIAL_PATTERN_CONCENTRIC := 2
+const MATERIAL_PATTERN_FIBERS := 3
+const MATERIAL_PATTERN_CELLS := 4
+const MATERIAL_PATTERN_CLOUDS := 5
+const MATERIAL_PATTERN_LAYERS := 6
+const MATERIAL_REACTIVE_NONE := 0
+const MATERIAL_REACTIVE_CHATTOYANCY := 1
+const MATERIAL_REACTIVE_OPALESCENCE := 2
+const MATERIAL_REACTIVE_IRIDESCENCE := 3
 
 @export var visual_id: StringName = &""
 @export var cut_id: StringName = &""
@@ -23,6 +38,11 @@ const OPTICS_ENVIRONMENT_GEM_BOOTH := 2
 
 @export var base_color: Color = Color.WHITE
 
+## Broad material family used by the traced and procedural paths.
+@export_enum("Faceted Transparent", "Patterned Opaque", "Patterned Translucent") var material_mode: int = MATERIAL_MODE_FACETED_TRANSPARENT
+@export var material_secondary_color: Color = Color.TRANSPARENT
+@export var material_tertiary_color: Color = Color.TRANSPARENT
+
 ## If true, sample from color_texture instead of flat base_color.
 ## Useful for opals, agates, and other patterned gems.
 @export var use_texture: bool = false
@@ -31,6 +51,48 @@ const OPTICS_ENVIRONMENT_GEM_BOOTH := 2
 @export_range(1.0, 4.0) var texture_zoom: float = 1.0
 @export var texture_offset: Vector2 = Vector2.ZERO
 @export_range(0.0, 1.0) var texture_facet_warp: float = 0.35
+
+# ---- Procedural surface field ----
+
+@export_group("Surface Field")
+@export_enum("None", "Bands", "Concentric", "Fibers", "Cells", "Clouds", "Layers") var surface_pattern_type: int = MATERIAL_PATTERN_NONE
+@export_range(0.0, 1.0) var surface_pattern_mix: float = 0.0
+@export var surface_pattern_scale: Vector2 = Vector2.ONE
+@export_range(-180.0, 180.0) var surface_pattern_rotation_degrees: float = 0.0
+@export_range(0.1, 8.0) var surface_pattern_density: float = 1.0
+@export_range(0.0, 1.0) var surface_pattern_contrast: float = 0.5
+@export_range(0.0, 1.0) var surface_pattern_warp_strength: float = 0.0
+@export_range(0.1, 8.0) var surface_pattern_warp_scale: float = 1.0
+@export_range(-1.0, 1.0) var surface_pattern_specular_variation: float = 0.0
+@export_range(-1.0, 1.0) var surface_pattern_roughness_variation: float = 0.0
+
+# ---- Procedural volume field ----
+
+@export_group("Volume Field")
+@export_enum("None", "Bands", "Concentric", "Fibers", "Cells", "Clouds", "Layers") var volume_pattern_type: int = MATERIAL_PATTERN_NONE
+@export_range(0.0, 1.0) var volume_pattern_mix: float = 0.0
+@export var volume_pattern_scale: Vector3 = Vector3.ONE
+@export var volume_pattern_axis: Vector3 = Vector3.UP
+@export_range(0.1, 8.0) var volume_pattern_density: float = 1.0
+@export_range(0.0, 1.0) var volume_pattern_contrast: float = 0.5
+@export_range(0.0, 1.0) var volume_pattern_warp_strength: float = 0.0
+@export_range(0.1, 8.0) var volume_pattern_warp_scale: float = 1.0
+@export_range(-1.0, 1.0) var volume_absorption_variation: float = 0.0
+@export_range(-1.0, 1.0) var volume_scattering_variation: float = 0.0
+
+# ---- Angle-reactive field ----
+
+@export_group("Angle Reactive")
+@export_enum("None", "Chatoyancy", "Opalescence", "Iridescence") var reactive_effect_type: int = MATERIAL_REACTIVE_NONE
+@export var reactive_color: Color = Color.TRANSPARENT
+@export var reactive_secondary_color: Color = Color.TRANSPARENT
+@export_range(0.0, 3.0) var reactive_strength: float = 0.0
+@export_range(0.5, 12.0) var reactive_sharpness: float = 2.0
+@export_range(0.1, 8.0) var reactive_density: float = 1.0
+@export_range(0.1, 8.0) var reactive_scale: float = 1.0
+@export var reactive_axis: Vector3 = Vector3.RIGHT
+
+@export_group("")
 
 # ---- Material properties ----
 
@@ -165,7 +227,7 @@ const OPTICS_ENVIRONMENT_GEM_BOOTH := 2
 @export_range(-180.0, 180.0) var optics_rotation_view_yaw_degrees: float = 36.0
 
 ## Scales the environment and direct light contribution used during traced baking.
-@export_enum("Neutral Sky", "Dark Studio", "Gem Booth") var optics_environment_preset: int = OPTICS_ENVIRONMENT_NEUTRAL
+@export_enum("Neutral Sky", "Dark Studio", "Gem Booth", "Gameplay Studio") var optics_environment_preset: int = OPTICS_ENVIRONMENT_NEUTRAL
 @export_range(-180.0, 180.0) var optics_environment_rotation_degrees: float = 0.0
 @export_range(0.0, 4.0) var optics_environment_energy: float = 1.0
 @export_range(0.0, 8.0) var optics_light_energy: float = 2.4

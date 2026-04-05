@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+visual_id = &"malachite_study"
+cut_id = &"opal_cushion"
+base_color = Color(0.08, 0.22, 0.15, 1)
+material_mode = 1
+material_secondary_color = Color(0.3, 0.78, 0.62, 1)
+material_tertiary_color = Color(0.02, 0.03, 0.02, 1)
+surface_pattern_type = 2
+surface_pattern_mix = 0.96
+surface_pattern_scale = Vector2(0.94, 1.08)
+surface_pattern_rotation_degrees = 8.0
+surface_pattern_density = 1.28
+surface_pattern_contrast = 0.82
+surface_pattern_warp_strength = 0.88
+surface_pattern_warp_scale = 1.85
+surface_pattern_specular_variation = -0.04
+surface_pattern_roughness_variation = 0.34
+shininess = 32.0
+specular_intensity = 0.24
+contrast = 0.14
+depth_tint = Color(0.03, 0.11, 0.07, 0.12)
+saturation_boost = 0.2
+rim_intensity = 0.03
+rim_color = Color(0.32, 0.74, 0.5, 1)
+gradient_color = Color(0.08, 0.24, 0.15, 1)
+gradient_strength = 0.04
+gradient_mode = 1
+brilliance_contrast = 0.08
+extinction = 0.02
+optics_ior = 1.57
+optics_dispersion = 0.003
+optics_absorption_color = Color(0.08, 0.19, 0.12, 1)
+optics_absorption_strength = 1.6
+optics_surface_roughness = 0.14
+optics_scattering_strength = 0.02
+optics_scattering_color = Color(0.22, 0.46, 0.29, 1)
+optics_environment_preset = 2
+optics_environment_rotation_degrees = 6.0
+optics_environment_energy = 0.3
+optics_light_energy = 0.68
+stylize_mix = 0.24
+stylize_facet_edge_gain = 0.34
+stylize_plane_contrast = 0.18
+stylize_shadow_floor = 0.03
+stylize_highlight_bloom_gain = 0.14
+stylize_highlight_bloom_threshold = 0.88
+stylize_microdetail_suppression = 0.38
+stylize_internal_color_shift_gain = 0.04
+stylize_tone_steps = 5
+stylize_edge_ink_strength = 0.08
+stylize_highlight_snap = 0.1

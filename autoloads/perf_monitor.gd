@@ -1,16 +1,8 @@
 extends Node
 
-## Lightweight performance monitor.
-##
-## Tracks FPS, detects frame-time spikes, and provides labelled timing spans
-## for measuring simulation / animation / asset-generation costs.
-##
-## Usage:
-##   PerfMonitor.begin_span("simulation")
-##   ... do work ...
-##   PerfMonitor.end_span("simulation")   # prints warning if slow
-##
-## The HUD reads `fps_text` every frame for display.
+## Deprecated legacy performance monitor.
+## This file is intentionally kept for reference only and is no longer wired
+## into `project.godot` or used by the active gameplay flow.
 
 # ---- Public read-only state for HUD ----
 

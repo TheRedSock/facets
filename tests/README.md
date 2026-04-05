@@ -10,6 +10,14 @@ godot --headless --script tests/test_smoke.gd
 
 Returns exit code 0 on success, 1 on failure. Output shows PASS/FAIL per test with a summary count.
 
+## Native Extension Test
+
+```bash
+godot --headless --script tests/test_native_trace_kernel.gd
+```
+
+Verifies the C++ `GemTraceKernel` GDExtension loads, registers, instantiates, and exposes the expected methods. Requires the native extension to be compiled (see Building the Native Tracer in the project README). Skips gracefully if the extension is not available.
+
 ## Test Coverage (40+ tests)
 
 ### Data Layer

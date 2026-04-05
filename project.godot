@@ -28,7 +28,6 @@ ReplayService="*res://autoloads/replay_service.gd"
 DebugFlags="*res://autoloads/debug_flags.gd"
 TileRegistry="*res://autoloads/tile_registry.gd"
 GemVisualRegistry="*res://autoloads/gem_visual_registry.gd"
-PerfMonitor="*res://autoloads/perf_monitor.gd"
 
 [display]
 

@@ -16,12 +16,18 @@ func _run() -> void:
 	var registry := get_root().get_node_or_null("GemVisualRegistry")
 	assert_true(registry != null, "GemVisualRegistry autoload should exist")
 	if registry != null:
+		var original_settings: Dictionary = registry.get_gameplay_variant_settings()
+		registry.set_gameplay_variant_settings(GemTracedBakeContract.default_variant_settings(), false)
 		test_variant_settings(registry)
 		test_lighting_blend_center_and_corner(registry)
 		test_lighting_blend_weights_sum(registry)
+		test_virtual_lighting_grid_can_be_coarser(registry)
 		test_rotation_blend_weights_sum(registry)
+		test_variant_settings_can_be_reconfigured(registry)
+		test_zero_variant_families_are_supported(registry)
 		test_build_requests_are_pure_and_explicit(registry)
 		test_rotation_axis_refinement_expands_request_suite(registry)
+		registry.set_gameplay_variant_settings(original_settings, false)
 
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
 	quit(1 if _fail_count > 0 else 0)
@@ -29,7 +35,9 @@ func _run() -> void:
 
 func test_variant_settings(registry: Node) -> void:
 	var settings: Dictionary = registry.get_gameplay_variant_settings()
+	assert_eq(settings.get("lighting_grid_preset"), &"quality", "Lighting preset should default to quality")
 	assert_eq(settings.get("lighting_grid_size"), Vector2i(5, 5), "Lighting grid should default to 5x5")
+	assert_eq(settings.get("lighting_runtime_grid_size"), Vector2i(5, 5), "Runtime lighting grid should default to the baked grid")
 	assert_eq(settings.get("rotation_bin_count"), 6, "Rotation verification suite should default to 6 orthographic views")
 	var rotation_views: Array = settings.get("rotation_views", [])
 	assert_eq(rotation_views.size(), 6, "Rotation view metadata should expose the 6 baseline verification views")
@@ -57,6 +65,26 @@ func test_lighting_blend_weights_sum(registry: Node) -> void:
 	assert_near(total, 1.0, 0.0001, "Lighting blend weights should sum to 1")
 
 
+func test_virtual_lighting_grid_can_be_coarser(registry: Node) -> void:
+	var defaults: Dictionary = registry.get_gameplay_variant_settings()
+	registry.set_gameplay_variant_settings({
+		"lighting_grid_preset": &"quality",
+		"lighting_runtime_grid_size": Vector2i(3, 3),
+	}, false)
+	var settings: Dictionary = registry.get_gameplay_variant_settings()
+	assert_eq(settings.get("lighting_grid_preset"), &"quality", "Preset-backed lighting grid should remain quality")
+	assert_eq(settings.get("lighting_grid_size"), Vector2i(5, 5), "Quality preset should keep a 5x5 baked lighting grid")
+	assert_eq(settings.get("lighting_runtime_grid_size"), Vector2i(3, 3), "Runtime lighting grid should allow a coarser 3x3 region map")
+	var blend: Array = registry.compute_gameplay_lighting_blend(Vector2(0.25, 0.5))
+	var weight_by_bin: Dictionary = {}
+	for entry in blend:
+		weight_by_bin[entry.get("lighting_bin", Vector2i(-1, -1))] = float(entry.get("weight", 0.0))
+	assert_eq(weight_by_bin.size(), 2, "Coarser runtime lighting grid should still collapse to a 4-bin-or-fewer bilinear blend")
+	assert_near(float(weight_by_bin.get(Vector2i(0, 2), 0.0)), 0.5, 0.0001, "Left runtime region should map to the left baked lighting keyframe")
+	assert_near(float(weight_by_bin.get(Vector2i(2, 2), 0.0)), 0.5, 0.0001, "Right runtime region should map to the center baked lighting keyframe")
+	registry.set_gameplay_variant_settings(defaults, false)
+
+
 func test_rotation_blend_weights_sum(registry: Node) -> void:
 	var blend: Array = registry.compute_gameplay_rotation_blend(0.42)
 	var total := 0.0
@@ -64,6 +92,45 @@ func test_rotation_blend_weights_sum(registry: Node) -> void:
 		total += float(entry.get("weight", 0.0))
 	assert_true(blend.size() <= 2, "Rotation blend should use at most two bins")
 	assert_near(total, 1.0, 0.0001, "Rotation blend weights should sum to 1")
+
+
+func test_variant_settings_can_be_reconfigured(registry: Node) -> void:
+	var defaults: Dictionary = registry.get_gameplay_variant_settings()
+	registry.set_gameplay_variant_settings({
+		"lighting_grid_preset": &"performance",
+		"rotation_axes": [&"pitch", &"yaw"],
+		"rotation_axis_steps": 1,
+		"rotation_step_degrees": 12.0,
+	}, false)
+	var settings: Dictionary = registry.get_gameplay_variant_settings()
+	assert_eq(settings.get("lighting_grid_preset"), &"performance", "Lighting preset should reflect the configured manifest/workbench settings")
+	assert_eq(settings.get("lighting_grid_size"), Vector2i(3, 3), "Lighting grid should reflect the configured manifest/workbench settings")
+	assert_eq(settings.get("rotation_bin_count"), 10, "Rotation bin count should expand from the configured axis sweeps")
+	var axis_blend: Array = registry.compute_gameplay_rotation_axis_blend(&"pitch", 0.33)
+	var total := 0.0
+	for entry in axis_blend:
+		total += float(entry.get("weight", 0.0))
+	assert_eq(axis_blend.size(), 2, "Axis-specific rotation preview should blend between two pitch bins")
+	assert_near(total, 1.0, 0.0001, "Axis-specific rotation weights should sum to 1")
+	registry.set_gameplay_variant_settings(defaults, false)
+
+
+func test_zero_variant_families_are_supported(registry: Node) -> void:
+	var defaults: Dictionary = registry.get_gameplay_variant_settings()
+	registry.set_gameplay_variant_settings({
+		"lighting_grid_size": Vector2i.ZERO,
+		"rotation_base_view_count": 0,
+		"rotation_axis_steps": 0,
+		"rotation_axes": [],
+	}, false)
+	var settings: Dictionary = registry.get_gameplay_variant_settings()
+	assert_eq(settings.get("lighting_grid_preset"), &"custom", "Zeroed lighting grid should normalize to a custom preset")
+	assert_eq(settings.get("lighting_grid_size"), Vector2i.ZERO, "Lighting grid should allow 0x0 to disable lighting renders")
+	assert_eq(settings.get("lighting_runtime_grid_size"), Vector2i.ZERO, "Runtime lighting grid should also disable when baked lighting is disabled")
+	assert_eq(settings.get("rotation_bin_count"), 0, "Rotation bin count should be 0 when baseline and sweep rotations are disabled")
+	assert_true(registry.compute_gameplay_lighting_blend(Vector2(0.5, 0.5)).is_empty(), "Lighting blend should be empty when lighting renders are disabled")
+	assert_true(registry.compute_gameplay_rotation_blend(0.5).is_empty(), "Rotation blend should be empty when rotation renders are disabled")
+	registry.set_gameplay_variant_settings(defaults, false)
 
 
 func test_build_requests_are_pure_and_explicit(registry: Node) -> void:

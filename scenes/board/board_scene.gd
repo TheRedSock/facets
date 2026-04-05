@@ -567,9 +567,6 @@ func _play_cascade_step(step: Dictionary, perf_label_prefix: String = "") -> voi
 	# sequentially, then gravity + spawn once at the end.
 	var chain_steps: Array = step.get("chain_steps", [])
 	var last_phase2_tween: Tween = null
-	var gravity_setup_label := "%sanim_gravity_setup" % perf_label_prefix
-	var spawn_create_label := "%sanim_spawn_create" % perf_label_prefix
-	var tween_build_label := "%sanim_tween_build" % perf_label_prefix
 
 	if not chain_steps.is_empty():
 		for i in chain_steps.size():
@@ -601,7 +598,6 @@ func _play_cascade_step(step: Dictionary, perf_label_prefix: String = "") -> voi
 	var spawn_events: Array = step.get("spawn_events", [])
 
 	if not gravity_events.is_empty() or not spawn_events.is_empty():
-		PerfMonitor.begin_span(gravity_setup_label)
 		# --- Consolidate gravity events per tile ---
 		# Physics produces per-round single-cell moves; merge into one
 		# (original_from -> final_to) entry per tile for correct distance.
@@ -627,8 +623,6 @@ func _play_cascade_step(step: Dictionary, perf_label_prefix: String = "") -> voi
 				view.cell = to
 
 		# --- Pre-create spawn tiles above the board, stacked per column ---
-		PerfMonitor.end_span(gravity_setup_label)
-		PerfMonitor.begin_span(spawn_create_label)
 		var spawns_by_col: Dictionary = {}
 		for event in spawn_events:
 			var cell: Vector2i = event.get("cell", Vector2i(-1, -1))
@@ -662,8 +656,6 @@ func _play_cascade_step(step: Dictionary, perf_label_prefix: String = "") -> voi
 				view.cell = cell
 
 		# --- Compute per-column stagger delays ---
-		PerfMonitor.end_span(spawn_create_label)
-		PerfMonitor.begin_span(tween_build_label)
 		# Group by destination column, sort bottom-first so tiles closest to
 		# the gap start falling first.
 		var all_moves: Array[Dictionary] = []
@@ -715,7 +707,6 @@ func _play_cascade_step(step: Dictionary, perf_label_prefix: String = "") -> voi
 			).set_delay(stagger + duration)
 			has_targets = true
 
-		PerfMonitor.end_span(tween_build_label)
 		if has_targets:
 			await tween.finished
 
@@ -1099,9 +1090,20 @@ func _pixel_to_cell(pixel: Vector2) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
+func _get_gameplay_cache_request_size() -> Vector2i:
+	if GemVisualRegistry == null:
+		return _cell_size
+	var manifest_summary: Dictionary = GemVisualRegistry.get_offline_traced_manifest_summary()
+	var manifest_cell_size: Vector2i = manifest_summary.get("cell_size", Vector2i.ZERO)
+	if manifest_cell_size.x > 0 and manifest_cell_size.y > 0:
+		return manifest_cell_size
+	return _cell_size
+
+
 func _ensure_gameplay_texture_cache() -> void:
 	if GemVisualRegistry != null:
-		if GemVisualRegistry.is_gameplay_texture_cache_current(_cell_size):
+		var cache_request_size := _get_gameplay_cache_request_size()
+		if GemVisualRegistry.is_gameplay_texture_cache_current(cache_request_size):
 			return
-		GemVisualRegistry.ensure_gameplay_texture_cache(_cell_size)
+		GemVisualRegistry.ensure_gameplay_texture_cache(cache_request_size)
 		await GemVisualRegistry.gameplay_texture_cache_rebuilt

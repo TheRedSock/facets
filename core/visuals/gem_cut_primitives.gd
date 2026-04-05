@@ -45,7 +45,13 @@ static func ellipse_point(rx: float, ry: float, angle: float) -> Vector2:
 	return CENTER + Vector2(cos(angle) * rx, sin(angle) * ry) * GEM_RADIUS
 
 
-static func superellipse_point(radius_factor: float, angle: float, exponent: float) -> Vector2:
+static func superellipse_point(
+	radius_factor: float,
+	angle: float,
+	exponent: float,
+	aspect_x: float = 1.0,
+	aspect_y: float = 1.0,
+) -> Vector2:
 	var ca := cos(angle)
 	var sa := sin(angle)
 	var abs_ca := absf(ca)
@@ -53,7 +59,7 @@ static func superellipse_point(radius_factor: float, angle: float, exponent: flo
 	var rr := 1.0
 	if abs_ca > 0.001 or abs_sa > 0.001:
 		rr = pow(pow(abs_ca, exponent) + pow(abs_sa, exponent), -1.0 / exponent)
-	return CENTER + Vector2(ca, sa) * rr * GEM_RADIUS * radius_factor
+	return CENTER + Vector2(ca * aspect_x, sa * aspect_y) * rr * GEM_RADIUS * radius_factor
 
 
 static func pear_point(radius_factor: float, angle: float, params: Dictionary = {}) -> Vector2:
@@ -173,6 +179,61 @@ static func diamond_points(x_radius: float, y_radius: float) -> Array[Vector2]:
 		CENTER + Vector2(0.0, y_radius * GEM_RADIUS),
 		CENTER + Vector2(-x_radius * GEM_RADIUS, 0.0),
 	]
+
+
+static func kite_point(rx: float, ry: float, angle: float, shoulder: float = 0.5) -> Vector2:
+	var ca := cos(angle)
+	var sa := sin(angle)
+
+	# Symmetric rhombus: closed-form polar distance (fast path).
+	if absf(shoulder - 0.5) < 0.001:
+		var abs_ca := absf(ca)
+		var abs_sa := absf(sa)
+		var denom := ry * abs_ca + rx * abs_sa
+		if denom < 0.001:
+			denom = 0.001
+		return CENTER + Vector2(ca, sa) * (rx * ry / denom) * GEM_RADIUS
+
+	# Asymmetric kite via ray–edge intersection.
+	# Vertices: Top(0,-ry), Right(rx,sy), Bottom(0,ry), Left(-rx,sy)
+	# where sy shifts the shoulder above or below center.
+	var sy := ry * (2.0 * shoulder - 1.0)
+	var rxry := rx * ry
+	var best_t := rx + ry  # safe upper bound
+
+	# Edge 0: Top(0,-ry) → Right(rx,sy)
+	var det0 := sa * rx - ca * (sy + ry)
+	if absf(det0) > 0.0001:
+		var t0 := -rxry / det0
+		var s0 := -ry * ca / det0
+		if t0 > 0.0001 and s0 >= -0.001 and s0 <= 1.001 and t0 < best_t:
+			best_t = t0
+
+	# Edge 1: Right(rx,sy) → Bottom(0,ry)
+	var det1 := -sa * rx - ca * (ry - sy)
+	if absf(det1) > 0.0001:
+		var t1 := -rxry / det1
+		var s1 := (ca * sy - sa * rx) / det1
+		if t1 > 0.0001 and s1 >= -0.001 and s1 <= 1.001 and t1 < best_t:
+			best_t = t1
+
+	# Edge 2: Bottom(0,ry) → Left(-rx,sy)
+	var det2 := -sa * rx - ca * (sy - ry)
+	if absf(det2) > 0.0001:
+		var t2 := -rxry / det2
+		var s2 := ca * ry / det2
+		if t2 > 0.0001 and s2 >= -0.001 and s2 <= 1.001 and t2 < best_t:
+			best_t = t2
+
+	# Edge 3: Left(-rx,sy) → Top(0,-ry)
+	var det3 := sa * rx + ca * (ry + sy)
+	if absf(det3) > 0.0001:
+		var t3 := -rxry / det3
+		var s3 := (ca * sy + sa * rx) / det3
+		if t3 > 0.0001 and s3 >= -0.001 and s3 <= 1.001 and t3 < best_t:
+			best_t = t3
+
+	return CENTER + Vector2(ca, sa) * best_t * GEM_RADIUS
 
 
 static func rect_points(half_width: float, half_height: float) -> Array[Vector2]:

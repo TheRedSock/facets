@@ -106,6 +106,29 @@ static func cushion() -> Dictionary:
 	}
 
 
+static func opal_cushion() -> Dictionary:
+	return {
+		"cut_id": &"opal_cushion",
+		"display_name": "Opal Cushion",
+		"shape_category": &"rectangle",
+		"sector_count": 12,
+		"boundary_mode": &"superellipse",
+		"boundary_params": {
+			"exponent": 4.4,
+			"aspect_x": 0.90,
+			"aspect_y": 1.08,
+		},
+		"table_ratio": 0.48,
+		"star_length": 0.60,
+		"half_radius_scale": 0.96,
+		"tilts": {"star": 18.0, "bezel": 30.0, "girdle": 44.0},
+		"silhouette_mode": &"curve",
+		"silhouette_symmetry": 12,
+		"silhouette_detail": GemCutPrimitives.DETAIL_HIGH,
+		"silhouette_min_points": 72,
+	}
+
+
 static func heart_brilliant() -> Dictionary:
 	return {
 		"cut_id": &"heart_brilliant",
@@ -133,6 +156,7 @@ static func trillion() -> Dictionary:
 	var bow_distance := GemCutPrimitives.GEM_RADIUS * 0.22
 	var girdle_segments := 8
 	var table_ratio := 0.36
+	var mid_star_ratio := 0.50
 	var star_ratio := 0.64
 	var side_midpoints: Array[Vector2] = []
 	var boundary_sides: Array = []
@@ -151,14 +175,25 @@ static func trillion() -> Dictionary:
 			silhouette.append(point)
 
 	var table := GemCutPrimitives.scale_points(corners, table_ratio)
+	var mid_star_points: Array[Vector2] = []
+	for midpoint in side_midpoints:
+		mid_star_points.append(center + (midpoint - center) * mid_star_ratio)
 	var star_points: Array[Vector2] = []
 	for midpoint in side_midpoints:
 		star_points.append(center + (midpoint - center) * star_ratio)
 
+	# Inner star ring: shallow tilt, between table edge and mid-star line.
+	var inner_star_facets: Array = []
+	for i in corners.size():
+		var next_index := (i + 1) % corners.size()
+		inner_star_facets.append([table[i], mid_star_points[i], table[next_index]])
+
+	# Outer star ring: steeper tilt, between mid-star and star points.
 	var star_facets: Array = []
 	for i in corners.size():
 		var next_index := (i + 1) % corners.size()
-		star_facets.append([table[i], star_points[i], table[next_index]])
+		star_facets.append([table[i], star_points[i], mid_star_points[i]])
+		star_facets.append([mid_star_points[i], star_points[i], table[next_index]])
 
 	var bezel_facets: Array = []
 	for i in corners.size():
@@ -177,10 +212,11 @@ static func trillion() -> Dictionary:
 		"display_name": "Trillion",
 		"shape_category": &"triangle",
 		"table": table,
+		"inner_star_facets": inner_star_facets,
 		"star_facets": star_facets,
 		"bezel_facets": bezel_facets,
 		"fans": fans,
-		"tilts": {"star": 18.0, "bezel": 34.0, "girdle": 42.0},
+		"tilts": {"inner_star": 11.0, "star": 21.0, "bezel": 34.0, "girdle": 42.0},
 		"silhouette": silhouette,
 	}
 
@@ -190,6 +226,7 @@ static func straight_trillion() -> Dictionary:
 	var center := GemCutPrimitives.CENTER
 	var girdle_segments := 3
 	var table_ratio := 0.34
+	var mid_star_ratio := 0.47
 	var star_ratio := 0.60
 	var side_midpoints: Array[Vector2] = []
 	var boundary_sides: Array = []
@@ -201,14 +238,28 @@ static func straight_trillion() -> Dictionary:
 		boundary_sides.append(GemCutPrimitives.sample_line_segment(corners[i], corners[next_index], girdle_segments))
 
 	var table := GemCutPrimitives.scale_points(corners, table_ratio)
+	var mid_star_points: Array[Vector2] = []
+	for midpoint in side_midpoints:
+		mid_star_points.append(center + (midpoint - center) * mid_star_ratio)
 	var star_points: Array[Vector2] = []
 	for midpoint in side_midpoints:
 		star_points.append(center + (midpoint - center) * star_ratio)
 
+	# Inner star ring: shallow tilt (12 deg), sits between table edge and
+	# the mid-star line.  These facets are nearly table-flat, so they catch
+	# specular at a very different angle than the outer star ring.
+	var inner_star_facets: Array = []
+	for i in corners.size():
+		var next_index := (i + 1) % corners.size()
+		inner_star_facets.append([table[i], mid_star_points[i], table[next_index]])
+
+	# Outer star ring: steeper tilt (22 deg), between mid-star and star
+	# points.  Two triangles per side to fill the quad region.
 	var star_facets: Array = []
 	for i in corners.size():
 		var next_index := (i + 1) % corners.size()
-		star_facets.append([table[i], star_points[i], table[next_index]])
+		star_facets.append([table[i], star_points[i], mid_star_points[i]])
+		star_facets.append([mid_star_points[i], star_points[i], table[next_index]])
 
 	var bezel_facets: Array = []
 	for i in corners.size():
@@ -227,10 +278,11 @@ static func straight_trillion() -> Dictionary:
 		"display_name": "Straight Trillion",
 		"shape_category": &"triangle",
 		"table": table,
+		"inner_star_facets": inner_star_facets,
 		"star_facets": star_facets,
 		"bezel_facets": bezel_facets,
 		"fans": fans,
-		"tilts": {"star": 19.0, "bezel": 34.0, "girdle": 42.0},
+		"tilts": {"inner_star": 12.0, "star": 22.0, "bezel": 34.0, "girdle": 42.0},
 		"silhouette": GemCutPrimitives.pva(corners),
 	}
 
@@ -249,7 +301,7 @@ static func princess_square() -> Dictionary:
 
 
 static func lozenge() -> Dictionary:
-	var x_radius := 0.48
+	var x_radius := 0.56
 	var y_radius := 1.0
 	var rings := [
 		GemCutPrimitives.diamond_points(x_radius, y_radius),
@@ -267,6 +319,24 @@ static func lozenge() -> Dictionary:
 		"ring_zones": ["girdle", "step", "step", "step", "table"],
 		"silhouette": GemCutPrimitives.pva(rings[0]),
 		"pavilion_rotation_fraction": 0.0,
+	}
+
+
+static func kite_brilliant() -> Dictionary:
+	return {
+		"cut_id": &"kite_brilliant",
+		"display_name": "Kite Brilliant",
+		"shape_category": &"kite",
+		"sector_count": 8,
+		"boundary_mode": &"kite",
+		"boundary_params": {"aspect_x": 0.62, "aspect_y": 1.0, "shoulder": 0.30},
+		"table_ratio": 0.46,
+		"star_length": 0.54,
+		"tilts": {"star": 20.0, "bezel": 35.0, "girdle": 43.0},
+		"silhouette_mode": &"curve",
+		"silhouette_symmetry": 8,
+		"silhouette_detail": GemCutPrimitives.DETAIL_HIGH,
+		"silhouette_min_points": 48,
 	}
 
 

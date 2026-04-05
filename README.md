@@ -7,12 +7,16 @@ Players swap tiles to form matches of 3+. Matched tiles merge into higher-tier g
 ## Project Structure
 
 ```
-autoloads/          # Singletons (GameConfig, DebugFlags, ReplayService, SaveService, TileRegistry, GemVisualRegistry, PerfMonitor)
+autoloads/          # Singletons (GameConfig, DebugFlags, ReplayService, SaveService, TileRegistry, GemVisualRegistry)
 core/
   board/            # Simulation: board grid, tiles, matching, effects, gravity, spawning
   rules/            # Simulation: SeededRng, EventLog, EventTimeline
   run/              # Simulation: run lifecycle, turn pipeline orchestration
   visuals/          # Procedural gem rendering: profiles, builders, primitives, lighting math
+native/             # C++ GDExtension: Embree-accelerated ray tracer (GemTraceKernel)
+  src/              # C++ source: trace kernel, Embree scene, material sampler, types
+  godot-cpp/        # Git submodule: Godot C++ bindings (4.5 branch)
+  embree/           # Vendored Intel Embree 4.x SDK
 data/
   tiles/            # Tile definition .tres files (8-gem merge ladder)
   visuals/          # GemVisualResource .tres files (per-gem colour, material, cut assignment)
@@ -23,14 +27,14 @@ resources/
   visuals/          # Resource class definitions (visual data schemas: GemCutResource, GemVisualResource)
 scenes/
   board/            # Board rendering, animation sequencer, input handling
-  menu/             # Main menu (Play + Gem Designer navigation)
-  design/           # Gem Designer tool (interactive visual editor with real-time preview + export)
+  menu/             # Main menu (Play + Gem Bake Workbench navigation)
+  design/           # Gem Bake Workbench (offline bake form + gameplay texture preview)
   main/             # Run entry point scene (hosts RunScene)
   run/              # Run gameplay scene (wires simulation to rendering)
   tile/             # Tile visuals (gameplay texture cache + procedural fallback)
   debug/            # Debug panel (F1 toggle, animation tuning sliders)
 tests/              # Headless smoke tests (40+ tests)
-tools/              # Board layout validator
+tools/              # Board layout validator, offline bake CLI runner
 ```
 
 ## Core Pipeline
@@ -81,21 +85,36 @@ Higher tiers have progressively more dramatic shading, brighter specular highlig
 
 `TileView` now prefers a gameplay texture from `GemVisualRegistry` and falls back to procedural `_draw()` when the cache is unavailable. Both paths share the same cached render bundles, so the bake path and the direct path stay visually aligned. The procedural draw pass still renders filled crown facets, pavilion extinction overlay, silhouette outline, and internal edge lines. Pavilion overlays are derived from per-cut metadata on `GemCutResource`, and `extinction` controls only overlay strength rather than also darkening crown facets. If no gem visual can be resolved, the remaining fallback is a coloured debug rectangle. Silhouette outlines are toggled via `DebugFlags.gem_silhouette_outline`.
 
-The higher-fidelity offline traced path is documented in [Traced Bake Pipeline Reference](plans/traced-bake-pipeline-reference.md). That reference covers mesh generation, tracer configuration, manifest/runtime contract, and recommended bake settings.
+The higher-fidelity offline traced path uses a native C++ ray tracer (`GemTraceKernel` GDExtension with Intel Embree) as its primary bake engine, with the GDScript `GemOpticsTracer` kept as a fallback for environments without the compiled extension. The bake pipeline, manifest format, and CLI usage are documented in [AGENTS.md](AGENTS.md) under "Native Ray Tracer" and "CLI Bake Reference".
 
-## Gem Designer
+## Gem Bake Workbench
 
-The Gem Designer (`scenes/design/gem_design.tscn`) is an interactive tool for designing gem visual configurations with real-time preview. It provides:
+The Gem Bake Workbench (`scenes/design/gem_bake_workbench.tscn`) is the active gem tooling surface. It provides:
 
-- **Cut profile dropdown** — all 23 available cuts
-- **Preset loader** — load any of the 8 built-in gem configurations as a starting point
-- **Full parameter control** — colour pickers (base, depth tint, rim, translucency, gradient, edge, outline), sliders for all material properties (shininess, specular, contrast, saturation, dispersion, transparency, rim power, translucency, secondary specular, sparkle, brilliance, extinction)
-- **Live preview** — 400x400 rendered gem updates in real-time as parameters change
-- **Export** — copy the designed configuration to clipboard as a ready-to-save `.tres` file or as JSON
+- **Offline bake form** — choose which gems to trace, lighting-grid density, rotation-axis sweeps, cell size, bake draw size, sample count, and worker threads
+- **Async job runner** — launches the traced bake in a separate headless Godot process and polls a status file so the UI stays responsive
+- **Gameplay preview board** — drag the selected gem around a run-style light grid to inspect the loaded lighting-bin blend
+- **Axis rotation cards** — preview pitch/yaw/roll rotation bins when the loaded manifest includes those sweeps
+- **Runtime reload** — refreshes the gameplay texture cache after a bake completes so subsequent runs use the new traced textures
+
+## Building the Native Tracer
+
+The native `GemTraceKernel` GDExtension requires MSVC 2022 (Desktop C++ workload), Python 3.x, and SCons. Without building it, the project still works using the GDScript fallback tracer.
+
+```bash
+pip install scons
+cd native
+python -m SCons platform=windows target=template_debug
+# Copy Embree runtime DLLs (once):
+cp embree/bin/embree4.dll lib/win64/
+cp embree/bin/tbb12.dll lib/win64/
+```
+
+After building, restart Godot. The bake pipeline will automatically detect and use the native kernel.
 
 ## Playing
 
-Open in Godot 4.6 and run the project. The main menu provides navigation to Play (starts a run) or the Gem Designer. Click a tile to select it (yellow highlight), then click an adjacent tile to swap. Drag between adjacent tiles also works. Valid swaps trigger the full merge cascade with animations. Invalid swaps bounce back.
+Open in Godot 4.6 and run the project. The main menu provides navigation to Play (starts a run) or the Gem Bake Workbench. Click a tile to select it (yellow highlight), then click an adjacent tile to swap. Drag between adjacent tiles also works. Valid swaps trigger the full merge cascade with animations. Invalid swaps bounce back.
 
 The HUD shows remaining moves and the current seed.
 
@@ -118,6 +137,7 @@ Additional traced/bake coverage:
 ```bash
 godot --headless --script tests/test_gem_meshes.gd
 godot --headless --script tests/test_gem_optics_tracer.gd
+godot --headless --script tests/test_native_trace_kernel.gd
 godot --headless --script tests/test_gameplay_bake_backends.gd
 godot --headless --script tests/test_gameplay_variant_math.gd
 ```

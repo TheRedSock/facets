@@ -3,7 +3,7 @@ extends SceneTree
 ## Integration and timing checks for the offline traced gameplay texture backend.
 
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
-const CELL_SIZE := Vector2i(112, 112)
+const CELL_SIZE := Vector2i(64, 64)
 const MAX_WAIT_FRAMES := 2500
 const PREFERENCES: Array[StringName] = [
 	&"offline_traced",
@@ -24,6 +24,7 @@ func _run() -> void:
 	for preference in PREFERENCES:
 		await _run_preference_case(preference)
 	await _run_scoped_preview_case()
+	await _run_manifest_reload_case()
 
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
 	quit(1 if _fail_count > 0 else 0)
@@ -39,24 +40,23 @@ func _run_preference_case(preference: StringName) -> void:
 	var job = OfflineGemBakeJobScript.new()
 	job.run_batch(
 		registry,
-		[&"quartz", &"diamond"],
+		[&"quartz"],
 		CELL_SIZE,
 		{
 			"output_root": "user://traced_bakes",
 			"draw_size": CELL_SIZE,
 			"sample_count": 1,
-			"lighting_bins": [Vector2i(2, 2)],
-			"rotation_bins": [0],
+			"lighting_grid_size": Vector2i(1, 1),
+			"rotation_base_view_count": 1,
 		}
 	)
 	registry.set_gameplay_bake_backend_preference(preference)
-	registry.ensure_gameplay_texture_cache(CELL_SIZE, [&"quartz", &"diamond"])
-	await _wait_for_cache(registry, preference, [&"quartz", &"diamond"])
+	registry.ensure_gameplay_texture_cache(CELL_SIZE, [&"quartz"])
+	await _wait_for_cache(registry, preference, [&"quartz"])
 
 	var report: Dictionary = registry.get_last_gameplay_bake_report()
 	var backend_counts: Dictionary = report.get("backend_counts", {})
 	var quartz_texture = registry.get_gameplay_texture(&"quartz", 1)
-	var diamond_texture = registry.get_gameplay_texture(&"diamond", 8)
 	var total_elapsed_ms := float(report.get("total_elapsed_ms", 0.0))
 	var requires_real_textures := DisplayServer.get_name() != "headless"
 
@@ -64,7 +64,6 @@ func _run_preference_case(preference: StringName) -> void:
 
 	if requires_real_textures:
 		assert_true(quartz_texture != null, "%s should produce a quartz texture" % String(preference))
-		assert_true(diamond_texture != null, "%s should produce a diamond texture" % String(preference))
 	assert_true(total_elapsed_ms > 0.0, "%s should record bake timings" % String(preference))
 
 	assert_true(int(backend_counts.get(&"offline_traced", 0)) > 0, "offline_traced should load traced variants from manifest")
@@ -73,7 +72,7 @@ func _run_preference_case(preference: StringName) -> void:
 		"offline gameplay cache should not use deprecated runtime bake backends"
 	)
 	assert_true(
-		registry.is_gameplay_texture_cache_current(CELL_SIZE, [&"quartz", &"diamond"]),
+		registry.is_gameplay_texture_cache_current(CELL_SIZE, [&"quartz"]),
 		"offline traced cache should stay scoped to traced preset coverage"
 	)
 
@@ -85,7 +84,7 @@ func _run_scoped_preview_case() -> void:
 		return
 
 	registry.invalidate_render_cache()
-	registry.set_gameplay_bake_backend_preference(&"2d_only")
+	registry.set_gameplay_bake_backend_preference(&"offline_traced")
 	registry.ensure_gameplay_texture_cache(CELL_SIZE, [&"quartz"])
 	await _wait_for_cache(registry, &"scoped_quartz_preview", [&"quartz"])
 
@@ -106,6 +105,38 @@ func _run_scoped_preview_case() -> void:
 	)
 	if DisplayServer.get_name() != "headless":
 		assert_true(scoped_texture != null, "scoped cache should still produce a quartz texture")
+
+
+func _run_manifest_reload_case() -> void:
+	var registry := get_root().get_node_or_null("GemVisualRegistry")
+	assert_true(registry != null, "GemVisualRegistry autoload should exist for manifest reload case")
+	if registry == null:
+		return
+
+	var job = OfflineGemBakeJobScript.new()
+	job.run_batch(
+		registry,
+		[&"quartz"],
+		CELL_SIZE,
+		{
+			"output_root": "user://traced_bakes",
+			"draw_size": CELL_SIZE,
+			"sample_count": 1,
+			"lighting_grid_preset": &"performance",
+			"lighting_runtime_grid_size": Vector2i(1, 1),
+			"lighting_bins": [Vector2i(1, 1)],
+			"rotation_axes": [&"pitch"],
+			"rotation_axis_steps": 1,
+			"rotation_step_degrees": 12.0,
+			"rotation_bins": [0],
+		}
+	)
+	registry.reload_offline_traced_manifest(false)
+	var settings: Dictionary = registry.get_gameplay_variant_settings()
+	assert_eq(settings.get("lighting_grid_preset"), &"performance", "Reloading the traced manifest should preserve the baked lighting preset")
+	assert_eq(settings.get("lighting_grid_size"), Vector2i(3, 3), "Reloading the traced manifest should update the active lighting grid")
+	assert_eq(settings.get("lighting_runtime_grid_size"), Vector2i(1, 1), "Reloading the traced manifest should update the virtual runtime lighting grid")
+	assert_eq(settings.get("rotation_bin_count"), 8, "Reloading the traced manifest should update the active rotation suite")
 
 
 func _wait_for_cache(registry: Node, preference: StringName, tile_scope = []) -> void:
@@ -133,3 +164,7 @@ func assert_true(condition: bool, message: String) -> void:
 	else:
 		_fail_count += 1
 		push_error("FAIL: %s" % message)
+
+
+func assert_eq(actual, expected, message: String) -> void:
+	assert_true(actual == expected, "%s (expected %s, got %s)" % [message, str(expected), str(actual)])

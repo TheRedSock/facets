@@ -10,6 +10,7 @@ extends RefCounted
 const DEFAULT_LIGHT_DIR := Vector3(-0.4, -0.5, 0.75)
 const DEFAULT_VIEW_DIR := Vector3(0.0, 0.0, 1.0)
 const AMBIENT := 0.15
+const GemMaterialSamplerScript = preload("res://core/visuals/gem_material_sampler.gd")
 
 
 ## Computes the flat-shaded colour for a single facet.
@@ -115,12 +116,25 @@ static func compute_all_facet_colors(
 	var has_saturation := not is_zero_approx(visual.saturation_boost)
 	var has_brilliance := visual.brilliance_contrast > 0.001
 	var has_transparency := visual.transparency > 0.001
+	var has_material_surface := (
+		visual.surface_pattern_mix > 0.001
+		and visual.surface_pattern_type != GemVisualResource.MATERIAL_PATTERN_NONE
+	)
+	var has_material_volume := (
+		visual.volume_pattern_mix > 0.001
+		and visual.volume_pattern_type != GemVisualResource.MATERIAL_PATTERN_NONE
+	)
+	var has_material_reactive := (
+		visual.reactive_strength > 0.001
+		and visual.reactive_effect_type != GemVisualResource.MATERIAL_REACTIVE_NONE
+	)
 
 	# Pre-computed cut data availability flags.
 	var has_centroids := cut.facet_centroids.size() == count
 	var has_precomputed_jitter := cut.facet_jitter.size() == count
 	var has_zone_weights := cut.zone_brilliance_weights.size() == count
 	has_brilliance = has_brilliance and (has_zone_weights or cut.facet_zones.size() == count)
+	var needs_centroid := has_gradient or has_material_surface or has_material_volume or has_material_reactive
 
 	# Secondary light direction: primary light rotated around Z by the offset angle.
 	var secondary_half := Vector3.ZERO
@@ -150,7 +164,7 @@ static func compute_all_facet_colors(
 		var n := cut.facet_normals[i]
 		var facet_base := base
 		var centroid := Vector2.ZERO
-		if has_gradient:
+		if needs_centroid:
 			if has_centroids:
 				centroid = cut.facet_centroids[i]
 			else:
@@ -179,6 +193,32 @@ static func compute_all_facet_colors(
 				lerpf(facet_base.b, visual.phenomenon_color.b, phenomenon_blend),
 				facet_base.a)
 
+		var object_position := Vector3(
+			(centroid.x - 0.5) * 2.0,
+			(centroid.y - 0.5) * 2.0,
+			0.0
+		)
+		var local_specular_intensity := specular_intensity
+		if has_material_surface:
+			var surface_material: Dictionary = GemMaterialSamplerScript.apply_surface_material(
+				visual,
+				facet_base,
+				centroid,
+				object_position,
+				n
+			)
+			facet_base = surface_material.get("color", facet_base)
+			local_specular_intensity *= float(surface_material.get("specular_mult", 1.0))
+		if has_material_volume:
+			var volume_material: Dictionary = GemMaterialSamplerScript.sample_volume_material(visual, object_position)
+			var volume_mix := visual.volume_pattern_mix * (
+				0.42 if visual.material_mode == GemVisualResource.MATERIAL_MODE_PATTERNED_TRANSLUCENT else 0.22
+			)
+			facet_base = facet_base.lerp(
+				volume_material.get("color", facet_base),
+				clampf(volume_mix, 0.0, 1.0)
+			)
+
 		# ---- Inlined Blinn-Phong lighting (Fix #2) ----
 		var ndotl := n.dot(l)
 		var half_lambert := ndotl * 0.5 + 0.5
@@ -186,7 +226,7 @@ static func compute_all_facet_colors(
 		var diffuse := lerpf(half_lambert, standard_lambert, contrast)
 		var spec := pow(maxf(n.dot(half_vec), 0.0), shininess)
 		var shade := AMBIENT + one_minus_ambient * diffuse
-		var spec_contrib := specular_intensity * spec
+		var spec_contrib := local_specular_intensity * spec
 
 		var cr := clampf(facet_base.r * shade + spec_contrib, 0.0, 1.0)
 		var cg := clampf(facet_base.g * shade + spec_contrib, 0.0, 1.0)
@@ -215,6 +255,12 @@ static func compute_all_facet_colors(
 			cr = clampf(cr + spec2, 0.0, 1.0)
 			cg = clampf(cg + spec2, 0.0, 1.0)
 			cb = clampf(cb + spec2, 0.0, 1.0)
+
+		if has_material_reactive:
+			var reactive_color: Color = GemMaterialSamplerScript.sample_reactive_color(visual, object_position, n, l)
+			cr = clampf(cr + reactive_color.r, 0.0, 1.0)
+			cg = clampf(cg + reactive_color.g, 0.0, 1.0)
+			cb = clampf(cb + reactive_color.b, 0.0, 1.0)
 
 		# Hue dispersion: prismatic hue shift per facet based on normal angle.
 		# Requires RGB→HSV→RGB round-trip, only when enabled.

@@ -46,12 +46,20 @@ static func build_step_cut(profile: Dictionary) -> GemCutResource:
 static func build_fan_cut(profile: Dictionary) -> GemCutResource:
 	var cut := _make_cut(profile)
 	var table: Array[Vector2] = profile.get("table", [])
+	var inner_star_facets: Array = profile.get("inner_star_facets", [])
 	var star_facets: Array = profile.get("star_facets", [])
 	var bezel_facets: Array = profile.get("bezel_facets", [])
 	var fans: Array = profile.get("fans", [])
 	var tilts: Dictionary = profile.get("tilts", {})
 
 	cut.add_facet(GemCutPrimitives.pva(table), Vector3(0, 0, 1), "table")
+
+	for facet_points in inner_star_facets:
+		var facet := GemCutPrimitives.pva(facet_points)
+		cut.add_facet(facet, GemCutPrimitives.normal_for(
+			GemCutPrimitives.centroid_pva(facet),
+			tilts.get("inner_star", 12.0)
+		), "star")
 
 	for facet_points in star_facets:
 		var facet := GemCutPrimitives.pva(facet_points)
@@ -469,11 +477,24 @@ static func _sample_boundary_point(
 		&"marquise":
 			return GemCutPrimitives.marquise_point(radius_scale, angle, params)
 		&"superellipse":
-			return GemCutPrimitives.superellipse_point(radius_scale, angle, params.get("exponent", 3.5))
+			return GemCutPrimitives.superellipse_point(
+				radius_scale,
+				angle,
+				params.get("exponent", 3.5),
+				params.get("aspect_x", 1.0),
+				params.get("aspect_y", 1.0)
+			)
 		&"heart":
 			return GemCutPrimitives.heart_point(radius_scale, angle, params)
 		&"pear":
 			return GemCutPrimitives.pear_point(radius_scale, angle, params)
+		&"kite":
+			return GemCutPrimitives.kite_point(
+				radius_scale * params.get("aspect_x", 1.0),
+				radius_scale * params.get("aspect_y", 1.0),
+				angle,
+				params.get("shoulder", 0.5)
+			)
 		_:
 			return GemCutPrimitives.radial_point(radius_scale, angle)
 

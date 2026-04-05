@@ -1,8 +1,36 @@
 # Tools
 
-Design-time utilities for level authoring and QA. These run headlessly without a scene tree.
+Design-time utilities for level authoring, offline baking, and QA. These run headlessly without a scene tree.
 
 ## Available
+
+### `run_offline_gem_bake.gd` — Offline Traced Gem Bake Runner
+
+Headless entry point for the traced bake pipeline. Spawns `OfflineGemBakeJob` with CLI-configured options. Uses the native `GemTraceKernel` (C++ + Embree) when the extension is compiled, falling back to the GDScript `GemOpticsTracer` otherwise.
+
+Usage:
+```bash
+godot --headless --path . --script res://tools/run_offline_gem_bake.gd -- [OPTIONS]
+```
+
+Key flags: `--gems`, `--size`, `--draw_size`, `--samples`, `--lighting_preset`, `--lighting_bins`, `--skip_lighting`, `--skip_rotations`, `--rotation_labels`, `--skip_stylize`, `--output`. See AGENTS.md "CLI Bake Reference" for the full flag table.
+
+Example — bake all gems at gameplay size:
+```bash
+godot --headless --path . --script res://tools/run_offline_gem_bake.gd -- --gems=all --size=112 --samples=2
+```
+
+Example — one high-quality Diamond front view without stylization:
+```bash
+godot --headless --path . --script res://tools/run_offline_gem_bake.gd -- \
+    --gems=diamond --size=512 --samples=5 \
+    --skip_lighting --rotation_labels=front --skip_stylize \
+    --output=res://assets/debug_bakes
+```
+
+### `offline_gem_bake_job.gd` — Bake Job Orchestrator
+
+Manages the traced bake pipeline: request building, parallel variant execution, tracer dispatch, PNG output, and manifest writing. Called by both `run_offline_gem_bake.gd` (CLI) and the Gem Bake Workbench (UI). Not invoked directly.
 
 ### `board_validator.gd` — Board Layout Validator
 

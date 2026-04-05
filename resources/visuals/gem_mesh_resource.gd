@@ -62,13 +62,22 @@ func build_trace_data() -> Dictionary:
 	var triangle_centroids: Array[Vector3] = []
 	var triangle_facet_indices := PackedInt32Array()
 	var triangle_zones := PackedStringArray()
-	var facet_planes: Array[Plane] = []
+	var min_v := Vector3(INF, INF, INF)
+	var max_v := Vector3(-INF, -INF, -INF)
+	var bounding_radius := 0.0
 	for facet_index in facet_vertices.size():
 		var verts := facet_vertices[facet_index]
 		if verts.size() < 3:
 			continue
 		var normal := facet_normals[facet_index] if facet_index < facet_normals.size() else _compute_facet_normal(verts)
-		facet_planes.append(Plane(normal, verts[0].dot(normal)))
+		for vertex in verts:
+			min_v.x = minf(min_v.x, vertex.x)
+			min_v.y = minf(min_v.y, vertex.y)
+			min_v.z = minf(min_v.z, vertex.z)
+			max_v.x = maxf(max_v.x, vertex.x)
+			max_v.y = maxf(max_v.y, vertex.y)
+			max_v.z = maxf(max_v.z, vertex.z)
+			bounding_radius = maxf(bounding_radius, vertex.length())
 		for tri_index in range(1, verts.size() - 1):
 			var a := verts[0]
 			var b := verts[tri_index]
@@ -82,6 +91,9 @@ func build_trace_data() -> Dictionary:
 			triangle_facet_indices.append(facet_index)
 			triangle_zones.append(facet_zones[facet_index] if facet_index < facet_zones.size() else "")
 	var bvh := _build_bvh(triangle_bounds, triangle_centroids)
+	var bounds := AABB()
+	if min_v.x != INF:
+		bounds = AABB(min_v, max_v - min_v)
 	var trace_data := {
 		"triangle_vertices_a": triangle_vertices_a,
 		"triangle_vertices_b": triangle_vertices_b,
@@ -91,9 +103,8 @@ func build_trace_data() -> Dictionary:
 		"triangle_centroids": triangle_centroids,
 		"triangle_facet_indices": triangle_facet_indices,
 		"triangle_zones": triangle_zones,
-		"facet_planes": facet_planes,
-		"bounds": compute_bounds(),
-		"bounding_radius": compute_bounding_radius(),
+		"bounds": bounds,
+		"bounding_radius": bounding_radius,
 		"bvh_triangle_indices": bvh.get("triangle_indices", []),
 		"bvh_node_bounds": bvh.get("node_bounds", []),
 		"bvh_node_left": bvh.get("node_left", []),

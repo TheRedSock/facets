@@ -9,7 +9,19 @@ const DEFAULT_ROTATION := -PI * 0.5
 const MIN_GENERIC_NORMAL_Z := 0.08
 const MAX_GENERIC_CROWN_HEIGHT := 0.26
 const BOUNDARY_EPSILON := 0.0025
-const FORCE_MIRRORED_CROWN_PAVILION_BASELINE := true
+const FORCE_MIRRORED_CROWN_PAVILION_BASELINE := false
+const GIRDLE_THICKNESS := 0.012
+const STANDARD_PAVILION_DEPTH_MIN := 0.38
+const STANDARD_PAVILION_DEPTH_SCALE := 2.4
+const STANDARD_PAVILION_DEPTH_EXTRA := 0.08
+const STANDARD_PAVILION_UPPER_DEPTH_RATIO := 0.48
+const STANDARD_PAVILION_LOWER_DEPTH_RATIO := 0.82
+## Deprecated mirrored-crown pavilion constants — kept for reference.
+const MIRRORED_PAVILION_GIRDLE_THICKNESS := 0.012
+const MIRRORED_PAVILION_TANGENT_VARIATION := 0.0035
+const MIRRORED_PAVILION_RADIAL_VARIATION := 0.008
+const MIRRORED_PAVILION_DEPTH_VARIATION := 0.035
+const MIRRORED_PAVILION_SIGNED_Z_VARIATION := 0.01
 
 
 static func build_round_brilliant_mesh(profile: Dictionary):
@@ -33,7 +45,7 @@ static func build_round_brilliant_mesh(profile: Dictionary):
 	var crown_height := float(profile.get("crown_height", _default_crown_height(table_ratio)))
 	var star_height := crown_height * float(profile.get("star_height_ratio", 0.62))
 	var pavilion_depth := float(profile.get("pavilion_depth", crown_height * 1.9))
-	var pavilion_ring_height := -pavilion_depth * float(profile.get("pavilion_ring_height_ratio", 0.48))
+	var pavilion_ring_height := -GIRDLE_THICKNESS - pavilion_depth * float(profile.get("pavilion_ring_height_ratio", 0.48))
 	var pavilion_ring_radius := radius * float(profile.get("pavilion_ring_radius_scale", 0.34))
 
 	var main_angles := _regular_angles(sector_count, DEFAULT_ROTATION)
@@ -44,7 +56,7 @@ static func build_round_brilliant_mesh(profile: Dictionary):
 	var girdle_main := _sample_ring(main_angles, radius, 0.0)
 	var girdle_half := _sample_ring(half_angles, radius, 0.0)
 	var pavilion_ring := _sample_ring(half_angles, pavilion_ring_radius, pavilion_ring_height)
-	var culet := Vector3(0.0, 0.0, -pavilion_depth)
+	var culet := Vector3(0.0, 0.0, -GIRDLE_THICKNESS - pavilion_depth)
 	var count := table_ring.size()
 
 	var table_polygon := PackedVector3Array(table_ring)
@@ -98,17 +110,29 @@ static func build_round_brilliant_mesh(profile: Dictionary):
 		_append_mirrored_crown_pavilion(mesh, crown_polygons_3d, crown_zones)
 		return mesh
 
+	# Girdle band — thin ring of quads sealing the crown-to-pavilion junction.
+	var girdle_lower_main := _offset_ring_z(girdle_main, -GIRDLE_THICKNESS)
+	var girdle_lower_half := _offset_ring_z(girdle_half, -GIRDLE_THICKNESS)
+	_append_girdle_band_interleaved(mesh, girdle_main, girdle_half, girdle_lower_main, girdle_lower_half)
+
 	for i in count:
 		var prev_index := (i - 1 + count) % count
 		var next_index := (i + 1) % count
 		mesh.add_facet(PackedVector3Array([
-			girdle_main[i],
+			girdle_lower_main[i],
 			pavilion_ring[prev_index],
-			girdle_half[prev_index],
+			girdle_lower_half[prev_index],
 		]), "pavilion")
 		mesh.add_facet(PackedVector3Array([
-			girdle_main[i],
-			girdle_half[i],
+			girdle_lower_main[i],
+			girdle_lower_half[i],
+			pavilion_ring[i],
+		]), "pavilion")
+		# Cap triangle — seals the gap at each main girdle vertex between
+		# the two adjacent pavilion ring points that the kite pairs don't cover.
+		mesh.add_facet(PackedVector3Array([
+			girdle_lower_main[i],
+			pavilion_ring[prev_index],
 			pavilion_ring[i],
 		]), "pavilion")
 		mesh.add_facet(PackedVector3Array([
@@ -126,6 +150,7 @@ static func build_mesh_from_cut(cut: GemCutResource):
 		return mesh
 	mesh.cut_id = cut.cut_id
 	mesh.display_name = cut.display_name
+	var pavilion_type := _detect_pavilion_type(cut)
 	var boundary_radius := _compute_boundary_radius(cut)
 	var solved := _solve_crown_vertex_heights(cut, boundary_radius)
 	var heights: Dictionary = solved.get("heights", {})
@@ -146,15 +171,20 @@ static func build_mesh_from_cut(cut: GemCutResource):
 		crown_polygons_3d.append(polygon_3d)
 		crown_zones.append(StringName(zone))
 		mesh.add_facet(polygon_3d, zone)
-	if FORCE_MIRRORED_CROWN_PAVILION_BASELINE:
+	var prefers_specialized_pavilion := (
+		pavilion_type == &"step"
+		or pavilion_type == &"rose"
+		or _can_build_trillion_pavilion(cut)
+		or _can_build_standard_brilliant_pavilion(cut)
+	)
+	if FORCE_MIRRORED_CROWN_PAVILION_BASELINE and not prefers_specialized_pavilion:
 		_append_mirrored_crown_pavilion(mesh, crown_polygons_3d, crown_zones)
 		return mesh
-	var pavilion_type := _detect_pavilion_type(cut)
 	match pavilion_type:
 		&"step":
 			_append_step_pavilion(mesh, cut, crown_height)
 		&"rose":
-			_append_shallow_pavilion(mesh, cut)
+			_append_shallow_pavilion(mesh, cut, crown_height)
 		_ when _can_build_trillion_pavilion(cut):
 			_append_trillion_pavilion(mesh, cut, crown_polygons_3d, crown_zones)
 		_ when _can_build_standard_brilliant_pavilion(cut):
@@ -174,6 +204,8 @@ static func _default_crown_height(table_ratio: float) -> float:
 
 
 static func _detect_pavilion_type(cut: GemCutResource) -> StringName:
+	if cut.shape_category == &"kite":
+		return &"kite"
 	for zone in cut.facet_zones:
 		if zone == "step":
 			return &"step"
@@ -186,10 +218,26 @@ static func _append_step_pavilion(mesh: GemMeshResource, cut: GemCutResource, cr
 	var boundary := _sanitize_loop(cut.silhouette)
 	if boundary.size() < 3:
 		return
-	var pavilion_depth := maxf(0.32, crown_height * 2.0 + 0.08)
-	var step_scales := [1.0, 0.66, 0.36]
-	var step_depths := [0.0, -pavilion_depth * 0.45, -pavilion_depth * 0.82]
-	var rotation_angle := _pavilion_rotation_angle(cut)
+	var profile := _resolve_standard_pavilion_profile(cut, crown_height, &"step")
+	var pavilion_depth := float(profile.get("depth", STANDARD_PAVILION_DEPTH_MIN))
+	var step_scales := [1.0, profile.get("upper_scale", 0.66), profile.get("lower_scale", 0.36)]
+	var step_depths := [
+		-GIRDLE_THICKNESS,
+		-GIRDLE_THICKNESS - pavilion_depth * float(profile.get("upper_depth_ratio", STANDARD_PAVILION_UPPER_DEPTH_RATIO)),
+		-GIRDLE_THICKNESS - pavilion_depth * float(profile.get("lower_depth_ratio", STANDARD_PAVILION_LOWER_DEPTH_RATIO)),
+	]
+	# Step pavilions must NOT rotate inner rings — step cuts rely on aligned
+	# parallel facets between crown and pavilion for the "hall of mirrors" effect.
+	# The 2D pavilion overlay system uses pavilion_rotation_fraction for the
+	# extinction pattern, but the 3D mesh needs aligned geometry for correct TIR.
+	var rotation_angle := 0.0
+
+	# Build girdle band from crown edge (z=0) to pavilion start (z=-GIRDLE_THICKNESS).
+	var crown_girdle_ring: Array[Vector3] = []
+	for point in boundary:
+		var mesh_xy := _to_mesh_xy(point)
+		crown_girdle_ring.append(Vector3(mesh_xy.x, mesh_xy.y, 0.0))
+
 	var rings: Array = []
 	for step_index in step_scales.size():
 		var ring: Array[Vector3] = []
@@ -202,7 +250,10 @@ static func _append_step_pavilion(mesh: GemMeshResource, cut: GemCutResource, cr
 			else:
 				ring.append(_project_pavilion_point(point, scale_factor, z, rotation_angle))
 		rings.append(ring)
-	var culet := Vector3(0.0, 0.0, -pavilion_depth)
+
+	_append_girdle_band_loop(mesh, crown_girdle_ring, rings[0])
+
+	var culet := Vector3(0.0, 0.0, -GIRDLE_THICKNESS - pavilion_depth)
 	for ring_index in rings.size() - 1:
 		var outer: Array = rings[ring_index]
 		var inner: Array = rings[ring_index + 1]
@@ -224,23 +275,12 @@ static func _append_step_pavilion(mesh: GemMeshResource, cut: GemCutResource, cr
 		]), "culet")
 
 
-static func _append_shallow_pavilion(mesh: GemMeshResource, cut: GemCutResource) -> void:
-	var boundary := _sanitize_loop(cut.silhouette)
+static func _append_shallow_pavilion(mesh: GemMeshResource, cut: GemCutResource, crown_height: float = 0.18) -> void:
+	var boundary := _prepare_pavilion_boundary(_sanitize_loop(cut.silhouette), &"rose")
 	if boundary.size() < 3:
 		return
-	var shallow_depth := 0.06
-	var boundary_ring: Array[Vector3] = []
-	for point in boundary:
-		var mesh_xy := _to_mesh_xy(point)
-		boundary_ring.append(Vector3(mesh_xy.x, mesh_xy.y, 0.0))
-	var center_point := Vector3(0.0, 0.0, -shallow_depth)
-	for index in boundary_ring.size():
-		var next_index := (index + 1) % boundary_ring.size()
-		mesh.add_facet(PackedVector3Array([
-			boundary_ring[index],
-			boundary_ring[next_index],
-			center_point,
-		]), "pavilion")
+	var profile := _resolve_standard_pavilion_profile(cut, crown_height, &"rose")
+	_append_outline_pavilion_from_boundary(mesh, boundary, cut, profile, false)
 
 
 static func _can_build_standard_brilliant_pavilion(cut: GemCutResource) -> bool:
@@ -277,7 +317,12 @@ static func _append_trillion_pavilion(
 	for polygon in crown_polygons_3d:
 		for vertex in polygon:
 			crown_height = maxf(crown_height, vertex.z)
-	_append_generic_pavilion(mesh, cut, crown_polygons_3d, crown_zones, crown_height)
+	var boundary := _prepare_pavilion_boundary(_sanitize_loop(cut.silhouette), &"trillion")
+	if boundary.size() < 3:
+		_append_generic_pavilion(mesh, cut, crown_polygons_3d, crown_zones, crown_height)
+		return
+	var profile := _resolve_standard_pavilion_profile(cut, crown_height, &"trillion")
+	_append_outline_pavilion_from_boundary(mesh, boundary, cut, profile, false)
 
 
 static func _append_standard_brilliant_pavilion(
@@ -297,27 +342,41 @@ static func _append_standard_brilliant_pavilion(
 		_append_generic_pavilion(mesh, cut, crown_polygons_3d, crown_zones, crown_height)
 		return
 	var count := girdle_main.size()
-	var pavilion_depth := maxf(0.42, crown_height * 2.05 + 0.10)
-	var upper_scale := clampf(cut.pavilion_scale * 0.39, 0.24, 0.42)
-	var lower_scale := clampf(upper_scale * 0.42, 0.10, 0.18)
-	var upper_z := -pavilion_depth * 0.50
-	var lower_z := -pavilion_depth * 0.84
+	var profile := _resolve_standard_pavilion_profile(cut, crown_height, &"brilliant")
+	var pavilion_depth := float(profile.get("depth", STANDARD_PAVILION_DEPTH_MIN))
+	var upper_scale := float(profile.get("upper_scale", 0.39))
+	var lower_scale := float(profile.get("lower_scale", 0.16))
+	var upper_z := -GIRDLE_THICKNESS - pavilion_depth * float(profile.get("upper_depth_ratio", STANDARD_PAVILION_UPPER_DEPTH_RATIO))
+	var lower_z := -GIRDLE_THICKNESS - pavilion_depth * float(profile.get("lower_depth_ratio", STANDARD_PAVILION_LOWER_DEPTH_RATIO))
 	var girdle_main_3d := _ring_to_mesh_points(girdle_main, 1.0, 0.0)
 	var girdle_half_3d := _ring_to_mesh_points(girdle_half, 1.0, 0.0)
+	var girdle_lower_main := _ring_to_mesh_points(girdle_main, 1.0, -GIRDLE_THICKNESS)
+	var girdle_lower_half := _ring_to_mesh_points(girdle_half, 1.0, -GIRDLE_THICKNESS)
 	var upper_ring := _ring_to_mesh_points(girdle_half, upper_scale, upper_z)
 	var lower_ring := _ring_to_mesh_points(girdle_half, lower_scale, lower_z)
-	var culet := Vector3(0.0, 0.0, -pavilion_depth)
+	var culet := Vector3(0.0, 0.0, -GIRDLE_THICKNESS - pavilion_depth)
+
+	# Girdle band seals the crown-to-pavilion junction.
+	_append_girdle_band_interleaved(mesh, girdle_main_3d, girdle_half_3d, girdle_lower_main, girdle_lower_half)
+
 	for i in count:
 		var prev_index := (i - 1 + count) % count
 		var next_index := (i + 1) % count
 		mesh.add_facet(PackedVector3Array([
-			girdle_main_3d[i],
+			girdle_lower_main[i],
 			upper_ring[prev_index],
-			girdle_half_3d[prev_index],
+			girdle_lower_half[prev_index],
 		]), "pavilion")
 		mesh.add_facet(PackedVector3Array([
-			girdle_main_3d[i],
-			girdle_half_3d[i],
+			girdle_lower_main[i],
+			girdle_lower_half[i],
+			upper_ring[i],
+		]), "pavilion")
+		# Cap triangle — seals the gap at each main girdle vertex between
+		# the two adjacent upper ring points that the kite pairs don't cover.
+		mesh.add_facet(PackedVector3Array([
+			girdle_lower_main[i],
+			upper_ring[prev_index],
 			upper_ring[i],
 		]), "pavilion")
 		mesh.add_facet(PackedVector3Array([
@@ -424,45 +483,9 @@ static func _append_generic_pavilion(
 	if boundary.size() < 3:
 		_append_mirrored_crown_pavilion(mesh, crown_polygons_3d, crown_zones)
 		return
-	var overlay_scale := _estimate_pavilion_overlay_scale(cut, _compute_boundary_radius(cut))
-	var upper_scale := clampf(lerpf(1.0, overlay_scale, 0.60), 0.46, 0.82)
-	var lower_scale := clampf(overlay_scale * 0.82, 0.18, upper_scale - 0.06)
-	var rotation_angle := 0.0
-	var pavilion_depth := maxf(0.30, crown_height * 2.0 + 0.10)
-	var upper_z := -pavilion_depth * 0.46
-	var lower_z := -pavilion_depth * 0.82
-	var outer_ring: Array[Vector3] = []
-	var upper_ring: Array[Vector3] = []
-	var lower_ring: Array[Vector3] = []
-	for index in boundary.size():
-		var point := boundary[index]
-		var sharpness := _loop_vertex_sharpness(boundary, index)
-		var point_upper_scale := clampf(upper_scale - sharpness * 0.06, 0.28, 0.96)
-		var point_lower_scale := clampf(lower_scale - sharpness * 0.10, 0.18, point_upper_scale - 0.04)
-		var mesh_xy := _to_mesh_xy(point)
-		outer_ring.append(Vector3(mesh_xy.x, mesh_xy.y, 0.0))
-		upper_ring.append(_project_pavilion_point(point, point_upper_scale, upper_z, rotation_angle))
-		lower_ring.append(_project_pavilion_point(point, point_lower_scale, lower_z, rotation_angle))
-	var culet := Vector3(0.0, 0.0, -pavilion_depth)
-	for index in outer_ring.size():
-		var next_index := (index + 1) % outer_ring.size()
-		mesh.add_facet(PackedVector3Array([
-			outer_ring[index],
-			outer_ring[next_index],
-			upper_ring[next_index],
-			upper_ring[index],
-		]), "pavilion")
-		mesh.add_facet(PackedVector3Array([
-			upper_ring[index],
-			upper_ring[next_index],
-			lower_ring[next_index],
-			lower_ring[index],
-		]), "pavilion")
-		mesh.add_facet(PackedVector3Array([
-			lower_ring[index],
-			lower_ring[next_index],
-			culet,
-		]), "culet")
+	var family := _detect_pavilion_type(cut)
+	var profile := _resolve_standard_pavilion_profile(cut, crown_height, family)
+	_append_outline_pavilion_from_boundary(mesh, boundary, cut, profile, true)
 
 
 static func _append_mirrored_crown_pavilion(
@@ -472,6 +495,8 @@ static func _append_mirrored_crown_pavilion(
 ) -> void:
 	if crown_polygons_3d.is_empty():
 		return
+	var preserve_shared_vertices := _contains_rose_zones(crown_zones)
+	var mirrored_vertex_cache: Dictionary = {}
 	for i in crown_polygons_3d.size():
 		var crown_polygon: PackedVector3Array = crown_polygons_3d[i]
 		if crown_polygon.size() < 3:
@@ -480,11 +505,61 @@ static func _append_mirrored_crown_pavilion(
 		mirrored.resize(crown_polygon.size())
 		for j in crown_polygon.size():
 			var vertex: Vector3 = crown_polygon[j]
-			mirrored[j] = Vector3(vertex.x, vertex.y, -vertex.z)
-		var crown_zone: StringName = crown_zones[i] if i < crown_zones.size() else &""
-		var mirrored_zone := "culet" if crown_zone == &"table" else "pavilion"
-		mesh.add_facet(mirrored, mirrored_zone)
+			var mirrored_source := Vector3(vertex.x, vertex.y, -vertex.z)
+			var cache_key := _point3_key(mirrored_source)
+			if preserve_shared_vertices and mirrored_vertex_cache.has(cache_key):
+				mirrored[j] = mirrored_vertex_cache[cache_key]
+				continue
+			var mirrored_vertex := _shape_mirrored_pavilion_vertex(
+				mirrored_source,
+				i,
+				j,
+				preserve_shared_vertices
+			)
+			if preserve_shared_vertices:
+				mirrored_vertex_cache[cache_key] = mirrored_vertex
+			mirrored[j] = mirrored_vertex
+		mesh.add_facet(mirrored, "pavilion")
 
+static func _shape_mirrored_pavilion_vertex(
+	vertex: Vector3,
+	polygon_index: int,
+	vertex_index: int,
+	preserve_shared_shape: bool = false
+) -> Vector3:
+	var adjusted := vertex
+	adjusted.z -= MIRRORED_PAVILION_GIRDLE_THICKNESS
+	if absf(vertex.z) <= 0.0001:
+		return adjusted
+	# Break the perfect crown mirror very slightly to reduce table-window reads.
+	var xy := Vector2(vertex.x, vertex.y)
+	var tangent := Vector2(-xy.y, xy.x)
+	if tangent.length_squared() <= 0.000001:
+		tangent = Vector2.RIGHT
+	else:
+		tangent = tangent.normalized()
+	var hash_input := xy.x * 91.713 + xy.y * 47.551 + absf(vertex.z) * 163.19
+	if not preserve_shared_shape:
+		hash_input += float(polygon_index) * 12.9898 + float(vertex_index) * 78.233
+	var noise := sin(hash_input) * 43758.5453
+	var jitter := (noise - floorf(noise)) - 0.5
+	var tangent_variation := MIRRORED_PAVILION_TANGENT_VARIATION
+	var radial_variation := MIRRORED_PAVILION_RADIAL_VARIATION
+	var depth_variation := MIRRORED_PAVILION_DEPTH_VARIATION
+	var signed_z_variation := MIRRORED_PAVILION_SIGNED_Z_VARIATION
+	if preserve_shared_shape:
+		tangent_variation *= 0.35
+		radial_variation *= 0.45
+		depth_variation *= 0.35
+		signed_z_variation *= 0.20
+	xy += tangent * (jitter * tangent_variation)
+	xy *= 1.0 - absf(jitter) * radial_variation
+	adjusted.x = xy.x
+	adjusted.y = xy.y
+	adjusted.z *= 1.0 + absf(jitter) * depth_variation
+	var depth_weight := clampf(absf(vertex.z) / maxf(MAX_GENERIC_CROWN_HEIGHT, 0.01), 0.0, 1.0)
+	adjusted.z += jitter * signed_z_variation * depth_weight
+	return adjusted
 
 static func _extract_standard_brilliant_rings(cut: GemCutResource) -> Dictionary:
 	if cut == null or cut.facet_vertices.is_empty():
@@ -578,13 +653,136 @@ static func _estimate_pavilion_overlay_scale(cut: GemCutResource, boundary_radiu
 	return clampf(overlay_radius / boundary_radius, 0.36, 0.8)
 
 
+static func _resolve_standard_pavilion_profile(
+	cut: GemCutResource,
+	crown_height: float,
+	family: StringName
+) -> Dictionary:
+	var overlay_scale := _estimate_pavilion_overlay_scale(cut, _compute_boundary_radius(cut))
+	var depth := maxf(STANDARD_PAVILION_DEPTH_MIN, crown_height * STANDARD_PAVILION_DEPTH_SCALE + STANDARD_PAVILION_DEPTH_EXTRA)
+	var upper_scale := clampf(lerpf(1.0, overlay_scale, 0.60), 0.46, 0.82)
+	var lower_scale := clampf(overlay_scale * 0.82, 0.18, upper_scale - 0.06)
+	var upper_depth_ratio := STANDARD_PAVILION_UPPER_DEPTH_RATIO
+	var lower_depth_ratio := STANDARD_PAVILION_LOWER_DEPTH_RATIO
+	var rotation_angle := 0.0
+	match family:
+		&"step":
+			upper_scale = clampf(cut.pavilion_scale * 0.62, 0.52, 0.70)
+			lower_scale = clampf(cut.pavilion_scale * 0.34, 0.26, 0.42)
+		&"rose":
+			depth = maxf(0.30, crown_height * 1.85 + 0.08)
+			upper_scale = clampf(cut.pavilion_scale * 0.58, 0.44, 0.60)
+			lower_scale = clampf(upper_scale * 0.42, 0.18, 0.28)
+			upper_depth_ratio = 0.52
+			lower_depth_ratio = 0.86
+		&"trillion":
+			depth = maxf(0.36, crown_height * 2.2 + 0.08)
+			upper_scale = clampf(cut.pavilion_scale * 0.52, 0.42, 0.58)
+			lower_scale = clampf(upper_scale * 0.44, 0.16, 0.26)
+			upper_depth_ratio = 0.50
+			lower_depth_ratio = 0.84
+		&"brilliant":
+			depth = maxf(0.38, crown_height * 1.8 + 0.07)
+			upper_scale = clampf(cut.pavilion_scale * 0.56, 0.36, 0.62)
+			lower_scale = clampf(upper_scale * 0.42, 0.14, 0.26)
+		&"kite":
+			depth = maxf(0.32, crown_height * 1.4 + 0.06)
+			upper_scale = clampf(cut.pavilion_scale * 0.54, 0.38, 0.60)
+			lower_scale = clampf(upper_scale * 0.40, 0.14, 0.24)
+			upper_depth_ratio = 0.46
+			lower_depth_ratio = 0.80
+	return {
+		"depth": depth,
+		"upper_scale": upper_scale,
+		"lower_scale": lower_scale,
+		"upper_depth_ratio": upper_depth_ratio,
+		"lower_depth_ratio": lower_depth_ratio,
+		"rotation_angle": rotation_angle,
+	}
+
+
+static func _append_outline_pavilion_from_boundary(
+	mesh: GemMeshResource,
+	boundary: PackedVector2Array,
+	cut: GemCutResource,
+	profile: Dictionary,
+	use_sharpness: bool
+) -> void:
+	if boundary.size() < 3:
+		return
+	var upper_scale := float(profile.get("upper_scale", 0.56))
+	var lower_scale := float(profile.get("lower_scale", 0.24))
+	var pavilion_depth := float(profile.get("depth", STANDARD_PAVILION_DEPTH_MIN))
+	var upper_z := -GIRDLE_THICKNESS - pavilion_depth * float(profile.get("upper_depth_ratio", STANDARD_PAVILION_UPPER_DEPTH_RATIO))
+	var lower_z := -GIRDLE_THICKNESS - pavilion_depth * float(profile.get("lower_depth_ratio", STANDARD_PAVILION_LOWER_DEPTH_RATIO))
+	var rotation_angle := float(profile.get("rotation_angle", 0.0))
+	var centroid_2d := _boundary_area_centroid(boundary)
+	var centroid_mesh_xy := _to_mesh_xy(centroid_2d)
+	var crown_girdle_ring: Array[Vector3] = []
+	var outer_ring: Array[Vector3] = []
+	var upper_ring: Array[Vector3] = []
+	var lower_ring: Array[Vector3] = []
+	for index in boundary.size():
+		var point := boundary[index]
+		var sharpness := _loop_vertex_sharpness(boundary, index) if use_sharpness else 0.0
+		var point_upper_scale := clampf(upper_scale - sharpness * 0.05, 0.20, 0.96)
+		var point_lower_scale := clampf(lower_scale - sharpness * 0.08, 0.10, point_upper_scale - 0.04)
+		var mesh_xy := _to_mesh_xy(point)
+		crown_girdle_ring.append(Vector3(mesh_xy.x, mesh_xy.y, 0.0))
+		outer_ring.append(Vector3(mesh_xy.x, mesh_xy.y, -GIRDLE_THICKNESS))
+		upper_ring.append(_project_pavilion_point(point, point_upper_scale, upper_z, rotation_angle, centroid_2d))
+		lower_ring.append(_project_pavilion_point(point, point_lower_scale, lower_z, rotation_angle, centroid_2d))
+
+	# Girdle band seals the crown-to-pavilion junction.
+	_append_girdle_band_loop(mesh, crown_girdle_ring, outer_ring)
+
+	var culet := Vector3(centroid_mesh_xy.x, centroid_mesh_xy.y, -GIRDLE_THICKNESS - pavilion_depth)
+	for index in outer_ring.size():
+		var next_index := (index + 1) % outer_ring.size()
+		mesh.add_facet(PackedVector3Array([
+			outer_ring[index],
+			outer_ring[next_index],
+			upper_ring[next_index],
+			upper_ring[index],
+		]), "pavilion")
+		mesh.add_facet(PackedVector3Array([
+			upper_ring[index],
+			upper_ring[next_index],
+			lower_ring[next_index],
+			lower_ring[index],
+		]), "pavilion")
+		mesh.add_facet(PackedVector3Array([
+			lower_ring[index],
+			lower_ring[next_index],
+			culet,
+		]), "culet")
+
+
+static func _prepare_pavilion_boundary(boundary: PackedVector2Array, family: StringName) -> PackedVector2Array:
+	if family == &"trillion" and boundary.size() == 3:
+		return _subdivide_boundary_midpoints(boundary)
+	return boundary
+
+
+static func _subdivide_boundary_midpoints(boundary: PackedVector2Array) -> PackedVector2Array:
+	var expanded := PackedVector2Array()
+	for index in boundary.size():
+		var next_index := (index + 1) % boundary.size()
+		var current := boundary[index]
+		var next := boundary[next_index]
+		expanded.append(current)
+		expanded.append(current.lerp(next, 0.5))
+	return expanded
+
+
 static func _project_pavilion_point(
 	point: Vector2,
 	scale_factor: float,
 	z: float,
 	rotation_angle: float,
+	center: Vector2 = Vector2(0.5, 0.5),
 ) -> Vector3:
-	var delta := point - Vector2(0.5, 0.5)
+	var delta := point - center
 	var cos_r := cos(rotation_angle)
 	var sin_r := sin(rotation_angle)
 	var scaled := delta * scale_factor
@@ -592,7 +790,7 @@ static func _project_pavilion_point(
 		scaled.x * cos_r - scaled.y * sin_r,
 		scaled.x * sin_r + scaled.y * cos_r
 	)
-	var mesh_xy := _to_mesh_xy(Vector2(0.5, 0.5) + rotated)
+	var mesh_xy := _to_mesh_xy(center + rotated)
 	return Vector3(mesh_xy.x, mesh_xy.y, z)
 
 
@@ -607,6 +805,52 @@ static func _loop_vertex_sharpness(loop: PackedVector2Array, index: int) -> floa
 		return 0.0
 	var turn := clampf((1.0 - incoming.dot(outgoing)) * 0.5, 0.0, 1.0)
 	return pow(turn, 0.7)
+
+
+static func _offset_ring_z(ring: Array[Vector3], z_offset: float) -> Array[Vector3]:
+	var offset_ring: Array[Vector3] = []
+	for point in ring:
+		offset_ring.append(Vector3(point.x, point.y, point.z + z_offset))
+	return offset_ring
+
+
+static func _append_girdle_band_loop(
+	mesh: GemMeshResource,
+	upper_ring: Array[Vector3],
+	lower_ring: Array[Vector3],
+) -> void:
+	for i in upper_ring.size():
+		var next_index := (i + 1) % upper_ring.size()
+		mesh.add_facet(PackedVector3Array([
+			upper_ring[i],
+			upper_ring[next_index],
+			lower_ring[next_index],
+			lower_ring[i],
+		]), "girdle")
+
+
+static func _append_girdle_band_interleaved(
+	mesh: GemMeshResource,
+	upper_main: Array[Vector3],
+	upper_half: Array[Vector3],
+	lower_main: Array[Vector3],
+	lower_half: Array[Vector3],
+) -> void:
+	var count := upper_main.size()
+	for i in count:
+		var next_index := (i + 1) % count
+		mesh.add_facet(PackedVector3Array([
+			upper_main[i],
+			upper_half[i],
+			lower_half[i],
+			lower_main[i],
+		]), "girdle")
+		mesh.add_facet(PackedVector3Array([
+			upper_half[i],
+			upper_main[next_index],
+			lower_main[next_index],
+			lower_half[i],
+		]), "girdle")
 
 
 static func _compute_boundary_radius(cut: GemCutResource) -> float:
@@ -659,6 +903,26 @@ static func _centroid_2d(points: PackedVector2Array) -> Vector2:
 	return centroid / float(maxi(points.size(), 1))
 
 
+## Computes the area-weighted centroid of a closed boundary polygon using the
+## shoelace-derived formula.  Falls back to vertex average for degenerate shapes.
+static func _boundary_area_centroid(boundary: PackedVector2Array) -> Vector2:
+	var area := 0.0
+	var cx := 0.0
+	var cy := 0.0
+	for i in boundary.size():
+		var j := (i + 1) % boundary.size()
+		var cross := boundary[i].x * boundary[j].y - boundary[j].x * boundary[i].y
+		area += cross
+		cx += (boundary[i].x + boundary[j].x) * cross
+		cy += (boundary[i].y + boundary[j].y) * cross
+	area *= 0.5
+	if absf(area) < 0.000001:
+		return _centroid_2d(boundary)
+	cx /= (6.0 * area)
+	cy /= (6.0 * area)
+	return Vector2(cx, cy)
+
+
 static func _to_mesh_xy(point: Vector2) -> Vector2:
 	return Vector2(point.x - 0.5, 0.5 - point.y)
 
@@ -668,3 +932,18 @@ static func _point_key(point: Vector2) -> String:
 		int(round(point.x * 100000.0)),
 		int(round(point.y * 100000.0)),
 	]
+
+
+static func _point3_key(point: Vector3) -> String:
+	return "%d:%d:%d" % [
+		int(round(point.x * 100000.0)),
+		int(round(point.y * 100000.0)),
+		int(round(point.z * 100000.0)),
+	]
+
+
+static func _contains_rose_zones(crown_zones: Array[StringName]) -> bool:
+	for zone in crown_zones:
+		if zone == &"rose" or zone == &"rose_center":
+			return true
+	return false

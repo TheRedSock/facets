@@ -1,7 +1,7 @@
 extends Control
 
 ## Main Menu — entry point for the game.
-## Provides navigation to the Run scene and offline baked gem gallery.
+## Provides navigation to the Run scene and the active gem bake workbench.
 
 
 func _ready() -> void:
@@ -54,9 +54,9 @@ func _ready() -> void:
 	play_btn.pressed.connect(_on_play)
 	vbox.add_child(play_btn)
 
-	# ---- Gem Gallery button ----
+	# ---- Gem Bake Workbench button ----
 	var gallery_btn := Button.new()
-	gallery_btn.text = "Offline Gem Gallery"
+	gallery_btn.text = "Gem Bake Workbench"
 	gallery_btn.custom_minimum_size = Vector2(300, 56)
 	gallery_btn.add_theme_font_size_override("font_size", 24)
 	gallery_btn.pressed.connect(_on_gallery)
@@ -68,4 +68,4 @@ func _on_play() -> void:
 
 
 func _on_gallery() -> void:
-	get_tree().change_scene_to_file("res://scenes/design/gem_gallery.tscn")
+	get_tree().change_scene_to_file("res://scenes/design/gem_bake_workbench.tscn")

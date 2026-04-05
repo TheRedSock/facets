@@ -1,8 +1,8 @@
 extends Control
 
-## Gem Designer — interactive tool for designing gem visual configurations.
-## Provides real-time preview with all GemVisualResource parameters exposed
-## as controls, plus export to .tres or JSON for creating new gem variants.
+## Deprecated legacy gem designer.
+## This scene is no longer part of the active gem workflow; use
+## `scenes/design/gem_bake_workbench.tscn` for current bake/preview tasks.
 
 const TILE_VIEW_SCENE := preload("res://scenes/tile/tile_view.tscn")
 
@@ -185,8 +185,8 @@ func _build_deprecated_offline_viewer() -> void:
 	top_bar.add_child(menu_btn)
 
 	var gallery_btn := Button.new()
-	gallery_btn.text = "Offline Gallery"
-	gallery_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/design/gem_gallery.tscn"))
+	gallery_btn.text = "Gem Bake Workbench"
+	gallery_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/design/gem_bake_workbench.tscn"))
 	top_bar.add_child(gallery_btn)
 
 	var title := Label.new()
@@ -548,8 +548,8 @@ func _build_preview_panel(parent: HBoxContainer) -> void:
 	top_bar.add_child(back_btn)
 
 	var gallery_btn := Button.new()
-	gallery_btn.text = "Preset Gallery"
-	gallery_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/design/gem_gallery.tscn"))
+	gallery_btn.text = "Gem Bake Workbench"
+	gallery_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/design/gem_bake_workbench.tscn"))
 	top_bar.add_child(gallery_btn)
 
 	var spacer := Control.new()

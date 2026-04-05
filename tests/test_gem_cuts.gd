@@ -12,11 +12,13 @@ const CUT_IDS: Array[StringName] = [
 	&"classic_round",
 	&"old_european_round",
 	&"cushion",
+	&"opal_cushion",
 	&"heart_brilliant",
 	&"trillion",
 	&"straight_trillion",
 	&"princess_square",
 	&"lozenge",
+	&"kite_brilliant",
 	&"radiant_square",
 	&"radiant_octagon",
 	&"hex_brilliant",
@@ -40,11 +42,13 @@ const EXPECTED_FACET_COUNTS := {
 	&"classic_round": 33,
 	&"old_european_round": 41,
 	&"cushion": 33,
+	&"opal_cushion": 49,
 	&"heart_brilliant": 41,
-	&"trillion": 31,
-	&"straight_trillion": 16,
+	&"trillion": 37,
+	&"straight_trillion": 22,
 	&"princess_square": 17,
 	&"lozenge": 17,
+	&"kite_brilliant": 33,
 	&"radiant_square": 25,
 	&"radiant_octagon": 25,
 	&"hex_brilliant": 25,
@@ -131,7 +135,9 @@ func test_outline_sampling_stability() -> void:
 		GemCutProfiles.classic_round(),
 		GemCutProfiles.old_european_round(),
 		GemCutProfiles.cushion(),
+		GemCutProfiles.opal_cushion(),
 		GemCutProfiles.heart_brilliant(),
+		GemCutProfiles.kite_brilliant(),
 		GemCutProfiles.oval_brilliant(),
 		GemCutProfiles.antique_oval(),
 		GemCutProfiles.marquise_brilliant(),
@@ -187,10 +193,14 @@ func test_pavilion_symmetry_metadata() -> void:
 		"Antique oval pavilion should follow its 10-sector profile")
 	assert_eq(GemCutGenerators.generate(&"marquise_brilliant").pavilion_sector_count, 10,
 		"Marquise pavilion should follow its 10-sector profile")
+	assert_eq(GemCutGenerators.generate(&"opal_cushion").pavilion_sector_count, 12,
+		"Opal cushion pavilion should follow its 12-sector profile")
 	assert_eq(GemCutGenerators.generate(&"radiant_octagon").pavilion_sector_count, 8,
 		"Radiant octagon pavilion should follow its outer-point count")
 	assert_eq(GemCutGenerators.generate(&"lozenge").pavilion_sector_count, 4,
 		"Lozenge pavilion should follow its 4-main profile")
+	assert_eq(GemCutGenerators.generate(&"kite_brilliant").pavilion_sector_count, 8,
+		"Kite brilliant pavilion should follow its 8-sector radial profile")
 	assert_eq(GemCutGenerators.generate(&"emerald_step").pavilion_sector_count, 8,
 		"Emerald step pavilion should follow its ring point count")
 
@@ -228,6 +238,11 @@ func test_profile_distinctiveness() -> void:
 	assert_true(float(asscher_bounds["aspect"]) > float(emerald_bounds["aspect"]) + 0.20,
 		"Asscher should read squarer than Emerald Step")
 
+	var cushion_bounds := _cut_bounds(GemCutGenerators.generate(&"cushion"))
+	var opal_bounds := _cut_bounds(GemCutGenerators.generate(&"opal_cushion"))
+	assert_true(float(opal_bounds["aspect"]) < float(cushion_bounds["aspect"]) - 0.08,
+		"Opal cushion should read more elongated than the base cushion")
+
 	var oval_tip_ratio := _tip_band_width_ratio(GemCutGenerators.generate(&"oval_brilliant").silhouette, 0.16)
 	var marquise_tip_ratio := _tip_band_width_ratio(GemCutGenerators.generate(&"marquise_brilliant").silhouette, 0.16)
 	assert_true(marquise_tip_ratio < oval_tip_ratio * 0.72,
@@ -236,6 +251,10 @@ func test_profile_distinctiveness() -> void:
 	var lozenge_bounds := _cut_bounds(GemCutGenerators.generate(&"lozenge"))
 	assert_true(float(lozenge_bounds["aspect"]) < 0.62,
 		"Lozenge should stay clearly more elongated than a square")
+
+	var kite_bounds := _cut_bounds(GemCutGenerators.generate(&"kite_brilliant"))
+	assert_true(float(kite_bounds["aspect"]) < 0.65,
+		"Kite brilliant should read as an elongated diamond")
 
 
 func test_rotation_variant_size_compensation() -> void:

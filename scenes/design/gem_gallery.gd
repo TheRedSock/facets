@@ -1,6 +1,8 @@
 extends Control
 
-## Gem Gallery — renders all built-in gem presets side by side for art review.
+## Deprecated legacy preset gallery.
+## This viewer is kept as a reference surface only; the active gem workflow now
+## lives in `scenes/design/gem_bake_workbench.tscn`.
 
 const TILE_VIEW_SCENE := preload("res://scenes/tile/tile_view.tscn")
 const PREVIEW_TILE_SIZE := Vector2(112, 112)
@@ -53,6 +55,11 @@ func _build_top_bar(parent: VBoxContainer) -> void:
 	menu_btn.text = "< Menu"
 	menu_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn"))
 	top_bar.add_child(menu_btn)
+
+	var workbench_btn := Button.new()
+	workbench_btn.text = "Gem Bake Workbench"
+	workbench_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/design/gem_bake_workbench.tscn"))
+	top_bar.add_child(workbench_btn)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL

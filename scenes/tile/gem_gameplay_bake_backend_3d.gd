@@ -1,7 +1,9 @@
 class_name GemGameplayBakeBackend3D
 extends "res://scenes/tile/gem_gameplay_bake_backend.gd"
 
-## Prototype 3D viewport bake path for selected cut families.
+## Deprecated prototype 3D viewport bake path.
+## The active runtime only uses offline traced textures; keep this file as
+## historical reference unless a user explicitly asks to revive it.
 
 const GEM_BAKE_SHADER := preload("res://scenes/tile/gem_bake_3d.gdshader")
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")

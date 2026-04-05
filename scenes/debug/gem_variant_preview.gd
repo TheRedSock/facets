@@ -1,5 +1,9 @@
 extends Control
 
+## Deprecated legacy variant preview.
+## This debug scene predates the active workbench and should not be treated as
+## the current gem preview/bake workflow.
+
 const TILE_VIEW_SCENE := preload("res://scenes/tile/tile_view.tscn")
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
 const DEFAULT_PREVIEW_TILE_ID := &"quartz"

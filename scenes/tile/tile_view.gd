@@ -41,6 +41,8 @@ var _outline_geometry: Dictionary = {}
 var _use_runtime_outline := false
 var _last_lighting_uv := Vector2(-10.0, -10.0)
 var _debug_lighting_uv_override := Vector2(-1.0, -1.0)
+var _debug_rotation_axis_preview: StringName = &""
+var _debug_rotation_phase_override := -1.0
 var _last_special_rotation_progress := -1.0
 var _last_applied_sprite_entries: Array[Dictionary] = []
 var _special_rotation_active := false
@@ -167,6 +169,13 @@ func set_debug_lighting_uv_override(uv: Vector2) -> void:
 		_refresh_gameplay_sprite_layers(true)
 
 
+func set_debug_rotation_axis_preview(axis: StringName, phase: float = -1.0) -> void:
+	_debug_rotation_axis_preview = axis
+	_debug_rotation_phase_override = phase
+	if is_inside_tree() and use_gameplay_texture_cache:
+		_refresh_gameplay_sprite_layers(true)
+
+
 func _update_visual() -> void:
 	if _label == null:
 		return
@@ -279,7 +288,15 @@ func _refresh_gameplay_sprite_layers(force: bool = false) -> bool:
 	if not use_gameplay_texture_cache or GemVisualRegistry == null:
 		return false
 	var entries: Array[Dictionary] = []
-	if _special_rotation_active:
+	if _debug_rotation_phase_override >= 0.0 and _debug_rotation_axis_preview != &"":
+		entries = GemVisualRegistry.get_gameplay_rotation_axis_blend_set(
+			tile_id,
+			tier,
+			_debug_rotation_axis_preview,
+			_debug_rotation_phase_override
+		)
+		_last_special_rotation_progress = _debug_rotation_phase_override
+	elif _special_rotation_active:
 		var duration := maxf(_special_rotation_duration, 0.001)
 		var progress := fposmod((_special_rotation_elapsed / duration) * _special_rotation_turns, 1.0)
 		if not force and absf(progress - _last_special_rotation_progress) < 0.001:
@@ -373,6 +390,8 @@ func get_debug_gameplay_variant_state() -> Dictionary:
 	return {
 		"lighting_uv": _last_lighting_uv,
 		"debug_lighting_uv_override": _debug_lighting_uv_override,
+		"debug_rotation_axis_preview": _debug_rotation_axis_preview,
+		"debug_rotation_phase_override": _debug_rotation_phase_override,
 		"rotation_progress": _last_special_rotation_progress,
 		"special_rotation_active": _special_rotation_active,
 		"entries": _last_applied_sprite_entries.duplicate(true),

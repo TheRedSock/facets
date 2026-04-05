@@ -50,21 +50,36 @@ core/board/     Simulation: board grid, tiles, matching, effects, gravity, spawn
 core/rules/     Simulation: RNG, event logging, event timeline
 core/run/       Simulation: run lifecycle, turn pipeline orchestration
 core/visuals/   Procedural gem rendering: cut profiles, builders, primitives, lighting math
+native/         C++ GDExtension: Embree-accelerated ray tracer (GemTraceKernel)
+native/src/     C++ source files for the native tracer kernel
 resources/      Resource class definitions (data schemas)
 data/tiles/     Tile definition .tres files (the 8-gem merge ladder)
 data/visuals/   GemVisualResource .tres files (per-gem colour, material, cut assignment)
-autoloads/      Global singletons (config, replay, save, debug, tile registry, gem visuals, perf monitor)
-scenes/menu/    Main menu screen (Play + Gem Designer navigation)
-scenes/design/  Gem Designer tool (interactive visual editor with real-time preview + export)
+autoloads/      Global singletons (config, replay, save, debug, tile registry, gem visuals)
+scenes/menu/    Main menu screen (Play + Gem Bake Workbench navigation)
+scenes/design/  Active gem bake workbench (offline bake form + preview); legacy designer/gallery remain for reference only
 scenes/run/     Run gameplay scene (wires simulation to rendering)
 scenes/board/   Board rendering, animation sequencer, input handling
 scenes/tile/    Tile visuals (gameplay texture cache + procedural fallback)
 scenes/main/    Run entry point scene (hosts RunScene)
 scenes/debug/   Debug panel (F1 toggle)
-tools/          Design-time utilities (board layout validator)
+tools/          Design-time utilities (board layout validator, offline bake CLI runner)
 tests/          Headless smoke tests (godot --headless --script tests/test_smoke.gd)
 plans/          Design documents (not code — reference only)
 ```
+
+## Deprecated Surfaces
+
+Treat these files/features as historical reference only unless the user explicitly asks to revive them:
+
+- `autoloads/perf_monitor.gd` — deprecated, no longer autoloaded or used by gameplay
+- `scenes/design/gem_design.tscn` / `scenes/design/gem_design.gd` — deprecated legacy gem designer
+- `scenes/design/gem_gallery.tscn` / `scenes/design/gem_gallery.gd` — deprecated preset gallery
+- `scenes/debug/gem_variant_preview.tscn` / `scenes/debug/gem_variant_preview.gd` — deprecated debug preview
+- `scenes/tile/gem_gameplay_bake_backend_3d.gd` — deprecated prototype 3D bake backend
+- `core/visuals/gem_optics_tracer.gd` — GDScript CPU tracer, now a **fallback only**. The native C++ `GemTraceKernel` (in `native/`) is the primary tracer. The GDScript version is kept as a readable reference implementation and for environments without the compiled extension.
+- `core/visuals/gem_material_sampler.gd` — Still used by the procedural 2D renderer (`GemRenderer`) and as reference. The native tracer has its own C++ port of the material sampling (`native/src/gem_trace_material.cpp`).
+- Runtime loading-screen overlays are not part of the active run flow anymore; do not assume the game uses a loading screen when reasoning about current UX
 
 ### Layer Boundaries
 
@@ -73,6 +88,7 @@ plans/          Design documents (not code — reference only)
 | `core/board/` | Other `core/` classes, `SeededRng` | Scenes, autoloads (except `TileRegistry` in `EffectResolver` for merge chain lookup) |
 | `core/run/` | `core/board/`, `core/rules/`, autoloads (`ReplayService`) | Scenes |
 | `core/visuals/` | `resources/visuals/` (resource classes only) | Scenes, autoloads, `core/board/` |
+| `native/` | godot-cpp, Embree, `resources/visuals/` (reads GemVisualResource/GemMeshResource via Variant API) | GDScript classes, scenes, autoloads — fully standalone |
 | `scenes/` | `core/` (read-only), autoloads | Must not mutate board state directly |
 | `autoloads/` | `core/` classes, `resources/` | Scenes |
 | `resources/` | Nothing (pure data schemas) | Everything |
@@ -338,10 +354,10 @@ Each tier has a distinct silhouette shape for instant visual identification:
 
 | Tier | Gem | Shape | Cut ID | Facet Count |
 |------|-----|-------|--------|-------------|
-| T1 | Quartz | Circle | `classic_round` | 33 |
+| T1 | Quartz | Octagon | `simple_octagon_step` | 17 |
 | T2 | Amethyst | Square (rounded) | `cushion` | 33 |
 | T3 | Peridot | Triangle (bowed edges) | `trillion` | 19 |
-| T4 | Topaz | Rotated Square ◆ | `radiant_diamond` | 13 |
+| T4 | Topaz | Rotated Square ◆ | `lozenge` | 13 |
 | T5 | Sapphire | Hexagon | `hex_brilliant` | 25 |
 | T6 | Emerald | Rectangle (portrait) | `emerald_step` | 17 |
 | T7 | Ruby | Oval (portrait) | `oval_brilliant` | 33 |
@@ -361,6 +377,107 @@ Each tier has a distinct silhouette shape for instant visual identification:
 | T8 | 0.6 | 0.9 | icy blue | 0.25 | Brilliant, prismatic fire |
 
 All gems additionally use rim lighting, zone brilliance, and pavilion extinction at tier-appropriate intensities. Higher tiers feature secondary specular, sparkle, and stronger extinction for increased visual complexity.
+
+---
+
+## Native Ray Tracer (GemTraceKernel)
+
+The primary offline bake tracer is a C++ GDExtension using Intel Embree for hardware-optimized BVH traversal and intersection. It replaces the GDScript `GemOpticsTracer` (which remains as a fallback for environments without the compiled extension).
+
+### Architecture
+
+```
+native/
+├── godot-cpp/              Git submodule (Godot C++ bindings, 4.5 branch)
+├── embree/                 Vendored Embree 4.x SDK (headers, libs, runtime DLLs)
+├── SConstruct              SCons build script
+├── src/
+│   ├── register_types.cpp  GDExtension entry point — registers GemTraceKernel
+│   ├── gem_trace_kernel.h  Public class (RefCounted, exposed to GDScript)
+│   ├── gem_trace_kernel.cpp Full trace pipeline: spectral trace, lighting, grading
+│   ├── gem_trace_scene.h   Embree scene wrapper (RTCDevice/RTCScene lifecycle)
+│   ├── gem_trace_scene.cpp Builds Embree scene from GDScript trace_data Dictionary
+│   ├── gem_trace_material.h Procedural material sampling (ported from GemMaterialSampler)
+│   ├── gem_trace_material.cpp Noise, patterns, reactive effects — all stateless
+│   └── gem_trace_types.h   All shared types, constants, inline math helpers
+└── lib/win64/              Build output (.dll) + Embree runtime DLLs
+```
+
+### Tracer Selection (Feature Flag)
+
+`OfflineGemBakeJob._trace_request_worker()` checks at runtime:
+```gdscript
+if ClassDB.class_exists(&"GemTraceKernel"):
+    tracer = ClassDB.instantiate(&"GemTraceKernel")  # Native C++ + Embree
+else:
+    tracer = GemOpticsTracerScript.new()               # GDScript fallback
+```
+
+Both expose the same API: `trace_to_image(mesh_resource, visual, request) -> Image` and `get_last_trace_profile() -> Dictionary`. The native kernel is ~50-100x faster.
+
+### Building
+
+Requires: MSVC 2022 (Desktop C++ workload), Python 3.x, SCons (`pip install scons`).
+
+```bash
+cd native
+python -m SCons platform=windows target=template_debug
+# Copy Embree runtime DLLs (once, or when Embree is updated):
+cp embree/bin/embree4.dll lib/win64/
+cp embree/bin/tbb12.dll lib/win64/
+```
+
+The `.gdextension` descriptor (`native.gdextension` in project root) and `.godot/extension_list.cfg` tell Godot where to find the compiled library. No changes to `project.godot` are needed.
+
+### What the C++ Kernel Ports
+
+The native kernel is a complete port of `GemOpticsTracer` (~1935 lines GDScript → ~3200 lines C++):
+
+| Component | GDScript (fallback) | C++ (primary) |
+|---|---|---|
+| BVH build + intersection | `gem_mesh_resource.gd` (median-split BVH) | `gem_trace_scene.cpp` (Embree QBVH with SIMD) |
+| Recursive spectral trace | `gem_optics_tracer.gd` | `gem_trace_kernel.cpp` |
+| Surface lighting (~200 lines) | `gem_optics_tracer.gd` | `gem_trace_kernel.cpp` |
+| Material sampling (noise, patterns) | `gem_material_sampler.gd` | `gem_trace_material.cpp` |
+| Output grading (ACES, gamma) | `gem_optics_tracer.gd` | `gem_trace_kernel.cpp` |
+| Row-band threading | GDScript `Thread` | `std::thread` |
+
+### CLI Bake Reference
+
+The offline bake runs as a headless Godot process via `tools/run_offline_gem_bake.gd`. Key flags:
+
+```bash
+godot --headless --path . --script res://tools/run_offline_gem_bake.gd -- [OPTIONS]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--gems=<ids>` | `all` | Comma-separated tile IDs or `all` |
+| `--size=<px>` | `112` | Cell size (square) |
+| `--draw_size=<px>` | same as size | Trace resolution (can be larger for supersampling) |
+| `--samples=<n>` | `1` | MSAA sample count (1-5) |
+| `--max_trace_bounces=<n>` | `12` | Max internal reflection bounces |
+| `--threads=<n>` | auto | Per-trace thread count |
+| `--variant_workers=<n>` | auto (max 4) | Parallel variant bake workers |
+| `--lighting_preset=<name>` | `quality` | Grid preset: `performance`(3x3), `balanced`(4x4), `quality`(5x5), `ultra`(6x6) |
+| `--lighting_grid=<X,Y>` | from preset | Custom lighting grid dimensions |
+| `--lighting_bins=<X,Y[;...]>` | all | Specific lighting bin coordinates to bake |
+| `--skip_lighting` | false | Skip all lighting variants |
+| `--skip_rotations` | false | Skip all rotation variants |
+| `--rotation_base_view_count=<n>` | `6` | Number of orthogonal views (crown, front, right, pavilion, left, back) |
+| `--rotation_labels=<names>` | all | Specific rotation views by label |
+| `--rotation_bins=<indices>` | all | Specific rotation views by index |
+| `--skip_stylize` | false | Skip post-trace stylizer |
+| `--output=<path>` | `user://traced_bakes` | Output directory |
+| `--trace_profile` | false | Include per-trace timing profile |
+
+Example — bake one high-quality Diamond frame without stylization:
+```bash
+godot --headless --path . --script res://tools/run_offline_gem_bake.gd -- \
+    --gems=diamond --size=512 --draw_size=512 --samples=5 \
+    --skip_lighting --rotation_labels=front --skip_stylize \
+    --output=res://assets/debug_bakes
+```
 
 ---
 
@@ -401,6 +518,8 @@ Run headlessly for level design QA. Warnings are informational; errors indicate 
 Run headless smoke tests: `godot --headless --script tests/test_smoke.gd`
 
 Focused cut regression test: `godot --headless --script tests/test_gem_cuts.gd`
+
+Native tracer extension test: `godot --headless --script tests/test_native_trace_kernel.gd`
 
 The test suites cover: board creation, topology (neighbors, portals, gravity), match detection (including unmatchable/holes), merge mechanic (remove count, upgrade, max tier), gravity (standard, custom direction, tile override, immovable, iterative convergence, diagonal fill, portals, cycle safety), pipeline (effect planning, conflict resolution, spawning, timeline structure), deterministic replay verification, and procedural cut generation invariants including pavilion fragment integrity, pavilion symmetry metadata, and winding-independent clipping.
 
@@ -452,7 +571,11 @@ These systems are designed but intentionally excluded from the current scaffold.
 | Add a new visual property | Add `@export` to `resources/visuals/gem_visual_resource.gd`, handle in `GemRenderer`, add control in `scenes/design/gem_design.gd` |
 | Change pavilion extinction geometry | `core/visuals/gem_cut_builders.gd` — `generate_pavilion_overlay()` |
 | Change pavilion extinction rendering | `core/visuals/gem_renderer.gd` — `compute_pavilion_colors()` |
-| Design a gem visually | Run the Gem Designer scene (`scenes/design/gem_design.tscn`), export `.tres` or JSON |
+| Preview or rebake gameplay gem variants | Use the Gem Bake Workbench scene (`scenes/design/gem_bake_workbench.tscn`) |
+| Change the native tracer's trace logic | `native/src/gem_trace_kernel.cpp` — rebuild with `scons platform=windows target=template_debug` |
+| Change the native tracer's material sampling | `native/src/gem_trace_material.cpp` — rebuild after changes |
+| Change the native tracer's Embree intersection | `native/src/gem_trace_scene.cpp` — rebuild after changes |
+| Rebuild the native extension | `cd native && python -m SCons platform=windows target=template_debug` |
 | Change merge behavior (what happens on 4-match, 5-match) | `core/board/effect_planner.gd` — `_plan_match_4()`, `_plan_match_5_plus()` |
 | Add a new effect type | Add const in `EffectPlanner`, handle in `EffectResolver.apply()` |
 | Change gravity behavior | `core/board/board_physics.gd` |

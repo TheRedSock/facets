@@ -17,3 +17,17 @@ mono_crash.*.json
 
 # Plans, concept, archive
 plans
+
+# Debug
+assets/debug_bakes/
+
+# Native GDExtension build artifacts
+native/lib/
+native/embree/
+native/godot-cpp/
+*.obj
+*.o
+*.pdb
+*.exp
+.sconsign.dblite
+.scon*

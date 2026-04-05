@@ -5,11 +5,10 @@ extends SceneTree
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")
 const GemCutBuildersScript = preload("res://core/visuals/gem_cut_builders.gd")
 const GemCutGeneratorsScript = preload("res://core/visuals/gem_cut_generators.gd")
-const GemMeshBuildersScript = preload("res://core/visuals/gem_mesh_builders.gd")
 
 const EXPECTED_FACET_COUNTS := {
-	&"classic_round": 57,
-	&"old_european_round": 71,
+	&"classic_round": 81,
+	&"old_european_round": 101,
 }
 
 var _pass_count := 0
@@ -94,9 +93,6 @@ func test_oval_brilliant_pavilion_has_detail() -> void:
 	assert_true(mesh != null, "Oval brilliant should generate a mesh resource")
 	if mesh == null:
 		return
-	if GemMeshBuildersScript.uses_mirrored_crown_pavilion_baseline():
-		_assert_mirrored_pavilion_layout(&"oval_brilliant", "Oval brilliant")
-		return
 	var pavilion_count := 0
 	var culet_count := 0
 	for zone in mesh.facet_zones:
@@ -131,9 +127,6 @@ func test_lozenge_pavilion_has_detail() -> void:
 	var mesh = GemMeshGeneratorsScript.generate(&"lozenge")
 	assert_true(mesh != null, "Lozenge should generate a mesh resource")
 	if mesh == null:
-		return
-	if GemMeshBuildersScript.uses_mirrored_crown_pavilion_baseline():
-		_assert_mirrored_pavilion_layout(&"lozenge", "Lozenge")
 		return
 	var pavilion_count := 0
 	var culet_count := 0
@@ -170,9 +163,6 @@ func test_pear_brilliant_pavilion_has_detail() -> void:
 	assert_true(mesh != null, "Pear brilliant should generate a mesh resource")
 	if mesh == null:
 		return
-	if GemMeshBuildersScript.uses_mirrored_crown_pavilion_baseline():
-		_assert_mirrored_pavilion_layout(&"pear_brilliant", "Pear brilliant")
-		return
 	var pavilion_count := 0
 	var culet_count := 0
 	for zone in mesh.facet_zones:
@@ -188,10 +178,6 @@ func test_expected_facet_counts() -> void:
 	for cut_id in EXPECTED_FACET_COUNTS.keys():
 		var mesh = GemMeshGeneratorsScript.generate(cut_id)
 		var expected: int = EXPECTED_FACET_COUNTS[cut_id]
-		if GemMeshBuildersScript.uses_mirrored_crown_pavilion_baseline():
-			var cut = GemCutGeneratorsScript.generate(cut_id)
-			if cut != null:
-				expected = cut.facet_count() * 2
 		assert_eq(mesh.facet_count(), expected, "%s facet count" % str(cut_id))
 
 
@@ -272,22 +258,3 @@ func _point_near_polygon_boundary(point: Vector2, polygon: PackedVector2Array, t
 		if Geometry2D.get_closest_point_to_segment(point, a, b).distance_to(point) <= tolerance:
 			return true
 	return false
-
-
-func _assert_mirrored_pavilion_layout(cut_id: StringName, label: String) -> void:
-	var cut = GemCutGeneratorsScript.generate(cut_id)
-	var mesh = GemMeshGeneratorsScript.generate(cut_id)
-	assert_true(cut != null, "%s cut should generate for mirrored pavilion assertions" % label)
-	assert_true(mesh != null, "%s mesh should generate for mirrored pavilion assertions" % label)
-	if cut == null or mesh == null:
-		return
-	var pavilion_count := 0
-	var culet_count := 0
-	for zone in mesh.facet_zones:
-		if zone == "pavilion":
-			pavilion_count += 1
-		elif zone == "culet":
-			culet_count += 1
-	assert_eq(mesh.facet_count(), cut.facet_count() * 2, "%s mirrored pavilion should double crown facets" % label)
-	assert_eq(pavilion_count, cut.facet_count() - 1, "%s mirrored pavilion should mirror every non-table crown facet" % label)
-	assert_eq(culet_count, 1, "%s mirrored pavilion should mirror the table once as culet" % label)

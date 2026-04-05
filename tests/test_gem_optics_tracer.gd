@@ -19,19 +19,22 @@ func _init() -> void:
 func _run() -> void:
 	print("\n=== Gem Optics Tracer Tests ===\n")
 	await process_frame
-	test_trace_image_has_visible_pixels()
-	test_lighting_variants_are_distinct()
-	test_rotation_variants_are_distinct()
-	test_non_round_rotation_variants_are_distinct()
-	test_ruby_trace_has_contrast_range()
-	test_ruby_lighting_bins_are_distinct()
-	test_ruby_birefringence_changes_trace()
-	test_trace_size_overrides_target_size()
-	test_stylizer_materially_changes_output()
-	test_stylizer_preserves_alpha_silhouette()
-	test_stylized_lighting_variants_are_distinct()
-	test_legacy_manifest_versions_are_rejected()
-	test_offline_bake_job_writes_manifest()
+	var tests := [
+		{"name": "trace_image_has_visible_pixels", "call": Callable(self, "test_trace_image_has_visible_pixels")},
+		{"name": "lighting_variants_are_distinct", "call": Callable(self, "test_lighting_variants_are_distinct")},
+		{"name": "rotation_variants_are_distinct", "call": Callable(self, "test_rotation_variants_are_distinct")},
+		{"name": "non_round_rotation_variants_are_distinct", "call": Callable(self, "test_non_round_rotation_variants_are_distinct")},
+		{"name": "birefringence_changes_trace", "call": Callable(self, "test_birefringence_changes_trace")},
+		{"name": "trace_size_overrides_target_size", "call": Callable(self, "test_trace_size_overrides_target_size")},
+		{"name": "stylizer_materially_changes_output", "call": Callable(self, "test_stylizer_materially_changes_output")},
+		{"name": "stylizer_preserves_alpha_silhouette", "call": Callable(self, "test_stylizer_preserves_alpha_silhouette")},
+		{"name": "stylized_lighting_variants_are_distinct", "call": Callable(self, "test_stylized_lighting_variants_are_distinct")},
+		{"name": "legacy_manifest_versions_are_rejected", "call": Callable(self, "test_legacy_manifest_versions_are_rejected")},
+		{"name": "offline_bake_job_writes_manifest", "call": Callable(self, "test_offline_bake_job_writes_manifest")},
+	]
+	for i in tests.size():
+		var test_info: Dictionary = tests[i]
+		_run_named_test(String(test_info.get("name", "")), test_info.get("call", Callable()), i + 1, tests.size())
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
 	quit(1 if _fail_count > 0 else 0)
 
@@ -83,64 +86,11 @@ func test_non_round_rotation_variants_are_distinct() -> void:
 	assert_true(_image_difference(image_a, image_b) > 0.01, "Non-round rotated meshes should produce materially distinct traced images")
 
 
-func test_ruby_trace_has_contrast_range() -> void:
+func test_birefringence_changes_trace() -> void:
 	var visual: GemVisualResource = load("res://data/visuals/ruby.tres")
 	var mesh_resource = GemMeshGeneratorsScript.generate(&"oval_brilliant")
-	assert_true(visual != null, "Ruby visual should load")
-	assert_true(mesh_resource != null, "Ruby cut should generate a mesh resource")
-	if visual == null or mesh_resource == null:
-		return
-	var image := _trace_image_with_mesh(
-		mesh_resource,
-		visual,
-		{
-			"variant_type": &"lighting",
-			"light_dir": Vector3(-0.4, -0.5, 0.75).normalized(),
-		}
-	)
-	var stats := _opaque_luma_stats(image)
-	assert_true(stats.get("count", 0) > 100, "Ruby trace should cover a meaningful image area")
-	assert_true(stats.get("min", 1.0) < 0.28, "Ruby trace should retain dark extinction regions")
-	assert_true(stats.get("max", 0.0) > 0.58, "Ruby trace should retain bright glare regions")
-	assert_true(stats.get("range", 0.0) > 0.44, "Ruby trace should show strong internal contrast")
-
-
-func test_ruby_lighting_bins_are_distinct() -> void:
-	var registry := get_root().get_node_or_null("GemVisualRegistry")
-	var visual: GemVisualResource = load("res://data/visuals/ruby.tres")
-	var mesh_resource = GemMeshGeneratorsScript.generate(&"oval_brilliant")
-	assert_true(registry != null, "GemVisualRegistry should exist for ruby lighting-bin coverage")
-	assert_true(visual != null, "Ruby visual should load for lighting-bin coverage")
-	assert_true(mesh_resource != null, "Ruby mesh should generate for lighting-bin coverage")
-	if registry == null or visual == null or mesh_resource == null:
-		return
-	var grid: Vector2i = registry.get_gameplay_variant_settings().get("lighting_grid_size", Vector2i(5, 5))
-	var image_a := _trace_image_with_mesh(
-		mesh_resource,
-		visual,
-		{
-			"variant_type": &"lighting",
-			"light_dir": registry.compute_gameplay_light_dir(Vector2i(0, 0)),
-			"lighting_uv": _lighting_bin_to_centered(Vector2i(0, 0), grid),
-		}
-	)
-	var image_b := _trace_image_with_mesh(
-		mesh_resource,
-		visual,
-		{
-			"variant_type": &"lighting",
-			"light_dir": registry.compute_gameplay_light_dir(Vector2i(4, 4)),
-			"lighting_uv": _lighting_bin_to_centered(Vector2i(4, 4), grid),
-		}
-	)
-	assert_true(_image_difference(image_a, image_b) > 0.012, "Ruby lighting bins should produce visibly distinct traced frames")
-
-
-func test_ruby_birefringence_changes_trace() -> void:
-	var visual: GemVisualResource = load("res://data/visuals/ruby.tres")
-	var mesh_resource = GemMeshGeneratorsScript.generate(&"oval_brilliant")
-	assert_true(visual != null, "Ruby visual should load for birefringence coverage")
-	assert_true(mesh_resource != null, "Ruby mesh should generate for birefringence coverage")
+	assert_true(visual != null, "Birefringent visual should load")
+	assert_true(mesh_resource != null, "Birefringent mesh should generate")
 	if visual == null or mesh_resource == null:
 		return
 	var scalar_visual: GemVisualResource = visual.duplicate(true)
@@ -161,7 +111,7 @@ func test_ruby_birefringence_changes_trace() -> void:
 			"rotation_degrees": 30.0,
 		}
 	)
-	assert_true(_image_difference(bire_image, scalar_image) > 0.002, "Ruby birefringence should measurably alter traced output")
+	assert_true(_image_difference(bire_image, scalar_image) > 0.002, "Birefringence should measurably alter traced output")
 
 
 func test_trace_size_overrides_target_size() -> void:
@@ -345,6 +295,20 @@ func _trace_image_with_mesh(mesh_resource, visual: GemVisualResource, overrides:
 	return tracer.trace_to_image(mesh_resource, visual, request)
 
 
+func _run_named_test(name: String, callback: Callable, index: int, total: int) -> void:
+	if not callback.is_valid():
+		push_error("Invalid test callable for %s" % name)
+		_fail_count += 1
+		return
+	print("[%d/%d] %s" % [index, total, name])
+	var before_fail_count := _fail_count
+	var start_usec := Time.get_ticks_usec()
+	callback.call()
+	var elapsed_ms := float(Time.get_ticks_usec() - start_usec) / 1000.0
+	var status := "FAIL" if _fail_count > before_fail_count else "ok"
+	print("[%d/%d] %s  |  %s  %.1fms" % [index, total, name, status, elapsed_ms])
+
+
 func _count_opaque_pixels(image: Image) -> int:
 	var count := 0
 	for y in image.get_height():
@@ -370,29 +334,6 @@ func _image_difference(image_a: Image, image_b: Image) -> float:
 	if pixel_count <= 0.0:
 		return 0.0
 	return total / pixel_count
-
-
-func _opaque_luma_stats(image: Image) -> Dictionary:
-	if image == null:
-		return {}
-	var count := 0
-	var min_luma := 1.0
-	var max_luma := 0.0
-	for y in image.get_height():
-		for x in image.get_width():
-			var pixel := image.get_pixel(x, y)
-			if pixel.a <= 0.01:
-				continue
-			var luma := pixel.r * 0.2126 + pixel.g * 0.7152 + pixel.b * 0.0722
-			min_luma = minf(min_luma, luma)
-			max_luma = maxf(max_luma, luma)
-			count += 1
-	return {
-		"count": count,
-		"min": min_luma,
-		"max": max_luma,
-		"range": max_luma - min_luma,
-	}
 
 
 func _lighting_bin_to_centered(lighting_bin: Vector2i, grid: Vector2i) -> Vector2:

@@ -59,8 +59,12 @@ static func apply(image: Image, visual: GemVisualResource, request: Dictionary =
 			micro_mask *= clampf(1.0 - detail_magnitude * 10.0, 0.0, 1.0)
 			var smooth_mix := mix * visual.stylize_microdetail_suppression * micro_mask * fringe
 			var styled := base_rgb.lerp(soft_rgb, smooth_mix)
+			var silhouette_strength := 1.0 - smoothstep(0.40, 0.92, a)
 
-			styled = _apply_plane_contrast(styled, mix * visual.stylize_plane_contrast)
+			styled = _apply_plane_contrast(
+				styled,
+				mix * visual.stylize_plane_contrast * (0.82 + interior_strength * 0.18)
+			)
 			styled = _lift_shadow_floor(
 				styled,
 				visual.stylize_shadow_floor * (0.45 + interior_strength * 0.55) * fringe
@@ -73,8 +77,11 @@ static func apply(image: Image, visual: GemVisualResource, request: Dictionary =
 			styled = _apply_tone_steps(styled, maxi(visual.stylize_tone_steps, 2), tone_band_amount)
 
 			var edge_gain := mix * visual.stylize_facet_edge_gain * edge_strength * fringe
-			styled += detail * (0.85 + edge_gain * 0.5) * edge_gain
+			var internal_edge_bias := lerpf(0.60, 1.0, silhouette_strength)
+			styled += detail * (0.42 + edge_gain * 0.26) * edge_gain * internal_edge_bias
 			var edge_ink_amount := mix * visual.stylize_edge_ink_strength * edge_strength * fringe
+			edge_ink_amount *= 0.34 + silhouette_strength * 0.66
+			edge_ink_amount *= 0.75 + (1.0 - highlight_strength) * 0.25
 			styled = styled.lerp(_build_ink_color(visual, styled), edge_ink_amount)
 			var highlight_snap := mix * visual.stylize_highlight_snap * highlight_strength * fringe
 			styled = _apply_highlight_snap(styled, highlight_snap)
@@ -104,21 +111,22 @@ static func apply(image: Image, visual: GemVisualResource, request: Dictionary =
 		false
 	)
 	var bloom_gain := mix * visual.stylize_highlight_bloom_gain
-	var output := image.duplicate()
+	var output_rgb: Array[Vector3] = []
+	output_rgb.resize(pixel_count)
 	for y in height:
 		for x in width:
 			var idx := _index(x, y, width)
 			var a := alpha[idx]
 			if a <= 0.0001:
-				output.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.0))
+				output_rgb[idx] = Vector3.ZERO
 				continue
 			var fringe := smoothstep(0.08, 0.7, a)
 			var final_rgb: Vector3 = styled_rgb[idx]
 			if bloom_gain > 0.0001 and idx < bloom_rgb.size():
 				final_rgb += bloom_rgb[idx] * bloom_gain * 0.42 * fringe
 			final_rgb = _clamp_rgb(final_rgb)
-			output.set_pixel(x, y, Color(final_rgb.x, final_rgb.y, final_rgb.z, a))
-	return output
+			output_rgb[idx] = final_rgb
+	return _build_image_from_rgb_alpha(output_rgb, alpha, width, height)
 
 
 static func _build_guides(
@@ -157,7 +165,7 @@ static func _build_guides(
 			var chroma_grad := absf(_chroma(right) - _chroma(left)) + absf(_chroma(down) - _chroma(up))
 			var high_pass := (center - smoothed_rgb[idx]).length()
 			var edge_strength := clampf(
-				luma_grad * 1.25 + chroma_grad * 0.8 + high_pass * 2.4,
+				luma_grad * 1.12 + chroma_grad * 0.84 + high_pass * 2.0,
 				0.0,
 				1.0
 			)
@@ -205,28 +213,120 @@ static func _box_blur_rgb(
 		for idx in rgb.size():
 			result[idx] = rgb[idx] if fallback_to_source else Vector3.ZERO
 		return result
-	for y in height:
-		for x in width:
-			var sum := Vector3.ZERO
-			var total_weight := 0.0
-			for oy in range(-radius, radius + 1):
-				for ox in range(-radius, radius + 1):
-					var nx := clampi(x + ox, 0, width - 1)
-					var ny := clampi(y + oy, 0, height - 1)
-					var nidx := _index(nx, ny, width)
-					var weight := weights[nidx]
-					if weight <= 0.0001:
-						continue
-					sum += rgb[nidx] * weight
-					total_weight += weight
-			var idx := _index(x, y, width)
-			if total_weight > 0.0001:
-				result[idx] = sum / total_weight
-			elif fallback_to_source:
-				result[idx] = rgb[idx]
-			else:
-				result[idx] = Vector3.ZERO
+	var horizontal := _blur_axis_weighted(rgb, weights, width, height, radius, true, false)
+	var vertical := _blur_axis_weighted(
+		horizontal.get("rgb", []),
+		horizontal.get("weights", PackedFloat32Array()),
+		width,
+		height,
+		radius,
+		false,
+		true
+	)
+	var final_rgb: Array = vertical.get("rgb", [])
+	var final_weights: PackedFloat32Array = vertical.get("weights", PackedFloat32Array())
+	for idx in rgb.size():
+		var total_weight := final_weights[idx] if idx < final_weights.size() else 0.0
+		if total_weight > 0.0001:
+			result[idx] = final_rgb[idx] / total_weight
+		elif fallback_to_source:
+			result[idx] = rgb[idx]
+		else:
+			result[idx] = Vector3.ZERO
 	return result
+
+
+static func _blur_axis_weighted(
+	rgb: Array,
+	weights: PackedFloat32Array,
+	width: int,
+	height: int,
+	radius: int,
+	horizontal: bool,
+	premultiplied: bool,
+) -> Dictionary:
+	var result_rgb: Array[Vector3] = []
+	result_rgb.resize(rgb.size())
+	var result_weights := PackedFloat32Array()
+	result_weights.resize(weights.size())
+	if width <= 0 or height <= 0:
+		return {
+			"rgb": result_rgb,
+			"weights": result_weights,
+		}
+	if horizontal:
+		for y in height:
+			var sum_rgb := Vector3.ZERO
+			var sum_weight := 0.0
+			for sample_x in range(-radius, radius + 1):
+				var clamped_x := clampi(sample_x, 0, width - 1)
+				var sample_idx := _index(clamped_x, y, width)
+				var sample_weight := weights[sample_idx]
+				sum_rgb += rgb[sample_idx] if premultiplied else rgb[sample_idx] * sample_weight
+				sum_weight += sample_weight
+			for x in width:
+				var idx := _index(x, y, width)
+				result_rgb[idx] = sum_rgb
+				result_weights[idx] = sum_weight
+				if x == width - 1:
+					continue
+				var remove_x := clampi(x - radius, 0, width - 1)
+				var add_x := clampi(x + radius + 1, 0, width - 1)
+				var remove_idx := _index(remove_x, y, width)
+				var add_idx := _index(add_x, y, width)
+				var remove_weight := weights[remove_idx]
+				var add_weight := weights[add_idx]
+				sum_rgb -= rgb[remove_idx] if premultiplied else rgb[remove_idx] * remove_weight
+				sum_rgb += rgb[add_idx] if premultiplied else rgb[add_idx] * add_weight
+				sum_weight += add_weight - remove_weight
+	else:
+		for x in width:
+			var sum_rgb := Vector3.ZERO
+			var sum_weight := 0.0
+			for sample_y in range(-radius, radius + 1):
+				var clamped_y := clampi(sample_y, 0, height - 1)
+				var sample_idx := _index(x, clamped_y, width)
+				var sample_weight := weights[sample_idx]
+				sum_rgb += rgb[sample_idx] if premultiplied else rgb[sample_idx] * sample_weight
+				sum_weight += sample_weight
+			for y in height:
+				var idx := _index(x, y, width)
+				result_rgb[idx] = sum_rgb
+				result_weights[idx] = sum_weight
+				if y == height - 1:
+					continue
+				var remove_y := clampi(y - radius, 0, height - 1)
+				var add_y := clampi(y + radius + 1, 0, height - 1)
+				var remove_idx := _index(x, remove_y, width)
+				var add_idx := _index(x, add_y, width)
+				var remove_weight := weights[remove_idx]
+				var add_weight := weights[add_idx]
+				sum_rgb -= rgb[remove_idx] if premultiplied else rgb[remove_idx] * remove_weight
+				sum_rgb += rgb[add_idx] if premultiplied else rgb[add_idx] * add_weight
+				sum_weight += add_weight - remove_weight
+	return {
+		"rgb": result_rgb,
+		"weights": result_weights,
+	}
+
+
+static func _build_image_from_rgb_alpha(
+	rgb: Array[Vector3],
+	alpha: PackedFloat32Array,
+	width: int,
+	height: int,
+) -> Image:
+	var bytes := PackedByteArray()
+	bytes.resize(width * height * 4)
+	for idx in rgb.size():
+		var color: Vector3 = rgb[idx]
+		var a := alpha[idx] if idx < alpha.size() else 1.0
+		var byte_index := idx * 4
+		bytes[byte_index] = int(round(clampf(color.x, 0.0, 1.0) * 255.0))
+		bytes[byte_index + 1] = int(round(clampf(color.y, 0.0, 1.0) * 255.0))
+		bytes[byte_index + 2] = int(round(clampf(color.z, 0.0, 1.0) * 255.0))
+		bytes[byte_index + 3] = int(round(clampf(a, 0.0, 1.0) * 255.0))
+	return Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, bytes)
 
 
 static func _sample_rgb(
@@ -251,8 +351,8 @@ static func _apply_plane_contrast(color: Vector3, amount: float) -> Vector3:
 		return color
 	var luma := _luma(color)
 	var centered := luma - 0.5
-	var contrasted_luma := 0.5 + centered * (1.0 + amount * 1.35)
-	contrasted_luma += signf(centered) * pow(absf(centered), 1.35) * amount * 0.24
+	var contrasted_luma := 0.5 + centered * (1.0 + amount * 0.95)
+	contrasted_luma += signf(centered) * pow(absf(centered), 1.28) * amount * 0.14
 	contrasted_luma = clampf(contrasted_luma, 0.0, 1.0)
 	return _set_luma(color, contrasted_luma)
 
@@ -283,17 +383,22 @@ static func _apply_tone_steps(color: Vector3, steps: int, amount: float) -> Vect
 	var band := clampi(int(floor(clamped_luma * float(steps))), 0, steps - 1)
 	var snapped_luma := (float(band) + 0.5) / float(steps)
 	var target_luma := lerpf(clamped_luma, snapped_luma, clampf(amount, 0.0, 1.0))
-	return _set_luma(color, target_luma)
+	# Scale all channels proportionally to preserve chrominance (hue + saturation).
+	# This prevents spectral dispersion detail from being collapsed into grey bands.
+	if clamped_luma > 0.0001:
+		var scale := target_luma / clamped_luma
+		return _clamp_rgb(color * scale)
+	return Vector3.ONE * target_luma
 
 
 static func _apply_highlight_snap(color: Vector3, amount: float) -> Vector3:
 	if amount <= 0.0001:
 		return color
 	var luma := _luma(color)
-	var target_luma := clampf(lerpf(luma, maxf(luma, 0.86), amount), 0.0, 1.0)
+	var target_luma := clampf(lerpf(luma, maxf(luma, 0.82), amount * 0.78), 0.0, 1.0)
 	var snapped := _set_luma(color, target_luma)
-	snapped = _adjust_saturation(snapped, -amount * 0.18)
-	var white_mix := clampf(amount * 0.18, 0.0, 0.18)
+	snapped = _adjust_saturation(snapped, amount * 0.06)
+	var white_mix := clampf(amount * 0.035, 0.0, 0.035)
 	return _clamp_rgb(snapped.lerp(Vector3.ONE, white_mix))
 
 
@@ -302,9 +407,9 @@ static func _build_ink_color(visual: GemVisualResource, color: Vector3) -> Vecto
 	var depth_rgb := Vector3(visual.depth_tint.r, visual.depth_tint.g, visual.depth_tint.b)
 	var ink_rgb := base_rgb
 	if visual.depth_tint.a > 0.01:
-		ink_rgb = ink_rgb.lerp(depth_rgb, clampf(visual.depth_tint.a * 0.75, 0.0, 0.75))
-	ink_rgb = _adjust_saturation(ink_rgb, -0.3)
-	var ink_luma := clampf(_luma(color) * 0.2 + 0.05, 0.035, 0.18)
+		ink_rgb = ink_rgb.lerp(depth_rgb, clampf(visual.depth_tint.a * 0.45, 0.0, 0.45))
+	ink_rgb = _adjust_saturation(ink_rgb, -0.12)
+	var ink_luma := clampf(_luma(color) * 0.34 + 0.07, 0.07, 0.28)
 	return _set_luma(ink_rgb, ink_luma)
 
 

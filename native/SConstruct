@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+"""SConstruct for the gem_trace GDExtension with Embree."""
+import os
+
+# Build godot-cpp first and inherit its environment.
+env = SConscript("godot-cpp/SConstruct")
+
+# Embree SDK (vendored)
+embree_root = "embree"
+env.Append(CPPPATH=[os.path.join(embree_root, "include")])
+
+if env["platform"] == "windows":
+    env.Append(LIBPATH=[os.path.join(embree_root, "lib")])
+    env.Append(LIBS=["embree4", "tbb"])
+elif env["platform"] == "linux":
+    env.Append(LIBPATH=[os.path.join(embree_root, "lib")])
+    env.Append(LIBS=["embree4", "tbb"])
+    env.Append(LINKFLAGS=["-Wl,-rpath,$ORIGIN"])
+elif env["platform"] == "macos":
+    env.Append(LIBPATH=[os.path.join(embree_root, "lib")])
+    env.Append(LIBS=["embree4", "tbb"])
+
+# Our source files
+env.Append(CPPPATH=["src/"])
+sources = Glob("src/*.cpp")
+
+# C++17 required
+if env["platform"] == "windows":
+    env.Append(CXXFLAGS=["/std:c++17"])
+else:
+    env.Append(CXXFLAGS=["-std=c++17"])
+
+# Output library name and path per platform
+lib_name = "gem_trace{}{}".format(env["suffix"], env["SHLIBSUFFIX"])
+
+if env["platform"] == "windows":
+    lib_path = os.path.join("lib", "win64", lib_name)
+elif env["platform"] == "linux":
+    lib_path = os.path.join("lib", "linux64", lib_name)
+elif env["platform"] == "macos":
+    lib_path = os.path.join("lib", "macos", lib_name)
+else:
+    lib_path = os.path.join("lib", lib_name)
+
+library = env.SharedLibrary(lib_path, source=sources)
+Default(library)
