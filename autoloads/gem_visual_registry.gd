@@ -14,6 +14,7 @@ const GAMEPLAY_BAKE_SUPERSAMPLE := 2
 const GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED := &"offline_traced"
 const GAMEPLAY_VARIANT_TYPE_LIGHTING := &"lighting"
 const GAMEPLAY_VARIANT_TYPE_ROTATION := &"rotation"
+const GAMEPLAY_VARIANT_TYPE_VIEW_SPHERE := &"view_sphere"
 const DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE := GemTracedBakeContract.DEFAULT_LIGHTING_GRID_SIZE
 const DEFAULT_GAMEPLAY_BASE_ROTATION_VIEW_COUNT := GemTracedBakeContract.DEFAULT_ROTATION_BASE_VIEW_COUNT
 const GAMEPLAY_ROTATION_DEFAULT_AXIS_STEPS := 0
@@ -23,6 +24,7 @@ const GAMEPLAY_LIGHTING_SWEEP_Y_DEGREES := 30.0
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 const GemCutProjector = preload("res://core/visuals/gem_cut_projector.gd")
 const GameplayBakeBackendOfflineTracedScript = preload("res://scenes/tile/gem_gameplay_bake_backend_offline_traced.gd")
+const GemViewSphereSamplingScript = preload("res://core/visuals/gem_view_sphere_sampling.gd")
 
 signal gameplay_texture_cache_rebuilt(profile: Dictionary)
 signal gameplay_texture_bake_progress(progress: Dictionary)
@@ -545,6 +547,102 @@ func build_gameplay_bake_requests_for_tile(
 	return _build_gameplay_bake_requests(tile_id, visual, cut_model, cut, draw_size, target_size, variant_options)
 
 
+## Build bake requests from an explicit visual + geometry (designer / tooling; no registry tile required).
+func build_explicit_bake_requests(
+	tile_id: StringName,
+	visual: GemVisualResource,
+	cut_model,
+	cut,
+	draw_size: Vector2i,
+	target_size: Vector2i,
+	options: Dictionary = {},
+) -> Array[Dictionary]:
+	if visual == null or cut_model == null or cut == null:
+		return []
+	if target_size == Vector2i.ZERO:
+		target_size = draw_size
+	var view_scale := _compute_trace_view_scale(visual, cut_model)
+	var variant_settings := _resolve_variant_settings(options.get("variant_settings", {}))
+	var out: Array[Dictionary] = []
+	if bool(options.get("include_lighting", true)):
+		out.append_array(_collect_lighting_bake_requests(
+			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale
+		))
+	if bool(options.get("include_rotation_suite", true)):
+		out.append_array(_collect_rotation_bake_requests(
+			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale
+		))
+	if bool(options.get("include_view_sphere_fibonacci", false)):
+		out.append_array(_collect_fibonacci_view_sphere_requests(
+			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, options
+		))
+	return out
+
+
+## Single crown (top-down) traced frame for live designer preview.
+func build_designer_preview_crown_request(
+	tile_id: StringName,
+	visual: GemVisualResource,
+	cut_model,
+	cut,
+	draw_size: Vector2i,
+	target_size: Vector2i,
+) -> Dictionary:
+	if visual == null or cut_model == null or cut == null:
+		return {}
+	if target_size == Vector2i.ZERO:
+		target_size = draw_size
+	var view_scale := _compute_trace_view_scale(visual, cut_model)
+	var variant_settings := _resolve_variant_settings({
+		"lighting_grid_size": GemTracedBakeContractScript.DEFAULT_LIGHTING_GRID_SIZE,
+	})
+	var lighting_bin := _get_default_lighting_bin_for_settings(variant_settings)
+	var lighting_uv := _lighting_bin_to_centered(lighting_bin, variant_settings)
+	var cut_key := get_visual_cut_key(visual)
+	var rotation_view: Dictionary = _make_rotation_view("crown", 0.0, 0.0, 0.0)
+	var view_pitch := float(rotation_view.get("view_pitch_degrees", 0.0))
+	var view_yaw := float(rotation_view.get("view_yaw_degrees", 0.0))
+	var view_roll := float(rotation_view.get("view_roll_degrees", 0.0))
+	var rotation_label := StringName(rotation_view.get("label", "crown"))
+	match rotation_label:
+		&"crown", &"pavilion":
+			view_roll += cut_model.orthographic_top_roll_degrees
+		_:
+			view_yaw += cut_model.orthographic_side_yaw_degrees
+	return {
+		"tile_id": tile_id,
+		"visual_id": visual.visual_id,
+		"spec_id": cut.spec_id,
+		"geometry_signature": cut.geometry_signature,
+		"cut_id": cut.cut_id,
+		"visual": visual,
+		"cut_model": cut_model,
+		"cut": cut,
+		"draw_size": draw_size,
+		"target_size": target_size,
+		"geometry_source": &"canonical_3d",
+		"variant_type": GAMEPLAY_VARIANT_TYPE_ROTATION,
+		"variant_key": _make_gameplay_variant_cache_key(
+			tile_id,
+			GAMEPLAY_VARIANT_TYPE_ROTATION,
+			Vector2i(-1, -1),
+			0
+		),
+		"cut_key_override": cut_key,
+		"rotation_bin": 0,
+		"rotation_label": rotation_label,
+		"rotation_axis": rotation_view.get("axis", &""),
+		"rotation_degrees": 0.0,
+		"view_pitch_degrees": view_pitch,
+		"view_yaw_degrees": view_yaw,
+		"view_roll_degrees": view_roll,
+		"light_dir": _compute_variant_light_dir(lighting_bin, variant_settings),
+		"lighting_uv": lighting_uv,
+		"lighting_bin": lighting_bin,
+		"view_scale": view_scale,
+	}
+
+
 func _resolve_gameplay_texture_base_key(tile_id: StringName, tier: int = -1) -> StringName:
 	if _gameplay_texture_cache.has(_make_gameplay_variant_cache_key(
 		tile_id,
@@ -970,6 +1068,8 @@ func _make_gameplay_variant_cache_key(
 	match variant_type:
 		GAMEPLAY_VARIANT_TYPE_ROTATION:
 			return StringName("%s@rot_%02d" % [String(base_key), maxi(rotation_bin, 0)])
+		GAMEPLAY_VARIANT_TYPE_VIEW_SPHERE:
+			return StringName("%s@vsph_%05d" % [String(base_key), maxi(rotation_bin, 0)])
 		_:
 			return StringName("%s@light_%d_%d" % [
 				String(base_key),
@@ -1024,9 +1124,29 @@ func _build_gameplay_bake_requests(
 	target_size: Vector2i,
 	variant_options: Dictionary = {},
 ) -> Array[Dictionary]:
-	var requests: Array[Dictionary] = []
 	var view_scale := _compute_trace_view_scale(visual, cut_model)
 	var variant_settings := _resolve_variant_settings(variant_options)
+	var requests: Array[Dictionary] = []
+	requests.append_array(_collect_lighting_bake_requests(
+		tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale
+	))
+	requests.append_array(_collect_rotation_bake_requests(
+		tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale
+	))
+	return requests
+
+
+func _collect_lighting_bake_requests(
+	tile_id: StringName,
+	visual: GemVisualResource,
+	cut_model,
+	cut,
+	draw_size: Vector2i,
+	target_size: Vector2i,
+	variant_settings: Dictionary,
+	view_scale: float,
+) -> Array[Dictionary]:
+	var requests: Array[Dictionary] = []
 	var lighting_grid: Vector2i = variant_settings.get(
 		"lighting_grid_size",
 		DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE
@@ -1060,6 +1180,20 @@ func _build_gameplay_bake_requests(
 					"light_dir": _compute_variant_light_dir(lighting_bin, variant_settings),
 					"view_scale": view_scale,
 				})
+	return requests
+
+
+func _collect_rotation_bake_requests(
+	tile_id: StringName,
+	visual: GemVisualResource,
+	cut_model,
+	cut,
+	draw_size: Vector2i,
+	target_size: Vector2i,
+	variant_settings: Dictionary,
+	view_scale: float,
+) -> Array[Dictionary]:
+	var requests: Array[Dictionary] = []
 	var rotation_views := _build_rotation_view_suite(variant_settings)
 	var cut_key := get_visual_cut_key(visual)
 	for rotation_bin in rotation_views.size():
@@ -1102,6 +1236,74 @@ func _build_gameplay_bake_requests(
 			"view_roll_degrees": view_roll,
 			"light_dir": _compute_variant_light_dir(_get_default_lighting_bin_for_settings(variant_settings), variant_settings),
 			"view_scale": view_scale,
+		})
+	return requests
+
+
+func _collect_fibonacci_view_sphere_requests(
+	tile_id: StringName,
+	visual: GemVisualResource,
+	cut_model,
+	cut,
+	draw_size: Vector2i,
+	target_size: Vector2i,
+	variant_settings: Dictionary,
+	view_scale: float,
+	options: Dictionary,
+) -> Array[Dictionary]:
+	var requests: Array[Dictionary] = []
+	var theta := float(options.get("fibonacci_theta_degrees", 12.0))
+	var n := int(options.get("fibonacci_point_count", 0))
+	if n <= 0:
+		n = GemViewSphereSamplingScript.fibonacci_point_count_for_theta_degrees(theta)
+	var dirs := GemViewSphereSamplingScript.build_fibonacci_unit_vectors(n)
+	var angular_res := theta
+	var cut_key := get_visual_cut_key(visual)
+	var default_light := _get_default_lighting_bin_for_settings(variant_settings)
+	var light_dir := _compute_variant_light_dir(default_light, variant_settings)
+	for i in dirs.size():
+		var view_dir: Vector3 = dirs[i]
+		var pyr: Vector3 = GemViewSphereSamplingScript.pitch_yaw_roll_for_view_dir(
+			view_dir,
+			visual,
+			true
+		)
+		var view_pitch := pyr.x
+		var view_yaw := pyr.y
+		var view_roll := pyr.z
+		requests.append({
+			"tile_id": tile_id,
+			"visual_id": visual.visual_id,
+			"spec_id": cut.spec_id,
+			"geometry_signature": cut.geometry_signature,
+			"cut_id": cut.cut_id,
+			"visual": visual,
+			"cut_model": cut_model,
+			"cut": cut,
+			"draw_size": draw_size,
+			"target_size": target_size,
+			"geometry_source": &"canonical_3d",
+			"variant_type": GAMEPLAY_VARIANT_TYPE_VIEW_SPHERE,
+			"variant_key": _make_gameplay_variant_cache_key(
+				tile_id,
+				GAMEPLAY_VARIANT_TYPE_VIEW_SPHERE,
+				Vector2i(-1, -1),
+				i
+			),
+			"cut_key_override": cut_key,
+			"rotation_bin": i,
+			"rotation_label": StringName("fib_%05d" % i),
+			"rotation_axis": &"",
+			"rotation_degrees": 0.0,
+			"view_pitch_degrees": view_pitch,
+			"view_yaw_degrees": view_yaw,
+			"view_roll_degrees": view_roll,
+			"light_dir": light_dir,
+			"view_scale": view_scale,
+			"view_dir_model": [view_dir.x, view_dir.y, view_dir.z],
+			"fibonacci_index": i,
+			"fibonacci_n": dirs.size(),
+			"angular_resolution_degrees": angular_res,
 		})
 	return requests
 

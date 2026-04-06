@@ -62,6 +62,14 @@ func _ready() -> void:
 	gallery_btn.pressed.connect(_on_gallery)
 	vbox.add_child(gallery_btn)
 
+	# ---- Gem designer (runtime) ----
+	var designer_btn := Button.new()
+	designer_btn.text = "Gem Designer"
+	designer_btn.custom_minimum_size = Vector2(300, 56)
+	designer_btn.add_theme_font_size_override("font_size", 24)
+	designer_btn.pressed.connect(_on_designer)
+	vbox.add_child(designer_btn)
+
 
 func _on_play() -> void:
 	get_tree().change_scene_to_file("res://scenes/main/main.tscn")
@@ -69,3 +77,7 @@ func _on_play() -> void:
 
 func _on_gallery() -> void:
 	get_tree().change_scene_to_file("res://scenes/design/gem_bake_workbench.tscn")
+
+
+func _on_designer() -> void:
+	get_tree().change_scene_to_file("res://scenes/design/gem_designer.tscn")

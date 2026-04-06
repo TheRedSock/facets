@@ -178,6 +178,246 @@ func run_batch(
 	)
 
 
+## Run traces for pre-built request dicts (e.g. designer explicit / Fibonacci sphere). Each must include visual + cut_model.
+func run_explicit_request_batch(
+	source_requests: Array,
+	cell_size: Vector2i,
+	options: Dictionary = {},
+) -> Dictionary:
+	if cell_size.x <= 0 or cell_size.y <= 0:
+		return {"status": "invalid_arguments", "entries": []}
+	var output_root := String(options.get("output_root", DEFAULT_OUTPUT_ROOT))
+	var draw_size: Vector2i = options.get("draw_size", cell_size)
+	var sample_count := clampi(
+		int(options.get("sample_count", 1)),
+		1,
+		max_supported_sample_count()
+	)
+	var variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(options)
+	var filtered_requests := _enrich_request_list(source_requests, sample_count, options)
+	var entries: Array[Dictionary] = []
+	var per_tile_counts: Dictionary = {}
+	var profiling := _make_batch_profile(0.0)
+	var start_usec := Time.get_ticks_usec()
+	var parallel_plan := _resolve_parallel_execution_plan(filtered_requests.size(), options)
+	_apply_parallel_execution_plan(filtered_requests, parallel_plan)
+	_record_parallel_execution_plan(profiling, parallel_plan)
+	_emit_progress({
+		"stage": "queued",
+		"completed": 0,
+		"total": filtered_requests.size(),
+		"progress": 0.0,
+		"elapsed_ms": 0.0,
+		"output_root": output_root,
+	})
+	_ensure_dir(output_root)
+	if bool(parallel_plan.get("pipeline_enabled", false)):
+		var pending_index := 0
+		var active_workers: Array[Dictionary] = []
+		var worker_count := int(parallel_plan.get("variant_worker_count", 1))
+		while pending_index < filtered_requests.size() and active_workers.size() < worker_count:
+			active_workers.append(_launch_trace_worker(
+				filtered_requests[pending_index],
+				pending_index,
+				filtered_requests.size(),
+				start_usec,
+				profiling
+			))
+			pending_index += 1
+		while not active_workers.is_empty():
+			var worker: Dictionary = active_workers.pop_front()
+			var traced_request: Dictionary = worker.get("request", {})
+			var trace_result: Dictionary = {}
+			var thread: Thread = worker.get("thread", null)
+			if thread != null:
+				trace_result = thread.wait_to_finish()
+			else:
+				trace_result = _trace_request_worker(traced_request)
+			_process_trace_result(
+				output_root,
+				cell_size,
+				draw_size,
+				sample_count,
+				filtered_requests,
+				entries,
+				per_tile_counts,
+				start_usec,
+				profiling,
+				traced_request,
+				int(worker.get("request_index", 0)),
+				int(worker.get("request_start_usec", Time.get_ticks_usec())),
+				trace_result
+			)
+			if pending_index < filtered_requests.size():
+				active_workers.append(_launch_trace_worker(
+					filtered_requests[pending_index],
+					pending_index,
+					filtered_requests.size(),
+					start_usec,
+					profiling
+				))
+				pending_index += 1
+	else:
+		for request_index in filtered_requests.size():
+			var traced_request: Dictionary = filtered_requests[request_index]
+			var request_start_usec := _emit_baking_start(
+				traced_request,
+				request_index,
+				filtered_requests.size(),
+				start_usec,
+				profiling
+			)
+			_process_trace_result(
+				output_root,
+				cell_size,
+				draw_size,
+				sample_count,
+				filtered_requests,
+				entries,
+				per_tile_counts,
+				start_usec,
+				profiling,
+				traced_request,
+				request_index,
+				request_start_usec,
+				_trace_request_worker(traced_request)
+			)
+	return _finalize_batch_result(
+		output_root,
+		cell_size,
+		draw_size,
+		sample_count,
+		filtered_requests,
+		entries,
+		per_tile_counts,
+		start_usec,
+		variant_settings,
+		profiling
+	)
+
+
+func run_explicit_request_batch_async(
+	host: Node,
+	source_requests: Array,
+	cell_size: Vector2i,
+	options: Dictionary = {},
+) -> Dictionary:
+	if cell_size.x <= 0 or cell_size.y <= 0:
+		return {"status": "invalid_arguments", "entries": []}
+	var output_root := String(options.get("output_root", DEFAULT_OUTPUT_ROOT))
+	var draw_size: Vector2i = options.get("draw_size", cell_size)
+	var sample_count := clampi(
+		int(options.get("sample_count", 1)),
+		1,
+		max_supported_sample_count()
+	)
+	var variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(options)
+	var filtered_requests := _enrich_request_list(source_requests, sample_count, options)
+	var entries: Array[Dictionary] = []
+	var per_tile_counts: Dictionary = {}
+	var profiling := _make_batch_profile(0.0)
+	var start_usec := Time.get_ticks_usec()
+	var parallel_plan := _resolve_parallel_execution_plan(filtered_requests.size(), options)
+	_apply_parallel_execution_plan(filtered_requests, parallel_plan)
+	_record_parallel_execution_plan(profiling, parallel_plan)
+	_emit_progress({
+		"stage": "queued",
+		"completed": 0,
+		"total": filtered_requests.size(),
+		"progress": 0.0,
+		"elapsed_ms": 0.0,
+		"output_root": output_root,
+	})
+	_ensure_dir(output_root)
+	if bool(parallel_plan.get("pipeline_enabled", false)):
+		var pending_index := 0
+		var active_workers: Array[Dictionary] = []
+		var worker_count := int(parallel_plan.get("variant_worker_count", 1))
+		while pending_index < filtered_requests.size() and active_workers.size() < worker_count:
+			active_workers.append(_launch_trace_worker(
+				filtered_requests[pending_index],
+				pending_index,
+				filtered_requests.size(),
+				start_usec,
+				profiling
+			))
+			pending_index += 1
+		while not active_workers.is_empty():
+			var worker: Dictionary = active_workers.pop_front()
+			var traced_request: Dictionary = worker.get("request", {})
+			var trace_result: Dictionary = {}
+			var thread: Thread = worker.get("thread", null)
+			if thread != null:
+				trace_result = thread.wait_to_finish()
+			else:
+				trace_result = _trace_request_worker(traced_request)
+			_process_trace_result(
+				output_root,
+				cell_size,
+				draw_size,
+				sample_count,
+				filtered_requests,
+				entries,
+				per_tile_counts,
+				start_usec,
+				profiling,
+				traced_request,
+				int(worker.get("request_index", 0)),
+				int(worker.get("request_start_usec", Time.get_ticks_usec())),
+				trace_result
+			)
+			if host != null and host.get_tree() != null:
+				await host.get_tree().process_frame
+			if pending_index < filtered_requests.size():
+				active_workers.append(_launch_trace_worker(
+					filtered_requests[pending_index],
+					pending_index,
+					filtered_requests.size(),
+					start_usec,
+					profiling
+				))
+				pending_index += 1
+	else:
+		for request_index in filtered_requests.size():
+			var traced_request: Dictionary = filtered_requests[request_index]
+			var request_start_usec := _emit_baking_start(
+				traced_request,
+				request_index,
+				filtered_requests.size(),
+				start_usec,
+				profiling
+			)
+			_process_trace_result(
+				output_root,
+				cell_size,
+				draw_size,
+				sample_count,
+				filtered_requests,
+				entries,
+				per_tile_counts,
+				start_usec,
+				profiling,
+				traced_request,
+				request_index,
+				request_start_usec,
+				_trace_request_worker(traced_request)
+			)
+			if host != null and host.get_tree() != null:
+				await host.get_tree().process_frame
+	return _finalize_batch_result(
+		output_root,
+		cell_size,
+		draw_size,
+		sample_count,
+		filtered_requests,
+		entries,
+		per_tile_counts,
+		start_usec,
+		variant_settings,
+		profiling
+	)
+
+
 func run_batch_async(
 	host: Node,
 	registry: Node,
@@ -330,6 +570,8 @@ func _request_matches_filters(request: Dictionary, options: Dictionary) -> bool:
 		return false
 	if variant_type == &"rotation" and bool(options.get("skip_rotations", false)):
 		return false
+	if variant_type == &"view_sphere" and bool(options.get("skip_view_sphere", false)):
+		return false
 	# Filter to specific bins when provided.
 	var lighting_filters: Array = options.get("lighting_bins", [])
 	var rotation_filters: Array = options.get("rotation_bins", [])
@@ -373,9 +615,8 @@ func _build_filtered_requests(
 	sample_count: int,
 	options: Dictionary,
 ) -> Array:
-	var filtered_requests: Array[Dictionary] = []
-	var mesh_cache: Dictionary = {}
 	var variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(options)
+	var base_requests: Array = []
 	for tile_id in tile_ids:
 		var visual: GemVisualResource = registry.get_visual(tile_id)
 		if visual == null:
@@ -389,37 +630,50 @@ func _build_filtered_requests(
 		for request in requests:
 			if not _request_matches_filters(request, options):
 				continue
-			var enriched_request: Dictionary = request.duplicate(true)
-			var mesh_cache_key := _resolve_request_mesh_cache_key(visual, enriched_request)
-			var mesh_resource = mesh_cache.get(mesh_cache_key, null)
-			var mesh_build_elapsed_ms := 0.0
+			base_requests.append(request)
+	return _enrich_request_list(base_requests, sample_count, options)
+
+
+func _enrich_request_list(base_requests: Array, sample_count: int, options: Dictionary) -> Array:
+	var filtered_requests: Array[Dictionary] = []
+	var mesh_cache: Dictionary = {}
+	for request in base_requests:
+		if typeof(request) != TYPE_DICTIONARY:
+			continue
+		var enriched_request: Dictionary = request.duplicate(true)
+		var visual: GemVisualResource = enriched_request.get("visual", null)
+		if visual == null:
+			continue
+		var mesh_cache_key := _resolve_request_mesh_cache_key(visual, enriched_request)
+		var mesh_resource = mesh_cache.get(mesh_cache_key, null)
+		var mesh_build_elapsed_ms := 0.0
+		if mesh_resource == null:
+			var mesh_build_start_usec := Time.get_ticks_usec()
+			mesh_resource = _build_request_mesh(visual, enriched_request)
 			if mesh_resource == null:
-				var mesh_build_start_usec := Time.get_ticks_usec()
-				mesh_resource = _build_request_mesh(visual, enriched_request)
-				if mesh_resource == null:
-					continue
-				mesh_build_elapsed_ms = (Time.get_ticks_usec() - mesh_build_start_usec) / 1000.0
-				mesh_cache[mesh_cache_key] = mesh_resource
-			enriched_request["sample_count"] = sample_count
-			if options.has("thread_count"):
-				enriched_request["thread_count"] = int(options.get("thread_count", 1))
-			if options.has("trace_profile"):
-				enriched_request["trace_profile"] = bool(options.get("trace_profile", false))
-			if options.has("max_trace_bounces"):
-				enriched_request["max_trace_bounces"] = GemTracedBakeContractScript.resolve_max_trace_bounces(
-					options.get(
-						"max_trace_bounces",
-						GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES
-					)
+				continue
+			mesh_build_elapsed_ms = (Time.get_ticks_usec() - mesh_build_start_usec) / 1000.0
+			mesh_cache[mesh_cache_key] = mesh_resource
+		enriched_request["sample_count"] = sample_count
+		if options.has("thread_count"):
+			enriched_request["thread_count"] = int(options.get("thread_count", 1))
+		if options.has("trace_profile"):
+			enriched_request["trace_profile"] = bool(options.get("trace_profile", false))
+		if options.has("max_trace_bounces"):
+			enriched_request["max_trace_bounces"] = GemTracedBakeContractScript.resolve_max_trace_bounces(
+				options.get(
+					"max_trace_bounces",
+					GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES
 				)
-			if options.has("skip_stylize"):
-				enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
-			enriched_request["mesh_resource"] = mesh_resource
-			enriched_request["visual"] = visual
-			enriched_request["mesh_includes_cut_rotation"] = _request_uses_variant_mesh(visual, enriched_request)
-			enriched_request["mesh_build_elapsed_ms"] = mesh_build_elapsed_ms
-			enriched_request["mesh_cache_key"] = mesh_cache_key
-			filtered_requests.append(enriched_request)
+			)
+		if options.has("skip_stylize"):
+			enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
+		enriched_request["mesh_resource"] = mesh_resource
+		enriched_request["visual"] = visual
+		enriched_request["mesh_includes_cut_rotation"] = _request_uses_variant_mesh(visual, enriched_request)
+		enriched_request["mesh_build_elapsed_ms"] = mesh_build_elapsed_ms
+		enriched_request["mesh_cache_key"] = mesh_cache_key
+		filtered_requests.append(enriched_request)
 	return filtered_requests
 
 

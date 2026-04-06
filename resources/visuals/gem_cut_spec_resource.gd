@@ -53,6 +53,11 @@ func apply_overrides_in_place(overrides: Dictionary) -> void:
 	_apply_contract_dict(merged)
 
 
+## Replace spec content from a full contract dict (e.g. designer tree merge).
+func apply_full_contract(contract: Dictionary) -> void:
+	_apply_contract_dict(_duplicate_variant(contract))
+
+
 func build_contract_dict() -> Dictionary:
 	return {
 		"spec_id": spec_id,
