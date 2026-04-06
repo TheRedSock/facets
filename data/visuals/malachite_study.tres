@@ -1,10 +1,12 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/opal_cushion.tres" id="1_dn2o6"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"malachite_study"
+cut_spec = ExtResource("1_dn2o6")
 cut_id = &"opal_cushion"
 base_color = Color(0.08, 0.22, 0.15, 1)
 material_mode = 1
@@ -20,11 +22,10 @@ surface_pattern_warp_strength = 0.88
 surface_pattern_warp_scale = 1.85
 surface_pattern_specular_variation = -0.04
 surface_pattern_roughness_variation = 0.34
-shininess = 32.0
 specular_intensity = 0.24
-contrast = 0.14
 depth_tint = Color(0.03, 0.11, 0.07, 0.12)
 saturation_boost = 0.2
+contrast = 0.14
 rim_intensity = 0.03
 rim_color = Color(0.32, 0.74, 0.5, 1)
 gradient_color = Color(0.08, 0.24, 0.15, 1)
@@ -51,6 +52,5 @@ stylize_highlight_bloom_gain = 0.14
 stylize_highlight_bloom_threshold = 0.88
 stylize_microdetail_suppression = 0.38
 stylize_internal_color_shift_gain = 0.04
-stylize_tone_steps = 5
 stylize_edge_ink_strength = 0.08
 stylize_highlight_snap = 0.1

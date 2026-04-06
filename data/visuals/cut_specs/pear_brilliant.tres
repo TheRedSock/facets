@@ -1,0 +1,74 @@
+[gd_resource type="Resource" script_class="GemCutSpecResource" format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_dlukq"]
+
+[resource]
+script = ExtResource("1_dlukq")
+spec_id = &"pear_brilliant"
+display_name = "Pear Brilliant"
+compatibility_cut_id = &"pear_brilliant"
+shape_category = &"pear"
+family = &"radial_brilliant"
+symmetry = {
+"half_angles": [],
+"main_angles": [],
+"pavilion_sector_count": 10,
+"rotation": -1.5707963267948966,
+"sector_count": 10
+}
+crown = {
+"bezel_facets": Array[PackedVector2Array]([]),
+"break_ratio": 0.5,
+"center_height_ratio": 1.0,
+"center_point": Vector2(0.5, 0.5),
+"edge_trim": 0.2,
+"fans": Array[Dictionary]([]),
+"height": 0.19,
+"inner_star_facets": Array[PackedVector2Array]([]),
+"inner_star_height_ratio": 0.78,
+"outer_shoulder_height_ratio": 0.0,
+"outer_shoulder_scale": 1.0,
+"star_facets": Array[PackedVector2Array]([]),
+"star_height_ratio": 0.6,
+"star_length": 0.52,
+"table": PackedVector2Array(),
+"table_ratio": 0.5
+}
+pavilion = {
+"depth": 0.38,
+"lower_depth_ratio": 0.82,
+"lower_scale": 0.18,
+"rotation_fraction": 0.0,
+"sector_count": 10,
+"upper_depth_ratio": 0.48,
+"upper_scale": 0.48
+}
+girdle = {
+"boundary_mode": &"pear",
+"boundary_params": {
+"shift_y": 0.055,
+"shoulder_bias": 0.8,
+"tip_power": 0.74,
+"y_stretch": 1.17
+},
+"half_radius_scale": 1.0,
+"outer_points": PackedVector2Array(),
+"silhouette": PackedVector2Array(),
+"thickness": 0.012
+}
+culet = {
+"style": "point"
+}
+constraints = {
+"max_edge_ratio": 45.0,
+"min_interior_angle_degrees": 4.0,
+"require_outward_normals": true,
+"require_pavilion_containment": true,
+"require_rotation_stability": true,
+"require_shared_edge_closure": true
+}
+orthographic_metadata = {
+"axis_fit_scale": 1.0,
+"side_yaw_degrees": 0.0,
+"top_roll_degrees": 0.0
+}

@@ -24,7 +24,7 @@ const SPECIAL_ROTATION_DEFAULT_TURNS := 1.0
 const MISSING_BAKE_COLOR := Color(0.22, 0.08, 0.12, 1.0)
 
 ## Cached procedural gem data (set by _update_visual, consumed by _draw).
-var _gem_cut: GemCutResource = null
+var _gem_cut = null
 var _gem_visual: GemVisualResource = null
 var _visual_cache_key: StringName = &""
 var _gem_colors: PackedColorArray = PackedColorArray()
@@ -35,7 +35,7 @@ var _use_procedural: bool = false
 ## Shared scaled geometry bundle from GemVisualRegistry.
 var _render_geometry: Dictionary = {}
 var use_gameplay_texture_cache := false
-var _outline_cut: GemCutResource = null
+var _outline_cut = null
 var _outline_cut_key: String = ""
 var _outline_geometry: Dictionary = {}
 var _use_runtime_outline := false
@@ -223,7 +223,7 @@ func _try_procedural_visual() -> bool:
 
 	var cache_key: StringName = visual_bundle["cache_key"]
 	var visual: GemVisualResource = visual_bundle["visual"]
-	var cut: GemCutResource = visual_bundle["cut"]
+	var cut = visual_bundle["cut"]
 
 	# Track whether the cut changed — if recycling as the same gem type,
 	# the scaled geometry is still valid and we can skip the expensive rebuild.
@@ -432,9 +432,9 @@ func _make_transparent_sprite_texture() -> Texture2D:
 	return ImageTexture.create_from_image(image)
 
 
-func _setup_runtime_outline(cut: GemCutResource, cut_key: String = "") -> void:
+func _setup_runtime_outline(cut, cut_key: String = "") -> void:
 	_outline_cut = cut
-	_outline_cut_key = cut_key if not cut_key.is_empty() else String(cut.cut_id)
+	_outline_cut_key = cut_key if not cut_key.is_empty() else String(cut.geometry_signature if cut != null else "")
 	_use_runtime_outline = true
 	_refresh_runtime_outline()
 

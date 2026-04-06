@@ -1,19 +1,21 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/cushion.tres" id="1_uhqmj"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"amethyst"
+cut_spec = ExtResource("1_uhqmj")
 cut_id = &"cushion"
 base_color = Color(0.62, 0.18, 0.85, 1)
 shininess = 52.0
 specular_intensity = 0.44
-contrast = 0.42
 depth_tint = Color(0.2, 0.04, 0.34, 0.45)
 saturation_boost = 0.08
+contrast = 0.42
 rim_intensity = 0.18
-rim_color = Color(0.98, 0.86, 1.0, 1)
+rim_color = Color(0.98, 0.86, 1, 1)
 rim_power = 1.9
 translucency = 0.08
 translucency_color = Color(0.74, 0.32, 0.9, 1)
@@ -21,10 +23,10 @@ secondary_specular = 0.16
 secondary_light_angle = 138.0
 sparkle_intensity = 0.18
 sparkle_threshold = 0.84
-brilliance_contrast = 0.38
-extinction = 0.28
 gradient_color = Color(0.48, 0.12, 0.72, 1)
 gradient_strength = 0.12
+brilliance_contrast = 0.38
+extinction = 0.28
 optics_ior = 1.553
 optics_dispersion = 0.01
 optics_absorption_color = Color(0.68, 0.18, 0.82, 1)
@@ -41,7 +43,6 @@ optics_light_energy = 1.54
 stylize_mix = 0.78
 stylize_facet_edge_gain = 0.72
 stylize_plane_contrast = 0.58
-stylize_shadow_floor = 0.08
 stylize_highlight_bloom_gain = 0.14
 stylize_highlight_bloom_threshold = 0.84
 stylize_microdetail_suppression = 0.34

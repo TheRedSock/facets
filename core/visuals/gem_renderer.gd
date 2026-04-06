@@ -4,7 +4,7 @@ extends RefCounted
 ## Pure-math lighting calculations for faceted gem rendering.
 ## No scene-tree dependency — can run headlessly.
 ##
-## Performance contract: facet normals in GemCutResource are pre-normalized at
+## Performance contract: facet normals in GemProjectedCutResource are pre-normalized at
 ## cut generation time.  This renderer skips redundant normalization calls.
 
 const DEFAULT_LIGHT_DIR := Vector3(-0.4, -0.5, 0.75)
@@ -66,13 +66,13 @@ static func compute_facet_color(
 ##   5. Hue dispersion, sparkle boost
 ##   6. Per-facet jitter, saturation boost, zone brilliance, transparency
 static func compute_all_facet_colors(
-	cut: GemCutResource,
+	cut,
 	visual: GemVisualResource,
 	light_dir: Vector3 = DEFAULT_LIGHT_DIR,
 	modifiers: Dictionary = {},
 ) -> PackedColorArray:
-	var count := cut.facet_count()
-	var colors := PackedColorArray()
+	var count = int(cut.facet_count())
+	var colors = PackedColorArray()
 	colors.resize(count)
 
 	var base := visual.base_color
@@ -130,9 +130,9 @@ static func compute_all_facet_colors(
 	)
 
 	# Pre-computed cut data availability flags.
-	var has_centroids := cut.facet_centroids.size() == count
-	var has_precomputed_jitter := cut.facet_jitter.size() == count
-	var has_zone_weights := cut.zone_brilliance_weights.size() == count
+	var has_centroids = cut.facet_centroids.size() == count
+	var has_precomputed_jitter = cut.facet_jitter.size() == count
+	var has_zone_weights = cut.zone_brilliance_weights.size() == count
 	has_brilliance = has_brilliance and (has_zone_weights or cut.facet_zones.size() == count)
 	var needs_centroid := has_gradient or has_material_surface or has_material_volume or has_material_reactive
 
@@ -161,7 +161,7 @@ static func compute_all_facet_colors(
 
 	for i in count:
 		# Normal is pre-normalized at cut generation time (see GemCutPrimitives.normal_for).
-		var n := cut.facet_normals[i]
+		var n: Vector3 = cut.facet_normals[i]
 		var facet_base := base
 		var centroid := Vector2.ZERO
 		if needs_centroid:
@@ -220,9 +220,9 @@ static func compute_all_facet_colors(
 			)
 
 		# ---- Inlined Blinn-Phong lighting (Fix #2) ----
-		var ndotl := n.dot(l)
-		var half_lambert := ndotl * 0.5 + 0.5
-		var standard_lambert := maxf(ndotl, 0.0)
+		var ndotl = n.dot(l)
+		var half_lambert = ndotl * 0.5 + 0.5
+		var standard_lambert = maxf(ndotl, 0.0)
 		var diffuse := lerpf(half_lambert, standard_lambert, contrast)
 		var spec := pow(maxf(n.dot(half_vec), 0.0), shininess)
 		var shade := AMBIENT + one_minus_ambient * diffuse
@@ -296,7 +296,7 @@ static func compute_all_facet_colors(
 				jitter_centroid = cut.facet_centroids[i]
 			else:
 				jitter_centroid = _compute_facet_centroid(cut, i)
-			var hash_val := sin(jitter_centroid.x * 127.1 + jitter_centroid.y * 311.7) * 43758.5453
+			var hash_val = sin(jitter_centroid.x * 127.1 + jitter_centroid.y * 311.7) * 43758.5453
 			hash_val = hash_val - floorf(hash_val)
 			jitter = (hash_val - 0.5) * 0.08
 		cr = clampf(cr + jitter, 0.0, 1.0)
@@ -344,9 +344,9 @@ static func compute_all_facet_colors(
 
 
 ## Returns the centroid of a facet's vertices in [0,1] unit space.
-static func _compute_facet_centroid(cut: GemCutResource, facet_index: int) -> Vector2:
-	var verts := cut.facet_vertices[facet_index]
-	var centroid := Vector2.ZERO
+static func _compute_facet_centroid(cut, facet_index: int) -> Vector2:
+	var verts: PackedVector2Array = cut.facet_vertices[facet_index]
+	var centroid = Vector2.ZERO
 	for v in verts:
 		centroid += v
 	return centroid / verts.size()
@@ -355,9 +355,9 @@ static func _compute_facet_centroid(cut: GemCutResource, facet_index: int) -> Ve
 ## Returns the Y coordinate of a facet's centroid in [0,1] unit space.
 ## Kept as a lightweight fallback for gradient computation when centroids
 ## are not pre-computed.
-static func _facet_centroid_y(cut: GemCutResource, facet_index: int) -> float:
-	var verts := cut.facet_vertices[facet_index]
-	var cy := 0.0
+static func _facet_centroid_y(cut, facet_index: int) -> float:
+	var verts: PackedVector2Array = cut.facet_vertices[facet_index]
+	var cy = 0.0
 	for v in verts:
 		cy += v.y
 	return cy / verts.size()
@@ -527,27 +527,27 @@ static func texture_uses_overlay_mode(visual: GemVisualResource) -> bool:
 ## extinction intensity and the fragment normal's light-return score.
 ## Fragments that would reflect light poorly appear darker (more opaque).
 static func compute_pavilion_colors(
-	cut: GemCutResource,
+	cut,
 	visual: GemVisualResource,
 	light_dir: Vector3 = DEFAULT_LIGHT_DIR,
 ) -> PackedColorArray:
-	var colors := PackedColorArray()
-	var count := cut.pavilion_count()
+	var colors = PackedColorArray()
+	var count = int(cut.pavilion_count())
 	if count == 0 or visual.extinction < 0.001:
 		return colors
 	colors.resize(count)
 
-	var l := light_dir.normalized()
+	var l = light_dir.normalized()
 
 	# Base extinction colour: use depth_tint if available, otherwise darkened base.
-	var ext_color := visual.base_color.darkened(0.7)
+	var ext_color = visual.base_color.darkened(0.7)
 	if visual.depth_tint.a > 0.01:
 		ext_color = visual.depth_tint.darkened(0.4)
 	ext_color.a = 1.0
 
 	for i in count:
 		# Pavilion normals are pre-normalized at generation time.
-		var n := cut.pavilion_normals[i]
+		var n: Vector3 = cut.pavilion_normals[i]
 		# Light return: how well the pavilion fragment reflects light back.
 		var light_return := clampf(n.dot(l), 0.0, 1.0)
 		# Poor light return → stronger extinction (more opaque overlay).

@@ -16,7 +16,7 @@ func supports_request(request: Dictionary) -> bool:
 	)
 
 
-func supports_visual(_tile_id: StringName, _visual: GemVisualResource, _cut: GemCutResource) -> bool:
+func supports_visual(_tile_id: StringName, _visual: GemVisualResource, _cut) -> bool:
 	return false
 
 

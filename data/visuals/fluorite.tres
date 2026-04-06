@@ -1,19 +1,23 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/rose_round.tres" id="1_se2ob"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"fluorite"
+cut_spec = ExtResource("1_se2ob")
 cut_id = &"rose_round"
 base_color = Color(0.62, 0.9, 0.74, 1)
+volume_pattern_type = 1
+volume_pattern_mix = 1.0
+volume_pattern_contrast = 0.6
 shininess = 14.0
 specular_intensity = 0.16
 transparency = 0.06
 depth_tint = Color(0.24, 0.34, 0.42, 0.12)
 saturation_boost = 0.18
 contrast = 0.28
-hue_dispersion = 0.0
 rim_intensity = 0.06
 rim_color = Color(0.8, 0.9, 0.96, 1)
 rim_power = 1.6
@@ -24,17 +28,13 @@ gradient_strength = 0.82
 gradient_angle_degrees = 68.0
 brilliance_contrast = 0.08
 extinction = 0.03
-volume_pattern_type = 1
-volume_pattern_mix = 1.0
-volume_pattern_scale = Vector2(1.0, 2.4)
-volume_pattern_contrast = 0.6
 optics_ior = 1.43
 optics_dispersion = 0.004
 optics_absorption_color = Color(0.72, 0.68, 0.76, 1)
 optics_absorption_strength = 0.64
 optics_surface_roughness = 0.16
 optics_scattering_strength = 0.14
-optics_scattering_color = Color(0.76, 0.82, 0.90, 1)
+optics_scattering_color = Color(0.76, 0.82, 0.9, 1)
 optics_environment_preset = 3
 optics_environment_rotation_degrees = 4.0
 optics_environment_energy = 0.54
@@ -47,6 +47,5 @@ stylize_highlight_bloom_gain = 0.08
 stylize_highlight_bloom_threshold = 0.9
 stylize_microdetail_suppression = 0.54
 stylize_internal_color_shift_gain = 0.24
-stylize_tone_steps = 5
 stylize_edge_ink_strength = 0.1
 stylize_highlight_snap = 0.12

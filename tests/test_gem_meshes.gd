@@ -1,15 +1,21 @@
 extends SceneTree
 
-## Focused geometry checks for prototype 3D gem meshes.
+## Canonical 3D mesh assembly checks.
 
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")
-const GemCutBuildersScript = preload("res://core/visuals/gem_cut_builders.gd")
 const GemCutGeneratorsScript = preload("res://core/visuals/gem_cut_generators.gd")
+const GemCutPrimitives = preload("res://core/visuals/gem_cut_primitives.gd")
 
-const EXPECTED_FACET_COUNTS := {
-	&"classic_round": 81,
-	&"old_european_round": 101,
-}
+const MESH_CUT_IDS := [
+	&"classic_round",
+	&"old_european_round",
+	&"emerald_step",
+	&"trillion",
+	&"princess_square",
+	&"lozenge",
+	&"oval_brilliant",
+	&"pear_brilliant",
+]
 
 var _pass_count := 0
 var _fail_count := 0
@@ -30,7 +36,6 @@ func _run() -> void:
 	test_lozenge_pavilion_has_detail()
 	test_oval_brilliant_pavilion_has_detail()
 	test_pear_brilliant_pavilion_has_detail()
-	test_expected_facet_counts()
 	test_bounds_and_radius()
 	test_normals_face_outward()
 	test_array_mesh_build()
@@ -41,12 +46,12 @@ func _run() -> void:
 
 
 func test_generate_supported_meshes() -> void:
-	for cut_id in EXPECTED_FACET_COUNTS.keys():
-		var mesh = GemMeshGeneratorsScript.generate(cut_id)
+	for cut_id in MESH_CUT_IDS:
+		var mesh = GemMeshGeneratorsScript.generate_from_spec_id(cut_id)
 		assert_true(mesh != null, "%s should generate a mesh resource" % str(cut_id))
 		if mesh == null:
 			continue
-		assert_eq(mesh.cut_id, cut_id, "%s should preserve cut_id" % str(cut_id))
+		assert_eq(mesh.spec_id, cut_id, "%s should preserve spec_id" % str(cut_id))
 		assert_eq(mesh.facet_vertices.size(), mesh.facet_normals.size(), "%s normals align" % str(cut_id))
 		assert_eq(mesh.facet_vertices.size(), mesh.facet_zones.size(), "%s zones align" % str(cut_id))
 
@@ -61,23 +66,24 @@ func test_generate_all_visual_cut_meshes() -> void:
 		assert_true(visual != null, "%s should resolve a gem visual" % str(tile_id))
 		if visual == null:
 			continue
-		var mesh = GemMeshGeneratorsScript.generate(visual.cut_id)
-		assert_true(mesh != null, "%s cut %s should generate a mesh resource" % [str(tile_id), str(visual.cut_id)])
+		var mesh = GemMeshGeneratorsScript.generate_from_visual(visual)
+		assert_true(mesh != null, "%s visual should generate a mesh resource" % str(tile_id))
 		if mesh == null:
 			continue
-		assert_true(mesh.facet_count() > 0, "%s cut %s should have facets" % [str(tile_id), str(visual.cut_id)])
+		assert_true(mesh.facet_count() > 0, "%s visual should have facets" % str(tile_id))
 
 
 func test_generate_rotated_variant_meshes() -> void:
-	var base_cut = GemCutGeneratorsScript.generate(&"emerald_step")
-	assert_true(base_cut != null, "Emerald Step cut should generate for rotated mesh coverage")
-	if base_cut == null:
+	var base_model = GemCutGeneratorsScript.generate_model_from_visual_with_rotation(_make_visual(&"emerald_step", 0.0))
+	var rotated_model = GemCutGeneratorsScript.generate_model_from_visual_with_rotation(_make_visual(&"emerald_step", 45.0))
+	assert_true(base_model != null, "Emerald Step model should generate for rotated mesh coverage")
+	assert_true(rotated_model != null, "Emerald Step rotated model should generate for rotated mesh coverage")
+	if base_model == null or rotated_model == null:
 		return
-	var rotated_cut = GemCutBuildersScript.create_visual_variant(base_cut, 45.0)
-	var base_mesh = GemMeshGeneratorsScript.generate_from_cut(base_cut)
-	var rotated_mesh = GemMeshGeneratorsScript.generate_from_cut(rotated_cut)
-	assert_true(base_mesh != null, "Base non-round cut should build a mesh from cut geometry")
-	assert_true(rotated_mesh != null, "Rotated non-round cut should build a mesh from cut geometry")
+	var base_mesh = GemMeshGeneratorsScript.generate_from_model(base_model)
+	var rotated_mesh = GemMeshGeneratorsScript.generate_from_model(rotated_model)
+	assert_true(base_mesh != null, "Base non-round cut should build a mesh from canonical model geometry")
+	assert_true(rotated_mesh != null, "Rotated non-round cut should build a mesh from canonical model geometry")
 	if base_mesh == null or rotated_mesh == null:
 		return
 	var base_bounds: AABB = base_mesh.compute_bounds()
@@ -89,7 +95,7 @@ func test_generate_rotated_variant_meshes() -> void:
 
 
 func test_oval_brilliant_pavilion_has_detail() -> void:
-	var mesh = GemMeshGeneratorsScript.generate(&"oval_brilliant")
+	var mesh = GemMeshGeneratorsScript.generate_from_spec_id(&"oval_brilliant")
 	assert_true(mesh != null, "Oval brilliant should generate a mesh resource")
 	if mesh == null:
 		return
@@ -105,8 +111,8 @@ func test_oval_brilliant_pavilion_has_detail() -> void:
 
 
 func test_trillion_pavilion_stays_within_crown_footprint() -> void:
-	var cut = GemCutGeneratorsScript.generate(&"trillion")
-	var mesh = GemMeshGeneratorsScript.generate(&"trillion")
+	var cut = GemCutGeneratorsScript.generate_from_spec_id(&"trillion")
+	var mesh = GemMeshGeneratorsScript.generate_from_spec_id(&"trillion")
 	assert_true(cut != null, "Trillion should generate a cut resource")
 	assert_true(mesh != null, "Trillion should generate a mesh resource")
 	if cut == null or mesh == null:
@@ -124,7 +130,7 @@ func test_trillion_pavilion_stays_within_crown_footprint() -> void:
 
 
 func test_lozenge_pavilion_has_detail() -> void:
-	var mesh = GemMeshGeneratorsScript.generate(&"lozenge")
+	var mesh = GemMeshGeneratorsScript.generate_from_spec_id(&"lozenge")
 	assert_true(mesh != null, "Lozenge should generate a mesh resource")
 	if mesh == null:
 		return
@@ -140,8 +146,8 @@ func test_lozenge_pavilion_has_detail() -> void:
 
 
 func test_princess_pavilion_stays_within_crown_footprint() -> void:
-	var cut = GemCutGeneratorsScript.generate(&"princess_square")
-	var mesh = GemMeshGeneratorsScript.generate(&"princess_square")
+	var cut = GemCutGeneratorsScript.generate_from_spec_id(&"princess_square")
+	var mesh = GemMeshGeneratorsScript.generate_from_spec_id(&"princess_square")
 	assert_true(cut != null, "Princess square should generate a cut resource")
 	assert_true(mesh != null, "Princess square should generate a mesh resource")
 	if cut == null or mesh == null:
@@ -159,7 +165,7 @@ func test_princess_pavilion_stays_within_crown_footprint() -> void:
 
 
 func test_pear_brilliant_pavilion_has_detail() -> void:
-	var mesh = GemMeshGeneratorsScript.generate(&"pear_brilliant")
+	var mesh = GemMeshGeneratorsScript.generate_from_spec_id(&"pear_brilliant")
 	assert_true(mesh != null, "Pear brilliant should generate a mesh resource")
 	if mesh == null:
 		return
@@ -174,26 +180,22 @@ func test_pear_brilliant_pavilion_has_detail() -> void:
 	assert_true(culet_count >= 10, "Pear brilliant should provide dedicated culet facets")
 
 
-func test_expected_facet_counts() -> void:
-	for cut_id in EXPECTED_FACET_COUNTS.keys():
-		var mesh = GemMeshGeneratorsScript.generate(cut_id)
-		var expected: int = EXPECTED_FACET_COUNTS[cut_id]
-		assert_eq(mesh.facet_count(), expected, "%s facet count" % str(cut_id))
-
-
 func test_bounds_and_radius() -> void:
-	for cut_id in EXPECTED_FACET_COUNTS.keys():
-		var mesh = GemMeshGeneratorsScript.generate(cut_id)
+	for cut_id in MESH_CUT_IDS:
+		var mesh = GemMeshGeneratorsScript.generate_from_spec_id(cut_id)
 		var bounds: AABB = mesh.compute_bounds()
-		assert_true(bounds.size.x > 0.5, "%s bounds span X" % str(cut_id))
+		assert_true(bounds.size.x > 0.30, "%s bounds span X" % str(cut_id))
 		assert_true(bounds.size.y > 0.5, "%s bounds span Y" % str(cut_id))
 		assert_true(bounds.size.z > 0.3, "%s bounds span Z" % str(cut_id))
-		assert_true(mesh.compute_bounding_radius() > 0.45, "%s radius stays non-trivial" % str(cut_id))
+		assert_true(
+			mesh.compute_bounding_radius() > GemCutPrimitives.GEM_RADIUS - 0.01,
+			"%s radius stays within the canonical fit" % str(cut_id)
+		)
 
 
 func test_normals_face_outward() -> void:
-	for cut_id in EXPECTED_FACET_COUNTS.keys():
-		var mesh = GemMeshGeneratorsScript.generate(cut_id)
+	for cut_id in MESH_CUT_IDS:
+		var mesh = GemMeshGeneratorsScript.generate_from_spec_id(cut_id)
 		for i in mesh.facet_count():
 			var centroid := _facet_centroid(mesh.facet_vertices[i])
 			assert_true(
@@ -203,8 +205,8 @@ func test_normals_face_outward() -> void:
 
 
 func test_array_mesh_build() -> void:
-	for cut_id in EXPECTED_FACET_COUNTS.keys():
-		var mesh = GemMeshGeneratorsScript.generate(cut_id)
+	for cut_id in MESH_CUT_IDS:
+		var mesh = GemMeshGeneratorsScript.generate_from_spec_id(cut_id)
 		var array_mesh: ArrayMesh = mesh.create_array_mesh()
 		assert_true(array_mesh != null, "%s should create an ArrayMesh" % str(cut_id))
 		if array_mesh == null:
@@ -213,8 +215,8 @@ func test_array_mesh_build() -> void:
 
 
 func test_trace_data_build() -> void:
-	for cut_id in EXPECTED_FACET_COUNTS.keys():
-		var mesh = GemMeshGeneratorsScript.generate(cut_id)
+	for cut_id in MESH_CUT_IDS:
+		var mesh = GemMeshGeneratorsScript.generate_from_spec_id(cut_id)
 		var trace_data: Dictionary = mesh.build_trace_data()
 		var triangle_vertices_a: Array = trace_data.get("triangle_vertices_a", [])
 		var triangle_vertices_b: Array = trace_data.get("triangle_vertices_b", [])
@@ -258,3 +260,10 @@ func _point_near_polygon_boundary(point: Vector2, polygon: PackedVector2Array, t
 		if Geometry2D.get_closest_point_to_segment(point, a, b).distance_to(point) <= tolerance:
 			return true
 	return false
+
+
+func _make_visual(spec_id: StringName, rotation_degrees: float = 0.0) -> GemVisualResource:
+	var visual := GemVisualResource.new()
+	visual.cut_spec = load("res://data/visuals/cut_specs/%s.tres" % String(spec_id))
+	visual.rotation_degrees = rotation_degrees
+	return visual

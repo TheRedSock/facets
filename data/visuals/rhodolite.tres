@@ -1,13 +1,14 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/kite_brilliant.tres" id="1_0sfqc"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"rhodolite"
+cut_spec = ExtResource("1_0sfqc")
 cut_id = &"kite_brilliant"
-rotation_degrees = 0.0
-base_color = Color(0.64, 0.10, 0.46, 1)
+base_color = Color(0.64, 0.1, 0.46, 1)
 shininess = 44.0
 specular_intensity = 0.34
 depth_tint = Color(0.24, 0.04, 0.22, 0.42)
@@ -15,13 +16,11 @@ saturation_boost = 0.14
 contrast = 0.56
 rim_intensity = 0.14
 rim_color = Color(0.9, 0.38, 0.7, 1)
-rim_power = 2.0
 translucency = 0.24
 translucency_color = Color(0.82, 0.24, 0.48, 1)
 secondary_specular = 0.18
 secondary_light_angle = 124.0
 sparkle_intensity = 0.08
-sparkle_threshold = 0.85
 gradient_color = Color(0.38, 0.08, 0.26, 1)
 gradient_strength = 0.18
 brilliance_contrast = 0.22
@@ -33,15 +32,14 @@ optics_absorption_strength = 2.04
 optics_surface_roughness = 0.04
 optics_scattering_strength = 0.03
 optics_scattering_color = Color(0.84, 0.26, 0.52, 1)
+optics_trace_view_scale = 1.1
 optics_environment_preset = 1
 optics_environment_rotation_degrees = 10.0
 optics_environment_energy = 0.58
-optics_trace_view_scale = 1.1
 optics_light_energy = 1.56
 stylize_mix = 0.8
 stylize_facet_edge_gain = 0.76
 stylize_plane_contrast = 0.6
-stylize_shadow_floor = 0.08
 stylize_highlight_bloom_gain = 0.14
 stylize_highlight_bloom_threshold = 0.84
 stylize_microdetail_suppression = 0.34

@@ -49,12 +49,12 @@ Never hardcode gravity direction. The `BoardPhysics` iterative settling algorith
 core/board/     Simulation: board grid, tiles, matching, effects, gravity, spawning
 core/rules/     Simulation: RNG, event logging, event timeline
 core/run/       Simulation: run lifecycle, turn pipeline orchestration
-core/visuals/   Procedural gem rendering: cut profiles, builders, primitives, lighting math
+core/visuals/   Model-first gem geometry: spec loading, topology building, projection, mesh assembly, lighting math
 native/         C++ GDExtension: Embree-accelerated ray tracer (GemTraceKernel)
 native/src/     C++ source files for the native tracer kernel
 resources/      Resource class definitions (data schemas)
 data/tiles/     Tile definition .tres files (the 8-gem merge ladder)
-data/visuals/   GemVisualResource .tres files (per-gem colour, material, cut assignment)
+data/visuals/   GemVisualResource .tres files plus `cut_specs/` authoring assets for gem geometry
 autoloads/      Global singletons (config, replay, save, debug, tile registry, gem visuals)
 scenes/menu/    Main menu screen (Play + Gem Bake Workbench navigation)
 scenes/design/  Active gem bake workbench (offline bake form + preview); legacy designer/gallery remain for reference only
@@ -73,10 +73,6 @@ plans/          Design documents (not code — reference only)
 Treat these files/features as historical reference only unless the user explicitly asks to revive them:
 
 - `autoloads/perf_monitor.gd` — deprecated, no longer autoloaded or used by gameplay
-- `scenes/design/gem_design.tscn` / `scenes/design/gem_design.gd` — deprecated legacy gem designer
-- `scenes/design/gem_gallery.tscn` / `scenes/design/gem_gallery.gd` — deprecated preset gallery
-- `scenes/debug/gem_variant_preview.tscn` / `scenes/debug/gem_variant_preview.gd` — deprecated debug preview
-- `scenes/tile/gem_gameplay_bake_backend_3d.gd` — deprecated prototype 3D bake backend
 - `core/visuals/gem_optics_tracer.gd` — GDScript CPU tracer, now a **fallback only**. The native C++ `GemTraceKernel` (in `native/`) is the primary tracer. The GDScript version is kept as a readable reference implementation and for environments without the compiled extension.
 - `core/visuals/gem_material_sampler.gd` — Still used by the procedural 2D renderer (`GemRenderer`) and as reference. The native tracer has its own C++ port of the material sampling (`native/src/gem_trace_material.cpp`).
 - Runtime loading-screen overlays are not part of the active run flow anymore; do not assume the game uses a loading screen when reasoning about current UX
@@ -263,35 +259,41 @@ Loads all `.tres` tile definitions from `data/tiles/` at startup. Provides:
 
 ## Procedural Gem Rendering
 
-Gems are authored procedurally using 2D polygon facets with pseudo-3D lighting. Gameplay usually shows runtime-baked textures generated from that procedural source data rather than hand-authored sprites. The source-of-truth system has five layers:
+Gems are authored from a canonical 3D model-first pipeline. Gameplay uses offline-traced textures generated from that source data; procedural drawing remains as the runtime fallback when a traced texture is unavailable. The source-of-truth system has these layers:
 
-### GemCutResource (geometry)
+### GemCutSpecResource (geometry authoring)
 
-Defines the 2D facet layout of a cut type. All vertices are in unit `[0,1]` space centred at `(0.5, 0.5)`. Contains:
-- `facet_vertices: Array[PackedVector2Array]` — one polygon per facet
-- `facet_normals: Array[Vector3]` — pseudo-3D normal per facet (for lighting)
-- `facet_zones: PackedStringArray` — zone tag per facet ("table", "star", "bezel", "girdle")
-- `silhouette: PackedVector2Array` — outer boundary for outline rendering
-- `edge_segments: Array[PackedVector2Array]` — visible facet boundary lines (currently hidden by default)
-- `pavilion_sector_count` / `pavilion_rotation_fraction` / `pavilion_scale` / `pavilion_normal_z_scale` — cut-specific pavilion overlay metadata copied from the generation profile
-- `pavilion_vertices: Array[PackedVector2Array]` — clipped pavilion extinction overlay fragments
-- `pavilion_normals: Array[Vector3]` — normals for pavilion fragments (steep tilt for darkening)
-- `pavilion_source_indices` / `pavilion_target_indices` — which mirrored crown facet produced each fragment and which crown facet it clips into
+Defines a cut in typed, data-driven form. Stored in `data/visuals/cut_specs/`. Key sections include:
+- `spec_id` / `display_name` / `compatibility_cut_id`
+- `family` / `symmetry` / `rings`
+- `crown` / `pavilion` / `girdle` / `culet`
+- `patches` — small named-loop tweaks applied by the generic builders
+- `constraints` / `orthographic_metadata`
 
-Generated at startup by `GemCutGenerators` — parametric functions that produce correct facet topology for each shape. All generated cuts are auto-normalized via `_normalize_to_fit()` to guarantee consistent cell margin regardless of aspect ratio. After normalization, `generate_pavilion_overlay()` computes the pavilion extinction fragments by mirroring crown facets and transforming them with cut-specific pavilion metadata rather than inferring symmetry from `shape_category`.
+### GemCutCompiler3D / GemCutModelResource
 
-### GemCutProfiles / GemCutBuilders / GemCutPrimitives
+`GemCutCompiler3D` compiles a spec into the canonical `GemCutModelResource`. The compile path:
+1. Builds family topology through `GemTopologyBuilders3D`
+2. Normalizes/centers the model through `GemGeometryNormalizer`
+3. Validates geometry quality through `GemGeometryValidator`
 
-The generator stack is split so new cuts are mostly data rather than bespoke geometry code:
-- `GemCutProfiles` — declarative cut dictionaries keyed by `cut_id`
-- `GemCutBuilders` — reusable topology assembly (`build_radial_brilliant`, `build_step_cut`, `build_fan_cut`, `build_radiant_cut`, `build_rose_cut`) and pavilion overlay generation
-- `GemCutPrimitives` — shared outline math, polygon helpers, curve samplers, silhouette helpers, and winding-safe Sutherland-Hodgman polygon clipping
+`GemCutModelResource` carries the compiled 3D facet data plus stable `spec_id` and `geometry_signature` identifiers used by caches and downstream consumers.
 
-When adding a cut, prefer a new profile first. Only add new primitive math or a new builder when an existing profile+builder combination cannot express the cut family cleanly.
+### GemCutProjector / GemProjectedCutResource
+
+`GemCutProjector` derives the procedural fallback packet from the compiled model. `GemProjectedCutResource` contains:
+- projected facet polygons and normals for `GemRenderer`
+- silhouette and edge segments for outlines/internal lines
+- pavilion extinction overlay fragments and source/target facet metadata
+- the same `spec_id` / `geometry_signature` identity used by the model
+
+### GemMeshAssembler / GemMeshResource
+
+`GemMeshAssembler` converts the compiled model into `GemMeshResource`, the traced-bake mesh packet consumed by the offline ray tracer. The mesh retains `spec_id` and `geometry_signature` so traced manifests and runtime requests key the same canonical geometry.
 
 ### GemVisualResource (appearance config)
 
-`.tres` files in `data/visuals/`, one per gem type. References a `cut_id` and configures:
+`.tres` files in `data/visuals/`, one per gem type. Each visual references a `cut_spec` and optional `cut_overrides`, then configures:
 - `base_color` — primary gem colour
 - `shininess` / `specular_intensity` — Blinn-Phong specular parameters
 - `contrast` (0–1) — blends between Half-Lambert (soft, flat) and standard Lambert (dramatic shadows). Low tiers use low contrast; high tiers use high contrast.
@@ -329,22 +331,25 @@ Also provides `compute_pavilion_colors()` for the pavilion extinction overlay �
 
 ### GemVisualRegistry (autoload)
 
-Loads `GemVisualResource` files from `data/visuals/` and generates `GemCutResource` instances via `GemCutGenerators` at startup. Provides:
+Loads `GemVisualResource` files from `data/visuals/` and compiles/caches canonical geometry on demand. Provides:
 - `get_visual(tile_id)` → `GemVisualResource`
 - `get_visual_for_tier(tier)` → `GemVisualResource` (resolved via TileRegistry)
-- `get_cut(cut_id)` → `GemCutResource`
+- `get_cut(geometry_signature)` → `GemProjectedCutResource`
+- `get_cut_model(geometry_signature)` → `GemCutModelResource`
+- `get_visual_cut_with_offset(...)` / `get_visual_cut_model_with_offset(...)` for resolved visual geometry plus normalized draw offset
 - shared color / geometry / render-bundle caches used by both direct drawing and gameplay baking
-- `ensure_gameplay_texture_cache(draw_size)` / `get_gameplay_texture(...)` for board-ready baked textures
+- `ensure_gameplay_texture_cache(draw_size)` / `get_gameplay_texture(...)` for board-ready offline-traced textures
+- `get_offline_traced_manifest_summary()` for runtime/workbench visibility into traced assets
 - `gameplay_texture_cache_rebuilt` signal so `BoardScene` can await the correct cell-size bake before rebuilding views
 
 ### TileView integration
 
 `TileView` resolves visuals in this priority order:
-1. Gameplay-baked texture (when `use_gameplay_texture_cache` is enabled and the registry has a baked texture for this tile/tier)
+1. Offline-traced gameplay texture (when `use_gameplay_texture_cache` is enabled and the registry has a traced texture for this tile/tier)
 2. Procedural gem via `_draw()` using shared cached render data
 3. Coloured rectangle (headless/debug fallback)
 
-The procedural draw pass renders: filled crown facets, pavilion extinction overlay (semi-transparent dark fragments), silhouette outline, and internal edge lines. Gameplay textures are baked from the same render bundles via `GameplayGemBakeView`, so the sprite-backed board path stays aligned with the procedural fallback.
+The procedural draw pass renders: filled crown facets, pavilion extinction overlay (semi-transparent dark fragments), silhouette outline, and internal edge lines. Gameplay textures are sourced from the offline-traced manifest, while the procedural fallback uses the same compiled geometry and render-bundle data so the two paths stay aligned.
 
 Silhouette outline toggled via `DebugFlags.gem_silhouette_outline`.
 
@@ -562,14 +567,14 @@ These systems are designed but intentionally excluded from the current scaffold.
 | What you want to change | File(s) to modify |
 |---|---|
 | Add a new gem type | Create `.tres` in `data/tiles/`, `TileRegistry` auto-loads it |
-| Change a gem's visual appearance | Edit its `.tres` in `data/visuals/` (colour, shininess, cut assignment) |
-| Add a new gem cut profile | Add a profile in `core/visuals/gem_cut_profiles.gd`, wire its `cut_id` in `core/visuals/gem_cut_generators.gd`, reference it from a `GemVisualResource` |
+| Change a gem's visual appearance | Edit its `.tres` in `data/visuals/` (colour, shininess, `cut_spec`, overrides) |
+| Add a new gem cut | Add/update a `GemCutSpecResource` in `data/visuals/cut_specs/`, then reference it from a `GemVisualResource` |
 | Add shared cut outline math | `core/visuals/gem_cut_primitives.gd` |
-| Add a new cut topology family | `core/visuals/gem_cut_builders.gd` |
+| Add a new cut topology family | `core/visuals/gem_topology_builders_3d.gd` |
 | Change the lighting model | `core/visuals/gem_renderer.gd` — `compute_facet_color()` |
 | Add a visual modifier effect | Add parameter handling in `GemRenderer.compute_all_facet_colors()` modifiers dict |
-| Add a new visual property | Add `@export` to `resources/visuals/gem_visual_resource.gd`, handle in `GemRenderer`, add control in `scenes/design/gem_design.gd` |
-| Change pavilion extinction geometry | `core/visuals/gem_cut_builders.gd` — `generate_pavilion_overlay()` |
+| Add a new visual property | Add `@export` to `resources/visuals/gem_visual_resource.gd`, handle in `GemRenderer`, add control in `scenes/design/gem_bake_workbench.gd` if tooling needs it |
+| Change pavilion extinction geometry | `core/visuals/gem_cut_projector.gd` and/or `core/visuals/gem_topology_builders_3d.gd` |
 | Change pavilion extinction rendering | `core/visuals/gem_renderer.gd` — `compute_pavilion_colors()` |
 | Preview or rebake gameplay gem variants | Use the Gem Bake Workbench scene (`scenes/design/gem_bake_workbench.tscn`) |
 | Change the native tracer's trace logic | `native/src/gem_trace_kernel.cpp` — rebuild with `scons platform=windows target=template_debug` |

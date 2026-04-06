@@ -4,7 +4,7 @@ extends RefCounted
 const DEFAULT_OUTPUT_ROOT := "user://traced_bakes"
 const DEFAULT_MANIFEST_NAME := "gameplay_manifest.json"
 const GENERATED_OUTPUT_ROOT := "res://generated/traced_bakes"
-const BAKED_LOOK_VERSION := 2
+const BAKED_LOOK_VERSION := 3
 const DEFAULT_LIGHTING_GRID_SIZE := Vector2i(5, 5)
 const LIGHTING_GRID_PRESET_CUSTOM := &"custom"
 const DEFAULT_LIGHTING_GRID_PRESET := &"quality"
@@ -111,7 +111,14 @@ static func build_manifest_entry(
 	return {
 		"tile_id": request.get("tile_id", &""),
 		"visual_id": visual.visual_id if visual != null else request.get("visual_id", &""),
+		"spec_id": request.get("spec_id", visual.get_cut_spec_id() if visual != null else &""),
+		"geometry_signature": request.get("geometry_signature", request.get("cut_key_override", "")),
 		"cut_id": request.get("cut_id", &""),
+		"cut_signature": request.get(
+			"cut_key_override",
+			request.get("geometry_signature", request.get("cut_id", &""))
+		),
+		"geometry_source": request.get("geometry_source", &"canonical_3d"),
 		"variant_type": request.get("variant_type", &""),
 		"variant_key": request.get("variant_key", &""),
 		"lighting_bin": request.get("lighting_bin", Vector2i(-1, -1)),
@@ -151,6 +158,10 @@ static func entry_matches_request(entry: Dictionary, request: Dictionary) -> boo
 	if entry.is_empty():
 		return false
 	if int(entry.get("stylize_version", 0)) != BAKED_LOOK_VERSION:
+		return false
+	if String(entry.get("cut_signature", "")) != String(
+		request.get("cut_key_override", request.get("geometry_signature", request.get("cut_id", &"")))
+	):
 		return false
 	var requested_target_size := normalize_size(
 		request.get("target_size", request.get("draw_size", Vector2i.ZERO)),

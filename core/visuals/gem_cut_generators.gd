@@ -1,74 +1,64 @@
 class_name GemCutGenerators
 extends RefCounted
 
-## Public facade for procedural gem cut generation.
+## Public facade for canonical cut generation.
 ##
-## Shared geometry math lives in `GemCutPrimitives`, reusable facet topology lives
-## in `GemCutBuilders`, and per-cut tuning lives in `GemCutProfiles`.
+## The active runtime now compiles fully 3D cut models and projects them to the
+## 2D procedural packet on demand from GemCutSpecResource or GemVisualResource.
+
+static func generate_from_spec_id(spec_id: StringName):
+	var model = generate_model_from_spec_id(spec_id)
+	if model == null:
+		return null
+	return GemCutProjector.project(model)
 
 
-# ===========================================================================
-#  Factory
-# ===========================================================================
+static func generate_model_from_spec_id(spec_id: StringName):
+	return GemCutCompiler3D.compile_spec_id(spec_id)
 
 
-static func generate(cut_id: StringName) -> GemCutResource:
-	match cut_id:
-		&"classic_round":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.classic_round())
-		&"old_european_round":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.old_european_round())
-		&"simple_octagon_step":
-			return GemCutBuilders.build_fan_cut(GemCutProfiles.simple_octagon_step())
-		&"cushion":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.cushion())
-		&"opal_cushion":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.opal_cushion())
-		&"heart_brilliant":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.heart_brilliant())
-		&"trillion":
-			return GemCutBuilders.build_fan_cut(GemCutProfiles.trillion())
-		&"straight_trillion":
-			return GemCutBuilders.build_fan_cut(GemCutProfiles.straight_trillion())
-		&"princess_square":
-			return GemCutBuilders.build_princess_cut(GemCutProfiles.princess_square())
-		&"lozenge":
-			return GemCutBuilders.build_step_cut(GemCutProfiles.lozenge())
-		&"kite_brilliant":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.kite_brilliant())
-		&"radiant_square":
-			return GemCutBuilders.build_radiant_cut(GemCutProfiles.radiant_square())
-		&"radiant_octagon":
-			return GemCutBuilders.build_radiant_cut(GemCutProfiles.radiant_octagon())
-		&"hex_brilliant":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.hex_brilliant())
-		&"pentagon_brilliant":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.pentagon_brilliant())
-		&"emerald_step":
-			return GemCutBuilders.build_step_cut(GemCutProfiles.emerald_step())
-		&"asscher_step":
-			return GemCutBuilders.build_step_cut(GemCutProfiles.asscher_step())
-		&"octagon_step":
-			return GemCutBuilders.build_step_cut(GemCutProfiles.octagon_step())
-		&"baguette_step":
-			return GemCutBuilders.build_step_cut(GemCutProfiles.baguette_step())
-		&"tapered_baguette_step":
-			return GemCutBuilders.build_step_cut(GemCutProfiles.tapered_baguette_step())
-		&"oval_brilliant":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.oval_brilliant())
-		&"antique_oval":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.antique_oval())
-		&"marquise_brilliant":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.marquise_brilliant())
-		&"pear_brilliant":
-			return GemCutBuilders.build_radial_brilliant(GemCutProfiles.pear_brilliant())
-		&"rose_round":
-			return GemCutBuilders.build_rose_cut(GemCutProfiles.rose_round())
-		&"half_dutch_rose_hex":
-			return GemCutBuilders.build_rose_cut(GemCutProfiles.half_dutch_rose_hex())
-		&"double_rose":
-			return GemCutBuilders.build_rose_cut(GemCutProfiles.double_rose())
-		&"cross_rose":
-			return GemCutBuilders.build_rose_cut(GemCutProfiles.cross_rose())
-	push_warning("GemCutGenerators: Unknown cut_id '%s'" % str(cut_id))
-	return null
+static func generate_from_spec(spec):
+	var model = generate_model_from_spec(spec)
+	if model == null:
+		return null
+	return GemCutProjector.project(model)
+
+
+static func generate_model_from_spec(spec):
+	return GemCutCompiler3D.compile_spec(spec)
+
+
+static func generate_from_visual(visual: GemVisualResource):
+	var model = generate_model_from_visual(visual)
+	if model == null:
+		return null
+	return GemCutProjector.project(model)
+
+
+static func generate_model_from_visual(visual: GemVisualResource):
+	if visual == null:
+		return null
+	return generate_model_from_spec(visual.resolve_cut_spec())
+
+
+static func generate_visual_with_rotation(
+	visual: GemVisualResource,
+	additional_rotation_degrees: float = 0.0,
+):
+	var model = generate_model_from_visual_with_rotation(visual, additional_rotation_degrees)
+	if model == null:
+		return null
+	return GemCutProjector.project(model)
+
+
+static func generate_model_from_visual_with_rotation(
+	visual: GemVisualResource,
+	additional_rotation_degrees: float = 0.0,
+):
+	var base_model = generate_model_from_visual(visual)
+	if base_model == null:
+		return null
+	return GemCutCompiler3D.create_visual_variant(
+		base_model,
+		visual.rotation_degrees + additional_rotation_degrees
+	)

@@ -1,10 +1,12 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/double_rose.tres" id="1_aomwr"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"blue_garnet"
+cut_spec = ExtResource("1_aomwr")
 cut_id = &"double_rose"
 base_color = Color(0.12, 0.28, 0.76, 1)
 shininess = 96.0
@@ -12,10 +14,8 @@ specular_intensity = 0.64
 depth_tint = Color(0.12, 0.08, 0.2, 0.38)
 saturation_boost = 0.18
 contrast = 0.58
-hue_dispersion = 0.0
 rim_intensity = 0.12
 rim_color = Color(0.78, 0.86, 0.98, 1)
-rim_power = 2.0
 translucency = 0.04
 translucency_color = Color(0.56, 0.24, 0.48, 1)
 secondary_specular = 0.28
@@ -45,7 +45,6 @@ optics_light_energy = 1.24
 stylize_mix = 0.74
 stylize_facet_edge_gain = 0.68
 stylize_plane_contrast = 0.52
-stylize_shadow_floor = 0.08
 stylize_highlight_bloom_gain = 0.16
 stylize_highlight_bloom_threshold = 0.84
 stylize_microdetail_suppression = 0.3

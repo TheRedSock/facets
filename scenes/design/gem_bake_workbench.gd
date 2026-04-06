@@ -265,7 +265,7 @@ func _build_form_panel(parent: HBoxContainer) -> void:
 	_draw_size_spin.value_changed.connect(func(_value: float): _refresh_selection_summary())
 	content.add_child(_labeled_control("Bake Draw Size", _draw_size_spin))
 
-	_sample_count_spin = _make_int_spinbox(1, GemOpticsTracer.max_supported_sample_count(), 2)
+	_sample_count_spin = _make_int_spinbox(1, OfflineGemBakeJob.max_supported_sample_count(), 2)
 	_sample_count_spin.value_changed.connect(func(_value: float): _refresh_selection_summary())
 	content.add_child(_labeled_control("Samples", _sample_count_spin))
 
@@ -582,10 +582,6 @@ func _populate_gem_selection_list() -> void:
 func _configure_registry() -> void:
 	if GemVisualRegistry == null:
 		return
-	GemVisualRegistry.set_gameplay_bake_backend_preference(
-		GemVisualRegistry.GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED
-	)
-	GemVisualRegistry.set_gameplay_runtime_bake_fallback_enabled(false)
 	GemVisualRegistry.reload_offline_traced_manifest(false)
 	if not GemVisualRegistry.gameplay_texture_cache_rebuilt.is_connected(_on_gameplay_texture_cache_rebuilt):
 		GemVisualRegistry.gameplay_texture_cache_rebuilt.connect(_on_gameplay_texture_cache_rebuilt)
@@ -635,7 +631,7 @@ func _restore_preview_selection() -> void:
 func _build_gem_label(tile_id: StringName) -> String:
 	var tier := _resolve_tier(tile_id)
 	var visual := GemVisualRegistry.get_visual(tile_id) if GemVisualRegistry != null else null
-	var cut_id := visual.cut_id if visual != null else &""
+	var cut_id := visual.get_cut_spec_id() if visual != null else &""
 	var parts := [_titleize(tile_id)]
 	if tier > 0:
 		parts.append("T%d" % tier)

@@ -1,0 +1,88 @@
+[gd_resource type="Resource" script_class="GemCutSpecResource" format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_3uvf4"]
+
+[resource]
+script = ExtResource("1_3uvf4")
+spec_id = &"baguette_step"
+display_name = "Baguette Step"
+compatibility_cut_id = &"baguette_step"
+shape_category = &"rectangle"
+family = &"step"
+symmetry = {
+"half_angles": [],
+"main_angles": [],
+"pavilion_sector_count": 4,
+"rotation": -1.5707963267948966,
+"sector_count": 4
+}
+rings = Array[Dictionary]([{
+"height_ratio": 0.0,
+"name": "ring_00",
+"points": PackedVector2Array(0.34642857, 0.06999999, 0.6535714, 0.06999999, 0.6535714, 0.93, 0.34642857, 0.93),
+"rose_height_ratio": 0.0,
+"zone": "girdle"
+}, {
+"height_ratio": 0.5358867,
+"name": "ring_01",
+"points": PackedVector2Array(0.38942856, 0.1904, 0.61057144, 0.1904, 0.61057144, 0.8096, 0.38942856, 0.8096),
+"rose_height_ratio": 0.56644195,
+"zone": "step"
+}, {
+"height_ratio": 1.0,
+"name": "ring_02",
+"points": PackedVector2Array(0.43242857, 0.31080002, 0.5675714, 0.31080002, 0.5675714, 0.6892, 0.43242857, 0.6892),
+"rose_height_ratio": 1.0,
+"zone": "table"
+}])
+crown = {
+"bezel_facets": Array[PackedVector2Array]([]),
+"break_ratio": 0.5,
+"center_height_ratio": 1.0,
+"center_point": Vector2(0.5, 0.5),
+"edge_trim": 0.2,
+"fans": Array[Dictionary]([]),
+"height": 0.16,
+"inner_star_facets": Array[PackedVector2Array]([]),
+"inner_star_height_ratio": 0.78,
+"outer_shoulder_height_ratio": 0.0,
+"outer_shoulder_scale": 1.0,
+"star_facets": Array[PackedVector2Array]([]),
+"star_height_ratio": 0.62,
+"star_length": 0.55,
+"table": PackedVector2Array(),
+"table_ratio": 0.5
+}
+pavilion = {
+"depth": 0.24,
+"lower_depth_ratio": 0.82,
+"lower_scale": 0.42,
+"rotation_fraction": 0.0,
+"sector_count": 4,
+"upper_depth_ratio": 0.48,
+"upper_scale": 0.72
+}
+girdle = {
+"boundary_mode": &"",
+"boundary_params": {},
+"half_radius_scale": 1.0,
+"outer_points": PackedVector2Array(),
+"silhouette": PackedVector2Array(0.34642857, 0.06999999, 0.6535714, 0.06999999, 0.6535714, 0.93, 0.34642857, 0.93),
+"thickness": 0.012
+}
+culet = {
+"style": "point"
+}
+constraints = {
+"max_edge_ratio": 45.0,
+"min_interior_angle_degrees": 4.0,
+"require_outward_normals": true,
+"require_pavilion_containment": true,
+"require_rotation_stability": true,
+"require_shared_edge_closure": true
+}
+orthographic_metadata = {
+"axis_fit_scale": 1.0,
+"side_yaw_degrees": 0.0,
+"top_roll_degrees": 0.0
+}

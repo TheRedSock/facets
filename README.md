@@ -12,7 +12,7 @@ core/
   board/            # Simulation: board grid, tiles, matching, effects, gravity, spawning
   rules/            # Simulation: SeededRng, EventLog, EventTimeline
   run/              # Simulation: run lifecycle, turn pipeline orchestration
-  visuals/          # Procedural gem rendering: profiles, builders, primitives, lighting math
+  visuals/          # Model-first gem geometry, projection, mesh assembly, and lighting math
 native/             # C++ GDExtension: Embree-accelerated ray tracer (GemTraceKernel)
   src/              # C++ source: trace kernel, Embree scene, material sampler, types
   godot-cpp/        # Git submodule: Godot C++ bindings (4.5 branch)
@@ -24,7 +24,7 @@ data/
 plans/              # Design documents (reference only, not code)
 resources/
   definitions/      # Resource class definitions (simulation data schemas)
-  visuals/          # Resource class definitions (visual data schemas: GemCutResource, GemVisualResource)
+  visuals/          # Resource class definitions (GemCutSpecResource, GemCutModelResource, GemVisualResource, ...)
 scenes/
   board/            # Board rendering, animation sequencer, input handling
   menu/             # Main menu (Play + Gem Bake Workbench navigation)
@@ -55,16 +55,17 @@ The simulation completes instantly and produces an `EventTimeline`. During gamep
 
 ## Procedural Gem Rendering
 
-Gems are still authored procedurally, but normal board gameplay now uses runtime-baked textures generated from that procedural source data rather than redrawing every polygon every frame. There is no hand-authored sprite atlas in the main path. Each gem type is defined by:
+Gems are authored from a canonical 3D model-first pipeline. Normal gameplay consumes offline-traced textures generated from that source data; direct procedural drawing remains only as the visual fallback when a traced texture is unavailable. There is no hand-authored sprite atlas in the active path. The main layers are:
 
-- **`GemCutResource`** — 2D polygon geometry defining the facet layout plus cut-specific pavilion overlay metadata/fragments (generated at startup from profile-driven cut builders)
-- **`GemVisualResource`** (`.tres` in `data/visuals/`) — Per-gem colour and material properties (shininess, contrast, specular intensity, depth tint, hue dispersion, rim lighting, translucency, secondary specular, sparkle, gradient, zone brilliance, pavilion extinction)
-- **`GemRenderer`** — Pure-math lighting: Half-Lambert/Lambert diffuse blend, Blinn-Phong specular, depth tint, colour gradient, translucency/SSS, Fresnel rim lighting, secondary specular, hue dispersion, sparkle boost, per-facet brightness jitter, zone brilliance, transparency, plus a separate pavilion-overlay colouring pass
-- **`GemVisualRegistry`** — Shared cache owner for facet colours, scaled geometry, render bundles, and gameplay-baked textures
-- **`GameplayGemBakeView`** — Hidden bake surface used by the registry to rasterize a gem into a gameplay texture for `TileView`
-- **`core/visuals/gem_cut_profiles.gd`** — declarative cut library
-- **`core/visuals/gem_cut_builders.gd`** — reusable facet topology builders + cut-specific pavilion overlay generation
-- **`core/visuals/gem_cut_primitives.gd`** — shared outline math, curve sampling helpers, and winding-safe Sutherland-Hodgman polygon clipping
+- **`GemCutSpecResource`** (`data/visuals/cut_specs/`) — typed authoring data for a cut family, symmetry, ring layout, pavilion, girdle, constraints, and optional named-loop patches
+- **`GemCutModelResource`** — canonical compiled 3D artifact with facet polygons, normals, zones, and a stable `geometry_signature`
+- **`GemProjectedCutResource`** — orthographic 2D projection packet derived from the compiled model for procedural fallback rendering
+- **`GemMeshResource`** — traced-bake mesh packet assembled from the compiled model for the ray tracer
+- **`GemVisualResource`** (`.tres` in `data/visuals/`) — per-gem appearance data plus a direct `cut_spec` reference and optional overrides
+- **`GemCutCompiler3D`**, **`GemCutProjector`**, **`GemMeshAssembler`** — the compile/project/mesh stages of the canonical geometry pipeline
+- **`GemRenderer`** — pure-math facet shading used by the procedural fallback and shared render bundles
+- **`GemVisualRegistry`** — shared cache owner for compiled geometry, projected cuts, render bundles, and offline-traced gameplay textures
+- **`GameplayGemBakeView`** — hidden raster surface for procedural preview/fallback rendering only; gameplay baking itself is sourced from offline traced output
 
 Each tier has a distinct **silhouette shape** for instant visual identification:
 
@@ -79,13 +80,13 @@ Each tier has a distinct **silhouette shape** for instant visual identification:
 | T7 | Ruby | Oval (portrait) | Oval Brilliant |
 | T8 | Diamond | Pear/Teardrop | Pear Brilliant |
 
-The profile base now also includes alternate cuts such as Asscher, baguette, tapered baguette, octagon step, marquise, heart, old European round, princess square, radiant octagon, and a rose-cut family for future use.
+The spec library also includes alternate cuts such as Asscher, baguette, tapered baguette, octagon step, marquise, heart, old European round, princess square, radiant octagon, and a rose-cut family for future use.
 
 Higher tiers have progressively more dramatic shading, brighter specular highlights, deeper depth tints, stronger rim lighting, and more pronounced pavilion extinction patterns. Diamond features prismatic hue dispersion ("fire"), maximum sparkle, and strong secondary specular.
 
-`TileView` now prefers a gameplay texture from `GemVisualRegistry` and falls back to procedural `_draw()` when the cache is unavailable. Both paths share the same cached render bundles, so the bake path and the direct path stay visually aligned. The procedural draw pass still renders filled crown facets, pavilion extinction overlay, silhouette outline, and internal edge lines. Pavilion overlays are derived from per-cut metadata on `GemCutResource`, and `extinction` controls only overlay strength rather than also darkening crown facets. If no gem visual can be resolved, the remaining fallback is a coloured debug rectangle. Silhouette outlines are toggled via `DebugFlags.gem_silhouette_outline`.
+`TileView` prefers an offline-traced gameplay texture from `GemVisualRegistry` and falls back to procedural `_draw()` only when that texture is unavailable. Both paths share the same compiled geometry and render-bundle caches, so the traced and procedural views stay aligned. The procedural draw pass still renders filled crown facets, pavilion extinction overlay, silhouette outline, and internal edge lines. Pavilion overlays are derived from projected model metadata, and `extinction` controls only overlay strength rather than also darkening crown facets. If no gem visual can be resolved, the remaining fallback is a coloured debug rectangle. Silhouette outlines are toggled via `DebugFlags.gem_silhouette_outline`.
 
-The higher-fidelity offline traced path uses a native C++ ray tracer (`GemTraceKernel` GDExtension with Intel Embree) as its primary bake engine, with the GDScript `GemOpticsTracer` kept as a fallback for environments without the compiled extension. The bake pipeline, manifest format, and CLI usage are documented in [AGENTS.md](AGENTS.md) under "Native Ray Tracer" and "CLI Bake Reference".
+Gameplay baking is an offline-traced pipeline backed by the native C++ ray tracer (`GemTraceKernel` GDExtension with Intel Embree). The GDScript `GemOpticsTracer` is kept only as an internal fallback implementation for environments without the compiled extension. The bake pipeline, manifest format, and CLI usage are documented in [AGENTS.md](AGENTS.md) under "Native Ray Tracer" and "CLI Bake Reference".
 
 ## Gem Bake Workbench
 
@@ -159,7 +160,7 @@ godot --headless --script tests/test_rng_cross_platform.gd
 - **Deterministic replay:** All randomness flows through `SeededRng` using integer-only operations. `BoardState.compute_hash()` provides checkpoint verification.
 - **Topology abstraction:** All adjacency uses `BoardState.get_neighbor()` which supports portals. All gravity uses `get_effective_gravity()` which supports per-cell and per-tile overrides.
 - **Event-driven rendering:** Simulation produces an authoritative `EventTimeline`; renderer plays it back via Godot Tweens and may overlap independent visual groups without re-running simulation.
-- **Procedural visuals:** Gem rendering is fully data-driven — cut geometry is generated parametrically, shading computed from pseudo-3D normals. No hand-authored sprites needed. Adding a new gem visual is adding a `.tres` config file.
+- **Model-first visuals:** Gem geometry is authored as `GemCutSpecResource`, compiled once into a canonical 3D model, then projected or meshed for each consumer. No hand-authored sprites are needed in the active path.
 
 ## Documentation
 

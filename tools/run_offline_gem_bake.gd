@@ -1,7 +1,6 @@
 extends SceneTree
 
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
-const GemOpticsTracerScript = preload("res://core/visuals/gem_optics_tracer.gd")
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 
 var _status_path := ""
@@ -44,7 +43,7 @@ func _run() -> void:
 	var sample_count := clampi(
 		maxi(int(args.get("samples", 1)), 1),
 		1,
-		GemOpticsTracerScript.max_supported_sample_count()
+		OfflineGemBakeJobScript.max_supported_sample_count()
 	)
 	var options := {
 		"output_root": args.get("output", "user://traced_bakes"),

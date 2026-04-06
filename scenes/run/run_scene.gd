@@ -119,10 +119,6 @@ func _start_run() -> void:
 	if TileRegistry != null:
 		TileRegistry.preload_runtime_assets()
 	if GemVisualRegistry != null:
-		GemVisualRegistry.set_gameplay_bake_backend_preference(
-			GemVisualRegistry.GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED
-		)
-		GemVisualRegistry.set_gameplay_runtime_bake_fallback_enabled(false)
 		var manifest_summary: Dictionary = GemVisualRegistry.get_offline_traced_manifest_summary()
 		var manifest_cell_size: Vector2i = manifest_summary.get("cell_size", Vector2i.ZERO)
 		if manifest_cell_size.x > 0 and manifest_cell_size.y > 0:

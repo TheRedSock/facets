@@ -1,44 +1,42 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/lozenge.tres" id="1_pvyw8"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"topaz"
+cut_spec = ExtResource("1_pvyw8")
 cut_id = &"lozenge"
-rotation_degrees = 0.0
-base_color = Color(0.90, 0.62, 0.22, 1)
+base_color = Color(0.9, 0.62, 0.22, 1)
 shininess = 52.0
 specular_intensity = 0.52
-contrast = 0.5
 depth_tint = Color(0.5, 0.28, 0.08, 0.24)
-saturation_boost = 0.0
+contrast = 0.5
+rim_intensity = 0.1
+rim_color = Color(1, 0.94, 0.74, 1)
 translucency = 0.08
 translucency_color = Color(0.98, 0.84, 0.46, 1)
-rim_intensity = 0.1
-rim_color = Color(1.0, 0.94, 0.74, 1)
 secondary_specular = 0.16
 secondary_light_angle = 130.0
 gradient_color = Color(0.72, 0.48, 0.18, 1)
 gradient_strength = 0.12
 brilliance_contrast = 0.3
 extinction = 0.18
-optics_ior = 1.62
 optics_dispersion = 0.01
 optics_absorption_color = Color(0.92, 0.72, 0.28, 1)
 optics_absorption_strength = 1.4
 optics_surface_roughness = 0.045
 optics_scattering_strength = 0.02
 optics_scattering_color = Color(0.96, 0.82, 0.5, 1)
+optics_trace_view_scale = 1.14
 optics_environment_preset = 2
 optics_environment_rotation_degrees = 18.0
 optics_environment_energy = 0.66
-optics_trace_view_scale = 1.14
 optics_light_energy = 1.58
 stylize_mix = 0.7
 stylize_facet_edge_gain = 0.68
 stylize_plane_contrast = 0.52
-stylize_shadow_floor = 0.08
 stylize_highlight_bloom_gain = 0.14
 stylize_highlight_bloom_threshold = 0.82
 stylize_microdetail_suppression = 0.3

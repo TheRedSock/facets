@@ -8,10 +8,13 @@ extends RefCounted
 ##   1. A readable reference implementation of the trace algorithm
 ##   2. A fallback for environments where the C++ extension is not compiled
 ##
+## Do not instantiate this class directly from gameplay tooling or regression
+## tests. Route tracer selection through `OfflineGemBakeJob.create_tracer()` and
+## related helper methods so the repo-facing pipeline stays native-first.
+##
 ## The bake pipeline (OfflineGemBakeJob) auto-selects the native kernel when
-## available via ClassDB.class_exists(&"GemTraceKernel"), falling back to this
-## class otherwise. Both expose the same API: trace_to_image() and
-## get_last_trace_profile().
+## available, falling back to this class otherwise. Both expose the same API:
+## trace_to_image() and get_last_trace_profile().
 ##
 ## If modifying the trace algorithm, update native/src/gem_trace_kernel.cpp
 ## first (primary), then mirror the change here (fallback).
@@ -117,7 +120,7 @@ func trace_to_image(mesh_resource: GemMeshResource, visual: GemVisualResource, r
 		1,
 		32
 	)
-	var thread_count := _resolve_trace_thread_count(
+	var thread_count := resolve_trace_thread_count(
 		request,
 		target_size,
 		sample_count,
@@ -162,7 +165,7 @@ func trace_to_image(mesh_resource: GemMeshResource, visual: GemVisualResource, r
 	return _finalize_traced_image(_color_array_to_image(pixels, target_size, trace_profile), trace_profile)
 
 
-func _resolve_trace_thread_count(
+static func resolve_trace_thread_count(
 	request: Dictionary,
 	target_size: Vector2i,
 	sample_count: int,
@@ -181,6 +184,15 @@ func _resolve_trace_thread_count(
 	var work_units := pixel_count * maxi(sample_count, 1) * maxi(spectral_sample_count, 1)
 	var work_limit := maxi(work_units / MIN_WORK_UNITS_PER_TRACE_THREAD, 1)
 	return maxi(mini(mini(thread_budget, row_limit), mini(pixel_limit, work_limit)), 1)
+
+
+func _resolve_trace_thread_count(
+	request: Dictionary,
+	target_size: Vector2i,
+	sample_count: int,
+	spectral_sample_count: int,
+) -> int:
+	return resolve_trace_thread_count(request, target_size, sample_count, spectral_sample_count)
 
 
 ## Traces a horizontal band of rows and returns a dictionary containing a flat

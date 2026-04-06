@@ -1,10 +1,12 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/opal_cushion.tres" id="1_3dv2o"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"opal_study"
+cut_spec = ExtResource("1_3dv2o")
 cut_id = &"opal_cushion"
 base_color = Color(0.72, 0.82, 0.88, 1)
 material_mode = 2
@@ -13,7 +15,6 @@ material_tertiary_color = Color(1, 0.74, 0.44, 1)
 surface_pattern_type = 5
 surface_pattern_mix = 0.05
 surface_pattern_scale = Vector2(1.1, 1.05)
-surface_pattern_density = 1.0
 surface_pattern_contrast = 0.18
 surface_pattern_warp_strength = 0.12
 surface_pattern_warp_scale = 1.8
@@ -29,7 +30,7 @@ volume_absorption_variation = 0.42
 volume_scattering_variation = 0.84
 reactive_effect_type = 2
 reactive_color = Color(1, 0.52, 0.28, 1)
-reactive_secondary_color = Color(0.32, 0.76, 1.0, 1)
+reactive_secondary_color = Color(0.32, 0.76, 1, 1)
 reactive_strength = 1.6
 reactive_sharpness = 1.4
 reactive_density = 1.32
@@ -37,13 +38,13 @@ reactive_scale = 2.8
 reactive_axis = Vector3(0.18, 0.95, 0.27)
 shininess = 46.0
 specular_intensity = 0.12
-contrast = 0.12
 depth_tint = Color(0.3, 0.42, 0.52, 0.24)
 saturation_boost = 0.14
-translucency = 0.34
-translucency_color = Color(0.78, 0.88, 0.96, 1)
+contrast = 0.12
 rim_intensity = 0.04
 rim_color = Color(0.92, 0.98, 1, 1)
+translucency = 0.34
+translucency_color = Color(0.78, 0.88, 0.96, 1)
 secondary_specular = 0.1
 secondary_light_angle = 108.0
 sparkle_intensity = 0.08
@@ -70,8 +71,7 @@ stylize_plane_contrast = 0.2
 stylize_shadow_floor = 0.06
 stylize_highlight_bloom_gain = 0.14
 stylize_highlight_bloom_threshold = 0.82
-stylize_microdetail_suppression = 0.10
+stylize_microdetail_suppression = 0.1
 stylize_internal_color_shift_gain = 0.52
-stylize_tone_steps = 5
 stylize_edge_ink_strength = 0.1
 stylize_highlight_snap = 0.14

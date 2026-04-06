@@ -2,10 +2,8 @@ extends SceneTree
 
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")
 const GemBakeStylizerScript = preload("res://core/visuals/gem_bake_stylizer.gd")
-const GemOpticsTracerScript = preload("res://core/visuals/gem_optics_tracer.gd")
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
-const GemCutBuildersScript = preload("res://core/visuals/gem_cut_builders.gd")
 const GemCutGeneratorsScript = preload("res://core/visuals/gem_cut_generators.gd")
 
 var _pass_count := 0
@@ -20,6 +18,7 @@ func _run() -> void:
 	print("\n=== Gem Optics Tracer Tests ===\n")
 	await process_frame
 	var tests := [
+		{"name": "trace_pipeline_selects_runtime_backend", "call": Callable(self, "test_trace_pipeline_selects_runtime_backend")},
 		{"name": "trace_image_has_visible_pixels", "call": Callable(self, "test_trace_image_has_visible_pixels")},
 		{"name": "lighting_variants_are_distinct", "call": Callable(self, "test_lighting_variants_are_distinct")},
 		{"name": "rotation_variants_are_distinct", "call": Callable(self, "test_rotation_variants_are_distinct")},
@@ -30,6 +29,7 @@ func _run() -> void:
 		{"name": "stylizer_preserves_alpha_silhouette", "call": Callable(self, "test_stylizer_preserves_alpha_silhouette")},
 		{"name": "stylized_lighting_variants_are_distinct", "call": Callable(self, "test_stylized_lighting_variants_are_distinct")},
 		{"name": "legacy_manifest_versions_are_rejected", "call": Callable(self, "test_legacy_manifest_versions_are_rejected")},
+		{"name": "stale_cut_signatures_are_rejected", "call": Callable(self, "test_stale_cut_signatures_are_rejected")},
 		{"name": "offline_bake_job_writes_manifest", "call": Callable(self, "test_offline_bake_job_writes_manifest")},
 	]
 	for i in tests.size():
@@ -37,6 +37,23 @@ func _run() -> void:
 		_run_named_test(String(test_info.get("name", "")), test_info.get("call", Callable()), i + 1, tests.size())
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
 	quit(1 if _fail_count > 0 else 0)
+
+
+func test_trace_pipeline_selects_runtime_backend() -> void:
+	var tracer = OfflineGemBakeJobScript.create_tracer()
+	assert_true(tracer != null, "Tracer pipeline should construct a tracer instance")
+	if tracer == null:
+		return
+	var backend_id := OfflineGemBakeJobScript.get_trace_backend_id()
+	if OfflineGemBakeJobScript.is_native_trace_kernel_available():
+		assert_eq(backend_id, &"native_cpp", "Tracer pipeline should prefer the native kernel when available")
+		assert_true(
+			StringName(tracer.get_class()) != &"GemOpticsTracer",
+			"Native kernel selection should avoid the fallback tracer class"
+		)
+	else:
+		assert_eq(backend_id, &"gdscript_fallback", "Tracer pipeline should report fallback mode when the extension is unavailable")
+		assert_eq(StringName(tracer.get_class()), &"GemOpticsTracer", "Fallback mode should construct the GDScript tracer")
 
 
 func test_trace_image_has_visible_pixels() -> void:
@@ -68,18 +85,19 @@ func test_rotation_variants_are_distinct() -> void:
 
 func test_non_round_rotation_variants_are_distinct() -> void:
 	var visual: GemVisualResource = load("res://data/visuals/emerald.tres")
-	var base_cut = GemCutGeneratorsScript.generate(&"emerald_step")
-	assert_true(base_cut != null, "Emerald cut should generate for non-round rotation tracing")
-	if visual == null or base_cut == null:
+	var base_model = GemCutGeneratorsScript.generate_model_from_visual_with_rotation(_make_visual(&"emerald_step", 0.0))
+	var rotated_model = GemCutGeneratorsScript.generate_model_from_visual_with_rotation(_make_visual(&"emerald_step", 45.0))
+	assert_true(base_model != null, "Emerald model should generate for non-round rotation tracing")
+	assert_true(rotated_model != null, "Emerald rotated model should generate for non-round rotation tracing")
+	if visual == null or base_model == null or rotated_model == null:
 		return
-	var rotated_cut = GemCutBuildersScript.create_visual_variant(base_cut, 45.0)
 	var image_a := _trace_image_with_mesh(
-		GemMeshGeneratorsScript.generate_from_cut(base_cut),
+		GemMeshGeneratorsScript.generate_from_model(base_model),
 		visual,
 		{"variant_type": &"rotation", "rotation_degrees": 0.0, "mesh_includes_cut_rotation": true}
 	)
 	var image_b := _trace_image_with_mesh(
-		GemMeshGeneratorsScript.generate_from_cut(rotated_cut),
+		GemMeshGeneratorsScript.generate_from_model(rotated_model),
 		visual,
 		{"variant_type": &"rotation", "rotation_degrees": 0.0, "mesh_includes_cut_rotation": true}
 	)
@@ -88,7 +106,7 @@ func test_non_round_rotation_variants_are_distinct() -> void:
 
 func test_birefringence_changes_trace() -> void:
 	var visual: GemVisualResource = load("res://data/visuals/ruby.tres")
-	var mesh_resource = GemMeshGeneratorsScript.generate(&"oval_brilliant")
+	var mesh_resource = GemMeshGeneratorsScript.generate_from_spec_id(&"oval_brilliant")
 	assert_true(visual != null, "Birefringent visual should load")
 	assert_true(mesh_resource != null, "Birefringent mesh should generate")
 	if visual == null or mesh_resource == null:
@@ -128,7 +146,7 @@ func test_trace_size_overrides_target_size() -> void:
 
 func test_stylizer_materially_changes_output() -> void:
 	var visual: GemVisualResource = load("res://data/visuals/diamond.tres")
-	var mesh_resource = GemMeshGeneratorsScript.generate(&"pear_brilliant")
+	var mesh_resource = GemMeshGeneratorsScript.generate_from_spec_id(&"pear_brilliant")
 	assert_true(visual != null, "Diamond visual should load for stylizer coverage")
 	assert_true(mesh_resource != null, "Diamond mesh should generate for stylizer coverage")
 	if visual == null or mesh_resource == null:
@@ -147,7 +165,7 @@ func test_stylizer_materially_changes_output() -> void:
 
 func test_stylizer_preserves_alpha_silhouette() -> void:
 	var visual: GemVisualResource = load("res://data/visuals/quartz.tres")
-	var mesh_resource = GemMeshGeneratorsScript.generate(&"old_european_round")
+	var mesh_resource = GemMeshGeneratorsScript.generate_from_spec_id(&"old_european_round")
 	assert_true(visual != null, "Quartz visual should load for stylizer silhouette coverage")
 	assert_true(mesh_resource != null, "Quartz mesh should generate for stylizer silhouette coverage")
 	if visual == null or mesh_resource == null:
@@ -171,7 +189,7 @@ func test_stylizer_preserves_alpha_silhouette() -> void:
 func test_stylized_lighting_variants_are_distinct() -> void:
 	var registry := get_root().get_node_or_null("GemVisualRegistry")
 	var visual: GemVisualResource = load("res://data/visuals/emerald.tres")
-	var mesh_resource = GemMeshGeneratorsScript.generate(&"emerald_step")
+	var mesh_resource = GemMeshGeneratorsScript.generate_from_spec_id(&"emerald_step")
 	assert_true(registry != null, "GemVisualRegistry should exist for stylized lighting-bin coverage")
 	assert_true(visual != null, "Emerald visual should load for stylized lighting-bin coverage")
 	assert_true(mesh_resource != null, "Emerald mesh should generate for stylized lighting-bin coverage")
@@ -205,10 +223,13 @@ func test_legacy_manifest_versions_are_rejected() -> void:
 	var request := {
 		"draw_size": Vector2i(48, 48),
 		"target_size": Vector2i(48, 48),
+		"geometry_signature": "old_european_round",
+		"cut_key_override": "old_european_round@rot_0",
 	}
 	var entry := {
 		"draw_size": Vector2i(48, 48),
 		"target_size": Vector2i(48, 48),
+		"cut_signature": "old_european_round@rot_0",
 		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION - 1,
 	}
 	var manifest := {
@@ -222,6 +243,25 @@ func test_legacy_manifest_versions_are_rejected() -> void:
 	assert_true(
 		not GemTracedBakeContractScript.manifest_matches_current(manifest),
 		"Legacy manifests should be rejected by the traced bake contract"
+	)
+
+
+func test_stale_cut_signatures_are_rejected() -> void:
+	var request := {
+		"draw_size": Vector2i(48, 48),
+		"target_size": Vector2i(48, 48),
+		"geometry_signature": "emerald_step",
+		"cut_key_override": "emerald_step@rot_45",
+	}
+	var stale_entry := {
+		"draw_size": Vector2i(48, 48),
+		"target_size": Vector2i(48, 48),
+		"cut_signature": "emerald_step@rot_0",
+		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION,
+	}
+	assert_true(
+		not GemTracedBakeContractScript.entry_matches_request(stale_entry, request),
+		"Entry matching should reject stale canonical geometry signatures"
 	)
 
 
@@ -273,16 +313,28 @@ func test_offline_bake_job_writes_manifest() -> void:
 		GemTracedBakeContractScript.BAKED_LOOK_VERSION,
 		"Manifest entries should record the current stylized bake version"
 	)
+	assert_true(
+		String(first_entry.get("cut_signature", "")) != "",
+		"Manifest entries should record the canonical geometry signature"
+	)
+	assert_eq(
+		StringName(first_entry.get("geometry_source", &"")),
+		&"canonical_3d",
+		"Manifest entries should record the canonical geometry source"
+	)
 
 
 func _trace_image(overrides: Dictionary) -> Image:
 	var visual: GemVisualResource = load("res://data/visuals/quartz.tres")
-	var mesh_resource = GemMeshGeneratorsScript.generate(&"old_european_round")
+	var mesh_resource = GemMeshGeneratorsScript.generate_from_spec_id(&"old_european_round")
 	return _trace_image_with_mesh(mesh_resource, visual, overrides)
 
 
 func _trace_image_with_mesh(mesh_resource, visual: GemVisualResource, overrides: Dictionary) -> Image:
-	var tracer = GemOpticsTracerScript.new()
+	var tracer = OfflineGemBakeJobScript.create_tracer()
+	assert_true(tracer != null, "Tracer pipeline should construct a tracer for image tests")
+	if tracer == null:
+		return null
 	var request := {
 		"draw_size": Vector2i(48, 48),
 		"target_size": Vector2i(48, 48),
@@ -355,3 +407,10 @@ func assert_true(condition: bool, message: String) -> void:
 
 func assert_eq(actual, expected, message: String) -> void:
 	assert_true(actual == expected, "%s (expected %s, got %s)" % [message, str(expected), str(actual)])
+
+
+func _make_visual(spec_id: StringName, rotation_degrees: float = 0.0) -> GemVisualResource:
+	var visual := GemVisualResource.new()
+	visual.cut_spec = load("res://data/visuals/cut_specs/%s.tres" % String(spec_id))
+	visual.rotation_degrees = rotation_degrees
+	return visual

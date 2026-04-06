@@ -1,7 +1,6 @@
 extends SceneTree
 
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
-const GemOpticsTracerScript = preload("res://core/visuals/gem_optics_tracer.gd")
 
 var _pass_count := 0
 var _fail_count := 0
@@ -41,14 +40,22 @@ func test_explicit_variant_workers_share_cpu_budget() -> void:
 
 
 func test_trace_thread_heuristic_avoids_overthreading_small_images() -> void:
-	var tracer = GemOpticsTracerScript.new()
-	var thread_count := tracer._resolve_trace_thread_count({"thread_count": 8}, Vector2i(48, 48), 1, 3)
+	var thread_count := OfflineGemBakeJobScript.resolve_trace_thread_count(
+		{"thread_budget": 8},
+		Vector2i(48, 48),
+		1,
+		3
+	)
 	assert_eq(thread_count, 1, "Tiny preview traces should stay single-threaded")
 
 
 func test_trace_thread_heuristic_scales_for_larger_images() -> void:
-	var tracer = GemOpticsTracerScript.new()
-	var thread_count := tracer._resolve_trace_thread_count({"thread_count": 8}, Vector2i(128, 128), 2, 7)
+	var thread_count := OfflineGemBakeJobScript.resolve_trace_thread_count(
+		{"thread_budget": 8},
+		Vector2i(128, 128),
+		2,
+		7
+	)
 	assert_true(thread_count > 1 and thread_count <= 8, "Larger traced bakes should use multiple threads within the requested budget")
 
 

@@ -1,22 +1,24 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/emerald_step.tres" id="1_mb8n7"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"emerald"
+cut_spec = ExtResource("1_mb8n7")
 cut_id = &"emerald_step"
 base_color = Color(0.02, 0.55, 0.32, 1)
 shininess = 36.0
 specular_intensity = 0.34
-contrast = 0.42
-depth_tint = Color(0.0, 0.16, 0.14, 0.38)
+depth_tint = Color(0, 0.16, 0.14, 0.38)
 saturation_boost = 0.14
-translucency = 0.22
-translucency_color = Color(0.16, 0.64, 0.46, 1)
+contrast = 0.42
 rim_intensity = 0.16
 rim_color = Color(0.8, 0.96, 0.88, 1)
-gradient_color = Color(0.0, 0.26, 0.18, 1)
+translucency = 0.22
+translucency_color = Color(0.16, 0.64, 0.46, 1)
+gradient_color = Color(0, 0.26, 0.18, 1)
 gradient_strength = 0.18
 brilliance_contrast = 0.38
 extinction = 0.26
@@ -38,9 +40,6 @@ stylize_facet_edge_gain = 0.72
 stylize_plane_contrast = 0.44
 stylize_shadow_floor = 0.09
 stylize_highlight_bloom_gain = 0.16
-stylize_highlight_bloom_threshold = 0.8
 stylize_microdetail_suppression = 0.36
 stylize_internal_color_shift_gain = 0.28
 stylize_tone_steps = 4
-stylize_edge_ink_strength = 0.16
-stylize_highlight_snap = 0.24

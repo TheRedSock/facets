@@ -1,35 +1,34 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/simple_octagon_step.tres" id="1_axqya"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"quartz"
+cut_spec = ExtResource("1_axqya")
 cut_id = &"simple_octagon_step"
 base_color = Color(0.88, 0.84, 0.74, 1)
 shininess = 12.0
 specular_intensity = 0.06
-contrast = 0.12
 depth_tint = Color(0.64, 0.58, 0.44, 0.12)
 saturation_boost = 0.04
-translucency = 0.38
-translucency_color = Color(0.94, 0.9, 0.8, 1)
+contrast = 0.12
 rim_intensity = 0.04
 rim_color = Color(0.88, 0.84, 0.78, 1)
+translucency = 0.38
+translucency_color = Color(0.94, 0.9, 0.8, 1)
 gradient_color = Color(0.92, 0.82, 0.58, 1)
-gradient_strength = 0.30
+gradient_strength = 0.3
 gradient_mode = 2
 phenomenon_color = Color(0.9, 0.8, 0.58, 1)
-phenomenon_strength = 0.0
 phenomenon_angle_degrees = 12.0
 phenomenon_sharpness = 1.6
 brilliance_contrast = 0.05
-extinction = 0.0
 optics_ior = 1.544
 optics_dispersion = 0.004
-optics_absorption_color = Color(0.95, 0.89, 0.74, 1)
-optics_absorption_strength = 0.4
 optics_absorption_color = Color(0.88, 0.82, 0.7, 1)
+optics_absorption_strength = 0.4
 optics_surface_roughness = 0.12
 optics_scattering_strength = 0.62
 optics_scattering_color = Color(0.92, 0.88, 0.78, 1)
@@ -47,6 +46,5 @@ stylize_highlight_bloom_gain = 0.08
 stylize_highlight_bloom_threshold = 0.88
 stylize_microdetail_suppression = 0.52
 stylize_internal_color_shift_gain = 0.16
-stylize_tone_steps = 5
 stylize_edge_ink_strength = 0.08
 stylize_highlight_snap = 0.1

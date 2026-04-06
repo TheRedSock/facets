@@ -2,8 +2,10 @@ class_name GemVisualResource
 extends Resource
 
 ## Defines the visual appearance of a specific gem type.
-## References a cut_id (resolved at runtime by GemVisualRegistry)
+## References a GemCutSpecResource (resolved at runtime by GemVisualRegistry)
 ## and specifies colour, material properties, and edge rendering.
+
+const GemCutSpecResourceScript = preload("res://resources/visuals/gem_cut_spec_resource.gd")
 
 const GRADIENT_MODE_LINEAR := 0
 const GRADIENT_MODE_RADIAL := 1
@@ -28,6 +30,11 @@ const MATERIAL_REACTIVE_OPALESCENCE := 2
 const MATERIAL_REACTIVE_IRIDESCENCE := 3
 
 @export var visual_id: StringName = &""
+@export var cut_spec: Resource = null
+@export var cut_overrides: Dictionary = {}
+
+## Migration-only compatibility label. Active geometry resolution should use
+## `cut_spec` directly.
 @export var cut_id: StringName = &""
 
 ## Rotates the cut in degrees before lighting and fit normalization.
@@ -269,3 +276,22 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 
 ## Snaps very bright highlights into cleaner, more graphic specular shapes.
 @export_range(0.0, 1.0) var stylize_highlight_snap: float = 0.24
+
+
+func resolve_cut_spec():
+	var base_spec = cut_spec
+	if base_spec == null:
+		return null
+	if not (base_spec is GemCutSpecResourceScript):
+		return null
+	if cut_overrides.is_empty():
+		return base_spec.duplicate_spec()
+	return base_spec.apply_overrides(cut_overrides)
+
+
+func get_cut_spec_id() -> StringName:
+	if cut_spec != null:
+		return cut_spec.get_label_id()
+	if cut_id != &"":
+		return cut_id
+	return &""

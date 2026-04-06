@@ -5,9 +5,6 @@ extends SceneTree
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
 const CELL_SIZE := Vector2i(64, 64)
 const MAX_WAIT_FRAMES := 2500
-const PREFERENCES: Array[StringName] = [
-	&"offline_traced",
-]
 
 var _pass_count := 0
 var _fail_count := 0
@@ -21,8 +18,7 @@ func _run() -> void:
 	print("\n=== Gameplay Bake Backend Test ===\n")
 	await process_frame
 
-	for preference in PREFERENCES:
-		await _run_preference_case(preference)
+	await _run_offline_traced_case()
 	await _run_scoped_preview_case()
 	await _run_manifest_reload_case()
 
@@ -30,7 +26,7 @@ func _run() -> void:
 	quit(1 if _fail_count > 0 else 0)
 
 
-func _run_preference_case(preference: StringName) -> void:
+func _run_offline_traced_case() -> void:
 	var registry := get_root().get_node_or_null("GemVisualRegistry")
 	assert_true(registry != null, "GemVisualRegistry autoload should exist")
 	if registry == null:
@@ -50,9 +46,8 @@ func _run_preference_case(preference: StringName) -> void:
 			"rotation_base_view_count": 1,
 		}
 	)
-	registry.set_gameplay_bake_backend_preference(preference)
 	registry.ensure_gameplay_texture_cache(CELL_SIZE, [&"quartz"])
-	await _wait_for_cache(registry, preference, [&"quartz"])
+	await _wait_for_cache(registry, &"offline_traced", [&"quartz"])
 
 	var report: Dictionary = registry.get_last_gameplay_bake_report()
 	var backend_counts: Dictionary = report.get("backend_counts", {})
@@ -60,11 +55,11 @@ func _run_preference_case(preference: StringName) -> void:
 	var total_elapsed_ms := float(report.get("total_elapsed_ms", 0.0))
 	var requires_real_textures := DisplayServer.get_name() != "headless"
 
-	print("%s total bake time: %.2fms  backends=%s" % [preference, total_elapsed_ms, backend_counts])
+	print("offline_traced total bake time: %.2fms  backends=%s" % [total_elapsed_ms, backend_counts])
 
 	if requires_real_textures:
-		assert_true(quartz_texture != null, "%s should produce a quartz texture" % String(preference))
-	assert_true(total_elapsed_ms > 0.0, "%s should record bake timings" % String(preference))
+		assert_true(quartz_texture != null, "offline_traced should produce a quartz texture")
+	assert_true(total_elapsed_ms > 0.0, "offline_traced should record bake timings")
 
 	assert_true(int(backend_counts.get(&"offline_traced", 0)) > 0, "offline_traced should load traced variants from manifest")
 	assert_true(
@@ -84,7 +79,6 @@ func _run_scoped_preview_case() -> void:
 		return
 
 	registry.invalidate_render_cache()
-	registry.set_gameplay_bake_backend_preference(&"offline_traced")
 	registry.ensure_gameplay_texture_cache(CELL_SIZE, [&"quartz"])
 	await _wait_for_cache(registry, &"scoped_quartz_preview", [&"quartz"])
 

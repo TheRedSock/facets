@@ -1,10 +1,12 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/half_dutch_rose_hex.tres" id="1_m7x0k"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"aquamarine"
+cut_spec = ExtResource("1_m7x0k")
 cut_id = &"half_dutch_rose_hex"
 base_color = Color(0.48, 0.78, 0.98, 1)
 shininess = 34.0
@@ -14,13 +16,12 @@ depth_tint = Color(0.14, 0.36, 0.5, 0.18)
 saturation_boost = 0.16
 contrast = 0.34
 rim_intensity = 0.1
-rim_color = Color(0.78, 0.94, 1.0, 1)
+rim_color = Color(0.78, 0.94, 1, 1)
 rim_power = 1.8
 translucency = 0.1
-translucency_color = Color(0.82, 0.96, 1.0, 1)
+translucency_color = Color(0.82, 0.96, 1, 1)
 secondary_specular = 0.12
-secondary_light_angle = 120.0
-gradient_color = Color(0.30, 0.64, 0.88, 1)
+gradient_color = Color(0.3, 0.64, 0.88, 1)
 gradient_strength = 0.1
 brilliance_contrast = 0.28
 extinction = 0.06
@@ -30,7 +31,7 @@ optics_absorption_color = Color(0.7, 0.9, 0.98, 1)
 optics_absorption_strength = 0.78
 optics_surface_roughness = 0.04
 optics_scattering_strength = 0.03
-optics_scattering_color = Color(0.86, 0.97, 1.0, 1)
+optics_scattering_color = Color(0.86, 0.97, 1, 1)
 optics_birefringence_strength = 0.006
 optics_optic_axis = Vector3(0, 1, 0.14)
 optics_environment_preset = 3
@@ -45,6 +46,5 @@ stylize_highlight_bloom_gain = 0.1
 stylize_highlight_bloom_threshold = 0.86
 stylize_microdetail_suppression = 0.46
 stylize_internal_color_shift_gain = 0.22
-stylize_tone_steps = 5
 stylize_edge_ink_strength = 0.12
 stylize_highlight_snap = 0.16

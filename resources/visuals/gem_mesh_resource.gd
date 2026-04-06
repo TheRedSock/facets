@@ -3,8 +3,10 @@ extends Resource
 
 ## Defines a faceted 3D gem mesh generated from scripted cut data.
 
+@export var spec_id: StringName = &""
 @export var cut_id: StringName = &""
 @export var display_name: String = ""
+var geometry_signature: String = ""
 
 var facet_vertices: Array[PackedVector3Array] = []
 var facet_normals: Array[Vector3] = []

@@ -7,14 +7,11 @@ extends Node
 ## - shared color / geometry / render bundles for both procedural and baked paths
 ## - a gameplay texture cache for the board's sprite-backed TileViews
 ##
-## Depends on: GemCutGenerators, GemVisualResource, GemCutResource, GemRenderer.
+## Depends on: GemCutGenerators, GemVisualResource, GemProjectedCutResource, GemRenderer.
 
 const VISUAL_DATA_PATH := "res://data/visuals/"
 const GAMEPLAY_BAKE_SUPERSAMPLE := 2
-const GAMEPLAY_BAKE_BACKEND_2D_ONLY := &"2d_only"
-const GAMEPLAY_BAKE_BACKEND_3D_ONLY := &"3d_only"
 const GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED := &"offline_traced"
-const GAMEPLAY_BAKE_BACKEND_HYBRID := &"hybrid"
 const GAMEPLAY_VARIANT_TYPE_LIGHTING := &"lighting"
 const GAMEPLAY_VARIANT_TYPE_ROTATION := &"rotation"
 const DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE := GemTracedBakeContract.DEFAULT_LIGHTING_GRID_SIZE
@@ -24,17 +21,20 @@ const GAMEPLAY_ROTATION_DEFAULT_STEP_DEGREES := 18.0
 const GAMEPLAY_LIGHTING_SWEEP_X_DEGREES := 46.0
 const GAMEPLAY_LIGHTING_SWEEP_Y_DEGREES := 30.0
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
+const GemCutProjector = preload("res://core/visuals/gem_cut_projector.gd")
 const GameplayBakeBackendOfflineTracedScript = preload("res://scenes/tile/gem_gameplay_bake_backend_offline_traced.gd")
 
 signal gameplay_texture_cache_rebuilt(profile: Dictionary)
 signal gameplay_texture_bake_progress(progress: Dictionary)
 
 var _visuals: Dictionary = {}          # StringName (visual_id / tile_id) -> GemVisualResource
-var _cuts: Dictionary = {}             # StringName (cut_id) -> GemCutResource
-var _cut_variants: Dictionary = {}     # String -> rotated GemCutResource per cut_id + rotation
+var _cut_models: Dictionary = {}       # String (geometry signature) -> GemCutModelResource
+var _cut_model_variants: Dictionary = {}  # String -> rotated GemCutModelResource per geometry signature + rotation
+var _cuts: Dictionary = {}             # String (geometry signature) -> GemProjectedCutResource
+var _cut_variants: Dictionary = {}     # String -> rotated GemProjectedCutResource per geometry signature + rotation
 var _tier_to_visual: Dictionary = {}   # int -> GemVisualResource (first match)
 var _color_cache: Dictionary = {}      # StringName (cache_key) -> [PackedColorArray, PackedColorArray]
-var _scaled_geometry_cache: Dictionary = {}  # String -> geometry bundle per cut_id + draw size
+var _scaled_geometry_cache: Dictionary = {}  # String -> geometry bundle per geometry signature + draw size
 var _render_cache: Dictionary = {}      # String -> render bundle per cache key + draw size
 var _gameplay_texture_cache: Dictionary = {}  # StringName composite variant key -> Texture2D
 var _gameplay_texture_metadata_cache: Dictionary = {}  # StringName composite variant key -> metadata
@@ -52,8 +52,6 @@ var _bake_current_tile_id: StringName = &""
 var _current_bake_request: Dictionary = {}
 var _bake_total_requests := 0
 var _bake_completed_requests := 0
-var _gameplay_bake_backend_preference: StringName = GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED
-var _gameplay_runtime_bake_fallback_enabled := false
 var _last_gameplay_bake_report: Dictionary = {}
 var _gameplay_variant_settings: Dictionary = GemTracedBakeContractScript.default_variant_settings()
 var _bake_started_usec := 0
@@ -111,34 +109,72 @@ func get_visual_ids() -> Array[StringName]:
 	return ids
 
 
-## Returns the generated GemCutResource for a cut_id, or null.
-func get_cut(cut_id: StringName) -> GemCutResource:
-	return _cuts.get(cut_id, null)
+## Returns the projected 2D cut for a geometry signature, or null.
+func get_cut(geometry_signature: String):
+	return _cuts.get(geometry_signature, null)
 
 
-## Returns the effective cut for a visual, including any per-visual rotation.
-func get_visual_cut(visual: GemVisualResource) -> GemCutResource:
+## Returns the canonical 3D cut model for a geometry signature, or null.
+func get_cut_model(geometry_signature: String):
+	return _cut_models.get(geometry_signature, null)
+
+
+## Returns the effective cut model for a visual, including any per-visual rotation.
+func get_visual_cut_model(visual: GemVisualResource):
+	return get_visual_cut_model_with_offset(visual, 0.0)
+
+
+func get_visual_cut_model_with_offset(
+	visual: GemVisualResource,
+	additional_rotation_degrees: float = 0.0,
+):
+	if visual == null:
+		return null
+	var geometry_key := _ensure_visual_geometry_cached(visual)
+	if geometry_key.is_empty():
+		return null
+	var base_model = _cut_models.get(geometry_key, null)
+	if base_model == null:
+		return null
+	var total_rotation := visual.rotation_degrees + additional_rotation_degrees
+	if is_zero_approx(total_rotation) and base_model.orthographic_axis_fit_scale >= 0.999:
+		return base_model
+	var variant_key := _make_cut_variant_key(geometry_key, total_rotation)
+	if _cut_model_variants.has(variant_key):
+		return _cut_model_variants[variant_key]
+	var rotated_model = GemCutCompiler3D.create_visual_variant(base_model, total_rotation)
+	if rotated_model != null:
+		_cut_model_variants[variant_key] = rotated_model
+	return rotated_model
+
+
+## Returns the effective projected cut for a visual, including any per-visual rotation.
+func get_visual_cut(visual: GemVisualResource):
 	return get_visual_cut_with_offset(visual, 0.0)
 
 
 func get_visual_cut_with_offset(
 	visual: GemVisualResource,
 	additional_rotation_degrees: float = 0.0,
-) -> GemCutResource:
+):
 	if visual == null:
 		return null
-	var base_cut: GemCutResource = _cuts.get(visual.cut_id, null)
+	var geometry_key := _ensure_visual_geometry_cached(visual)
+	if geometry_key.is_empty():
+		return null
+	var base_cut = _cuts.get(geometry_key, null)
 	if base_cut == null:
 		return null
 	var total_rotation := visual.rotation_degrees + additional_rotation_degrees
-	if is_zero_approx(total_rotation) and base_cut.orientation_fit_axis_aligned_scale >= 0.999:
+	if is_zero_approx(total_rotation) and base_cut.orthographic_axis_fit_scale >= 0.999:
 		return base_cut
 
-	var variant_key := _make_cut_variant_key(visual.cut_id, total_rotation)
+	var variant_key := _make_cut_variant_key(geometry_key, total_rotation)
 	if _cut_variants.has(variant_key):
 		return _cut_variants[variant_key]
 
-	var rotated_cut := GemCutBuilders.create_visual_variant(base_cut, total_rotation)
+	var rotated_model = get_visual_cut_model_with_offset(visual, additional_rotation_degrees)
+	var rotated_cut = GemCutProjector.project(rotated_model) if rotated_model != null else null
 	if rotated_cut != null:
 		_cut_variants[variant_key] = rotated_cut
 	return rotated_cut
@@ -495,15 +531,18 @@ func build_gameplay_bake_requests_for_tile(
 	target_size: Vector2i = Vector2i.ZERO,
 	variant_options: Dictionary = {},
 ) -> Array[Dictionary]:
-	var visual := get_visual(tile_id)
+	var visual = get_visual(tile_id)
 	if visual == null:
 		return []
-	var cut := get_visual_cut(visual)
+	var cut = get_visual_cut(visual)
+	var cut_model = get_visual_cut_model(visual)
 	if cut == null:
+		return []
+	if cut_model == null:
 		return []
 	if target_size == Vector2i.ZERO:
 		target_size = draw_size
-	return _build_gameplay_bake_requests(tile_id, visual, cut, draw_size, target_size, variant_options)
+	return _build_gameplay_bake_requests(tile_id, visual, cut_model, cut, draw_size, target_size, variant_options)
 
 
 func _resolve_gameplay_texture_base_key(tile_id: StringName, tier: int = -1) -> StringName:
@@ -539,28 +578,6 @@ func _resolve_gameplay_texture_base_key(tile_id: StringName, tier: int = -1) -> 
 
 func get_gameplay_texture_profile() -> Dictionary:
 	return _gameplay_texture_profile.duplicate(true)
-
-
-func set_gameplay_bake_backend_preference(preference: StringName) -> void:
-	preference = GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED
-	if _gameplay_bake_backend_preference == preference:
-		return
-	_gameplay_bake_backend_preference = preference
-	_gameplay_texture_cache.clear()
-	_gameplay_texture_profile.clear()
-	_last_gameplay_bake_report.clear()
-
-
-func get_gameplay_bake_backend_preference() -> StringName:
-	return _gameplay_bake_backend_preference
-
-
-func set_gameplay_runtime_bake_fallback_enabled(enabled: bool) -> void:
-	_gameplay_runtime_bake_fallback_enabled = false
-
-
-func is_gameplay_runtime_bake_fallback_enabled() -> bool:
-	return _gameplay_runtime_bake_fallback_enabled
 
 
 func get_last_gameplay_bake_report() -> Dictionary:
@@ -611,7 +628,7 @@ func ensure_gameplay_texture_cache(
 		_gameplay_texture_metadata_cache.clear()
 		_gameplay_texture_profile = {
 			"cell_size": draw_size,
-			"backend_preference": _gameplay_bake_backend_preference,
+			"backend_id": GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED,
 			"lighting_grid_size": get_gameplay_variant_settings().get(
 				"lighting_grid_size",
 				DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE
@@ -634,12 +651,14 @@ func ensure_gameplay_texture_cache(
 	if queue_scope.is_empty():
 		for tile_id in _visuals:
 			var visual: GemVisualResource = _visuals[tile_id]
-			var cut: GemCutResource = get_visual_cut(visual)
-			if cut == null:
+			var cut = get_visual_cut(visual)
+			var cut_model = get_visual_cut_model(visual)
+			if cut == null or cut_model == null:
 				continue
 			_bake_queue.append_array(_build_gameplay_bake_requests(
 				tile_id,
 				visual,
+				cut_model,
 				cut,
 				_bake_draw_size,
 				draw_size,
@@ -651,12 +670,14 @@ func ensure_gameplay_texture_cache(
 			if not _visuals.has(scoped_tile_id):
 				continue
 			var visual: GemVisualResource = _visuals[scoped_tile_id]
-			var cut: GemCutResource = get_visual_cut(visual)
-			if cut == null:
+			var cut = get_visual_cut(visual)
+			var cut_model = get_visual_cut_model(visual)
+			if cut == null or cut_model == null:
 				continue
 			_bake_queue.append_array(_build_gameplay_bake_requests(
 				scoped_tile_id,
 				visual,
+				cut_model,
 				cut,
 				_bake_draw_size,
 				draw_size,
@@ -679,7 +700,7 @@ func ensure_gameplay_texture_cache(
 ## cache_key should be tile_id for normal gems, or a synthetic key for fallback paths.
 func get_cached_colors(
 	cache_key: StringName,
-	cut: GemCutResource,
+	cut,
 	visual: GemVisualResource,
 	light_dir: Vector3 = GemRenderer.DEFAULT_LIGHT_DIR,
 ) -> Array:
@@ -697,7 +718,7 @@ func get_cached_colors(
 ## while still preserving per-tile-id color caches.
 func get_cached_render_data(
 	cache_key: StringName,
-	cut: GemCutResource,
+	cut,
 	visual: GemVisualResource,
 	draw_size: Vector2i,
 	light_dir: Vector3 = GemRenderer.DEFAULT_LIGHT_DIR,
@@ -721,7 +742,7 @@ func get_cached_render_data(
 
 
 ## Returns cached scaled geometry for the given cut and pixel size.
-func get_cached_scaled_geometry(cut: GemCutResource, cut_key: String, draw_size: Vector2i) -> Dictionary:
+func get_cached_scaled_geometry(cut, cut_key: String, draw_size: Vector2i) -> Dictionary:
 	if cut == null:
 		return {}
 	var geometry_key := _make_scaled_geometry_key(cut_key, draw_size)
@@ -744,7 +765,7 @@ func preload_runtime_assets(
 			continue
 		for tile_id in _visuals:
 			var visual: GemVisualResource = _visuals[tile_id]
-			var cut: GemCutResource = get_visual_cut(visual)
+			var cut = get_visual_cut(visual)
 			if cut != null:
 				get_cached_render_data(tile_id, cut, visual, draw_size)
 				var tier := _resolve_visual_tier(tile_id)
@@ -758,6 +779,7 @@ func invalidate_color_cache() -> void:
 	_color_cache.clear()
 	_render_cache.clear()
 	_scaled_geometry_cache.clear()
+	_cut_model_variants.clear()
 	_cut_variants.clear()
 	_gameplay_texture_cache.clear()
 	_gameplay_texture_metadata_cache.clear()
@@ -769,6 +791,7 @@ func invalidate_color_cache() -> void:
 func invalidate_render_cache() -> void:
 	_scaled_geometry_cache.clear()
 	_render_cache.clear()
+	_cut_model_variants.clear()
 	_cut_variants.clear()
 	_gameplay_texture_cache.clear()
 	_gameplay_texture_metadata_cache.clear()
@@ -809,21 +832,12 @@ func _load_visuals() -> void:
 
 
 func _generate_cuts() -> void:
-	# Collect all unique cut_ids referenced by loaded visuals.
-	var needed: Dictionary = {}
 	for visual_id in _visuals:
 		var vis: GemVisualResource = _visuals[visual_id]
-		if vis.cut_id != &"":
-			needed[vis.cut_id] = true
-
-	# Generate each cut.
-	for cut_id in needed:
-		var cut := GemCutGenerators.generate(cut_id)
-		if cut != null:
-			_cuts[cut_id] = cut
+		_ensure_visual_geometry_cached(vis)
 
 	if not _cuts.is_empty():
-		print("GemVisualRegistry: Generated %d gem cuts" % _cuts.size())
+		print("GemVisualRegistry: Generated %d canonical cut models" % _cuts.size())
 
 
 func _initialize_bake_backends() -> void:
@@ -862,7 +876,7 @@ func _begin_bake_report(cell_size: Vector2i, bake_draw_size: Vector2i) -> void:
 		"profile": {
 			"cell_size": cell_size,
 			"draw_size": bake_draw_size,
-			"backend_preference": _gameplay_bake_backend_preference,
+			"backend_id": GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED,
 			"tile_scope": _gameplay_texture_profile.get("tile_scope", PackedStringArray()),
 		},
 		"tile_metrics": [],
@@ -1004,13 +1018,14 @@ func _merge_variant_weight_entries(entries: Array, field_name: String) -> Array[
 func _build_gameplay_bake_requests(
 	tile_id: StringName,
 	visual: GemVisualResource,
-	cut: GemCutResource,
+	cut_model,
+	cut,
 	draw_size: Vector2i,
 	target_size: Vector2i,
 	variant_options: Dictionary = {},
 ) -> Array[Dictionary]:
 	var requests: Array[Dictionary] = []
-	var view_scale := _compute_trace_view_scale(visual, cut)
+	var view_scale := _compute_trace_view_scale(visual, cut_model)
 	var variant_settings := _resolve_variant_settings(variant_options)
 	var lighting_grid: Vector2i = variant_settings.get(
 		"lighting_grid_size",
@@ -1024,11 +1039,15 @@ func _build_gameplay_bake_requests(
 				requests.append({
 					"tile_id": tile_id,
 					"visual_id": visual.visual_id,
+					"spec_id": cut.spec_id,
+					"geometry_signature": cut.geometry_signature,
 					"cut_id": cut.cut_id,
 					"visual": visual,
+					"cut_model": cut_model,
 					"cut": cut,
 					"draw_size": draw_size,
 					"target_size": target_size,
+					"geometry_source": &"canonical_3d",
 					"variant_type": GAMEPLAY_VARIANT_TYPE_LIGHTING,
 					"variant_key": _make_gameplay_variant_cache_key(
 						tile_id,
@@ -1045,14 +1064,27 @@ func _build_gameplay_bake_requests(
 	var cut_key := get_visual_cut_key(visual)
 	for rotation_bin in rotation_views.size():
 		var rotation_view: Dictionary = rotation_views[rotation_bin]
+		var view_pitch := float(rotation_view.get("view_pitch_degrees", 0.0))
+		var view_yaw := float(rotation_view.get("view_yaw_degrees", 0.0))
+		var view_roll := float(rotation_view.get("view_roll_degrees", 0.0))
+		var rotation_label := StringName(rotation_view.get("label", "rot_%02d" % rotation_bin))
+		match rotation_label:
+			&"crown", &"pavilion":
+				view_roll += cut_model.orthographic_top_roll_degrees
+			_:
+				view_yaw += cut_model.orthographic_side_yaw_degrees
 		requests.append({
 			"tile_id": tile_id,
 			"visual_id": visual.visual_id,
+			"spec_id": cut.spec_id,
+			"geometry_signature": cut.geometry_signature,
 			"cut_id": cut.cut_id,
 			"visual": visual,
+			"cut_model": cut_model,
 			"cut": cut,
 			"draw_size": draw_size,
 			"target_size": target_size,
+			"geometry_source": &"canonical_3d",
 			"variant_type": GAMEPLAY_VARIANT_TYPE_ROTATION,
 			"variant_key": _make_gameplay_variant_cache_key(
 				tile_id,
@@ -1062,12 +1094,12 @@ func _build_gameplay_bake_requests(
 			),
 			"cut_key_override": cut_key,
 			"rotation_bin": rotation_bin,
-			"rotation_label": StringName(rotation_view.get("label", "rot_%02d" % rotation_bin)),
+			"rotation_label": rotation_label,
 			"rotation_axis": rotation_view.get("axis", &""),
 			"rotation_degrees": 0.0,
-			"view_pitch_degrees": float(rotation_view.get("view_pitch_degrees", 0.0)),
-			"view_yaw_degrees": float(rotation_view.get("view_yaw_degrees", 0.0)),
-			"view_roll_degrees": float(rotation_view.get("view_roll_degrees", 0.0)),
+			"view_pitch_degrees": view_pitch,
+			"view_yaw_degrees": view_yaw,
+			"view_roll_degrees": view_roll,
 			"light_dir": _compute_variant_light_dir(_get_default_lighting_bin_for_settings(variant_settings), variant_settings),
 			"view_scale": view_scale,
 		})
@@ -1227,13 +1259,13 @@ func _lighting_bin_to_centered(lighting_bin: Vector2i, settings: Dictionary = {}
 ## visual area on the game board.  The per-visual optics_trace_view_scale is
 ## always respected as a base multiplier for area normalization across all
 ## cut families (triangles, ovals, pears, etc.).
-func _compute_trace_view_scale(visual: GemVisualResource, cut: GemCutResource) -> float:
-	if visual == null or cut == null:
+func _compute_trace_view_scale(visual: GemVisualResource, cut_model) -> float:
+	if visual == null or cut_model == null:
 		return 1.0
 	var base_scale := visual.optics_trace_view_scale
-	var is_square_family := (
-		cut.shape_category == &"square"
-		or cut.orientation_fit_axis_aligned_scale < 0.999
+	var is_square_family = (
+		cut_model.shape_category == &"square"
+		or cut_model.orthographic_axis_fit_scale < 0.999
 	)
 	if not is_square_family:
 		return base_scale
@@ -1241,7 +1273,7 @@ func _compute_trace_view_scale(visual: GemVisualResource, cut: GemCutResource) -
 	var is_rotated_diamond := rotation > 30.0 and rotation < 60.0
 	if is_rotated_diamond:
 		return 1.08 * base_scale
-	return cut.orientation_fit_axis_aligned_scale * base_scale
+	return cut_model.orthographic_axis_fit_scale * base_scale
 
 
 ## Eagerly computes and caches facet colors for all loaded gem types.
@@ -1250,7 +1282,7 @@ func _pre_warm_colors(include_tier_aliases: bool = false) -> void:
 		return
 	for tile_id in _visuals:
 		var visual: GemVisualResource = _visuals[tile_id]
-		var cut: GemCutResource = get_visual_cut(visual)
+		var cut = get_visual_cut(visual)
 		if cut != null:
 			get_cached_colors(tile_id, cut, visual)
 			var tier := _resolve_visual_tier(tile_id)
@@ -1263,11 +1295,40 @@ func _pre_warm_colors(include_tier_aliases: bool = false) -> void:
 func get_visual_cut_key(visual: GemVisualResource) -> String:
 	if visual == null:
 		return ""
-	return _make_cut_variant_key(visual.cut_id, visual.rotation_degrees)
+	var geometry_key := _build_visual_geometry_key(visual)
+	if geometry_key.is_empty():
+		return ""
+	return _make_cut_variant_key(geometry_key, visual.rotation_degrees)
 
 
-func _make_cut_variant_key(cut_id: StringName, rotation_degrees: float) -> String:
-	return "%s@rot_%s" % [String(cut_id), String.num(snappedf(rotation_degrees, 0.001))]
+func _build_visual_geometry_key(visual: GemVisualResource) -> String:
+	if visual == null:
+		return ""
+	var spec = visual.resolve_cut_spec()
+	if spec == null:
+		return ""
+	return spec.build_geometry_signature()
+
+
+func _ensure_visual_geometry_cached(visual: GemVisualResource) -> String:
+	var geometry_key := _build_visual_geometry_key(visual)
+	if geometry_key.is_empty():
+		return ""
+	if _cut_models.has(geometry_key) and _cuts.has(geometry_key):
+		return geometry_key
+	var spec = visual.resolve_cut_spec()
+	if spec == null:
+		return ""
+	var cut_model = GemCutCompiler3D.compile_spec(spec)
+	if cut_model == null:
+		return ""
+	_cut_models[geometry_key] = cut_model
+	_cuts[geometry_key] = GemCutProjector.project(cut_model)
+	return geometry_key
+
+
+func _make_cut_variant_key(geometry_key: String, rotation_degrees: float) -> String:
+	return "%s@rot_%s" % [geometry_key, String.num(snappedf(rotation_degrees, 0.001))]
 
 
 func _make_scaled_geometry_key(cut_key: String, draw_size: Vector2i) -> String:
@@ -1278,16 +1339,16 @@ func _make_render_cache_key(cache_key: StringName, draw_size: Vector2i) -> Strin
 	return "%s@%dx%d" % [String(cache_key), draw_size.x, draw_size.y]
 
 
-func _build_scaled_geometry(cut: GemCutResource, draw_size: Vector2i) -> Dictionary:
-	var size_v := Vector2(draw_size)
-	var s := minf(size_v.x, size_v.y)
-	var offset := (size_v - Vector2(s, s)) * 0.5
+func _build_scaled_geometry(cut, draw_size: Vector2i) -> Dictionary:
+	var size_v = Vector2(draw_size)
+	var s = minf(size_v.x, size_v.y)
+	var offset = (size_v - Vector2(s, s)) * 0.5
 
 	var scaled_facets: Array[PackedVector2Array] = []
 	scaled_facets.resize(cut.facet_count())
 	for i in cut.facet_count():
-		var verts := cut.facet_vertices[i]
-		var scaled := PackedVector2Array()
+		var verts = cut.facet_vertices[i]
+		var scaled = PackedVector2Array()
 		scaled.resize(verts.size())
 		for j in verts.size():
 			scaled[j] = verts[j] * s + offset
@@ -1296,45 +1357,45 @@ func _build_scaled_geometry(cut: GemCutResource, draw_size: Vector2i) -> Diction
 	var scaled_pavilion: Array[PackedVector2Array] = []
 	scaled_pavilion.resize(cut.pavilion_count())
 	for i in cut.pavilion_count():
-		var verts := cut.pavilion_vertices[i]
-		var scaled := PackedVector2Array()
+		var verts = cut.pavilion_vertices[i]
+		var scaled = PackedVector2Array()
 		scaled.resize(verts.size())
 		for j in verts.size():
 			scaled[j] = verts[j] * s + offset
 		scaled_pavilion[i] = scaled
 
-	var scaled_silhouette := PackedVector2Array()
+	var scaled_silhouette = PackedVector2Array()
 	if cut.silhouette.size() >= 3:
 		scaled_silhouette.resize(cut.silhouette.size() + 1)
 		for j in cut.silhouette.size():
 			scaled_silhouette[j] = cut.silhouette[j] * s + offset
 		scaled_silhouette[cut.silhouette.size()] = scaled_silhouette[0]
 
-	var scaled_edges := PackedVector2Array()
+	var scaled_edges = PackedVector2Array()
 	for seg in cut.edge_segments:
 		if seg.size() >= 2:
 			scaled_edges.append(seg[0] * s + offset)
 			scaled_edges.append(seg[1] * s + offset)
 
-	var edge_aa_a := PackedVector2Array()
-	var edge_aa_b := PackedVector2Array()
-	var edge_aa_pairs := PackedInt32Array()
+	var edge_aa_a = PackedVector2Array()
+	var edge_aa_b = PackedVector2Array()
+	var edge_aa_pairs = PackedInt32Array()
 	if cut.edge_facet_a.size() == cut.edge_segments.size():
 		for i in cut.edge_segments.size():
-			var fa := cut.edge_facet_a[i]
-			var fb := cut.edge_facet_b[i]
+			var fa = cut.edge_facet_a[i]
+			var fb = cut.edge_facet_b[i]
 			if fa < 0 or fb < 0:
 				continue
-			var seg := cut.edge_segments[i]
+			var seg = cut.edge_segments[i]
 			if seg.size() < 2:
 				continue
-			var a := seg[0] * s + offset
-			var b := seg[1] * s + offset
-			var dir := b - a
-			var length := dir.length()
+			var a = seg[0] * s + offset
+			var b = seg[1] * s + offset
+			var dir = b - a
+			var length = dir.length()
 			if length < 4.0:
 				continue
-			var t := 1.5 / length
+			var t = 1.5 / length
 			a += dir * t
 			b -= dir * t
 			edge_aa_a.append(a)
@@ -1356,18 +1417,18 @@ func _build_scaled_geometry(cut: GemCutResource, draw_size: Vector2i) -> Diction
 
 
 func _build_edge_aa_colors(geometry: Dictionary, facet_colors: PackedColorArray) -> PackedColorArray:
-	var edge_aa_colors := PackedColorArray()
+	var edge_aa_colors = PackedColorArray()
 	var edge_aa_pairs: PackedInt32Array = geometry.get("edge_aa_pairs", PackedInt32Array())
-	var pair_count := int(edge_aa_pairs.size() / 2.0)
+	var pair_count = int(edge_aa_pairs.size() / 2.0)
 	edge_aa_colors.resize(pair_count)
 	for i in pair_count:
-		var fa := edge_aa_pairs[i * 2]
-		var fb := edge_aa_pairs[i * 2 + 1]
+		var fa = edge_aa_pairs[i * 2]
+		var fb = edge_aa_pairs[i * 2 + 1]
 		if fa < 0 or fb < 0 or fa >= facet_colors.size() or fb >= facet_colors.size():
 			edge_aa_colors[i] = Color(0, 0, 0, 0)
 			continue
-		var ca := facet_colors[fa]
-		var cb := facet_colors[fb]
+		var ca: Color = facet_colors[fa]
+		var cb: Color = facet_colors[fb]
 		edge_aa_colors[i] = Color(
 			(ca.r + cb.r) * 0.5,
 			(ca.g + cb.g) * 0.5,
@@ -1456,8 +1517,7 @@ func _can_extend_gameplay_texture_profile(draw_size: Vector2i, requested_scope: 
 
 
 func _should_preload_procedural_runtime_assets() -> bool:
-	return _gameplay_bake_backend_preference != GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED \
-		or _gameplay_runtime_bake_fallback_enabled
+	return false
 
 
 func _invalidate_gameplay_texture_cache_state() -> void:
@@ -1531,7 +1591,7 @@ func _begin_next_bake_step() -> void:
 		var visual: GemVisualResource = request.get("visual", null)
 		if visual == null:
 			continue
-		var cut: GemCutResource = request.get("cut", null)
+		var cut = request.get("cut", null)
 		if cut == null:
 			continue
 		var backend = _select_bake_backend(request)
@@ -1664,7 +1724,9 @@ func _clear_runtime_state() -> void:
 	_scaled_geometry_cache.clear()
 	_color_cache.clear()
 	_tier_to_visual.clear()
+	_cut_model_variants.clear()
 	_cut_variants.clear()
+	_cut_models.clear()
 	_cuts.clear()
 	_visuals.clear()
 	_loaded = false

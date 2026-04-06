@@ -13,6 +13,41 @@ const MAX_AUTO_VARIANT_WORKERS := 4
 signal progress_updated(progress: Dictionary)
 
 
+static func is_native_trace_kernel_available() -> bool:
+	return ClassDB.class_exists(&"GemTraceKernel")
+
+
+static func get_trace_backend_id() -> StringName:
+	return &"native_cpp" if is_native_trace_kernel_available() else &"gdscript_fallback"
+
+
+static func create_tracer():
+	if is_native_trace_kernel_available():
+		var kernel = ClassDB.instantiate(&"GemTraceKernel")
+		if kernel != null:
+			return kernel
+	return GemOpticsTracerScript.new()
+
+
+static func max_supported_sample_count() -> int:
+	# The native kernel mirrors the fallback sample-pattern contract.
+	return GemOpticsTracerScript.max_supported_sample_count()
+
+
+static func resolve_trace_thread_count(
+	request: Dictionary,
+	target_size: Vector2i,
+	sample_count: int,
+	spectral_sample_count: int,
+) -> int:
+	return GemOpticsTracerScript.resolve_trace_thread_count(
+		request,
+		target_size,
+		sample_count,
+		spectral_sample_count
+	)
+
+
 func run_batch(
 	registry: Node,
 	tile_ids: Array,
@@ -27,7 +62,7 @@ func run_batch(
 	var sample_count := clampi(
 		int(options.get("sample_count", 1)),
 		1,
-		GemOpticsTracerScript.max_supported_sample_count()
+		max_supported_sample_count()
 	)
 	var entries: Array[Dictionary] = []
 	var per_tile_counts: Dictionary = {}
@@ -168,7 +203,7 @@ func _run_batch_internal(
 	var sample_count := clampi(
 		int(options.get("sample_count", 1)),
 		1,
-		GemOpticsTracerScript.max_supported_sample_count()
+		max_supported_sample_count()
 	)
 	var entries: Array[Dictionary] = []
 	var per_tile_counts: Dictionary = {}
@@ -384,28 +419,25 @@ func _build_filtered_requests(
 
 
 func _build_request_mesh(visual: GemVisualResource, request: Dictionary):
-	if _request_uses_variant_mesh(visual, request):
-		var request_cut: GemCutResource = request.get("cut", null)
-		if request_cut != null:
-			return GemMeshGeneratorsScript.generate_from_cut(request_cut)
-	return GemMeshGeneratorsScript.generate(visual.cut_id)
+	var request_model = request.get("cut_model", null)
+	if request_model != null:
+		return GemMeshGeneratorsScript.generate_from_model(request_model)
+	return GemMeshGeneratorsScript.generate_from_visual(visual)
 
 
 func _resolve_request_mesh_cache_key(visual: GemVisualResource, request: Dictionary) -> String:
 	if _request_uses_variant_mesh(visual, request):
-		return "variant:%s" % String(request.get("cut_key_override", request.get("variant_key", visual.cut_id)))
-	return "canonical:%s" % String(visual.cut_id)
+		return "variant:%s" % String(request.get(
+			"cut_key_override",
+			request.get("geometry_signature", request.get("variant_key", visual.get_cut_spec_id()))
+		))
+	return "canonical:%s" % String(request.get("geometry_signature", visual.get_cut_spec_id()))
 
 
 func _request_uses_variant_mesh(visual: GemVisualResource, request: Dictionary) -> bool:
 	if visual == null:
 		return false
-	var request_cut: GemCutResource = request.get("cut", null)
-	if request_cut == null:
-		return false
-	if request.get("variant_type", &"") == &"rotation":
-		return true
-	return visual.cut_id != &"classic_round" and visual.cut_id != &"old_european_round"
+	return request.get("cut_model", null) != null
 
 
 func _resolve_parallel_execution_plan(request_count: int, options: Dictionary = {}) -> Dictionary:
@@ -505,11 +537,7 @@ func _emit_baking_start(
 
 
 func _trace_request_worker(traced_request: Dictionary) -> Dictionary:
-	var tracer
-	if ClassDB.class_exists(&"GemTraceKernel"):
-		tracer = ClassDB.instantiate(&"GemTraceKernel")
-	else:
-		tracer = GemOpticsTracerScript.new()
+	var tracer = create_tracer()
 	var mesh_resource: GemMeshResource = traced_request.get("mesh_resource", null)
 	var visual: GemVisualResource = traced_request.get("visual", null)
 	var trace_start_usec := Time.get_ticks_usec()

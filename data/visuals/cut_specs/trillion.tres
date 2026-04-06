@@ -1,0 +1,78 @@
+[gd_resource type="Resource" script_class="GemCutSpecResource" format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_fnf6y"]
+
+[resource]
+script = ExtResource("1_fnf6y")
+spec_id = &"trillion"
+display_name = "Trillion"
+compatibility_cut_id = &"trillion"
+shape_category = &"triangle"
+family = &"fan"
+symmetry = {
+"half_angles": [],
+"main_angles": [],
+"pavilion_sector_count": 3,
+"rotation": -1.5707963267948966,
+"sector_count": 3
+}
+crown = {
+"bezel_facets": Array[PackedVector2Array]([PackedVector2Array(0.35461855, 0.416064, 0.5, 0.3452, 0.64538145, 0.41606402, 0.5, 0.06999999), PackedVector2Array(0.64538145, 0.41606402, 0.63406074, 0.5774, 0.5, 0.667872, 0.8723909, 0.71500003), PackedVector2Array(0.5, 0.667872, 0.36593926, 0.5774, 0.35461855, 0.416064, 0.12760907, 0.71500003)]),
+"break_ratio": 0.5,
+"center_height_ratio": 1.0,
+"center_point": Vector2(0.5, 0.5),
+"edge_trim": 0.2,
+"fans": Array[Dictionary]([{
+"apex": Vector2(0.64538145, 0.41606402),
+"boundary": PackedVector2Array(0.5, 0.06999999, 0.5644702, 0.14027813, 0.62381995, 0.21351251, 0.6780494, 0.28970313, 0.7271585, 0.36885002, 0.77114713, 0.45095313, 0.81001544, 0.53601253, 0.84376335, 0.62402815, 0.8723909, 0.71500003)
+}, {
+"apex": Vector2(0.5, 0.667872),
+"boundary": PackedVector2Array(0.8723909, 0.71500003, 0.7792932, 0.73569375, 0.6861955, 0.75047505, 0.59309775, 0.7593438, 0.5, 0.7623, 0.40690228, 0.7593438, 0.31380454, 0.75047505, 0.2207068, 0.73569375, 0.12760907, 0.71500003)
+}, {
+"apex": Vector2(0.35461855, 0.416064),
+"boundary": PackedVector2Array(0.12760907, 0.71500003, 0.15623662, 0.6240281, 0.18998455, 0.53601253, 0.22885285, 0.4509531, 0.2728415, 0.36885, 0.32195058, 0.28970313, 0.37618, 0.2135125, 0.43552983, 0.14027812, 0.5, 0.06999999)
+}]),
+"height": 0.19,
+"inner_star_facets": Array[PackedVector2Array]([PackedVector2Array(0.5, 0.3452, 0.6135793, 0.434425, 0.63406074, 0.5774), PackedVector2Array(0.63406074, 0.5774, 0.5, 0.63115, 0.36593926, 0.5774), PackedVector2Array(0.36593926, 0.5774, 0.38642076, 0.434425, 0.5, 0.3452)]),
+"inner_star_height_ratio": 0.72,
+"outer_shoulder_height_ratio": 0.0,
+"outer_shoulder_scale": 1.0,
+"star_facets": Array[PackedVector2Array]([PackedVector2Array(0.5, 0.3452, 0.64538145, 0.41606402, 0.6135793, 0.434425), PackedVector2Array(0.6135793, 0.434425, 0.64538145, 0.41606402, 0.63406074, 0.5774), PackedVector2Array(0.63406074, 0.5774, 0.5, 0.667872, 0.5, 0.63115), PackedVector2Array(0.5, 0.63115, 0.5, 0.667872, 0.36593926, 0.5774), PackedVector2Array(0.36593926, 0.5774, 0.35461855, 0.416064, 0.38642076, 0.434425), PackedVector2Array(0.38642076, 0.434425, 0.35461855, 0.416064, 0.5, 0.3452)]),
+"star_height_ratio": 0.52,
+"star_length": 0.55,
+"table": PackedVector2Array(0.5, 0.3452, 0.63406074, 0.5774, 0.36593926, 0.5774),
+"table_ratio": 0.5
+}
+pavilion = {
+"depth": 0.35,
+"lower_depth_ratio": 0.82,
+"lower_scale": 0.26,
+"rotation_fraction": 0.0,
+"sector_count": 3,
+"upper_depth_ratio": 0.48,
+"upper_scale": 0.54
+}
+girdle = {
+"boundary_mode": &"",
+"boundary_params": {},
+"half_radius_scale": 1.0,
+"outer_points": PackedVector2Array(),
+"silhouette": PackedVector2Array(0.5, 0.06999999, 0.5328751, 0.10476953, 0.5644702, 0.14027813, 0.59478515, 0.17652579, 0.62381995, 0.21351251, 0.65157473, 0.2512383, 0.6780494, 0.28970313, 0.703244, 0.32890704, 0.7271585, 0.36885002, 0.7497929, 0.40953207, 0.77114713, 0.45095313, 0.7912214, 0.49311334, 0.81001544, 0.53601253, 0.82752943, 0.5796508, 0.84376335, 0.62402815, 0.8587172, 0.6691445, 0.8723909, 0.71500003, 0.8258421, 0.7260859, 0.7792932, 0.73569375, 0.73274434, 0.74382347, 0.6861955, 0.75047505, 0.6396466, 0.7556485, 0.59309775, 0.7593438, 0.54654884, 0.761561, 0.5, 0.7623, 0.45345113, 0.7615609, 0.40690228, 0.7593438, 0.36035338, 0.7556485, 0.31380454, 0.75047505, 0.26725566, 0.74382347, 0.2207068, 0.73569375, 0.17415795, 0.72608596, 0.12760907, 0.71500003, 0.1412828, 0.6691446, 0.15623662, 0.6240281, 0.17247054, 0.5796508, 0.18998455, 0.53601253, 0.20877865, 0.4931133, 0.22885285, 0.4509531, 0.25020713, 0.40953204, 0.2728415, 0.36885, 0.29675603, 0.328907, 0.32195058, 0.28970313, 0.34842527, 0.2512383, 0.37618, 0.2135125, 0.40521488, 0.17652577, 0.43552983, 0.14027812, 0.46712485, 0.10476953),
+"thickness": 0.012
+}
+culet = {
+"style": "point"
+}
+constraints = {
+"max_edge_ratio": 45.0,
+"min_interior_angle_degrees": 4.0,
+"require_outward_normals": true,
+"require_pavilion_containment": true,
+"require_rotation_stability": true,
+"require_shared_edge_closure": true
+}
+orthographic_metadata = {
+"axis_fit_scale": 1.0,
+"side_yaw_degrees": 0.0,
+"top_roll_degrees": 0.0
+}
