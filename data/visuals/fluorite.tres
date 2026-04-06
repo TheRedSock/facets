@@ -1,13 +1,13 @@
 [gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
-[ext_resource type="Resource" path="res://data/visuals/cut_specs/rose_round.tres" id="1_se2ob"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/old_european_round.tres" id="1_se2ob"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"fluorite"
 cut_spec = ExtResource("1_se2ob")
-cut_id = &"rose_round"
+cut_id = &"old_european_round"
 base_color = Color(0.62, 0.9, 0.74, 1)
 volume_pattern_type = 1
 volume_pattern_mix = 1.0

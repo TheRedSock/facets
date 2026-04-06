@@ -406,7 +406,12 @@ func _build_filtered_requests(
 			if options.has("trace_profile"):
 				enriched_request["trace_profile"] = bool(options.get("trace_profile", false))
 			if options.has("max_trace_bounces"):
-				enriched_request["max_trace_bounces"] = int(options.get("max_trace_bounces", 0))
+				enriched_request["max_trace_bounces"] = GemTracedBakeContractScript.resolve_max_trace_bounces(
+					options.get(
+						"max_trace_bounces",
+						GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES
+					)
+				)
 			if options.has("skip_stylize"):
 				enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
 			enriched_request["mesh_resource"] = mesh_resource
@@ -669,7 +674,12 @@ func _finalize_batch_result(
 	variant_settings: Dictionary = {},
 	profiling: Dictionary = {},
 ) -> Dictionary:
-	var merged_entries := _merge_manifest_entries(_join_path(output_root, DEFAULT_MANIFEST_NAME), entries)
+	var manifest_max_trace_bounces := _resolve_batch_max_trace_bounces(filtered_requests)
+	var merged_entries := _merge_manifest_entries(
+		_join_path(output_root, DEFAULT_MANIFEST_NAME),
+		entries,
+		{"max_trace_bounces": manifest_max_trace_bounces}
+	)
 	var merged_tile_counts := _count_entries_by_tile(merged_entries)
 	var manifest := {
 		"backend_id": &"offline_traced",
@@ -678,6 +688,7 @@ func _finalize_batch_result(
 		"cell_size": cell_size,
 		"draw_size": draw_size,
 		"sample_count": sample_count,
+		"max_trace_bounces": manifest_max_trace_bounces,
 		"variant_settings": GemTracedBakeContractScript.build_manifest_variant_settings(variant_settings),
 		"tile_counts": merged_tile_counts,
 		"entries": merged_entries,
@@ -753,13 +764,16 @@ func _merge_profile_dict(profile: Dictionary, field_name: String, values: Dictio
 	profile[field_name] = merged
 
 
-func _merge_manifest_entries(manifest_path: String, new_entries: Array) -> Array:
+func _merge_manifest_entries(manifest_path: String, new_entries: Array, manifest_context: Dictionary = {}) -> Array:
 	var merged_by_key: Dictionary = {}
 	if FileAccess.file_exists(manifest_path):
 		var existing_file := FileAccess.open(manifest_path, FileAccess.READ)
 		if existing_file != null:
 			var parsed = JSON.parse_string(existing_file.get_as_text())
-			if typeof(parsed) == TYPE_DICTIONARY and GemTracedBakeContractScript.manifest_matches_current(parsed):
+			if typeof(parsed) == TYPE_DICTIONARY and GemTracedBakeContractScript.manifest_matches_current(
+				parsed,
+				manifest_context
+			):
 				var existing_entries: Array = parsed.get("entries", [])
 				for raw_entry in existing_entries:
 					if typeof(raw_entry) != TYPE_DICTIONARY:
@@ -796,3 +810,15 @@ func _count_entries_by_tile(entries: Array) -> Dictionary:
 			continue
 		counts[tile_id] = int(counts.get(tile_id, 0)) + 1
 	return counts
+
+
+func _resolve_batch_max_trace_bounces(filtered_requests: Array) -> int:
+	if filtered_requests.is_empty():
+		return GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES
+	var first_request: Dictionary = filtered_requests[0]
+	return GemTracedBakeContractScript.resolve_max_trace_bounces(
+		first_request.get(
+			"max_trace_bounces",
+			GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES
+		)
+	)

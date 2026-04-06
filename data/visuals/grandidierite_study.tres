@@ -1,13 +1,13 @@
 [gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
-[ext_resource type="Resource" path="res://data/visuals/cut_specs/opal_cushion.tres" id="1_47wwt"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/patterned_cushion.tres" id="1_47wwt"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"grandidierite_study"
 cut_spec = ExtResource("1_47wwt")
-cut_id = &"opal_cushion"
+cut_id = &"patterned_cushion"
 base_color = Color(0.16, 0.44, 0.5, 1)
 material_mode = 2
 material_secondary_color = Color(0.2, 0.62, 0.66, 1)

@@ -54,7 +54,9 @@ func _run() -> void:
 		options["trace_profile"] = true
 	var max_trace_bounces := int(args.get("max_trace_bounces", 0))
 	if max_trace_bounces > 0:
-		options["max_trace_bounces"] = max_trace_bounces
+		options["max_trace_bounces"] = GemTracedBakeContractScript.resolve_max_trace_bounces(
+			max_trace_bounces
+		)
 	var thread_count := int(args.get("threads", 0))
 	if thread_count > 0:
 		options["thread_count"] = thread_count

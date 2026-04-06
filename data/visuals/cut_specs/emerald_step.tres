@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_5pkn8")
 spec_id = &"emerald_step"
-display_name = "Emerald Step"
+display_name = "Emerald Cut"
 compatibility_cut_id = &"emerald_step"
 shape_category = &"rectangle"
 family = &"step"
@@ -19,19 +19,19 @@ symmetry = {
 rings = Array[Dictionary]([{
 "height_ratio": 0.0,
 "name": "ring_00",
-"points": PackedVector2Array(0.25792593, 0.06999999, 0.7420741, 0.06999999, 0.8185185, 0.14644444, 0.8185185, 0.85355556, 0.7420741, 0.93, 0.25792593, 0.93, 0.18148148, 0.85355556, 0.18148148, 0.14644444),
+"points": PackedVector2Array(0.275, 0.06999999, 0.725, 0.06999999, 0.805, 0.15, 0.805, 0.85, 0.725, 0.93, 0.275, 0.93, 0.195, 0.85, 0.195, 0.15),
 "rose_height_ratio": 0.0,
 "zone": "girdle"
 }, {
 "height_ratio": 0.5358867,
 "name": "ring_01",
-"points": PackedVector2Array(0.3353896, 0.2076, 0.6646104, 0.2076, 0.7165926, 0.25958222, 0.7165926, 0.7404178, 0.6646104, 0.7924, 0.3353896, 0.7924, 0.2834074, 0.7404178, 0.2834074, 0.25958222),
+"points": PackedVector2Array(0.345, 0.215, 0.655, 0.215, 0.71, 0.27, 0.71, 0.73, 0.655, 0.785, 0.345, 0.785, 0.29, 0.73, 0.29, 0.27),
 "rose_height_ratio": 0.56644195,
 "zone": "step"
 }, {
 "height_ratio": 1.0,
 "name": "ring_02",
-"points": PackedVector2Array(0.40317038, 0.328, 0.59682965, 0.328, 0.62740743, 0.3585778, 0.62740743, 0.6414222, 0.59682965, 0.672, 0.40317038, 0.672, 0.3725926, 0.6414222, 0.3725926, 0.3585778),
+"points": PackedVector2Array(0.41, 0.34, 0.59, 0.34, 0.62, 0.37, 0.62, 0.63, 0.59, 0.66, 0.41, 0.66, 0.38, 0.63, 0.38, 0.37),
 "rose_height_ratio": 1.0,
 "zone": "table"
 }])
@@ -42,7 +42,7 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.17,
+"height": 0.18,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
@@ -54,20 +54,20 @@ crown = {
 "table_ratio": 0.5
 }
 pavilion = {
-"depth": 0.3,
+"depth": 0.31,
 "lower_depth_ratio": 0.82,
-"lower_scale": 0.36,
+"lower_scale": 0.34,
 "rotation_fraction": 0.0,
 "sector_count": 8,
 "upper_depth_ratio": 0.48,
-"upper_scale": 0.66
+"upper_scale": 0.64
 }
 girdle = {
 "boundary_mode": &"",
 "boundary_params": {},
 "half_radius_scale": 1.0,
 "outer_points": PackedVector2Array(),
-"silhouette": PackedVector2Array(0.25792593, 0.06999999, 0.7420741, 0.06999999, 0.8185185, 0.14644444, 0.8185185, 0.85355556, 0.7420741, 0.93, 0.25792593, 0.93, 0.18148148, 0.85355556, 0.18148148, 0.14644444),
+"silhouette": PackedVector2Array(0.275, 0.06999999, 0.725, 0.06999999, 0.805, 0.15, 0.805, 0.85, 0.725, 0.93, 0.275, 0.93, 0.195, 0.85, 0.195, 0.15),
 "thickness": 0.012
 }
 culet = {

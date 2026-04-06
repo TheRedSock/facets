@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_0lxa8")
 spec_id = &"cushion"
-display_name = "Cushion"
+display_name = "Cushion Brilliant"
 compatibility_cut_id = &"cushion"
 shape_category = &"square"
 family = &"radial_brilliant"
@@ -23,30 +23,30 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.19,
+"height": 0.185,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
 "outer_shoulder_scale": 1.0,
 "star_facets": Array[PackedVector2Array]([]),
 "star_height_ratio": 0.6,
-"star_length": 0.58,
+"star_length": 0.56,
 "table": PackedVector2Array(),
-"table_ratio": 0.46
+"table_ratio": 0.44
 }
 pavilion = {
-"depth": 0.39,
+"depth": 0.37,
 "lower_depth_ratio": 0.82,
-"lower_scale": 0.2,
+"lower_scale": 0.22,
 "rotation_fraction": 0.0,
 "sector_count": 8,
 "upper_depth_ratio": 0.48,
-"upper_scale": 0.52
+"upper_scale": 0.5
 }
 girdle = {
 "boundary_mode": &"superellipse",
 "boundary_params": {
-"exponent": 3.6
+"exponent": 4.0
 },
 "half_radius_scale": 1.0,
 "outer_points": PackedVector2Array(),
@@ -65,7 +65,7 @@ constraints = {
 "require_shared_edge_closure": true
 }
 orthographic_metadata = {
-"axis_fit_scale": 0.97,
+"axis_fit_scale": 0.96,
 "side_yaw_degrees": 0.0,
 "top_roll_degrees": 0.0
 }

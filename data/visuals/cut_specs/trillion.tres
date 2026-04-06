@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_fnf6y")
 spec_id = &"trillion"
-display_name = "Trillion"
+display_name = "Curved Trillion"
 compatibility_cut_id = &"trillion"
 shape_category = &"triangle"
 family = &"fan"
@@ -32,25 +32,25 @@ crown = {
 "apex": Vector2(0.35461855, 0.416064),
 "boundary": PackedVector2Array(0.12760907, 0.71500003, 0.15623662, 0.6240281, 0.18998455, 0.53601253, 0.22885285, 0.4509531, 0.2728415, 0.36885, 0.32195058, 0.28970313, 0.37618, 0.2135125, 0.43552983, 0.14027812, 0.5, 0.06999999)
 }]),
-"height": 0.19,
+"height": 0.18,
 "inner_star_facets": Array[PackedVector2Array]([PackedVector2Array(0.5, 0.3452, 0.6135793, 0.434425, 0.63406074, 0.5774), PackedVector2Array(0.63406074, 0.5774, 0.5, 0.63115, 0.36593926, 0.5774), PackedVector2Array(0.36593926, 0.5774, 0.38642076, 0.434425, 0.5, 0.3452)]),
 "inner_star_height_ratio": 0.72,
 "outer_shoulder_height_ratio": 0.0,
 "outer_shoulder_scale": 1.0,
 "star_facets": Array[PackedVector2Array]([PackedVector2Array(0.5, 0.3452, 0.64538145, 0.41606402, 0.6135793, 0.434425), PackedVector2Array(0.6135793, 0.434425, 0.64538145, 0.41606402, 0.63406074, 0.5774), PackedVector2Array(0.63406074, 0.5774, 0.5, 0.667872, 0.5, 0.63115), PackedVector2Array(0.5, 0.63115, 0.5, 0.667872, 0.36593926, 0.5774), PackedVector2Array(0.36593926, 0.5774, 0.35461855, 0.416064, 0.38642076, 0.434425), PackedVector2Array(0.38642076, 0.434425, 0.35461855, 0.416064, 0.5, 0.3452)]),
-"star_height_ratio": 0.52,
+"star_height_ratio": 0.54,
 "star_length": 0.55,
 "table": PackedVector2Array(0.5, 0.3452, 0.63406074, 0.5774, 0.36593926, 0.5774),
-"table_ratio": 0.5
+"table_ratio": 0.48
 }
 pavilion = {
-"depth": 0.35,
+"depth": 0.34,
 "lower_depth_ratio": 0.82,
 "lower_scale": 0.26,
 "rotation_fraction": 0.0,
 "sector_count": 3,
 "upper_depth_ratio": 0.48,
-"upper_scale": 0.54
+"upper_scale": 0.52
 }
 girdle = {
 "boundary_mode": &"",

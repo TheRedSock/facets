@@ -7,7 +7,7 @@ script = ExtResource("1_dlukq")
 spec_id = &"pear_brilliant"
 display_name = "Pear Brilliant"
 compatibility_cut_id = &"pear_brilliant"
-shape_category = &"pear"
+shape_category = &"special"
 family = &"radial_brilliant"
 symmetry = {
 "half_angles": [],
@@ -32,24 +32,24 @@ crown = {
 "star_height_ratio": 0.6,
 "star_length": 0.52,
 "table": PackedVector2Array(),
-"table_ratio": 0.5
+"table_ratio": 0.48
 }
 pavilion = {
-"depth": 0.38,
+"depth": 0.39,
 "lower_depth_ratio": 0.82,
-"lower_scale": 0.18,
+"lower_scale": 0.16,
 "rotation_fraction": 0.0,
 "sector_count": 10,
 "upper_depth_ratio": 0.48,
-"upper_scale": 0.48
+"upper_scale": 0.46
 }
 girdle = {
 "boundary_mode": &"pear",
 "boundary_params": {
 "shift_y": 0.055,
-"shoulder_bias": 0.8,
-"tip_power": 0.74,
-"y_stretch": 1.17
+"shoulder_bias": 0.84,
+"tip_power": 0.8,
+"y_stretch": 1.2
 },
 "half_radius_scale": 1.0,
 "outer_points": PackedVector2Array(),

@@ -5,10 +5,10 @@
 [resource]
 script = ExtResource("1_othi0")
 spec_id = &"lozenge"
-display_name = "Lozenge"
+display_name = "Lozenge Cut"
 compatibility_cut_id = &"lozenge"
 shape_category = &"diamond"
-family = &"radiant"
+family = &"step"
 symmetry = {
 "half_angles": [],
 "main_angles": [],
@@ -16,9 +16,28 @@ symmetry = {
 "rotation": -1.5707963267948966,
 "sector_count": 4
 }
+rings = Array[Dictionary]([{
+"height_ratio": 0.0,
+"name": "ring_00",
+"points": PackedVector2Array(0.5, 0.06999999, 0.74, 0.5, 0.5, 0.93, 0.26, 0.5),
+"rose_height_ratio": 0.0,
+"zone": "girdle"
+}, {
+"height_ratio": 0.54,
+"name": "ring_01",
+"points": PackedVector2Array(0.5, 0.215, 0.64, 0.5, 0.5, 0.785, 0.36, 0.5),
+"rose_height_ratio": 0.56,
+"zone": "step"
+}, {
+"height_ratio": 1.0,
+"name": "ring_02",
+"points": PackedVector2Array(0.5, 0.34, 0.58, 0.5, 0.5, 0.66, 0.42, 0.5),
+"rose_height_ratio": 1.0,
+"zone": "table"
+}])
 crown = {
 "bezel_facets": Array[PackedVector2Array]([]),
-"break_ratio": 0.54,
+"break_ratio": 0.5,
 "center_height_ratio": 1.0,
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
@@ -29,26 +48,26 @@ crown = {
 "outer_shoulder_height_ratio": 0.0,
 "outer_shoulder_scale": 1.0,
 "star_facets": Array[PackedVector2Array]([]),
-"star_height_ratio": 0.62,
-"star_length": 0.55,
+"star_height_ratio": 0.6,
+"star_length": 0.5,
 "table": PackedVector2Array(),
 "table_ratio": 0.42
 }
 pavilion = {
 "depth": 0.31,
 "lower_depth_ratio": 0.82,
-"lower_scale": 0.3,
+"lower_scale": 0.22,
 "rotation_fraction": 0.0,
 "sector_count": 4,
 "upper_depth_ratio": 0.48,
-"upper_scale": 0.58
+"upper_scale": 0.48
 }
 girdle = {
 "boundary_mode": &"",
 "boundary_params": {},
 "half_radius_scale": 1.0,
-"outer_points": PackedVector2Array(0.5, 0.06999999, 0.7408, 0.5, 0.5, 0.93, 0.2592, 0.5),
-"silhouette": PackedVector2Array(0.5, 0.06999999, 0.7408, 0.5, 0.5, 0.93, 0.2592, 0.5),
+"outer_points": PackedVector2Array(0.5, 0.06999999, 0.74, 0.5, 0.5, 0.93, 0.26, 0.5),
+"silhouette": PackedVector2Array(0.5, 0.06999999, 0.74, 0.5, 0.5, 0.93, 0.26, 0.5),
 "thickness": 0.012
 }
 culet = {

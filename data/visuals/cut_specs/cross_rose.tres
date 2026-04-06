@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_7s2qb")
 spec_id = &"cross_rose"
-display_name = "Cross Rose"
+display_name = "Designer Cross Rose"
 compatibility_cut_id = &"cross_rose"
 shape_category = &"round"
 family = &"rose"

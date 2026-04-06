@@ -1,14 +1,14 @@
 [gd_resource type="Resource" script_class="GemCutSpecResource" format=3]
 
-[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_7jn2m"]
+[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_hexst"]
 
 [resource]
-script = ExtResource("1_7jn2m")
-spec_id = &"half_dutch_rose_hex"
-display_name = "Designer Hex Rose"
-compatibility_cut_id = &"half_dutch_rose_hex"
+script = ExtResource("1_hexst")
+spec_id = &"hexagon_step"
+display_name = "Hexagon Step Cut"
+compatibility_cut_id = &"hexagon_step"
 shape_category = &"hexagon"
-family = &"rose"
+family = &"step"
 symmetry = {
 "half_angles": [],
 "main_angles": [],
@@ -21,13 +21,19 @@ rings = Array[Dictionary]([{
 "name": "ring_00",
 "points": PackedVector2Array(0.5, 0.06999999, 0.8723909, 0.285, 0.8723909, 0.71500003, 0.5, 0.93, 0.12760907, 0.71500003, 0.12760907, 0.285),
 "rose_height_ratio": 0.0,
-"zone": &""
+"zone": "girdle"
+}, {
+"height_ratio": 0.54,
+"name": "ring_01",
+"points": PackedVector2Array(0.5, 0.205, 0.756, 0.3525, 0.756, 0.6475, 0.5, 0.795, 0.244, 0.6475, 0.244, 0.3525),
+"rose_height_ratio": 0.56,
+"zone": "step"
 }, {
 "height_ratio": 1.0,
-"name": "ring_01",
-"points": PackedVector2Array(0.586, 0.35104364, 0.672, 0.5, 0.586, 0.64895636, 0.414, 0.64895636, 0.328, 0.5, 0.414, 0.35104364),
+"name": "ring_02",
+"points": PackedVector2Array(0.5, 0.31, 0.66, 0.4025, 0.66, 0.5975, 0.5, 0.69, 0.34, 0.5975, 0.34, 0.4025),
 "rose_height_ratio": 1.0,
-"zone": &""
+"zone": "table"
 }])
 crown = {
 "bezel_facets": Array[PackedVector2Array]([]),
@@ -36,21 +42,21 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.18,
+"height": 0.17,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
 "outer_shoulder_scale": 1.0,
 "star_facets": Array[PackedVector2Array]([]),
 "star_height_ratio": 0.62,
-"star_length": 0.55,
+"star_length": 0.5,
 "table": PackedVector2Array(),
 "table_ratio": 0.5
 }
 pavilion = {
-"depth": 0.28,
+"depth": 0.31,
 "lower_depth_ratio": 0.82,
-"lower_scale": 0.24,
+"lower_scale": 0.3,
 "rotation_fraction": 0.0,
 "sector_count": 6,
 "upper_depth_ratio": 0.48,

@@ -1,20 +1,20 @@
 [gd_resource type="Resource" script_class="GemCutSpecResource" format=3]
 
-[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_6kxic"]
+[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_ff7ws"]
 
 [resource]
-script = ExtResource("1_6kxic")
-spec_id = &"kite_brilliant"
-display_name = "Kite Brilliant"
-compatibility_cut_id = &"kite_brilliant"
-shape_category = &"diamond"
+script = ExtResource("1_ff7ws")
+spec_id = &"patterned_cushion"
+display_name = "Patterned Cushion"
+compatibility_cut_id = &"patterned_cushion"
+shape_category = &"rectangle"
 family = &"radial_brilliant"
 symmetry = {
 "half_angles": [],
 "main_angles": [],
-"pavilion_sector_count": 8,
+"pavilion_sector_count": 12,
 "rotation": -1.5707963267948966,
-"sector_count": 8
+"sector_count": 12
 }
 crown = {
 "bezel_facets": Array[PackedVector2Array]([]),
@@ -23,34 +23,34 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.19,
+"height": 0.17,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
 "outer_shoulder_scale": 1.0,
 "star_facets": Array[PackedVector2Array]([]),
-"star_height_ratio": 0.57,
-"star_length": 0.54,
+"star_height_ratio": 0.58,
+"star_length": 0.6,
 "table": PackedVector2Array(),
-"table_ratio": 0.46
+"table_ratio": 0.48
 }
 pavilion = {
-"depth": 0.31,
-"lower_depth_ratio": 0.76,
-"lower_scale": 0.26,
+"depth": 0.34,
+"lower_depth_ratio": 0.82,
+"lower_scale": 0.22,
 "rotation_fraction": 0.0,
-"sector_count": 8,
-"upper_depth_ratio": 0.44,
-"upper_scale": 0.54
+"sector_count": 12,
+"upper_depth_ratio": 0.48,
+"upper_scale": 0.5
 }
 girdle = {
-"boundary_mode": &"kite",
+"boundary_mode": &"superellipse",
 "boundary_params": {
-"aspect_x": 0.54,
-"aspect_y": 1.0,
-"shoulder": 0.38
+"aspect_x": 0.9,
+"aspect_y": 1.08,
+"exponent": 4.4
 },
-"half_radius_scale": 1.0,
+"half_radius_scale": 0.96,
 "outer_points": PackedVector2Array(),
 "silhouette": PackedVector2Array(),
 "thickness": 0.012

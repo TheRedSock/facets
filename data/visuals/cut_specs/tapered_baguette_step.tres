@@ -7,7 +7,7 @@ script = ExtResource("1_mia2s")
 spec_id = &"tapered_baguette_step"
 display_name = "Tapered Baguette Step"
 compatibility_cut_id = &"tapered_baguette_step"
-shape_category = &"tapered_rectangle"
+shape_category = &"rectangle"
 family = &"step"
 symmetry = {
 "half_angles": [],

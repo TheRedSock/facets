@@ -7,7 +7,7 @@ script = ExtResource("1_ywum8")
 spec_id = &"octagon_step"
 display_name = "Octagon Step"
 compatibility_cut_id = &"octagon_step"
-shape_category = &"octagon"
+shape_category = &"square"
 family = &"step"
 symmetry = {
 "half_angles": [],

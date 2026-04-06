@@ -7,7 +7,7 @@ script = ExtResource("1_nbkgl")
 spec_id = &"radiant_octagon"
 display_name = "Radiant Octagon"
 compatibility_cut_id = &"radiant_octagon"
-shape_category = &"octagon"
+shape_category = &"square"
 family = &"radiant"
 symmetry = {
 "half_angles": [],

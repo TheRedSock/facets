@@ -17,6 +17,8 @@ const LIGHTING_GRID_PRESETS := {
 const DEFAULT_ROTATION_BASE_VIEW_COUNT := 6
 const DEFAULT_ROTATION_AXIS_STEPS := 0
 const DEFAULT_ROTATION_STEP_DEGREES := 18.0
+const DEFAULT_MAX_TRACE_BOUNCES := 12
+const MAX_TRACE_BOUNCES_LIMIT := 24
 const SUPPORTED_ROTATION_AXES := [&"pitch", &"yaw", &"roll"]
 
 
@@ -132,6 +134,9 @@ static func build_manifest_entry(
 		"target_size": cell_size,
 		"draw_size": draw_size,
 		"sample_count": sample_count,
+		"max_trace_bounces": resolve_max_trace_bounces(
+			request.get("max_trace_bounces", DEFAULT_MAX_TRACE_BOUNCES)
+		),
 		"stylize_version": BAKED_LOOK_VERSION,
 	}
 
@@ -146,12 +151,23 @@ static func get_manifest_variant_settings(manifest: Dictionary) -> Dictionary:
 	return normalize_variant_settings(manifest.get("variant_settings", {}))
 
 
-static func manifest_matches_current(manifest: Dictionary) -> bool:
+static func manifest_matches_current(manifest: Dictionary, expected: Dictionary = {}) -> bool:
 	if manifest.is_empty():
 		return false
 	if StringName(manifest.get("backend_id", &"")) != &"offline_traced":
 		return false
-	return int(manifest.get("stylize_version", 0)) == BAKED_LOOK_VERSION
+	if int(manifest.get("stylize_version", 0)) != BAKED_LOOK_VERSION:
+		return false
+	var expected_max_trace_bounces := resolve_max_trace_bounces(
+		expected.get(
+			"max_trace_bounces",
+			manifest.get("max_trace_bounces", DEFAULT_MAX_TRACE_BOUNCES)
+		)
+	)
+	var manifest_max_trace_bounces := resolve_max_trace_bounces(
+		manifest.get("max_trace_bounces", expected_max_trace_bounces)
+	)
+	return manifest_max_trace_bounces == expected_max_trace_bounces
 
 
 static func entry_matches_request(entry: Dictionary, request: Dictionary) -> bool:
@@ -169,6 +185,14 @@ static func entry_matches_request(entry: Dictionary, request: Dictionary) -> boo
 	)
 	var entry_target_size := normalize_size(entry.get("target_size", requested_target_size), requested_target_size)
 	if requested_target_size != Vector2i.ZERO and entry_target_size != requested_target_size:
+		return false
+	var requested_max_trace_bounces := resolve_max_trace_bounces(
+		request.get("max_trace_bounces", DEFAULT_MAX_TRACE_BOUNCES)
+	)
+	var entry_max_trace_bounces := resolve_max_trace_bounces(
+		entry.get("max_trace_bounces", requested_max_trace_bounces)
+	)
+	if entry_max_trace_bounces != requested_max_trace_bounces:
 		return false
 	return true
 
@@ -195,6 +219,10 @@ static func normalize_size(raw_value, fallback: Vector2i = Vector2i.ZERO) -> Vec
 		if values.has("x") and values.has("y"):
 			return Vector2i(int(values.get("x", fallback.x)), int(values.get("y", fallback.y)))
 	return fallback
+
+
+static func resolve_max_trace_bounces(raw_value) -> int:
+	return clampi(int(raw_value), 1, MAX_TRACE_BOUNCES_LIMIT)
 
 
 static func get_lighting_grid_presets() -> Dictionary:

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_l7bfu")
 spec_id = &"double_rose"
-display_name = "Double Rose"
+display_name = "Modified Double Rose"
 compatibility_cut_id = &"double_rose"
 shape_category = &"round"
 family = &"rose"

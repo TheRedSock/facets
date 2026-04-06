@@ -149,14 +149,14 @@ func get_visual_cut_model_with_offset(
 
 
 ## Returns the effective projected cut for a visual, including any per-visual rotation.
-func get_visual_cut(visual: GemVisualResource):
+func get_visual_cut(visual: GemVisualResource) -> GemProjectedCutResource:
 	return get_visual_cut_with_offset(visual, 0.0)
 
 
 func get_visual_cut_with_offset(
 	visual: GemVisualResource,
 	additional_rotation_degrees: float = 0.0,
-):
+) -> GemProjectedCutResource:
 	if visual == null:
 		return null
 	var geometry_key := _ensure_visual_geometry_cached(visual)

@@ -30,6 +30,7 @@ func _run() -> void:
 		{"name": "stylized_lighting_variants_are_distinct", "call": Callable(self, "test_stylized_lighting_variants_are_distinct")},
 		{"name": "legacy_manifest_versions_are_rejected", "call": Callable(self, "test_legacy_manifest_versions_are_rejected")},
 		{"name": "stale_cut_signatures_are_rejected", "call": Callable(self, "test_stale_cut_signatures_are_rejected")},
+		{"name": "trace_bounce_mismatches_are_rejected", "call": Callable(self, "test_trace_bounce_mismatches_are_rejected")},
 		{"name": "offline_bake_job_writes_manifest", "call": Callable(self, "test_offline_bake_job_writes_manifest")},
 	]
 	for i in tests.size():
@@ -265,6 +266,39 @@ func test_stale_cut_signatures_are_rejected() -> void:
 	)
 
 
+func test_trace_bounce_mismatches_are_rejected() -> void:
+	var request := {
+		"draw_size": Vector2i(48, 48),
+		"target_size": Vector2i(48, 48),
+		"geometry_signature": "old_european_round",
+		"cut_key_override": "old_european_round@rot_0",
+		"max_trace_bounces": 7,
+	}
+	var stale_entry := {
+		"draw_size": Vector2i(48, 48),
+		"target_size": Vector2i(48, 48),
+		"cut_signature": "old_european_round@rot_0",
+		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION,
+		"max_trace_bounces": 12,
+	}
+	var stale_manifest := {
+		"backend_id": &"offline_traced",
+		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION,
+		"max_trace_bounces": 12,
+	}
+	assert_true(
+		not GemTracedBakeContractScript.entry_matches_request(stale_entry, request),
+		"Entry matching should reject stale max-trace-bounce settings"
+	)
+	assert_true(
+		not GemTracedBakeContractScript.manifest_matches_current(
+			stale_manifest,
+			{"max_trace_bounces": 7}
+		),
+		"Manifest matching should reject stale max-trace-bounce settings"
+	)
+
+
 func test_offline_bake_job_writes_manifest() -> void:
 	var registry := get_root().get_node_or_null("GemVisualRegistry")
 	assert_true(registry != null, "GemVisualRegistry autoload should exist")
@@ -279,6 +313,7 @@ func test_offline_bake_job_writes_manifest() -> void:
 			"output_root": "user://traced_bakes_test",
 			"draw_size": Vector2i(48, 48),
 			"sample_count": 1,
+			"max_trace_bounces": 7,
 			"lighting_bins": [Vector2i(2, 2)],
 			"rotation_bins": [0],
 		}
@@ -303,6 +338,11 @@ func test_offline_bake_job_writes_manifest() -> void:
 		GemTracedBakeContractScript.BAKED_LOOK_VERSION,
 		"Manifest should record the current stylized bake version"
 	)
+	assert_eq(
+		int(manifest.get("max_trace_bounces", 0)),
+		7,
+		"Manifest should record the trace bounce budget"
+	)
 	var entries: Array = manifest.get("entries", [])
 	assert_true(not entries.is_empty(), "Manifest should include traced entries")
 	if entries.is_empty():
@@ -312,6 +352,11 @@ func test_offline_bake_job_writes_manifest() -> void:
 		int(first_entry.get("stylize_version", 0)),
 		GemTracedBakeContractScript.BAKED_LOOK_VERSION,
 		"Manifest entries should record the current stylized bake version"
+	)
+	assert_eq(
+		int(first_entry.get("max_trace_bounces", 0)),
+		7,
+		"Manifest entries should record the trace bounce budget"
 	)
 	assert_true(
 		String(first_entry.get("cut_signature", "")) != "",

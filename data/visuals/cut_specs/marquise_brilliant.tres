@@ -7,7 +7,7 @@ script = ExtResource("1_mhipv")
 spec_id = &"marquise_brilliant"
 display_name = "Marquise Brilliant"
 compatibility_cut_id = &"marquise_brilliant"
-shape_category = &"marquise"
+shape_category = &"oval"
 family = &"radial_brilliant"
 symmetry = {
 "half_angles": [],

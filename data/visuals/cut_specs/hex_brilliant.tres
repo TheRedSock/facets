@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_h7ml8")
 spec_id = &"hex_brilliant"
-display_name = "Hex Brilliant"
+display_name = "Hexagonal Brilliant"
 compatibility_cut_id = &"hex_brilliant"
 shape_category = &"hexagon"
 family = &"radial_brilliant"
@@ -23,7 +23,7 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.18,
+"height": 0.17,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
@@ -32,16 +32,16 @@ crown = {
 "star_height_ratio": 0.62,
 "star_length": 0.48,
 "table": PackedVector2Array(),
-"table_ratio": 0.52
+"table_ratio": 0.5
 }
 pavilion = {
-"depth": 0.33,
+"depth": 0.35,
 "lower_depth_ratio": 0.82,
-"lower_scale": 0.24,
+"lower_scale": 0.22,
 "rotation_fraction": 0.0,
 "sector_count": 6,
 "upper_depth_ratio": 0.48,
-"upper_scale": 0.54
+"upper_scale": 0.52
 }
 girdle = {
 "boundary_mode": &"circle",

@@ -7,7 +7,7 @@ script = ExtResource("1_fruty")
 spec_id = &"heart_brilliant"
 display_name = "Heart Brilliant"
 compatibility_cut_id = &"heart_brilliant"
-shape_category = &"heart"
+shape_category = &"special"
 family = &"radial_brilliant"
 symmetry = {
 "half_angles": [],

@@ -1,42 +1,29 @@
 [gd_resource type="Resource" script_class="GemCutSpecResource" format=3]
 
-[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_7jn2m"]
+[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_lozrd"]
 
 [resource]
-script = ExtResource("1_7jn2m")
-spec_id = &"half_dutch_rose_hex"
-display_name = "Designer Hex Rose"
-compatibility_cut_id = &"half_dutch_rose_hex"
-shape_category = &"hexagon"
-family = &"rose"
+script = ExtResource("1_lozrd")
+spec_id = &"lozenge_radiant"
+display_name = "Modified Lozenge Radiant"
+compatibility_cut_id = &"lozenge_radiant"
+shape_category = &"diamond"
+family = &"radiant"
 symmetry = {
 "half_angles": [],
 "main_angles": [],
-"pavilion_sector_count": 6,
+"pavilion_sector_count": 4,
 "rotation": -1.5707963267948966,
-"sector_count": 6
+"sector_count": 4
 }
-rings = Array[Dictionary]([{
-"height_ratio": 0.0,
-"name": "ring_00",
-"points": PackedVector2Array(0.5, 0.06999999, 0.8723909, 0.285, 0.8723909, 0.71500003, 0.5, 0.93, 0.12760907, 0.71500003, 0.12760907, 0.285),
-"rose_height_ratio": 0.0,
-"zone": &""
-}, {
-"height_ratio": 1.0,
-"name": "ring_01",
-"points": PackedVector2Array(0.586, 0.35104364, 0.672, 0.5, 0.586, 0.64895636, 0.414, 0.64895636, 0.328, 0.5, 0.414, 0.35104364),
-"rose_height_ratio": 1.0,
-"zone": &""
-}])
 crown = {
 "bezel_facets": Array[PackedVector2Array]([]),
-"break_ratio": 0.5,
+"break_ratio": 0.54,
 "center_height_ratio": 1.0,
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.18,
+"height": 0.17,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
@@ -45,23 +32,23 @@ crown = {
 "star_height_ratio": 0.62,
 "star_length": 0.55,
 "table": PackedVector2Array(),
-"table_ratio": 0.5
+"table_ratio": 0.4
 }
 pavilion = {
-"depth": 0.28,
+"depth": 0.33,
 "lower_depth_ratio": 0.82,
-"lower_scale": 0.24,
+"lower_scale": 0.28,
 "rotation_fraction": 0.0,
-"sector_count": 6,
+"sector_count": 4,
 "upper_depth_ratio": 0.48,
-"upper_scale": 0.58
+"upper_scale": 0.56
 }
 girdle = {
 "boundary_mode": &"",
 "boundary_params": {},
 "half_radius_scale": 1.0,
-"outer_points": PackedVector2Array(),
-"silhouette": PackedVector2Array(0.5, 0.06999999, 0.8723909, 0.285, 0.8723909, 0.71500003, 0.5, 0.93, 0.12760907, 0.71500003, 0.12760907, 0.285),
+"outer_points": PackedVector2Array(0.5, 0.085, 0.752, 0.5, 0.5, 0.915, 0.248, 0.5),
+"silhouette": PackedVector2Array(0.5, 0.085, 0.752, 0.5, 0.5, 0.915, 0.248, 0.5),
 "thickness": 0.012
 }
 culet = {

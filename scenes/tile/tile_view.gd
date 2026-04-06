@@ -24,7 +24,7 @@ const SPECIAL_ROTATION_DEFAULT_TURNS := 1.0
 const MISSING_BAKE_COLOR := Color(0.22, 0.08, 0.12, 1.0)
 
 ## Cached procedural gem data (set by _update_visual, consumed by _draw).
-var _gem_cut = null
+var _gem_cut: GemProjectedCutResource = null
 var _gem_visual: GemVisualResource = null
 var _visual_cache_key: StringName = &""
 var _gem_colors: PackedColorArray = PackedColorArray()
@@ -223,11 +223,11 @@ func _try_procedural_visual() -> bool:
 
 	var cache_key: StringName = visual_bundle["cache_key"]
 	var visual: GemVisualResource = visual_bundle["visual"]
-	var cut = visual_bundle["cut"]
+	var cut: GemProjectedCutResource = visual_bundle["cut"] as GemProjectedCutResource
 
 	# Track whether the cut changed — if recycling as the same gem type,
 	# the scaled geometry is still valid and we can skip the expensive rebuild.
-	var cut_changed := (_gem_cut != cut)
+	var cut_changed: bool = _gem_cut != cut
 	var cache_key_changed := (_visual_cache_key != cache_key)
 
 	_visual_cache_key = cache_key

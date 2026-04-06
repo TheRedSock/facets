@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_pabmi")
 spec_id = &"pentagon_brilliant"
-display_name = "Pentagon Brilliant"
+display_name = "Designer Pentagon Brilliant"
 compatibility_cut_id = &"pentagon_brilliant"
-shape_category = &"pentagon"
+shape_category = &"special"
 family = &"radial_brilliant"
 symmetry = {
 "half_angles": [],
