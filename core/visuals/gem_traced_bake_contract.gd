@@ -4,7 +4,26 @@ extends RefCounted
 const DEFAULT_OUTPUT_ROOT := "user://traced_bakes"
 const DEFAULT_MANIFEST_NAME := "gameplay_manifest.json"
 const GENERATED_OUTPUT_ROOT := "res://generated/traced_bakes"
-const BAKED_LOOK_VERSION := 3
+const BAKED_LOOK_VERSION := 4
+
+## Image output format constants.
+const IMAGE_FORMAT_PNG := &"png"
+const IMAGE_FORMAT_WEBP := &"webp"
+const DEFAULT_IMAGE_FORMAT := IMAGE_FORMAT_WEBP
+const SUPPORTED_IMAGE_FORMATS := [IMAGE_FORMAT_PNG, IMAGE_FORMAT_WEBP]
+
+## WebP quality defaults.  Quality 92 provides near-imperceptible loss for
+## stylized gem textures while achieving ~10-20x compression over PNG.
+const DEFAULT_WEBP_QUALITY: float = 0.92
+const MIN_WEBP_QUALITY: float = 0.50
+const MAX_WEBP_QUALITY: float = 1.0
+
+## GPU block compression after decode (~4x VRAM vs RGBA8). Desktop: BC7 (BPTC); mobile: ASTC in loader.
+const VRAM_COMPRESS_ON_LOAD := true
+const VRAM_COMPRESS_FORMAT := Image.COMPRESS_BPTC
+## Minimum shorter image edge (px) to compress; small board cells stay uncompressed to avoid block artifacts.
+const VRAM_COMPRESS_MIN_SIZE := 256
+
 const DEFAULT_LIGHTING_GRID_SIZE := Vector2i(5, 5)
 const LIGHTING_GRID_PRESET_CUSTOM := &"custom"
 const DEFAULT_LIGHTING_GRID_PRESET := &"quality"
@@ -17,6 +36,9 @@ const LIGHTING_GRID_PRESETS := {
 const DEFAULT_ROTATION_BASE_VIEW_COUNT := 6
 const DEFAULT_ROTATION_AXIS_STEPS := 0
 const DEFAULT_ROTATION_STEP_DEGREES := 18.0
+const DEFAULT_SHOWROOM_DIRECTION_COUNT := 0
+const DEFAULT_SHOWROOM_ROLL_STEPS := 6
+const GAMEPLAY_VARIANT_TYPE_SHOWROOM := &"showroom"
 const DEFAULT_MAX_TRACE_BOUNCES := 12
 const MAX_TRACE_BOUNCES_LIMIT := 24
 const SUPPORTED_ROTATION_AXES := [&"pitch", &"yaw", &"roll"]
@@ -31,6 +53,11 @@ static func default_variant_settings() -> Dictionary:
 		"rotation_axis_steps": DEFAULT_ROTATION_AXIS_STEPS,
 		"rotation_step_degrees": DEFAULT_ROTATION_STEP_DEGREES,
 		"rotation_axes": PackedStringArray(),
+		"showroom_direction_count": DEFAULT_SHOWROOM_DIRECTION_COUNT,
+		"showroom_roll_steps": DEFAULT_SHOWROOM_ROLL_STEPS,
+		"lighting_atlas_layers": 0,
+		"lighting_atlas_layer_order": "",
+		"rotation_atlas_layers": 0,
 	}
 
 
@@ -83,6 +110,15 @@ static func normalize_variant_settings(raw_value: Dictionary = {}) -> Dictionary
 			continue
 		seen_axes[axis] = true
 		normalized_axes.append(axis)
+	var showroom_dir_count := maxi(
+		int(raw_value.get("showroom_direction_count", defaults["showroom_direction_count"])),
+		0
+	)
+	var showroom_roll_steps := clampi(
+		int(raw_value.get("showroom_roll_steps", defaults["showroom_roll_steps"])),
+		1,
+		64
+	)
 	return {
 		"lighting_grid_preset": detect_lighting_grid_preset(lighting_grid),
 		"lighting_grid_size": lighting_grid,
@@ -91,6 +127,16 @@ static func normalize_variant_settings(raw_value: Dictionary = {}) -> Dictionary
 		"rotation_axis_steps": axis_steps,
 		"rotation_step_degrees": step_degrees,
 		"rotation_axes": PackedStringArray(normalized_axes),
+		"showroom_direction_count": showroom_dir_count,
+		"showroom_roll_steps": showroom_roll_steps,
+		"lighting_atlas_layers": maxi(
+			0,
+			int(raw_value.get("lighting_atlas_layers", maxi(0, lighting_grid.x * lighting_grid.y)))
+		),
+		"lighting_atlas_layer_order": String(
+			raw_value.get("lighting_atlas_layer_order", defaults["lighting_atlas_layer_order"])
+		),
+		"rotation_atlas_layers": maxi(0, int(raw_value.get("rotation_atlas_layers", 0))),
 	}
 
 
@@ -98,8 +144,46 @@ static func sanitize_variant_key(value: String) -> String:
 	return value.replace("@", "__").replace("/", "_").replace("\\", "_").replace(":", "_")
 
 
-static func build_texture_path(output_root: String, tile_id: String, variant_key: String) -> String:
-	return _join_path(output_root, "%s/%s.png" % [tile_id, sanitize_variant_key(variant_key)])
+static func build_texture_path(output_root: String, tile_id: String, variant_key: String, image_format: StringName = DEFAULT_IMAGE_FORMAT) -> String:
+	var ext := "webp" if image_format == IMAGE_FORMAT_WEBP else "png"
+	return _join_path(output_root, "%s/%s.%s" % [tile_id, sanitize_variant_key(variant_key), ext])
+
+
+static func normalize_image_format(raw_value) -> StringName:
+	var normalized := StringName(String(raw_value).strip_edges().to_lower())
+	if SUPPORTED_IMAGE_FORMATS.has(normalized):
+		return normalized
+	return DEFAULT_IMAGE_FORMAT
+
+
+## Compute WebP quality for a given visual, factoring in optical complexity.
+## Gems with high dispersion, sparkle or specular intensity get higher quality
+## to preserve fine spectral detail that compresses poorly.  Returns a float
+## in [MIN_WEBP_QUALITY, MAX_WEBP_QUALITY].
+## If the visual has a non-negative bake_quality_override it takes precedence.
+static func compute_adaptive_webp_quality(visual: Resource, base_quality: float = DEFAULT_WEBP_QUALITY) -> float:
+	if visual == null:
+		return clampf(base_quality, MIN_WEBP_QUALITY, MAX_WEBP_QUALITY)
+	# Honour explicit per-gem override.
+	var override_quality := _get_visual_float(visual, &"bake_quality_override", -1.0)
+	if override_quality >= 0.0:
+		return clampf(override_quality, MIN_WEBP_QUALITY, MAX_WEBP_QUALITY)
+	var quality := base_quality
+	# Dispersion (Diamond-like prismatic fire) compresses poorly.
+	if _get_visual_float(visual, &"hue_dispersion") > 0.1:
+		quality += 0.04
+	# High specular intensity produces bright highlights that need precision.
+	if _get_visual_float(visual, &"specular_intensity") > 0.7:
+		quality += 0.02
+	# Sparkle creates sharp high-contrast details.
+	if _get_visual_float(visual, &"sparkle_intensity") > 0.3:
+		quality += 0.02
+	return clampf(quality, MIN_WEBP_QUALITY, MAX_WEBP_QUALITY)
+
+
+## File extension (without dot) for the given image format.
+static func image_format_extension(image_format: StringName) -> String:
+	return "webp" if image_format == IMAGE_FORMAT_WEBP else "png"
 
 
 static func build_manifest_entry(
@@ -110,7 +194,7 @@ static func build_manifest_entry(
 	draw_size: Vector2i,
 	sample_count: int,
 ) -> Dictionary:
-	return {
+	var entry := {
 		"tile_id": request.get("tile_id", &""),
 		"visual_id": visual.visual_id if visual != null else request.get("visual_id", &""),
 		"spec_id": request.get("spec_id", visual.get_cut_spec_id() if visual != null else &""),
@@ -131,9 +215,12 @@ static func build_manifest_entry(
 		"view_yaw_degrees": request.get("view_yaw_degrees", null),
 		"view_roll_degrees": request.get("view_roll_degrees", null),
 		"view_dir_model": request.get("view_dir_model", null),
-		"fibonacci_index": request.get("fibonacci_index", null),
-		"fibonacci_n": request.get("fibonacci_n", null),
-		"angular_resolution_degrees": request.get("angular_resolution_degrees", null),
+		"showroom_direction_index": request.get("showroom_direction_index", null),
+		"showroom_roll_index": request.get("showroom_roll_index", null),
+		"showroom_direction_count": request.get("showroom_direction_count", null),
+		"showroom_roll_steps": request.get("showroom_roll_steps", null),
+		"showroom_orientation": request.get("showroom_orientation", null),
+		"showroom_frame_type": request.get("showroom_frame_type", null),
 		"texture_path": texture_path,
 		"target_size": cell_size,
 		"draw_size": draw_size,
@@ -142,11 +229,53 @@ static func build_manifest_entry(
 			request.get("max_trace_bounces", DEFAULT_MAX_TRACE_BOUNCES)
 		),
 		"stylize_version": BAKED_LOOK_VERSION,
+		"image_format": String(request.get("image_format", DEFAULT_IMAGE_FORMAT)),
+		"image_quality": float(request.get("image_quality", DEFAULT_WEBP_QUALITY)),
 	}
+	var vtype: StringName = entry.get("variant_type", &"")
+	var tid := String(entry.get("tile_id", &""))
+	if vtype == &"lighting":
+		var lg := normalize_size(request.get("lighting_grid_size", Vector2i.ZERO), Vector2i.ZERO)
+		if lg != Vector2i.ZERO:
+			var bin: Vector2i = normalize_size(request.get("lighting_bin", Vector2i.ZERO), Vector2i.ZERO)
+			entry["atlas_group"] = "%s_lighting" % tid
+			entry["atlas_layer"] = bin.y * lg.x + bin.x
+	elif vtype == &"rotation":
+		entry["atlas_group"] = "%s_rotation" % tid
+		entry["atlas_layer"] = int(entry.get("rotation_bin", 0))
+	return entry
 
 
 static func build_manifest_variant_settings(raw_value: Dictionary = {}) -> Dictionary:
-	return normalize_variant_settings(raw_value)
+	var normalized := normalize_variant_settings(raw_value)
+	if raw_value.has("image_format"):
+		normalized["image_format"] = normalize_image_format(raw_value.get("image_format"))
+	return normalized
+
+
+## Runtime Texture2DArray layout metadata (also written into gameplay manifests).
+static func merge_atlas_metadata_into_variant_settings(
+	settings: Dictionary,
+	rotation_layer_count: int,
+) -> Dictionary:
+	var merged := settings.duplicate(true)
+	var lg: Vector2i = normalize_size(merged.get("lighting_grid_size", DEFAULT_LIGHTING_GRID_SIZE), DEFAULT_LIGHTING_GRID_SIZE)
+	merged["lighting_atlas_layers"] = maxi(0, lg.x * lg.y)
+	merged["lighting_atlas_layer_order"] = "row_major"
+	merged["rotation_atlas_layers"] = maxi(0, rotation_layer_count)
+	return merged
+
+
+static func infer_rotation_layer_count_from_requests(requests: Array) -> int:
+	var max_bin := -1
+	for raw in requests:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var r: Dictionary = raw
+		if StringName(r.get("variant_type", &"")) != &"rotation":
+			continue
+		max_bin = maxi(max_bin, int(r.get("rotation_bin", -1)))
+	return maxi(0, max_bin + 1)
 
 
 static func get_manifest_variant_settings(manifest: Dictionary) -> Dictionary:
@@ -260,3 +389,12 @@ static func _join_path(base: String, tail: String) -> String:
 	if base.ends_with("/"):
 		return "%s%s" % [base, tail]
 	return "%s/%s" % [base, tail]
+
+
+## Safe float property accessor for visual resources. Returns fallback when the
+## property does not exist or is null (e.g. when called with a non-GemVisualResource).
+static func _get_visual_float(visual: Resource, property: StringName, fallback: float = 0.0) -> float:
+	var value = visual.get(property)
+	if value == null:
+		return fallback
+	return float(value)

@@ -55,6 +55,9 @@ var _skip_rotations_checkbox: CheckBox
 var _lighting_bins_filter_edit: LineEdit
 var _rotation_bins_filter_edit: LineEdit
 var _rotation_labels_filter_edit: LineEdit
+var _include_showroom_checkbox: CheckBox
+var _showroom_dirs_spin: SpinBox
+var _showroom_roll_spin: SpinBox
 var _preview_tile_id: StringName = &""
 var _preview_tier := 1
 var _preview_drag_active := false
@@ -316,6 +319,19 @@ func _build_form_panel(parent: HBoxContainer) -> void:
 		axis_box.add_child(checkbox)
 		_rotation_axis_checkboxes[axis] = checkbox
 	content.add_child(_labeled_control("Rotation Axis Sweeps", axis_box))
+
+	content.add_child(_make_separator())
+	content.add_child(_make_section_title("Showroom (optional)"))
+	_include_showroom_checkbox = CheckBox.new()
+	_include_showroom_checkbox.text = "Include showroom bake (Fibonacci directions × roll steps)"
+	_include_showroom_checkbox.toggled.connect(func(_p: bool): _refresh_selection_summary())
+	content.add_child(_labeled_control("Showroom", _include_showroom_checkbox))
+	_showroom_dirs_spin = _make_int_spinbox(0, 2000, 0)
+	_showroom_dirs_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	content.add_child(_labeled_control("Showroom Directions (0 = skip)", _showroom_dirs_spin))
+	_showroom_roll_spin = _make_int_spinbox(1, 24, 6)
+	_showroom_roll_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	content.add_child(_labeled_control("Showroom Roll Steps", _showroom_roll_spin))
 
 	content.add_child(_make_separator())
 	content.add_child(_make_section_title("Selective Baking Filters"))
@@ -609,6 +625,12 @@ func _sync_form_from_loaded_settings() -> void:
 	for axis in ROTATION_AXES:
 		if _rotation_axis_checkboxes.has(axis):
 			_rotation_axis_checkboxes[axis].button_pressed = selected_axes.has(String(axis))
+	if _showroom_dirs_spin != null:
+		_showroom_dirs_spin.value = int(settings.get("showroom_direction_count", 0))
+	if _showroom_roll_spin != null:
+		_showroom_roll_spin.value = int(settings.get("showroom_roll_steps", 6))
+	if _include_showroom_checkbox != null:
+		_include_showroom_checkbox.button_pressed = int(settings.get("showroom_direction_count", 0)) > 0
 	_quality_dropdown.select(1)
 	_on_quality_preset_selected(_quality_dropdown.selected)
 	_syncing_settings_form = false
@@ -819,7 +841,15 @@ func _refresh_selection_summary() -> void:
 	if _rotation_labels_filter_edit != null and not _rotation_labels_filter_edit.text.strip_edges().is_empty():
 		filter_parts.append("rot-label-filter")
 	var filter_note := "  |  filters: %s" % ",".join(filter_parts) if not filter_parts.is_empty() else ""
-	_selection_summary_label.text = "%d gems selected  |  %s  |  runtime %dx%d  |  %s  |  %d px cell  |  %d px bake  |  %d samples  |  threads %s  |  workers %s%s" % [
+	var showroom_note := ""
+	if _include_showroom_checkbox != null and _include_showroom_checkbox.button_pressed:
+		var sd := int(_showroom_dirs_spin.value) if _showroom_dirs_spin != null else 0
+		var sr := int(_showroom_roll_spin.value) if _showroom_roll_spin != null else 6
+		if sd > 0:
+			showroom_note = "  |  showroom %d×%d=%d" % [sd, sr, sd * sr]
+		else:
+			showroom_note = "  |  showroom (set directions > 0)"
+	_selection_summary_label.text = "%d gems selected  |  %s  |  runtime %dx%d  |  %s  |  %d px cell  |  %d px bake  |  %d samples  |  threads %s  |  workers %s%s%s" % [
 		selected.size(),
 		lighting_label,
 		runtime_grid.x,
@@ -831,6 +861,7 @@ func _refresh_selection_summary() -> void:
 		"auto" if int(_thread_count_spin.value) <= 0 else str(int(_thread_count_spin.value)),
 		"auto" if int(_variant_worker_count_spin.value) <= 0 else str(int(_variant_worker_count_spin.value)),
 		filter_note,
+		showroom_note,
 	]
 
 
@@ -1011,18 +1042,26 @@ func _update_rotation_preview_cards() -> void:
 
 func _format_variant_state(state: Dictionary) -> String:
 	var entries: Array = state.get("entries", [])
-	if entries.is_empty():
+	if not entries.is_empty():
+		var parts: Array[String] = []
+		for entry in entries:
+			var metadata: Dictionary = entry.get("metadata", {})
+			var variant_key := String(metadata.get("variant_key", metadata.get("variant_cache_key", "")))
+			var weight := float(entry.get("weight", 0.0))
+			if not variant_key.is_empty():
+				parts.append("%s %.2f" % [variant_key.get_file(), weight])
+		if not parts.is_empty():
+			return " | ".join(parts)
+	var blend: Dictionary = state.get("sprite_blend", {})
+	if blend.is_empty():
 		return "waiting for cached variants"
-	var parts: Array[String] = []
-	for entry in entries:
-		var metadata: Dictionary = entry.get("metadata", {})
-		var variant_key := String(metadata.get("variant_key", metadata.get("variant_cache_key", "")))
-		var weight := float(entry.get("weight", 0.0))
-		if not variant_key.is_empty():
-			parts.append("%s %.2f" % [variant_key.get_file(), weight])
-	if parts.is_empty():
+	var w: Vector4 = blend.get("weights", Vector4.ZERO)
+	var li: Vector4 = blend.get("layer_index", Vector4.ZERO)
+	if w.length_squared() < 1e-10:
 		return "active blend unavailable"
-	return " | ".join(parts)
+	return "atlas layers (%.0f,%.0f,%.0f,%.0f)  w(%.2f,%.2f,%.2f,%.2f)" % [
+		li.x, li.y, li.z, li.w, w.x, w.y, w.z, w.w,
+	]
 
 
 func _build_job_settings() -> Dictionary:
@@ -1047,6 +1086,9 @@ func _build_job_settings() -> Dictionary:
 		"lighting_bins_filter": _lighting_bins_filter_edit.text.strip_edges() if _lighting_bins_filter_edit != null else "",
 		"rotation_bins_filter": _rotation_bins_filter_edit.text.strip_edges() if _rotation_bins_filter_edit != null else "",
 		"rotation_labels_filter": _rotation_labels_filter_edit.text.strip_edges() if _rotation_labels_filter_edit != null else "",
+		"include_showroom": _include_showroom_checkbox.button_pressed if _include_showroom_checkbox != null else false,
+		"showroom_direction_count": int(_showroom_dirs_spin.value) if _showroom_dirs_spin != null else 0,
+		"showroom_roll_steps": int(_showroom_roll_spin.value) if _showroom_roll_spin != null else 6,
 	}
 
 
@@ -1102,6 +1144,9 @@ func _start_bake_job() -> void:
 	var rotation_labels_filter := String(settings.get("rotation_labels_filter", ""))
 	if not rotation_labels_filter.is_empty():
 		args.append("--rotation_labels=%s" % rotation_labels_filter)
+	if bool(settings.get("include_showroom", false)) and int(settings.get("showroom_direction_count", 0)) > 0:
+		args.append("--showroom_directions=%d" % int(settings["showroom_direction_count"]))
+		args.append("--showroom_roll_steps=%d" % int(settings.get("showroom_roll_steps", 6)))
 	var thread_count := int(settings["thread_count"])
 	if thread_count > 0:
 		args.append("--threads=%d" % thread_count)

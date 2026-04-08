@@ -12,19 +12,20 @@ extends Node
 const VISUAL_DATA_PATH := "res://data/visuals/"
 const GAMEPLAY_BAKE_SUPERSAMPLE := 2
 const GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED := &"offline_traced"
+const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 const GAMEPLAY_VARIANT_TYPE_LIGHTING := &"lighting"
 const GAMEPLAY_VARIANT_TYPE_ROTATION := &"rotation"
-const GAMEPLAY_VARIANT_TYPE_VIEW_SPHERE := &"view_sphere"
+const GAMEPLAY_VARIANT_TYPE_SHOWROOM := GemTracedBakeContractScript.GAMEPLAY_VARIANT_TYPE_SHOWROOM
 const DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE := GemTracedBakeContract.DEFAULT_LIGHTING_GRID_SIZE
 const DEFAULT_GAMEPLAY_BASE_ROTATION_VIEW_COUNT := GemTracedBakeContract.DEFAULT_ROTATION_BASE_VIEW_COUNT
 const GAMEPLAY_ROTATION_DEFAULT_AXIS_STEPS := 0
 const GAMEPLAY_ROTATION_DEFAULT_STEP_DEGREES := 18.0
 const GAMEPLAY_LIGHTING_SWEEP_X_DEGREES := 46.0
 const GAMEPLAY_LIGHTING_SWEEP_Y_DEGREES := 30.0
-const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
-const GemCutProjector = preload("res://core/visuals/gem_cut_projector.gd")
+const GemCutProjectorScript = preload("res://core/visuals/gem_cut_projector.gd")
 const GameplayBakeBackendOfflineTracedScript = preload("res://scenes/tile/gem_gameplay_bake_backend_offline_traced.gd")
 const GemViewSphereSamplingScript = preload("res://core/visuals/gem_view_sphere_sampling.gd")
+const GemAtlasCacheScript = preload("res://core/visuals/gem_atlas_cache.gd")
 
 signal gameplay_texture_cache_rebuilt(profile: Dictionary)
 signal gameplay_texture_bake_progress(progress: Dictionary)
@@ -40,6 +41,12 @@ var _scaled_geometry_cache: Dictionary = {}  # String -> geometry bundle per geo
 var _render_cache: Dictionary = {}      # String -> render bundle per cache key + draw size
 var _gameplay_texture_cache: Dictionary = {}  # StringName composite variant key -> Texture2D
 var _gameplay_texture_metadata_cache: Dictionary = {}  # StringName composite variant key -> metadata
+var _gameplay_lighting_atlas_by_key: Dictionary = {}  # StringName base_key -> Texture2DArray
+var _gameplay_rotation_atlas_by_key: Dictionary = {}  # StringName base_key -> Texture2DArray
+var _gameplay_blend_placeholder_atlas: Texture2DArray = null
+var _gem_atlas_run_cache = GemAtlasCacheScript.new()
+var _gameplay_run_tile_scope: PackedStringArray = PackedStringArray()
+var _gameplay_run_tile_scope_previous: PackedStringArray = PackedStringArray()
 var _gameplay_texture_profile: Dictionary = {}
 var _gameplay_bake_backends: Dictionary = {}  # StringName -> GemGameplayBakeBackend
 var _loaded: bool = false
@@ -56,6 +63,8 @@ var _bake_total_requests := 0
 var _bake_completed_requests := 0
 var _last_gameplay_bake_report: Dictionary = {}
 var _gameplay_variant_settings: Dictionary = GemTracedBakeContractScript.default_variant_settings()
+## Per-tile showroom frames for quaternion lookup (manifest and/or designer session).
+var _showroom_cache: Dictionary = {}  # StringName -> Dictionary (orientations, textures, sigma, meta)
 var _bake_started_usec := 0
 var _bake_warmup_elapsed_ms := 0.0
 var _bake_queue_build_elapsed_ms := 0.0
@@ -176,7 +185,7 @@ func get_visual_cut_with_offset(
 		return _cut_variants[variant_key]
 
 	var rotated_model = get_visual_cut_model_with_offset(visual, additional_rotation_degrees)
-	var rotated_cut = GemCutProjector.project(rotated_model) if rotated_model != null else null
+	var rotated_cut = GemCutProjectorScript.project(rotated_model) if rotated_model != null else null
 	if rotated_cut != null:
 		_cut_variants[variant_key] = rotated_cut
 	return rotated_cut
@@ -219,82 +228,223 @@ func get_gameplay_rotation_texture(
 	)
 
 
+func get_gameplay_blend_placeholder_atlas() -> Texture2DArray:
+	if _gameplay_blend_placeholder_atlas == null:
+		var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		var ta := Texture2DArray.new()
+		ta.create_from_images([img])
+		_gameplay_blend_placeholder_atlas = ta
+	return _gameplay_blend_placeholder_atlas
+
+
+## Lighting grid row-major: layer = bin.y * grid.x + bin.x (matches bake request order).
+func lighting_atlas_layer_index(lighting_bin: Vector2i, grid: Vector2i) -> int:
+	return lighting_bin.y * grid.x + lighting_bin.x
+
+
+## Builds a 4-layer array for the gameplay blend shader (unused slots may be transparent).
+func build_gameplay_sprite_atlas_from_textures(textures: Array) -> Texture2DArray:
+	var w := 1
+	var h := 1
+	var fmt := Image.FORMAT_RGBA8
+	for t in textures:
+		if t is Texture2D and t != null:
+			var sz: Vector2 = (t as Texture2D).get_size()
+			w = maxi(w, int(round(sz.x)))
+			h = maxi(h, int(round(sz.y)))
+	var imgs: Array[Image] = []
+	for i in 4:
+		var tex: Texture2D = textures[i] if i < textures.size() else null
+		var im: Image = null
+		if tex != null:
+			im = tex.get_image()
+		if im == null:
+			var blank := Image.create(w, h, false, fmt)
+			blank.fill(Color(0, 0, 0, 0))
+			imgs.append(blank)
+		else:
+			if im.get_width() != w or im.get_height() != h:
+				var dup := im.duplicate()
+				dup.resize(w, h, Image.INTERPOLATE_BILINEAR)
+				imgs.append(dup)
+			else:
+				imgs.append(im.duplicate())
+	var arr := Texture2DArray.new()
+	arr.create_from_images(imgs)
+	return arr
+
+
+func _gameplay_blend_dict_from_textures(textures: Array, weights: Vector4) -> Dictionary:
+	return {
+		"atlas": build_gameplay_sprite_atlas_from_textures(textures),
+		"layer_index": Vector4(0.0, 1.0, 2.0, 3.0),
+		"weights": weights,
+	}
+
+
+func _gameplay_blend_dict_pack_lighting(
+	tile_id: StringName,
+	tier: int,
+	blend_entries: Array,
+	baked_grid: Vector2i,
+	atlas: Texture2DArray,
+) -> Dictionary:
+	var empty := {
+		"atlas": null,
+		"layer_index": Vector4.ZERO,
+		"weights": Vector4.ZERO,
+	}
+	if blend_entries.is_empty():
+		return empty
+	var layer_index := Vector4.ZERO
+	var weights := Vector4.ZERO
+	var slot := 0
+	for entry in blend_entries:
+		if slot >= 4:
+			break
+		var wt := clampf(float(entry.get("weight", 0.0)), 0.0, 1.0)
+		var layer_f := float(
+			lighting_atlas_layer_index(
+				entry.get("lighting_bin", Vector2i.ZERO),
+				baked_grid
+			)
+		)
+		match slot:
+			0:
+				layer_index.x = layer_f
+				weights.x = wt
+			1:
+				layer_index.y = layer_f
+				weights.y = wt
+			2:
+				layer_index.z = layer_f
+				weights.z = wt
+			3:
+				layer_index.w = layer_f
+				weights.w = wt
+		slot += 1
+	if atlas != null:
+		return {"atlas": atlas, "layer_index": layer_index, "weights": weights}
+	var tex_list: Array = []
+	for entry in blend_entries:
+		if tex_list.size() >= 4:
+			break
+		var bin: Vector2i = entry.get("lighting_bin", _get_default_lighting_bin())
+		tex_list.append(get_gameplay_lighting_texture(tile_id, tier, bin))
+	while tex_list.size() < 4:
+		tex_list.append(null)
+	return _gameplay_blend_dict_from_textures(tex_list, weights)
+
+
+func _gameplay_blend_dict_pack_rotation(
+	tile_id: StringName,
+	tier: int,
+	blend_entries: Array,
+	atlas: Texture2DArray,
+) -> Dictionary:
+	var empty := {
+		"atlas": null,
+		"layer_index": Vector4.ZERO,
+		"weights": Vector4.ZERO,
+	}
+	if blend_entries.is_empty():
+		return empty
+	var layer_index := Vector4.ZERO
+	var weights := Vector4.ZERO
+	var slot := 0
+	for entry in blend_entries:
+		if slot >= 4:
+			break
+		var wt := clampf(float(entry.get("weight", 0.0)), 0.0, 1.0)
+		var layer_f := float(int(entry.get("rotation_bin", 0)))
+		match slot:
+			0:
+				layer_index.x = layer_f
+				weights.x = wt
+			1:
+				layer_index.y = layer_f
+				weights.y = wt
+			2:
+				layer_index.z = layer_f
+				weights.z = wt
+			3:
+				layer_index.w = layer_f
+				weights.w = wt
+		slot += 1
+	if atlas != null:
+		return {"atlas": atlas, "layer_index": layer_index, "weights": weights}
+	var tex_list: Array = []
+	for entry in blend_entries:
+		if tex_list.size() >= 4:
+			break
+		var rb: int = int(entry.get("rotation_bin", 0))
+		tex_list.append(get_gameplay_rotation_texture(tile_id, tier, rb))
+	while tex_list.size() < 4:
+		tex_list.append(null)
+	return _gameplay_blend_dict_from_textures(tex_list, weights)
+
+
 func get_gameplay_lighting_blend_set(
 	tile_id: StringName,
 	tier: int,
 	normalized_position: Vector2,
-) -> Array[Dictionary]:
+) -> Dictionary:
+	var empty := {
+		"atlas": null,
+		"layer_index": Vector4.ZERO,
+		"weights": Vector4.ZERO,
+	}
 	var base_key := _resolve_gameplay_texture_base_key(tile_id, tier)
 	if base_key == &"":
-		return []
+		return empty
 	var blend_entries := compute_gameplay_lighting_blend(normalized_position)
 	if blend_entries.is_empty():
+		var rot_atlas: Texture2DArray = _gameplay_rotation_atlas_by_key.get(base_key, null)
+		if rot_atlas != null:
+			return {
+				"atlas": rot_atlas,
+				"layer_index": Vector4.ZERO,
+				"weights": Vector4(1.0, 0.0, 0.0, 0.0),
+			}
 		var fallback_rotation := get_gameplay_rotation_texture(tile_id, tier, 0)
 		if fallback_rotation != null:
-			return [{
-				"texture": fallback_rotation,
-				"weight": 1.0,
-				"rotation_bin": 0,
-				"metadata": _get_gameplay_variant_metadata(
-					base_key,
-					GAMEPLAY_VARIANT_TYPE_ROTATION,
-					Vector2i(-1, -1),
-					0
-				),
-			}]
-		return []
-	var textured_entries: Array[Dictionary] = []
-	for entry in blend_entries:
-		var texture := get_gameplay_lighting_texture(
-			tile_id,
-			tier,
-			entry.get("lighting_bin", _get_default_lighting_bin())
-		)
-		if texture == null:
-			continue
-		textured_entries.append({
-			"texture": texture,
-			"weight": entry.get("weight", 0.0),
-			"lighting_bin": entry.get("lighting_bin", Vector2i.ZERO),
-			"metadata": _get_gameplay_variant_metadata(
-				base_key,
-				GAMEPLAY_VARIANT_TYPE_LIGHTING,
-				entry.get("lighting_bin", _get_default_lighting_bin())
-			),
-		})
-	return textured_entries
+			return _gameplay_blend_dict_from_textures(
+				[fallback_rotation, null, null, null],
+				Vector4(1.0, 0.0, 0.0, 0.0)
+			)
+		return empty
+	var settings := get_gameplay_variant_settings()
+	var baked_grid: Vector2i = settings.get(
+		"lighting_grid_size",
+		DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE
+	)
+	var atlas: Texture2DArray = _gameplay_lighting_atlas_by_key.get(base_key, null)
+	return _gameplay_blend_dict_pack_lighting(
+		tile_id,
+		tier,
+		blend_entries,
+		baked_grid,
+		atlas
+	)
 
 
 func get_gameplay_rotation_blend_set(
 	tile_id: StringName,
 	tier: int,
 	rotation_progress: float,
-) -> Array[Dictionary]:
+) -> Dictionary:
+	var empty := {
+		"atlas": null,
+		"layer_index": Vector4.ZERO,
+		"weights": Vector4.ZERO,
+	}
 	var base_key := _resolve_gameplay_texture_base_key(tile_id, tier)
 	if base_key == &"":
-		return []
+		return empty
 	var blend_entries := compute_gameplay_rotation_blend(rotation_progress)
-	var textured_entries: Array[Dictionary] = []
-	for entry in blend_entries:
-		var texture := get_gameplay_rotation_texture(
-			tile_id,
-			tier,
-			entry.get("rotation_bin", 0)
-		)
-		if texture == null:
-			continue
-		textured_entries.append({
-			"texture": texture,
-			"weight": entry.get("weight", 0.0),
-			"rotation_bin": entry.get("rotation_bin", 0),
-			"metadata": _get_gameplay_variant_metadata(
-				base_key,
-				GAMEPLAY_VARIANT_TYPE_ROTATION,
-				Vector2i(-1, -1),
-				entry.get("rotation_bin", 0)
-			),
-		})
-	return textured_entries
+	var atlas: Texture2DArray = _gameplay_rotation_atlas_by_key.get(base_key, null)
+	return _gameplay_blend_dict_pack_rotation(tile_id, tier, blend_entries, atlas)
 
 
 func get_gameplay_rotation_axis_blend_set(
@@ -302,29 +452,18 @@ func get_gameplay_rotation_axis_blend_set(
 	tier: int,
 	axis: StringName,
 	rotation_progress: float,
-) -> Array[Dictionary]:
+) -> Dictionary:
+	var empty := {
+		"atlas": null,
+		"layer_index": Vector4.ZERO,
+		"weights": Vector4.ZERO,
+	}
 	var base_key := _resolve_gameplay_texture_base_key(tile_id, tier)
 	if base_key == &"":
-		return []
+		return empty
 	var blend_entries := compute_gameplay_rotation_axis_blend(axis, rotation_progress)
-	var textured_entries: Array[Dictionary] = []
-	for entry in blend_entries:
-		var rotation_bin: int = int(entry.get("rotation_bin", 0))
-		var texture := get_gameplay_rotation_texture(tile_id, tier, rotation_bin)
-		if texture == null:
-			continue
-		textured_entries.append({
-			"texture": texture,
-			"weight": entry.get("weight", 0.0),
-			"rotation_bin": rotation_bin,
-			"metadata": _get_gameplay_variant_metadata(
-				base_key,
-				GAMEPLAY_VARIANT_TYPE_ROTATION,
-				Vector2i(-1, -1),
-				rotation_bin
-			),
-		})
-	return textured_entries
+	var atlas: Texture2DArray = _gameplay_rotation_atlas_by_key.get(base_key, null)
+	return _gameplay_blend_dict_pack_rotation(tile_id, tier, blend_entries, atlas)
 
 
 func compute_gameplay_lighting_blend(normalized_position: Vector2) -> Array[Dictionary]:
@@ -461,6 +600,179 @@ func get_offline_traced_manifest_summary() -> Dictionary:
 	return backend.get_manifest_summary()
 
 
+## Replace showroom lookup data for one tile (e.g. gem designer session bake).
+func set_showroom_bake_session(tile_id: StringName, entries: Array) -> void:
+	_showroom_cache[tile_id] = _pack_showroom_entries_for_tile(tile_id, entries)
+
+
+func find_nearest_showroom_frames(
+	tile_id: StringName,
+	current_orientation: Quaternion,
+	count: int = 4,
+	frame_type_filter: StringName = &"",
+) -> Array[Dictionary]:
+	var pack: Dictionary = _showroom_cache.get(tile_id, {})
+	var orientations: Array = pack.get("orientations", [])
+	var textures: Array = pack.get("textures", [])
+	var dir_idx: Array = pack.get("direction_indices", [])
+	var roll_idx: Array = pack.get("roll_indices", [])
+	var ftypes: Array = pack.get("frame_types", [])
+	var sigma := float(pack.get("sigma", 0.35))
+	if orientations.is_empty():
+		return []
+	var q_cur := current_orientation.normalized()
+	count = clampi(count, 1, 4)
+	var scored: Array[Dictionary] = []
+	var n := orientations.size()
+	for i in n:
+		if frame_type_filter != &"" and i < ftypes.size():
+			if ftypes[i] != frame_type_filter:
+				continue
+		var qi: Quaternion = orientations[i]
+		var dot := absf(q_cur.dot(qi.normalized()))
+		scored.append({"i": i, "dot": dot})
+	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("dot", 0.0)) > float(b.get("dot", 0.0))
+	)
+	var take := mini(count, scored.size())
+	var raw_weights: Array[float] = []
+	for k in take:
+		var it: Dictionary = scored[k]
+		var dot: float = float(it.get("dot", 0.0))
+		var ang := 2.0 * acos(clampf(dot, 0.0, 1.0))
+		raw_weights.append(exp(-ang * ang / (2.0 * sigma * sigma)))
+	var sum_w := 0.0
+	for w in raw_weights:
+		sum_w += w
+	var out: Array[Dictionary] = []
+	var uniform := 1.0 / float(maxi(take, 1))
+	for k in take:
+		var it: Dictionary = scored[k]
+		var i: int = int(it.get("i", 0))
+		var w := (raw_weights[k] / sum_w) if sum_w > 1e-10 else uniform
+		var tex: Texture2D = null
+		if i < textures.size():
+			tex = textures[i]
+		var d_i := int(dir_idx[i]) if i < dir_idx.size() else -1
+		var r_i := int(roll_idx[i]) if i < roll_idx.size() else -1
+		var ori: Quaternion = orientations[i] if i < orientations.size() else Quaternion.IDENTITY
+		out.append({
+			"texture": tex,
+			"weight": w,
+			"direction_index": d_i,
+			"roll_index": r_i,
+			"orientation": ori,
+		})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("weight", 0.0)) > float(b.get("weight", 0.0))
+	)
+	return out
+
+
+func _refresh_showroom_cache_from_backend() -> void:
+	var backend = _gameplay_bake_backends.get(GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED, null)
+	if backend == null or not backend.has_method("get_manifest_entries_flat"):
+		return
+	var flat: Array = backend.get_manifest_entries_flat()
+	_ingest_showroom_entries_from_manifest(flat)
+
+
+func _ingest_showroom_entries_from_manifest(entries: Array) -> void:
+	var by_tile: Dictionary = {}
+	for raw in entries:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = raw
+		if StringName(e.get("variant_type", &"")) != GAMEPLAY_VARIANT_TYPE_SHOWROOM:
+			continue
+		var tid: StringName = e.get("tile_id", &"")
+		if tid == &"":
+			continue
+		if not by_tile.has(tid):
+			by_tile[tid] = []
+		(by_tile[tid] as Array).append(e)
+	for tid in by_tile.keys():
+		_showroom_cache[tid] = _pack_showroom_entries_for_tile(tid, by_tile[tid] as Array)
+
+
+func _pack_showroom_entries_for_tile(_tile_id: StringName, entries: Array) -> Dictionary:
+	var sorted: Array = entries.duplicate()
+	sorted.sort_custom(func(a, b) -> bool:
+		if typeof(a) != TYPE_DICTIONARY or typeof(b) != TYPE_DICTIONARY:
+			return false
+		var ad := int(a.get("showroom_direction_index", 0))
+		var bd := int(b.get("showroom_direction_index", 0))
+		if ad != bd:
+			return ad < bd
+		return int(a.get("showroom_roll_index", 0)) < int(b.get("showroom_roll_index", 0))
+	)
+	var orientations: Array[Quaternion] = []
+	var textures: Array = []
+	var direction_indices: Array[int] = []
+	var roll_indices: Array[int] = []
+	var frame_types: Array[StringName] = []
+	for e in sorted:
+		if typeof(e) != TYPE_DICTIONARY:
+			continue
+		var ed: Dictionary = e
+		var oa = ed.get("showroom_orientation", null)
+		if oa is Array:
+			var arr: Array = oa
+			if arr.size() < 4:
+				continue
+			var qw := float(arr[0])
+			var qx := float(arr[1])
+			var qy := float(arr[2])
+			var qz := float(arr[3])
+			orientations.append(Quaternion(qx, qy, qz, qw))
+		else:
+			continue
+		direction_indices.append(int(ed.get("showroom_direction_index", 0)))
+		roll_indices.append(int(ed.get("showroom_roll_index", 0)))
+		frame_types.append(StringName(ed.get("showroom_frame_type", &"orbit")))
+		textures.append(_load_showroom_texture_from_path(String(ed.get("texture_path", ""))))
+	var sigma := _compute_showroom_sigma(orientations)
+	return {
+		"orientations": orientations,
+		"textures": textures,
+		"direction_indices": direction_indices,
+		"roll_indices": roll_indices,
+		"frame_types": frame_types,
+		"sigma": sigma,
+	}
+
+
+func _load_showroom_texture_from_path(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	var gpath := ProjectSettings.globalize_path(path)
+	if not FileAccess.file_exists(gpath):
+		return null
+	var img := Image.load_from_file(gpath)
+	if img == null:
+		return null
+	return ImageTexture.create_from_image(img)
+
+
+func _compute_showroom_sigma(orientations: Array[Quaternion]) -> float:
+	var n := orientations.size()
+	if n <= 1:
+		return 0.35
+	var sum_nn := 0.0
+	for i in n:
+		var best_dot := -1.0
+		var qi := orientations[i]
+		for j in n:
+			if i == j:
+				continue
+			var d := absf(qi.dot(orientations[j]))
+			best_dot = maxf(best_dot, d)
+		var ang := 2.0 * acos(clampf(best_dot, 0.0, 1.0))
+		sum_nn += ang
+	var mean_angle := sum_nn / float(n)
+	return mean_angle * 1.5
+
+
 func get_gameplay_rotation_view_descriptors(options: Dictionary = {}) -> Array[Dictionary]:
 	var suite := _build_rotation_view_suite(options)
 	var descriptors: Array[Dictionary] = []
@@ -572,9 +884,17 @@ func build_explicit_bake_requests(
 		out.append_array(_collect_rotation_bake_requests(
 			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale
 		))
-	if bool(options.get("include_view_sphere_fibonacci", false)):
-		out.append_array(_collect_fibonacci_view_sphere_requests(
-			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, options
+	var showroom_axis_steps := int(options.get("showroom_axis_steps", 0))
+	if showroom_axis_steps > 0:
+		out.append_array(_collect_showroom_axis_requests(
+			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, showroom_axis_steps
+		))
+	var showroom_dirs := int(options.get("showroom_direction_count", 0))
+	if bool(options.get("include_showroom", false)) and showroom_dirs <= 0:
+		showroom_dirs = 200
+	if showroom_dirs > 0:
+		out.append_array(_collect_showroom_bake_requests(
+			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, options, showroom_dirs
 		))
 	return out
 
@@ -686,7 +1006,59 @@ func is_gameplay_texture_cache_current(
 	draw_size: Vector2i,
 	tile_scope = [],
 ) -> bool:
-	return _is_gameplay_profile_current(draw_size, tile_scope) and not _bake_in_progress
+	var norm := _normalize_tile_scope(tile_scope)
+	if norm.is_empty() and not _gameplay_run_tile_scope.is_empty():
+		norm = _gameplay_run_tile_scope
+	return _is_gameplay_profile_current(draw_size, norm) and not _bake_in_progress
+
+
+## Restricts gameplay texture loading to the given tile IDs for the active run.
+## When the set changes, cached traced variants and atlases are invalidated; callers
+## should then warm the cache via [method ensure_gameplay_texture_cache] (e.g. from [BoardScene]).
+func load_run_gems(tile_ids: Array, _cell_size: Vector2i = Vector2i.ZERO) -> void:
+	var norm := _normalize_tile_scope(tile_ids)
+	if norm.is_empty():
+		return
+	_gem_atlas_run_cache.set_active_tile_ids(norm)
+	if norm == _gameplay_run_tile_scope_previous:
+		_gameplay_run_tile_scope = norm
+		return
+	_gameplay_run_tile_scope_previous = norm
+	_gameplay_run_tile_scope = norm
+	_invalidate_gameplay_texture_cache_state()
+
+
+## Clears run scoping and drops all gameplay traced texture caches (return to menu / teardown).
+func unload_run_gameplay_textures() -> void:
+	_gameplay_run_tile_scope = PackedStringArray()
+	_gameplay_run_tile_scope_previous = PackedStringArray()
+	_gem_atlas_run_cache.clear()
+	_invalidate_gameplay_texture_cache_state()
+
+
+func get_gameplay_run_tile_scope() -> PackedStringArray:
+	return _gameplay_run_tile_scope
+
+
+## Best-effort BC7-sized estimate from built atlases for gems in the active run scope.
+func estimate_gameplay_run_vram_bytes() -> int:
+	var total := 0
+	for tid in _gameplay_run_tile_scope:
+		var lat: Texture2DArray = _gameplay_lighting_atlas_by_key.get(tid, null)
+		var rat: Texture2DArray = _gameplay_rotation_atlas_by_key.get(tid, null)
+		if lat != null:
+			total += GemAtlasCacheScript.estimate_bc7_atlas_bytes(
+				lat.get_layers(),
+				lat.get_width(),
+				lat.get_height()
+			)
+		if rat != null:
+			total += GemAtlasCacheScript.estimate_bc7_atlas_bytes(
+				rat.get_layers(),
+				rat.get_width(),
+				rat.get_height()
+			)
+	return total
 
 
 ## Ensures the gameplay texture cache exists for the requested board cell size.
@@ -701,6 +1073,8 @@ func ensure_gameplay_texture_cache(
 		return
 	_sync_gameplay_variant_settings_from_offline_manifest(false)
 	var normalized_scope := _normalize_tile_scope(tile_scope)
+	if normalized_scope.is_empty() and not _gameplay_run_tile_scope.is_empty():
+		normalized_scope = _gameplay_run_tile_scope
 	if _is_gameplay_profile_current(draw_size, normalized_scope):
 		return
 	if _bake_in_progress:
@@ -724,6 +1098,8 @@ func ensure_gameplay_texture_cache(
 	if not can_extend_scope:
 		_gameplay_texture_cache.clear()
 		_gameplay_texture_metadata_cache.clear()
+		_gameplay_lighting_atlas_by_key.clear()
+		_gameplay_rotation_atlas_by_key.clear()
 		_gameplay_texture_profile = {
 			"cell_size": draw_size,
 			"backend_id": GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED,
@@ -881,6 +1257,8 @@ func invalidate_color_cache() -> void:
 	_cut_variants.clear()
 	_gameplay_texture_cache.clear()
 	_gameplay_texture_metadata_cache.clear()
+	_gameplay_lighting_atlas_by_key.clear()
+	_gameplay_rotation_atlas_by_key.clear()
 	_gameplay_texture_profile.clear()
 	_last_gameplay_bake_report.clear()
 
@@ -893,6 +1271,8 @@ func invalidate_render_cache() -> void:
 	_cut_variants.clear()
 	_gameplay_texture_cache.clear()
 	_gameplay_texture_metadata_cache.clear()
+	_gameplay_lighting_atlas_by_key.clear()
+	_gameplay_rotation_atlas_by_key.clear()
 	_gameplay_texture_profile.clear()
 	_last_gameplay_bake_report.clear()
 
@@ -940,7 +1320,11 @@ func _generate_cuts() -> void:
 
 func _initialize_bake_backends() -> void:
 	_shutdown_bake_backends()
-	_register_bake_backend(GameplayBakeBackendOfflineTracedScript.new())
+	var offline_traced := GameplayBakeBackendOfflineTracedScript.new()
+	offline_traced.vram_compress_on_load = GemTracedBakeContract.VRAM_COMPRESS_ON_LOAD
+	offline_traced.vram_compress_min_size = GemTracedBakeContract.VRAM_COMPRESS_MIN_SIZE
+	offline_traced.vram_compress_desktop_format = GemTracedBakeContract.VRAM_COMPRESS_FORMAT
+	_register_bake_backend(offline_traced)
 
 
 func _register_bake_backend(backend) -> void:
@@ -1054,6 +1438,7 @@ func _map_lighting_bin_axis(index: int, source_count: int, target_count: int) ->
 	if target_count <= 1:
 		return 0
 	if source_count <= 1:
+		@warning_ignore("INTEGER_DIVISION")
 		return clampi((target_count - 1) / 2, 0, target_count - 1)
 	var normalized := float(clampi(index, 0, source_count - 1)) / float(source_count - 1)
 	return clampi(int(round(normalized * float(target_count - 1))), 0, target_count - 1)
@@ -1068,8 +1453,12 @@ func _make_gameplay_variant_cache_key(
 	match variant_type:
 		GAMEPLAY_VARIANT_TYPE_ROTATION:
 			return StringName("%s@rot_%02d" % [String(base_key), maxi(rotation_bin, 0)])
-		GAMEPLAY_VARIANT_TYPE_VIEW_SPHERE:
-			return StringName("%s@vsph_%05d" % [String(base_key), maxi(rotation_bin, 0)])
+		GAMEPLAY_VARIANT_TYPE_SHOWROOM:
+			return StringName("%s@showroom_d%03d_r%02d" % [
+				String(base_key),
+				maxi(lighting_bin.x, 0),
+				maxi(lighting_bin.y, 0),
+			])
 		_:
 			return StringName("%s@light_%d_%d" % [
 				String(base_key),
@@ -1133,6 +1522,11 @@ func _build_gameplay_bake_requests(
 	requests.append_array(_collect_rotation_bake_requests(
 		tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale
 	))
+	var showroom_n := int(variant_settings.get("showroom_direction_count", 0))
+	if showroom_n > 0:
+		requests.append_array(_collect_showroom_bake_requests(
+			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, {}, showroom_n
+		))
 	return requests
 
 
@@ -1176,6 +1570,7 @@ func _collect_lighting_bake_requests(
 					),
 					"cut_key_override": get_visual_cut_key(visual),
 					"lighting_bin": lighting_bin,
+					"lighting_grid_size": lighting_grid,
 					"lighting_uv": lighting_uv,
 					"light_dir": _compute_variant_light_dir(lighting_bin, variant_settings),
 					"view_scale": view_scale,
@@ -1236,11 +1631,80 @@ func _collect_rotation_bake_requests(
 			"view_roll_degrees": view_roll,
 			"light_dir": _compute_variant_light_dir(_get_default_lighting_bin_for_settings(variant_settings), variant_settings),
 			"view_scale": view_scale,
+			"uniform_projection": true,
 		})
 	return requests
 
 
-func _collect_fibonacci_view_sphere_requests(
+func _collect_showroom_axis_requests(
+	tile_id: StringName,
+	visual: GemVisualResource,
+	cut_model,
+	cut,
+	draw_size: Vector2i,
+	target_size: Vector2i,
+	variant_settings: Dictionary,
+	view_scale: float,
+	axis_steps: int,
+) -> Array[Dictionary]:
+	var requests: Array[Dictionary] = []
+	axis_steps = clampi(axis_steps, 1, 360)
+	var cut_key := get_visual_cut_key(visual)
+	var default_light := _get_default_lighting_bin_for_settings(variant_settings)
+	var light_dir := _compute_variant_light_dir(default_light, variant_settings)
+	# Two axes: pitch (X) and yaw (Y). Each gets axis_steps evenly spaced frames.
+	var axes: Array[Dictionary] = [
+		{"axis": Vector3.RIGHT, "frame_type": "pitch", "label_prefix": "pitch"},
+		{"axis": Vector3.UP, "frame_type": "yaw", "label_prefix": "yaw"},
+	]
+	for ax_def in axes:
+		var axis: Vector3 = ax_def["axis"]
+		var frame_type: String = ax_def["frame_type"]
+		var label_prefix: String = ax_def["label_prefix"]
+		for i in axis_steps:
+			var angle := TAU * float(i) / float(axis_steps)
+			var q := Quaternion(axis, angle)
+			var basis := Basis(q)
+			var variant_key := StringName("%s@showroom_%s_%03d" % [
+				String(tile_id), label_prefix, i
+			])
+			requests.append({
+				"tile_id": tile_id,
+				"visual_id": visual.visual_id,
+				"spec_id": cut.spec_id,
+				"geometry_signature": cut.geometry_signature,
+				"cut_id": cut.cut_id,
+				"visual": visual,
+				"cut_model": cut_model,
+				"cut": cut,
+				"draw_size": draw_size,
+				"target_size": target_size,
+				"geometry_source": &"canonical_3d",
+				"variant_type": GAMEPLAY_VARIANT_TYPE_SHOWROOM,
+				"variant_key": variant_key,
+				"cut_key_override": cut_key,
+				"rotation_bin": axes.find(ax_def) * 1000 + i,
+				"rotation_label": StringName("%s_%03d" % [label_prefix, i]),
+				"rotation_axis": &"",
+				"rotation_degrees": 0.0,
+				"view_pitch_degrees": 0.0,
+				"view_yaw_degrees": 0.0,
+				"view_roll_degrees": 0.0,
+				"light_dir": light_dir,
+				"view_scale": view_scale,
+				"view_basis_override": basis,
+				"uniform_projection": true,
+				"showroom_frame_type": frame_type,
+				"showroom_direction_index": axes.find(ax_def) * 1000 + i,
+				"showroom_roll_index": 0,
+				"showroom_direction_count": axis_steps,
+				"showroom_roll_steps": 1,
+				"showroom_orientation": [q.w, q.x, q.y, q.z],
+			})
+	return requests
+
+
+func _collect_showroom_bake_requests(
 	tile_id: StringName,
 	visual: GemVisualResource,
 	cut_model,
@@ -1250,61 +1714,63 @@ func _collect_fibonacci_view_sphere_requests(
 	variant_settings: Dictionary,
 	view_scale: float,
 	options: Dictionary,
+	direction_count: int,
 ) -> Array[Dictionary]:
 	var requests: Array[Dictionary] = []
-	var theta := float(options.get("fibonacci_theta_degrees", 12.0))
-	var n := int(options.get("fibonacci_point_count", 0))
-	if n <= 0:
-		n = GemViewSphereSamplingScript.fibonacci_point_count_for_theta_degrees(theta)
+	var roll_steps := int(options.get("showroom_roll_steps", variant_settings.get("showroom_roll_steps", 6)))
+	roll_steps = clampi(roll_steps, 1, 64)
+	var n := clampi(
+		direction_count,
+		GemViewSphereSamplingScript.MIN_FIBONACCI_POINTS,
+		GemViewSphereSamplingScript.MAX_FIBONACCI_POINTS
+	)
 	var dirs := GemViewSphereSamplingScript.build_fibonacci_unit_vectors(n)
-	var angular_res := theta
 	var cut_key := get_visual_cut_key(visual)
 	var default_light := _get_default_lighting_bin_for_settings(variant_settings)
 	var light_dir := _compute_variant_light_dir(default_light, variant_settings)
 	for i in dirs.size():
-		var view_dir: Vector3 = dirs[i]
-		var pyr: Vector3 = GemViewSphereSamplingScript.pitch_yaw_roll_for_view_dir(
-			view_dir,
-			visual,
-			true
-		)
-		var view_pitch := pyr.x
-		var view_yaw := pyr.y
-		var view_roll := pyr.z
-		requests.append({
-			"tile_id": tile_id,
-			"visual_id": visual.visual_id,
-			"spec_id": cut.spec_id,
-			"geometry_signature": cut.geometry_signature,
-			"cut_id": cut.cut_id,
-			"visual": visual,
-			"cut_model": cut_model,
-			"cut": cut,
-			"draw_size": draw_size,
-			"target_size": target_size,
-			"geometry_source": &"canonical_3d",
-			"variant_type": GAMEPLAY_VARIANT_TYPE_VIEW_SPHERE,
-			"variant_key": _make_gameplay_variant_cache_key(
-				tile_id,
-				GAMEPLAY_VARIANT_TYPE_VIEW_SPHERE,
-				Vector2i(-1, -1),
-				i
-			),
-			"cut_key_override": cut_key,
-			"rotation_bin": i,
-			"rotation_label": StringName("fib_%05d" % i),
-			"rotation_axis": &"",
-			"rotation_degrees": 0.0,
-			"view_pitch_degrees": view_pitch,
-			"view_yaw_degrees": view_yaw,
-			"view_roll_degrees": view_roll,
-			"light_dir": light_dir,
-			"view_scale": view_scale,
-			"view_dir_model": [view_dir.x, view_dir.y, view_dir.z],
-			"fibonacci_index": i,
-			"fibonacci_n": dirs.size(),
-			"angular_resolution_degrees": angular_res,
-		})
+		for j in roll_steps:
+			var roll_r := TAU * float(j) / float(roll_steps)
+			var basis := GemViewSphereSamplingScript.build_showroom_orientation(dirs[i], roll_r)
+			var q := Quaternion(basis)
+			requests.append({
+				"tile_id": tile_id,
+				"visual_id": visual.visual_id,
+				"spec_id": cut.spec_id,
+				"geometry_signature": cut.geometry_signature,
+				"cut_id": cut.cut_id,
+				"visual": visual,
+				"cut_model": cut_model,
+				"cut": cut,
+				"draw_size": draw_size,
+				"target_size": target_size,
+				"geometry_source": &"canonical_3d",
+				"variant_type": GAMEPLAY_VARIANT_TYPE_SHOWROOM,
+				"variant_key": _make_gameplay_variant_cache_key(
+					tile_id,
+					GAMEPLAY_VARIANT_TYPE_SHOWROOM,
+					Vector2i(i, j),
+					0
+				),
+				"cut_key_override": cut_key,
+				"rotation_bin": i * roll_steps + j,
+				"rotation_label": StringName("showroom_d%03d_r%02d" % [i, j]),
+				"rotation_axis": &"",
+				"rotation_degrees": 0.0,
+				"view_pitch_degrees": 0.0,
+				"view_yaw_degrees": 0.0,
+				"view_roll_degrees": 0.0,
+				"light_dir": light_dir,
+				"view_scale": view_scale,
+				"view_basis_override": basis,
+				"uniform_projection": true,
+				"showroom_frame_type": "orbit",
+				"showroom_direction_index": i,
+				"showroom_roll_index": j,
+				"showroom_direction_count": n,
+				"showroom_roll_steps": roll_steps,
+				"showroom_orientation": [q.w, q.x, q.y, q.z],
+			})
 	return requests
 
 
@@ -1525,7 +1991,7 @@ func _ensure_visual_geometry_cached(visual: GemVisualResource) -> String:
 	if cut_model == null:
 		return ""
 	_cut_models[geometry_key] = cut_model
-	_cuts[geometry_key] = GemCutProjector.project(cut_model)
+	_cuts[geometry_key] = GemCutProjectorScript.project(cut_model)
 	return geometry_key
 
 
@@ -1725,6 +2191,8 @@ func _should_preload_procedural_runtime_assets() -> bool:
 func _invalidate_gameplay_texture_cache_state() -> void:
 	_gameplay_texture_cache.clear()
 	_gameplay_texture_metadata_cache.clear()
+	_gameplay_lighting_atlas_by_key.clear()
+	_gameplay_rotation_atlas_by_key.clear()
 	_gameplay_texture_profile.clear()
 	_last_gameplay_bake_report.clear()
 
@@ -1738,6 +2206,7 @@ func _sync_gameplay_variant_settings_from_offline_manifest(
 	backend.reload_manifest()
 	var manifest_settings: Dictionary = backend.get_manifest_variant_settings()
 	set_gameplay_variant_settings(manifest_settings, invalidate_cache)
+	_refresh_showroom_cache_from_backend()
 	return get_gameplay_variant_settings()
 
 
@@ -1867,11 +2336,142 @@ func _store_gameplay_texture_variant(
 		_gameplay_texture_metadata_cache[tier_cache_key] = stored_metadata.duplicate(true)
 
 
+func _collect_gameplay_atlas_base_keys() -> Array[StringName]:
+	var seen: Dictionary = {}
+	var out: Array[StringName] = []
+	for cache_key_variant in _gameplay_texture_cache.keys():
+		var ks := String(cache_key_variant)
+		var at := ks.find("@")
+		if at <= 0:
+			continue
+		var base := StringName(ks.substr(0, at))
+		if seen.has(base):
+			continue
+		seen[base] = true
+		out.append(base)
+	return out
+
+
+func _try_build_lighting_atlas_for_base_key(base_key: StringName) -> Texture2DArray:
+	var settings := get_gameplay_variant_settings()
+	var grid: Vector2i = settings.get(
+		"lighting_grid_size",
+		DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE
+	)
+	if grid.x <= 0 or grid.y <= 0:
+		return null
+	var w := 0
+	var h := 0
+	for y in grid.y:
+		for x in grid.x:
+			var bin := Vector2i(x, y)
+			var tex: Texture2D = _gameplay_texture_cache.get(
+				_make_gameplay_variant_cache_key(base_key, GAMEPLAY_VARIANT_TYPE_LIGHTING, bin),
+				null
+			)
+			if tex != null:
+				var sz: Vector2 = tex.get_size()
+				w = maxi(w, int(round(sz.x)))
+				h = maxi(h, int(round(sz.y)))
+	if w <= 0 or h <= 0:
+		return null
+	var imgs: Array[Image] = []
+	for y in grid.y:
+		for x in grid.x:
+			var bin2 := Vector2i(x, y)
+			var tex2: Texture2D = _gameplay_texture_cache.get(
+				_make_gameplay_variant_cache_key(base_key, GAMEPLAY_VARIANT_TYPE_LIGHTING, bin2),
+				null
+			)
+			var im: Image = null
+			if tex2 != null:
+				im = tex2.get_image()
+			if im == null:
+				var blank := Image.create(w, h, false, Image.FORMAT_RGBA8)
+				blank.fill(Color(0, 0, 0, 0))
+				imgs.append(blank)
+			else:
+				if im.get_width() != w or im.get_height() != h:
+					var dup := im.duplicate()
+					dup.resize(w, h, Image.INTERPOLATE_BILINEAR)
+					imgs.append(dup)
+				else:
+					imgs.append(im.duplicate())
+	var arr := Texture2DArray.new()
+	arr.create_from_images(imgs)
+	return arr
+
+
+func _try_build_rotation_atlas_for_base_key(base_key: StringName) -> Texture2DArray:
+	var bin_count := _get_rotation_view_count()
+	if bin_count <= 0:
+		return null
+	var w := 0
+	var h := 0
+	for rotation_bin in bin_count:
+		var tex: Texture2D = _gameplay_texture_cache.get(
+			_make_gameplay_variant_cache_key(
+				base_key,
+				GAMEPLAY_VARIANT_TYPE_ROTATION,
+				Vector2i(-1, -1),
+				rotation_bin
+			),
+			null
+		)
+		if tex != null:
+			var sz: Vector2 = tex.get_size()
+			w = maxi(w, int(round(sz.x)))
+			h = maxi(h, int(round(sz.y)))
+	if w <= 0 or h <= 0:
+		return null
+	var imgs: Array[Image] = []
+	for rotation_bin2 in bin_count:
+		var tex_r: Texture2D = _gameplay_texture_cache.get(
+			_make_gameplay_variant_cache_key(
+				base_key,
+				GAMEPLAY_VARIANT_TYPE_ROTATION,
+				Vector2i(-1, -1),
+				rotation_bin2
+			),
+			null
+		)
+		var im: Image = null
+		if tex_r != null:
+			im = tex_r.get_image()
+		if im == null:
+			var blank := Image.create(w, h, false, Image.FORMAT_RGBA8)
+			blank.fill(Color(0, 0, 0, 0))
+			imgs.append(blank)
+		else:
+			if im.get_width() != w or im.get_height() != h:
+				var dup := im.duplicate()
+				dup.resize(w, h, Image.INTERPOLATE_BILINEAR)
+				imgs.append(dup)
+			else:
+				imgs.append(im.duplicate())
+	var arr := Texture2DArray.new()
+	arr.create_from_images(imgs)
+	return arr
+
+
+func _rebuild_gameplay_texture_atlases() -> void:
+	_gameplay_lighting_atlas_by_key.clear()
+	_gameplay_rotation_atlas_by_key.clear()
+	for base_key in _collect_gameplay_atlas_base_keys():
+		var lat := _try_build_lighting_atlas_for_base_key(base_key)
+		if lat != null:
+			_gameplay_lighting_atlas_by_key[base_key] = lat
+		var rat := _try_build_rotation_atlas_for_base_key(base_key)
+		if rat != null:
+			_gameplay_rotation_atlas_by_key[base_key] = rat
+
+
 func _finish_bake_queue() -> void:
 	_bake_in_progress = false
 	_bake_current_tile_id = &""
 	_current_bake_request = {}
 	_bake_completed_requests = _bake_total_requests
+	_rebuild_gameplay_texture_atlases()
 	_last_gameplay_bake_report["profile"] = get_gameplay_texture_profile()
 	_last_gameplay_bake_report["variant_texture_count"] = _gameplay_texture_cache.size()
 	_last_gameplay_bake_report["total_wall_elapsed_ms"] = (
@@ -1921,7 +2521,12 @@ func _clear_runtime_state() -> void:
 	_gameplay_texture_profile.clear()
 	_gameplay_texture_cache.clear()
 	_gameplay_texture_metadata_cache.clear()
+	_gameplay_lighting_atlas_by_key.clear()
+	_gameplay_rotation_atlas_by_key.clear()
 	_last_gameplay_bake_report.clear()
+	_gameplay_run_tile_scope = PackedStringArray()
+	_gameplay_run_tile_scope_previous = PackedStringArray()
+	_gem_atlas_run_cache.clear()
 	_render_cache.clear()
 	_scaled_geometry_cache.clear()
 	_color_cache.clear()
@@ -1932,6 +2537,7 @@ func _clear_runtime_state() -> void:
 	_cuts.clear()
 	_visuals.clear()
 	_loaded = false
+	_showroom_cache.clear()
 
 
 func _queue_next_bake_step() -> void:

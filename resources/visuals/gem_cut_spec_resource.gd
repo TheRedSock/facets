@@ -77,6 +77,13 @@ func build_contract_dict() -> Dictionary:
 	}
 
 
+## Return a contract dict with all Godot-native types (PackedVector2Array,
+## Vector2, StringName, etc.) replaced by JSON-safe equivalents so that
+## JSON.stringify → JSON.parse_string round-trips cleanly.
+func build_json_safe_contract_dict() -> Dictionary:
+	return _to_json_safe(build_contract_dict())
+
+
 func build_geometry_signature() -> String:
 	var base_id := spec_id
 	if base_id == &"":
@@ -213,7 +220,16 @@ func get_table_points() -> Array[Vector2]:
 
 
 func get_center_point() -> Vector2:
-	return crown.get("center_point", Vector2(0.5, 0.5))
+	var raw = crown.get("center_point", Vector2(0.5, 0.5))
+	if raw is Vector2:
+		return raw
+	if typeof(raw) == TYPE_STRING:
+		var parsed := _parse_vector2_array_string("[%s]" % raw)
+		if parsed.size() >= 1:
+			return parsed[0]
+	if typeof(raw) == TYPE_ARRAY and raw.size() >= 2:
+		return Vector2(float(raw[0]), float(raw[1]))
+	return Vector2(0.5, 0.5)
 
 
 func get_inner_star_facets() -> Array:
@@ -249,7 +265,14 @@ func get_outer_points() -> Array[Vector2]:
 
 
 func get_silhouette_points() -> PackedVector2Array:
-	return PackedVector2Array(girdle.get("silhouette", PackedVector2Array()))
+	var raw = girdle.get("silhouette", PackedVector2Array())
+	if raw is PackedVector2Array:
+		return raw
+	var arr := _packed_or_array_to_vector2_array(raw)
+	var result := PackedVector2Array()
+	for v in arr:
+		result.append(v)
+	return result
 
 
 func get_orthographic_top_roll_degrees() -> float:
@@ -307,6 +330,63 @@ static func _duplicate_variant(value):
 			return result
 		TYPE_PACKED_BYTE_ARRAY, TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_INT64_ARRAY, TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY, TYPE_PACKED_STRING_ARRAY, TYPE_PACKED_VECTOR2_ARRAY, TYPE_PACKED_VECTOR3_ARRAY, TYPE_PACKED_COLOR_ARRAY:
 			return value.duplicate()
+		_:
+			return value
+
+
+## Recursively convert Godot-native types to JSON-safe equivalents.
+## PackedVector2Array → [[x,y], ...], Vector2 → [x,y], StringName → String, etc.
+static func _to_json_safe(value):
+	match typeof(value):
+		TYPE_DICTIONARY:
+			var result := {}
+			for key in value.keys():
+				result[String(key) if key is StringName else key] = _to_json_safe(value[key])
+			return result
+		TYPE_ARRAY:
+			var result: Array = []
+			result.resize(value.size())
+			for i in value.size():
+				result[i] = _to_json_safe(value[i])
+			return result
+		TYPE_PACKED_VECTOR2_ARRAY:
+			var result: Array = []
+			for v in value:
+				result.append([v.x, v.y])
+			return result
+		TYPE_PACKED_VECTOR3_ARRAY:
+			var result: Array = []
+			for v in value:
+				result.append([v.x, v.y, v.z])
+			return result
+		TYPE_PACKED_COLOR_ARRAY:
+			var result: Array = []
+			for c in value:
+				result.append([c.r, c.g, c.b, c.a])
+			return result
+		TYPE_VECTOR2, TYPE_VECTOR2I:
+			return [value.x, value.y]
+		TYPE_VECTOR3, TYPE_VECTOR3I:
+			return [value.x, value.y, value.z]
+		TYPE_COLOR:
+			return [value.r, value.g, value.b, value.a]
+		TYPE_STRING_NAME:
+			return String(value)
+		TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_INT64_ARRAY:
+			var result: Array = []
+			for v in value:
+				result.append(v)
+			return result
+		TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY:
+			var result: Array = []
+			for v in value:
+				result.append(v)
+			return result
+		TYPE_PACKED_STRING_ARRAY:
+			var result: Array = []
+			for v in value:
+				result.append(String(v))
+			return result
 		_:
 			return value
 
@@ -385,9 +465,54 @@ static func _packed_or_array_to_vector2_array(value) -> Array[Vector2]:
 		for point in value:
 			result.append(point)
 		return result
+	if typeof(value) == TYPE_STRING:
+		return _parse_vector2_array_string(value)
 	if typeof(value) == TYPE_ARRAY:
-		for point in value:
-			result.append(point)
+		for element in value:
+			var v: Variant = _coerce_to_vector2(element)
+			if v != null:
+				result.append(v)
+	return result
+
+
+## Coerce a single JSON-parsed element to Vector2.
+## Handles: Vector2 (pass-through), [x, y] Array, {"x": x, "y": y} Dictionary.
+static func _coerce_to_vector2(element) -> Variant:
+	if element is Vector2:
+		return element
+	if typeof(element) == TYPE_ARRAY and element.size() >= 2:
+		return Vector2(float(element[0]), float(element[1]))
+	if typeof(element) == TYPE_DICTIONARY:
+		if element.has("x") and element.has("y"):
+			return Vector2(float(element["x"]), float(element["y"]))
+	return null
+
+
+## Parse a GDScript-style vector2 array string, e.g. "[(0.5, 0.05), (0.78, 0.22)]".
+static func _parse_vector2_array_string(text: String) -> Array[Vector2]:
+	var result: Array[Vector2] = []
+	var s := text.strip_edges()
+	if s == "" or s == "[]":
+		return result
+	# Strip outer brackets
+	if s.begins_with("[") and s.ends_with("]"):
+		s = s.substr(1, s.length() - 2).strip_edges()
+	if s == "":
+		return result
+	# Find all (x, y) pairs via parentheses
+	var start := 0
+	while start < s.length():
+		var open := s.find("(", start)
+		if open < 0:
+			break
+		var close := s.find(")", open)
+		if close < 0:
+			break
+		var inner := s.substr(open + 1, close - open - 1)
+		var parts := inner.split(",")
+		if parts.size() >= 2:
+			result.append(Vector2(float(parts[0].strip_edges()), float(parts[1].strip_edges())))
+		start = close + 1
 	return result
 
 

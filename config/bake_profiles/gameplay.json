@@ -1,0 +1,18 @@
+{
+	"profile_id": "gameplay_v1",
+	"format": "webp",
+	"base_quality": 92,
+	"cell_size": 112,
+	"draw_size": 224,
+	"sample_count": 2,
+	"max_trace_bounces": 12,
+	"lighting_grid_preset": "quality",
+	"rotation_base_view_count": 6,
+	"rotation_axes": ["pitch"],
+	"rotation_axis_steps": 5,
+	"rotation_step_degrees": 15,
+	"vram_compress": true,
+	"atlas_output": true,
+	"gems": "all",
+	"output_root": "res://generated/traced_bakes"
+}

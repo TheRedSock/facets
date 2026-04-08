@@ -4,14 +4,14 @@ extends RefCounted
 ## Derives a 2D render packet from the canonical 3D cut model.
 
 const GemProjectedCutResourceScript = preload("res://resources/visuals/gem_projected_cut_resource.gd")
-const GemCutPrimitives = preload("res://core/visuals/gem_cut_primitives.gd")
+const GemCutPrimitivesScript = preload("res://core/visuals/gem_cut_primitives.gd")
 
 const EXCLUDED_TOP_ZONES := {
 	"pavilion": true,
 	"culet": true,
 	"girdle_band": true,
 }
-const TARGET_HORIZONTAL_SPAN := GemCutPrimitives.GEM_RADIUS * 2.0
+const TARGET_HORIZONTAL_SPAN := GemCutPrimitivesScript.GEM_RADIUS * 2.0
 
 
 static func project(model):
@@ -42,7 +42,7 @@ static func project(model):
 			polygon.append(_project_point(vertex))
 		if polygon.size() < 3:
 			continue
-		if absf(GemCutPrimitives.polygon_signed_area(polygon)) <= 0.000001:
+		if absf(GemCutPrimitivesScript.polygon_signed_area(polygon)) <= 0.000001:
 			continue
 		top_source_indices.append(facet_index)
 		top_polygons.append(polygon)
@@ -68,7 +68,7 @@ static func project(model):
 static func _build_projected_pavilion(
 	projected,
 	model,
-	top_source_indices: Array[int],
+	_top_source_indices: Array[int],
 	transform: Callable,
 ) -> void:
 	projected.clear_pavilion()
@@ -88,8 +88,8 @@ static func _build_projected_pavilion(
 				continue
 			if projected.facet_zones[target_index] == "table":
 				continue
-			var clipped = GemCutPrimitives.clip_polygon(pav_poly, target_polygons[target_index])
-			var clipped_area = absf(GemCutPrimitives.polygon_signed_area(clipped))
+			var clipped = GemCutPrimitivesScript.clip_polygon(pav_poly, target_polygons[target_index])
+			var clipped_area = absf(GemCutPrimitivesScript.polygon_signed_area(clipped))
 			if clipped.size() >= 3 and clipped_area > 0.000005:
 				projected.add_pavilion_fragment(
 					clipped,
@@ -120,10 +120,10 @@ static func _collect_bounds(polygons: Array[PackedVector2Array], outer_loop: Pac
 
 
 static func _build_unit_transform() -> Callable:
-	var target_size = 1.0 - 2.0 * GemCutPrimitives.FIT_MARGIN
+	var target_size = 1.0 - 2.0 * GemCutPrimitivesScript.FIT_MARGIN
 	var scale_factor = target_size / maxf(TARGET_HORIZONTAL_SPAN, 0.00001)
 	return func(point: Vector2) -> Vector2:
-		return point * scale_factor + GemCutPrimitives.CENTER
+		return point * scale_factor + GemCutPrimitivesScript.CENTER
 
 
 static func _transform_polygon(points: PackedVector2Array, transform: Callable) -> PackedVector2Array:

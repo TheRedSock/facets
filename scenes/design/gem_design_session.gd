@@ -153,3 +153,16 @@ func apply_contract_dict_to_cut(contract: Dictionary) -> void:
 	var merged := GemCutSpecResourceScript._deep_merge_dict(working_cut_spec.build_contract_dict(), contract)
 	working_cut_spec.apply_full_contract(merged)
 	mark_geometry_dirty()
+
+
+func get_visual_json_dict() -> Dictionary:
+	if working_visual == null:
+		return {}
+	return working_visual.build_visual_json_dict()
+
+
+func apply_visual_json_dict(data: Dictionary) -> void:
+	if working_visual == null:
+		return
+	working_visual.apply_visual_json_dict(data)
+	mark_visual_dirty()

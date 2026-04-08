@@ -12,9 +12,9 @@ family = &"radial_brilliant"
 symmetry = {
 "half_angles": [],
 "main_angles": [],
-"pavilion_sector_count": 10,
+"pavilion_sector_count": 8,
 "rotation": -1.5707963267948966,
-"sector_count": 10
+"sector_count": 8
 }
 crown = {
 "bezel_facets": Array[PackedVector2Array]([]),
@@ -29,17 +29,17 @@ crown = {
 "outer_shoulder_height_ratio": 0.0,
 "outer_shoulder_scale": 1.0,
 "star_facets": Array[PackedVector2Array]([]),
-"star_height_ratio": 0.68,
+"star_height_ratio": 0.64,
 "star_length": 0.4,
 "table": PackedVector2Array(),
 "table_ratio": 0.44
 }
 pavilion = {
-"depth": 0.514,
+"depth": 0.42,
 "lower_depth_ratio": 0.82,
 "lower_scale": 0.16,
 "rotation_fraction": 0.0,
-"sector_count": 10,
+"sector_count": 8,
 "upper_depth_ratio": 0.48,
 "upper_scale": 0.42
 }

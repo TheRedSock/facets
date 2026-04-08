@@ -37,9 +37,9 @@ crown = {
 pavilion = {
 "depth": 0.24,
 "lower_depth_ratio": 0.78,
-"lower_scale": 0.2,
+"lower_scale": 0.12,
 "rotation_fraction": 0.0,
-"sector_count": 8,
+"sector_count": 4,
 "upper_depth_ratio": 0.46,
 "upper_scale": 0.46
 }

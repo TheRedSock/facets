@@ -4,7 +4,7 @@ extends RefCounted
 ## Explicit 3D topology builders for the canonical cut pipeline.
 
 const GemCutModelResourceScript = preload("res://resources/visuals/gem_cut_model_resource.gd")
-const GemCutPrimitives = preload("res://core/visuals/gem_cut_primitives.gd")
+const GemCutPrimitivesScript = preload("res://core/visuals/gem_cut_primitives.gd")
 const GIRDLE_WALL_ZONE := "girdle_band"
 
 
@@ -31,15 +31,15 @@ static func build(spec):
 
 static func _build_radial_brilliant(spec):
 	var model = _make_model(spec)
-	var main_angles = spec.get_main_angles()
+	var main_angles = _to_float_array(spec.get_main_angles())
 	if main_angles.is_empty():
-		main_angles = GemCutPrimitives.regular_angles(
+		main_angles = GemCutPrimitivesScript.regular_angles(
 			spec.get_symmetry_sector_count(),
 			spec.get_symmetry_rotation()
 		)
-	var half_angles = spec.get_half_angles()
+	var half_angles = _to_float_array(spec.get_half_angles())
 	if half_angles.is_empty():
-		half_angles = GemCutPrimitives.half_angles(main_angles)
+		half_angles = GemCutPrimitivesScript.half_angles(main_angles)
 	var rings = _sample_radial_rings(spec, main_angles, half_angles)
 
 	var table_z = spec.get_crown_height()
@@ -62,7 +62,12 @@ static func _build_radial_brilliant(spec):
 	girdle_h = patched_loops.get("girdle_half", girdle_h)
 	var count = table_v.size()
 
-	model.outer_loop = _loop_to_mesh(girdle_m, 0.0)
+	var interleaved_girdle: Array[Vector2] = []
+	for i in girdle_m.size():
+		interleaved_girdle.append(girdle_m[i])
+		if i < girdle_h.size():
+			interleaved_girdle.append(girdle_h[i])
+	model.outer_loop = _loop_to_mesh(interleaved_girdle, 0.0)
 	model.add_facet(_polygon3(table_v, table_z), "table")
 
 	for i in count:
@@ -226,7 +231,7 @@ static func _build_fan(spec):
 			if not _point_height_exists(point_heights, point):
 				_set_point_height(point_heights, point, inner_star_z)
 	for fan in fans:
-		var apex = fan.get("apex", GemCutPrimitives.CENTER)
+		var apex = fan.get("apex", GemCutPrimitivesScript.CENTER)
 		_set_point_height(point_heights, apex, star_z)
 		var boundary = _ensure_loop_array(fan.get("boundary", []))
 		_register_height_points(point_heights, boundary, 0.0)
@@ -250,7 +255,7 @@ static func _build_fan(spec):
 	for facet_points in bezel_facets:
 		model.add_facet(_polygon3_from_height_map(facet_points, point_heights, 0.0), "bezel")
 	for fan in fans:
-		var apex = fan.get("apex", GemCutPrimitives.CENTER)
+		var apex = fan.get("apex", GemCutPrimitivesScript.CENTER)
 		var boundary = _ensure_loop_array(fan.get("boundary", []))
 		for i in boundary.size() - 1:
 			model.add_facet(PackedVector3Array([
@@ -271,7 +276,7 @@ static func _build_radiant(spec):
 	if count < 4:
 		model.finalize_model()
 		return model
-	var table = GemCutPrimitives.scale_points(outer, spec.get_table_ratio())
+	var table = GemCutPrimitivesScript.scale_points(outer, spec.get_table_ratio())
 	var patched_loops = _apply_named_loop_patches(spec, {
 		"outer": outer,
 		"table": table,
@@ -282,7 +287,7 @@ static func _build_radiant(spec):
 	var outer_breaks = []
 	for i in count:
 		var next_index = (i + 1) % count
-		outer_breaks.append(GemCutPrimitives.point_on_segment(outer[i], outer[next_index], break_ratio))
+		outer_breaks.append(GemCutPrimitivesScript.point_on_segment(outer[i], outer[next_index], break_ratio))
 
 	var table_z = spec.get_crown_height()
 	var break_z = spec.get_crown_height() * spec.get_star_height_ratio()
@@ -319,7 +324,7 @@ static func _build_princess(spec):
 	if outer.size() != 4:
 		model.finalize_model()
 		return model
-	var table = GemCutPrimitives.scale_points(outer, spec.get_table_ratio())
+	var table = GemCutPrimitivesScript.scale_points(outer, spec.get_table_ratio())
 	var patched_loops = _apply_named_loop_patches(spec, {
 		"outer": outer,
 		"table": table,
@@ -331,8 +336,8 @@ static func _build_princess(spec):
 	var trim_end = []
 	for i in outer.size():
 		var next_index = (i + 1) % outer.size()
-		trim_start.append(GemCutPrimitives.point_on_segment(outer[i], outer[next_index], edge_trim))
-		trim_end.append(GemCutPrimitives.point_on_segment(outer[i], outer[next_index], 1.0 - edge_trim))
+		trim_start.append(GemCutPrimitivesScript.point_on_segment(outer[i], outer[next_index], edge_trim))
+		trim_end.append(GemCutPrimitivesScript.point_on_segment(outer[i], outer[next_index], 1.0 - edge_trim))
 
 	var table_z = spec.get_crown_height()
 	var star_z = spec.get_crown_height() * spec.get_star_height_ratio()
@@ -438,6 +443,35 @@ static func _append_interleaved_pavilion(
 		lower_ring.append(_project_pavilion_point(point, spec.get_pavilion_lower_scale(), lower_z, rotation_angle))
 	var ring_count = boundary_ring.size()
 	var culet = Vector3(0.0, 0.0, -spec.get_girdle_thickness() - spec.get_pavilion_depth())
+
+	# Merge lower-ring points that converge at shape cusps (e.g. pear tip)
+	# to avoid degenerate culet triangles and sliver pavilion quads.
+	var lower_seg_dists: Array[float] = []
+	for i in ring_count:
+		lower_seg_dists.append(lower_ring[i].distance_to(lower_ring[(i + 1) % ring_count]))
+	lower_seg_dists.sort()
+	@warning_ignore("INTEGER_DIVISION")
+	var median_lower_dist := lower_seg_dists[lower_seg_dists.size() / 2] if not lower_seg_dists.is_empty() else 0.0
+	var merge_threshold := median_lower_dist * 0.2
+
+	var merged_lower: Array[Vector3] = []
+	var lower_map: Array[int] = []
+	lower_map.resize(ring_count)
+	merged_lower.append(lower_ring[0])
+	lower_map[0] = 0
+	for i in range(1, ring_count):
+		if lower_ring[i].distance_to(merged_lower.back()) > merge_threshold:
+			merged_lower.append(lower_ring[i])
+		lower_map[i] = merged_lower.size() - 1
+	# Wrap-around: merge trailing points that are close to the first merged point.
+	while merged_lower.size() > 1 and merged_lower.back().distance_to(merged_lower[0]) <= merge_threshold:
+		var last_idx := merged_lower.size() - 1
+		merged_lower[0] = (merged_lower[0] + merged_lower[last_idx]) * 0.5
+		merged_lower.resize(last_idx)
+		for i in ring_count:
+			if lower_map[i] >= last_idx:
+				lower_map[i] = 0
+
 	for i in ring_count:
 		var next_index = (i + 1) % ring_count
 		model.add_facet(PackedVector3Array([
@@ -452,17 +486,27 @@ static func _append_interleaved_pavilion(
 			upper_ring[next_index],
 			upper_ring[i],
 		]), "pavilion")
-		model.add_facet(PackedVector3Array([
-			upper_ring[i],
-			upper_ring[next_index],
-			lower_ring[next_index],
-			lower_ring[i],
-		]), "pavilion")
-		model.add_facet(PackedVector3Array([
-			lower_ring[i],
-			culet,
-			lower_ring[next_index],
-		]), "culet")
+		var mi := lower_map[i]
+		var mn := lower_map[next_index]
+		if mi != mn:
+			model.add_facet(PackedVector3Array([
+				upper_ring[i],
+				upper_ring[next_index],
+				merged_lower[mn],
+				merged_lower[mi],
+			]), "pavilion")
+			model.add_facet(PackedVector3Array([
+				merged_lower[mi],
+				culet,
+				merged_lower[mn],
+			]), "culet")
+		else:
+			# Converging segment: collapse lower quad to triangle, skip culet.
+			model.add_facet(PackedVector3Array([
+				upper_ring[i],
+				upper_ring[next_index],
+				merged_lower[mi],
+			]), "pavilion")
 
 
 static func _append_outline_pavilion(
@@ -586,6 +630,13 @@ static func _loop_to_mesh(points: Array[Vector2], z: float) -> PackedVector3Arra
 	return loop
 
 
+static func _to_float_array(source: Array) -> Array[float]:
+	var result: Array[float] = []
+	for value in source:
+		result.append(float(value))
+	return result
+
+
 static func _ensure_loop_array(points) -> Array[Vector2]:
 	var loop: Array[Vector2] = []
 	for point in points:
@@ -603,7 +654,7 @@ static func _packed_to_array(points: PackedVector2Array) -> Array[Vector2]:
 static func _scale_loop_about_center(points: Array[Vector2], scale: float) -> Array[Vector2]:
 	var result: Array[Vector2] = []
 	for point in points:
-		result.append(GemCutPrimitives.CENTER + (point - GemCutPrimitives.CENTER) * scale)
+		result.append(GemCutPrimitivesScript.CENTER + (point - GemCutPrimitivesScript.CENTER) * scale)
 	return result
 
 
@@ -620,8 +671,8 @@ static func _rotate_loop_about_center(points: Array[Vector2], degrees: float) ->
 	var sin_r := sin(radians)
 	var result: Array[Vector2] = []
 	for point in points:
-		var delta := point - GemCutPrimitives.CENTER
-		result.append(GemCutPrimitives.CENTER + Vector2(
+		var delta := point - GemCutPrimitivesScript.CENTER
+		result.append(GemCutPrimitivesScript.CENTER + Vector2(
 			delta.x * cos_r - delta.y * sin_r,
 			delta.x * sin_r + delta.y * cos_r
 		))
@@ -712,7 +763,7 @@ static func _project_pavilion_point(
 	z: float,
 	rotation_angle: float,
 ) -> Vector3:
-	var delta = point - GemCutPrimitives.CENTER
+	var delta = point - GemCutPrimitivesScript.CENTER
 	var scaled = delta * scale_factor
 	var cos_r = cos(rotation_angle)
 	var sin_r = sin(rotation_angle)
@@ -720,7 +771,7 @@ static func _project_pavilion_point(
 		scaled.x * cos_r - scaled.y * sin_r,
 		scaled.x * sin_r + scaled.y * cos_r
 	)
-	return _p3(GemCutPrimitives.CENTER + rotated, z)
+	return _p3(GemCutPrimitivesScript.CENTER + rotated, z)
 
 
 static func _register_height_points(point_heights: Dictionary, points: Array[Vector2], z: float) -> void:
@@ -792,15 +843,15 @@ static func _sample_boundary_point(
 	var params = spec.get_boundary_params()
 	match mode:
 		&"ellipse":
-			return GemCutPrimitives.ellipse_point(
+			return GemCutPrimitivesScript.ellipse_point(
 				radius_scale * params.get("aspect_x", 1.0),
 				radius_scale * params.get("aspect_y", 1.0),
 				angle
 			)
 		&"marquise":
-			return GemCutPrimitives.marquise_point(radius_scale, angle, params)
+			return GemCutPrimitivesScript.marquise_point(radius_scale, angle, params)
 		&"superellipse":
-			return GemCutPrimitives.superellipse_point(
+			return GemCutPrimitivesScript.superellipse_point(
 				radius_scale,
 				angle,
 				params.get("exponent", 3.5),
@@ -808,15 +859,15 @@ static func _sample_boundary_point(
 				params.get("aspect_y", 1.0)
 			)
 		&"heart":
-			return GemCutPrimitives.heart_point(radius_scale, angle, params)
+			return GemCutPrimitivesScript.heart_point(radius_scale, angle, params)
 		&"pear":
-			return GemCutPrimitives.pear_point(radius_scale, angle, params)
+			return GemCutPrimitivesScript.pear_point(radius_scale, angle, params)
 		&"kite":
-			return GemCutPrimitives.kite_point(
+			return GemCutPrimitivesScript.kite_point(
 				radius_scale * params.get("aspect_x", 1.0),
 				radius_scale * params.get("aspect_y", 1.0),
 				angle,
 				params.get("shoulder", 0.5)
 			)
 		_:
-			return GemCutPrimitives.radial_point(radius_scale, angle)
+			return GemCutPrimitivesScript.radial_point(radius_scale, angle)

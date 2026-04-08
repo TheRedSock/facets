@@ -21,6 +21,8 @@ data/
   tiles/            # Tile definition .tres files (8-gem merge ladder)
   visuals/          # GemVisualResource .tres files (per-gem colour, material, cut assignment)
   spawn_tables/     # SpawnTableResource .tres files
+config/
+  bake_profiles/    # Version-controlled bake specifications (gameplay.json)
 plans/              # Design documents (reference only, not code)
 resources/
   definitions/      # Resource class definitions (simulation data schemas)
@@ -34,7 +36,7 @@ scenes/
   tile/             # Tile visuals (gameplay texture cache + procedural fallback)
   debug/            # Debug panel (F1 toggle, animation tuning sliders)
 tests/              # Headless smoke tests (40+ tests)
-tools/              # Board layout validator, offline bake CLI runner
+tools/              # Board layout validator, offline bake CLI, production bake + validation
 ```
 
 ## Core Pipeline
@@ -71,11 +73,11 @@ Each tier has a distinct **silhouette shape** for instant visual identification:
 
 | Tier | Gem | Shape | Signature Cut |
 |------|-----|-------|---------------|
-| T1 | Quartz | Circle | Classic Round Brilliant |
+| T1 | Quartz | Octagon | Simple Octagon Step |
 | T2 | Amethyst | Square (rounded) | Cushion |
 | T3 | Peridot | Triangle (bowed edges) | Trillion |
-| T4 | Topaz | Rotated Square ◆ | Radiant Diamond |
-| T5 | Sapphire | Hexagon | Hex Brilliant |
+| T4 | Topaz | Rotated Square ◆ | Lozenge |
+| T5 | Sapphire | Hexagon | Hexagon Step |
 | T6 | Emerald | Rectangle (portrait) | Emerald Step |
 | T7 | Ruby | Oval (portrait) | Oval Brilliant |
 | T8 | Diamond | Pear/Teardrop | Pear Brilliant |
@@ -97,6 +99,26 @@ The Gem Bake Workbench (`scenes/design/gem_bake_workbench.tscn`) is the active g
 - **Gameplay preview board** — drag the selected gem around a run-style light grid to inspect the loaded lighting-bin blend
 - **Axis rotation cards** — preview pitch/yaw/roll rotation bins when the loaded manifest includes those sweeps
 - **Runtime reload** — refreshes the gameplay texture cache after a bake completes so subsequent runs use the new traced textures
+
+## Baking Workflow
+
+Traced textures are produced by the offline ray tracer and loaded at runtime. There are three bake contexts:
+
+- **Workbench** — Single-gem design iteration from the Gem Bake Workbench UI. Output goes to `user://traced_bakes/`. Use this when tweaking a gem's visual and wanting quick feedback.
+- **Development CLI** — `tools/run_offline_gem_bake.gd` with per-flag control. Output defaults to `user://traced_bakes/`. Use this for bulk bakes during development.
+- **Production** — `tools/run_production_bake.gd --profile=res://config/bake_profiles/gameplay.json`. Output goes to `res://generated/traced_bakes/` (gitignored). This is what ships in the exported build.
+
+The runtime backend searches `user://` first, then `res://generated/`. During development, workbench bakes override production bakes. In shipped builds, only `res://generated/` has files.
+
+When running from the Godot editor, `BoardScene` calls `ensure_gameplay_texture_cache()` at run start. If a valid manifest already exists, textures load from disk. If not, the registry bakes on-demand (slow first run, then cached). Delete `user://traced_bakes/` to force a rebake.
+
+Validate a production bake before export:
+```bash
+godot --headless --path . --script res://tools/validate_production_bake.gd -- \
+    --profile=res://config/bake_profiles/gameplay.json
+```
+
+See [AGENTS.md](AGENTS.md) for the full CLI flag table, asset optimization details, and bake configuration reference.
 
 ## Building the Native Tracer
 

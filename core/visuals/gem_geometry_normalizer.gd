@@ -3,9 +3,9 @@ extends RefCounted
 
 ## Shared normalization and rotation logic for canonical 3D cut models.
 
-const GemCutPrimitives = preload("res://core/visuals/gem_cut_primitives.gd")
+const GemCutPrimitivesScript = preload("res://core/visuals/gem_cut_primitives.gd")
 
-const TARGET_HORIZONTAL_SPAN := GemCutPrimitives.GEM_RADIUS * 2.0
+const TARGET_HORIZONTAL_SPAN := GemCutPrimitivesScript.GEM_RADIUS * 2.0
 
 
 static func finalize_model(model):

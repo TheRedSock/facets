@@ -18,7 +18,6 @@ var _outline_overlay: Control
 const GAMEPLAY_BLEND_SHADER := preload("res://scenes/tile/gameplay_sprite_blend.gdshader")
 const GAME_OUTLINE_COLOR := Color(0.0, 0.0, 0.0, 0.5)
 const DEFAULT_GAME_OUTLINE_WIDTH := 0.5
-const MAX_GAMEPLAY_SPRITE_LAYERS := 4
 const SPECIAL_ROTATION_DEFAULT_DURATION := 0.42
 const SPECIAL_ROTATION_DEFAULT_TURNS := 1.0
 const MISSING_BAKE_COLOR := Color(0.22, 0.08, 0.12, 1.0)
@@ -44,7 +43,8 @@ var _debug_lighting_uv_override := Vector2(-1.0, -1.0)
 var _debug_rotation_axis_preview: StringName = &""
 var _debug_rotation_phase_override := -1.0
 var _last_special_rotation_progress := -1.0
-var _last_applied_sprite_entries: Array[Dictionary] = []
+var _last_applied_sprite_blend: Dictionary = {}
+var _transparent_sprite_atlas: Texture2DArray = null
 var _special_rotation_active := false
 var _special_rotation_elapsed := 0.0
 var _special_rotation_duration := 0.0
@@ -268,16 +268,17 @@ func _clear_runtime_outline() -> void:
 
 
 func _clear_sprite_layers() -> void:
-	_last_applied_sprite_entries.clear()
+	_last_applied_sprite_blend.clear()
 	if _sprite_texture != null:
 		_sprite_texture.visible = false
 	if _sprite_blend_material == null:
 		return
 	_sprite_blend_material.set_shader_parameter("weights", Vector4.ZERO)
-	_sprite_blend_material.set_shader_parameter("texture_a", _transparent_sprite_texture)
-	_sprite_blend_material.set_shader_parameter("texture_b", _transparent_sprite_texture)
-	_sprite_blend_material.set_shader_parameter("texture_c", _transparent_sprite_texture)
-	_sprite_blend_material.set_shader_parameter("texture_d", _transparent_sprite_texture)
+	_sprite_blend_material.set_shader_parameter("layer_index", Vector4.ZERO)
+	var placeholder: Texture2DArray = _get_transparent_sprite_atlas()
+	if GemVisualRegistry != null:
+		placeholder = GemVisualRegistry.get_gameplay_blend_placeholder_atlas()
+	_sprite_blend_material.set_shader_parameter("atlas", placeholder)
 	_sprite_blend_material.set_shader_parameter("outline_enabled", false)
 	_sprite_blend_material.set_shader_parameter("outline_color", GAME_OUTLINE_COLOR)
 	_sprite_blend_material.set_shader_parameter("outline_width_pixels", _get_game_outline_width())
@@ -287,9 +288,9 @@ func _clear_sprite_layers() -> void:
 func _refresh_gameplay_sprite_layers(force: bool = false) -> bool:
 	if not use_gameplay_texture_cache or GemVisualRegistry == null:
 		return false
-	var entries: Array[Dictionary] = []
+	var blend: Dictionary = {}
 	if _debug_rotation_phase_override >= 0.0 and _debug_rotation_axis_preview != &"":
-		entries = GemVisualRegistry.get_gameplay_rotation_axis_blend_set(
+		blend = GemVisualRegistry.get_gameplay_rotation_axis_blend_set(
 			tile_id,
 			tier,
 			_debug_rotation_axis_preview,
@@ -302,78 +303,59 @@ func _refresh_gameplay_sprite_layers(force: bool = false) -> bool:
 		if not force and absf(progress - _last_special_rotation_progress) < 0.001:
 			return _has_visible_sprite_layers()
 		_last_special_rotation_progress = progress
-		entries = GemVisualRegistry.get_gameplay_rotation_blend_set(tile_id, tier, progress)
-		if entries.is_empty():
+		blend = GemVisualRegistry.get_gameplay_rotation_blend_set(tile_id, tier, progress)
+		if blend.get("atlas", null) == null:
 			_special_rotation_active = false
 	else:
 		var lighting_uv := _compute_board_lighting_uv()
 		if not force and lighting_uv.distance_squared_to(_last_lighting_uv) < 0.00002:
 			return _has_visible_sprite_layers()
 		_last_lighting_uv = lighting_uv
-		entries = GemVisualRegistry.get_gameplay_lighting_blend_set(tile_id, tier, lighting_uv)
-	if entries.is_empty() and not _special_rotation_active:
-		var lighting_uv := _compute_board_lighting_uv()
-		_last_lighting_uv = lighting_uv
-		entries = GemVisualRegistry.get_gameplay_lighting_blend_set(tile_id, tier, lighting_uv)
-	if entries.is_empty():
+		blend = GemVisualRegistry.get_gameplay_lighting_blend_set(tile_id, tier, lighting_uv)
+	if (blend.get("atlas", null) == null) and not _special_rotation_active:
+		var lighting_uv2 := _compute_board_lighting_uv()
+		_last_lighting_uv = lighting_uv2
+		blend = GemVisualRegistry.get_gameplay_lighting_blend_set(tile_id, tier, lighting_uv2)
+	if blend.get("atlas", null) == null:
 		_clear_sprite_layers()
 		return false
-	_apply_sprite_entries(entries)
+	_apply_sprite_blend_dict(blend)
 	return true
 
 
-func _apply_sprite_entries(entries: Array[Dictionary]) -> void:
-	_last_applied_sprite_entries = []
+func _apply_sprite_blend_dict(blend: Dictionary) -> void:
+	_last_applied_sprite_blend = blend.duplicate(true)
 	if _sprite_blend_material == null:
 		return
-	var textures: Array = [
-		_transparent_sprite_texture,
-		_transparent_sprite_texture,
-		_transparent_sprite_texture,
-		_transparent_sprite_texture,
-	]
-	var weights := Vector4.ZERO
-	var has_visible_entry := false
-	for entry_index in mini(entries.size(), MAX_GAMEPLAY_SPRITE_LAYERS):
-		var entry: Dictionary = entries[entry_index]
-		var texture: Texture2D = entry.get("texture", null)
-		var weight := clampf(float(entry.get("weight", 0.0)), 0.0, 1.0)
-		if texture == null or weight <= 0.001:
-			continue
-		textures[entry_index] = texture
-		match entry_index:
-			0:
-				weights.x = weight
-			1:
-				weights.y = weight
-			2:
-				weights.z = weight
-			3:
-				weights.w = weight
-		has_visible_entry = true
-		_last_applied_sprite_entries.append(entry.duplicate(true))
+	var real_atlas: Texture2DArray = blend.get("atlas", null)
+	var weights: Vector4 = blend.get("weights", Vector4.ZERO)
+	var layer_index: Vector4 = blend.get("layer_index", Vector4.ZERO)
+	var has_visible := real_atlas != null and weights.length_squared() > 1e-8
+	var atlas: Texture2DArray = real_atlas
+	if atlas == null:
+		atlas = (
+			GemVisualRegistry.get_gameplay_blend_placeholder_atlas()
+			if GemVisualRegistry != null
+			else _get_transparent_sprite_atlas()
+		)
+	_sprite_blend_material.set_shader_parameter("atlas", atlas)
+	_sprite_blend_material.set_shader_parameter("layer_index", layer_index)
 	_sprite_blend_material.set_shader_parameter("weights", weights)
-	_sprite_blend_material.set_shader_parameter("texture_a", textures[0])
-	_sprite_blend_material.set_shader_parameter("texture_b", textures[1])
-	_sprite_blend_material.set_shader_parameter("texture_c", textures[2])
-	_sprite_blend_material.set_shader_parameter("texture_d", textures[3])
-	_update_sprite_outline_shader(textures)
+	_update_sprite_outline_shader_atlas(atlas if real_atlas != null else null)
 	if _sprite_texture != null:
-		_sprite_texture.visible = has_visible_entry
+		_sprite_texture.visible = has_visible
 
 
 func _has_visible_sprite_layers() -> bool:
 	return _sprite_texture != null and _sprite_texture.visible
 
 
-func _update_sprite_outline_shader(textures: Array) -> void:
+func _update_sprite_outline_shader_atlas(atlas_tex: Texture2DArray) -> void:
 	if _sprite_blend_material == null:
 		return
 	var texture_size := Vector2.ONE
-	for texture in textures:
-		if texture is Texture2D and texture != _transparent_sprite_texture:
-			texture_size = Vector2((texture as Texture2D).get_size())
-			break
+	if atlas_tex != null:
+		texture_size = Vector2(atlas_tex.get_width(), atlas_tex.get_height())
 	_sprite_blend_material.set_shader_parameter(
 		"outline_enabled",
 		DebugFlags != null and DebugFlags.gem_silhouette_outline
@@ -394,7 +376,7 @@ func get_debug_gameplay_variant_state() -> Dictionary:
 		"debug_rotation_phase_override": _debug_rotation_phase_override,
 		"rotation_progress": _last_special_rotation_progress,
 		"special_rotation_active": _special_rotation_active,
-		"entries": _last_applied_sprite_entries.duplicate(true),
+		"sprite_blend": _last_applied_sprite_blend.duplicate(true),
 	}
 
 
@@ -430,6 +412,16 @@ func _make_transparent_sprite_texture() -> Texture2D:
 	var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.0, 0.0, 0.0, 0.0))
 	return ImageTexture.create_from_image(image)
+
+
+func _get_transparent_sprite_atlas() -> Texture2DArray:
+	if _transparent_sprite_atlas == null:
+		var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		var ta := Texture2DArray.new()
+		ta.create_from_images([img])
+		_transparent_sprite_atlas = ta
+	return _transparent_sprite_atlas
 
 
 func _setup_runtime_outline(cut, cut_key: String = "") -> void:
@@ -579,13 +571,9 @@ func refresh_debug_visuals() -> void:
 	queue_redraw()
 	if _outline_overlay != null:
 		_outline_overlay.queue_redraw()
-	if _has_visible_sprite_layers():
-		_update_sprite_outline_shader([
-			_sprite_blend_material.get_shader_parameter("texture_a"),
-			_sprite_blend_material.get_shader_parameter("texture_b"),
-			_sprite_blend_material.get_shader_parameter("texture_c"),
-			_sprite_blend_material.get_shader_parameter("texture_d"),
-		])
+	if _has_visible_sprite_layers() and _sprite_blend_material != null:
+		var a: Variant = _sprite_blend_material.get_shader_parameter("atlas")
+		_update_sprite_outline_shader_atlas(a as Texture2DArray)
 
 
 func _is_low_detail_enabled() -> bool:

@@ -256,8 +256,13 @@ TraceContext GemTraceKernel::build_context(
     // Store trace_data in request so trace_to_image can access it
     request["_trace_data"] = trace_data;
 
-    // Build view basis
-    Basis view_basis = build_view_basis(v, request);
+    // Build view basis (showroom / tooling may supply a pre-built basis)
+    Basis view_basis;
+    if (request.has("view_basis_override")) {
+        view_basis = Basis(request.get("view_basis_override", Basis()));
+    } else {
+        view_basis = build_view_basis(v, request);
+    }
     Basis inverse_basis = view_basis.inverse();
     ctx.inverse_basis = inverse_basis;
 
@@ -270,7 +275,13 @@ TraceContext GemTraceKernel::build_context(
     // Camera params
     double aspect = (double)target_size.x / dmax((double)target_size.y, 1.0);
     double view_scale = clampd((double)(float)request.get("view_scale", 1.0), 0.5, 2.0);
-    double half_height = dmax((double)bounds.size.y, radius * 2.0) * VIEW_MARGIN * 0.5 / view_scale;
+    // uniform_projection: use bounding sphere for consistent scale across rotations
+    // (showroom + rotation suite). Default: fit rotated AABB for gameplay tile normalization.
+    bool uniform_proj = (bool)request.get("uniform_projection", false);
+    double projection_extent = uniform_proj
+        ? radius * 2.0
+        : dmax((double)bounds.size.y, radius * 2.0);
+    double half_height = projection_extent * VIEW_MARGIN * 0.5 / view_scale;
     double half_width = half_height * aspect;
     double origin_z = (double)bounds.position.z + (double)bounds.size.z + radius * 2.4;
     ctx.half_width = half_width;

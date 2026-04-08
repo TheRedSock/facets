@@ -228,7 +228,7 @@ static func _surface_object_coord(object_position: Vector3, visual: GemVisualRes
 
 static func _apply_procedural_facet_warp(
 	coord: Vector2,
-	object_position: Vector3,
+	_object_position: Vector3,
 	normal: Vector3,
 	warp_strength: float,
 ) -> Vector2:

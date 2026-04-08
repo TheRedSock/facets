@@ -14,9 +14,17 @@ var _manifest_modified_time := -1
 var _default_manifest_paths: Array[String] = []
 var _texture_cache: Dictionary = {}
 
+## Wired from GemTracedBakeContract via GemVisualRegistry (defaults applied in _init).
+var vram_compress_on_load: bool = true
+var vram_compress_min_size: int = 256
+var vram_compress_desktop_format: Image.CompressMode = Image.COMPRESS_BPTC
+
 
 func _init() -> void:
 	backend_id = &"offline_traced"
+	vram_compress_on_load = GemTracedBakeContractScript.VRAM_COMPRESS_ON_LOAD
+	vram_compress_min_size = GemTracedBakeContractScript.VRAM_COMPRESS_MIN_SIZE
+	vram_compress_desktop_format = GemTracedBakeContractScript.VRAM_COMPRESS_FORMAT
 	_default_manifest_paths = [
 		"%s/%s" % [
 			GemTracedBakeContractScript.DEFAULT_OUTPUT_ROOT,
@@ -127,6 +135,33 @@ func get_manifest_path() -> String:
 	return _manifest_path
 
 
+## All manifest entries (for showroom quaternion cache, tooling). O(n) copy.
+func get_manifest_entries_flat() -> Array[Dictionary]:
+	_ensure_manifest_loaded()
+	var out: Array[Dictionary] = []
+	for k in _entries_by_key:
+		var e: Dictionary = _entries_by_key[k]
+		out.append(e.duplicate(true))
+	return out
+
+
+func get_showroom_texture(tile_id: StringName, direction_index: int, roll_index: int) -> ImageTexture:
+	_ensure_manifest_loaded()
+	for k in _entries_by_key:
+		var e: Dictionary = _entries_by_key[k]
+		if StringName(e.get("tile_id", &"")) != tile_id:
+			continue
+		if String(e.get("variant_type", "")) != "showroom":
+			continue
+		if int(e.get("showroom_direction_index", -1)) != direction_index:
+			continue
+		if int(e.get("showroom_roll_index", -1)) != roll_index:
+			continue
+		var tex_result := _load_texture_cached(String(e.get("texture_path", "")))
+		return tex_result.get("texture", null) as ImageTexture
+	return null
+
+
 func get_manifest_summary() -> Dictionary:
 	_ensure_manifest_loaded()
 	return {
@@ -228,14 +263,48 @@ func _load_texture_cached(resource_path: String) -> Dictionary:
 	if normalized_path.begins_with("res://") or normalized_path.begins_with("user://"):
 		load_path = ProjectSettings.globalize_path(normalized_path)
 	var err := image.load(load_path)
+	# Fallback: if the primary path failed, try swapping the extension between
+	# .webp and .png.  This supports transition periods where the manifest
+	# references the new format but the file on disk is still the old one.
+	if err != OK:
+		var fallback_path := _swap_image_extension(load_path)
+		if not fallback_path.is_empty():
+			err = image.load(fallback_path)
 	if err != OK:
 		return {
 			"texture": null,
 			"cache_hit": false,
 		}
+	_apply_vram_compress_after_decode(image)
 	var texture := ImageTexture.create_from_image(image)
 	_texture_cache[resource_path] = texture
 	return {
 		"texture": texture,
 		"cache_hit": false,
 	}
+
+
+func _apply_vram_compress_after_decode(image: Image) -> void:
+	if not vram_compress_on_load:
+		return
+	if image == null:
+		return
+	var min_edge := mini(image.get_width(), image.get_height())
+	if min_edge < vram_compress_min_size:
+		return
+	var os_name := OS.get_name()
+	var primary_mode: Image.CompressMode = (
+		Image.COMPRESS_ASTC if (os_name == "Android" or os_name == "iOS") else vram_compress_desktop_format
+	)
+	var cerr := image.compress(primary_mode)
+	if cerr != OK:
+		cerr = image.compress(Image.COMPRESS_S3TC)
+
+
+## Swap .webp <-> .png for fallback loading during format transitions.
+static func _swap_image_extension(path: String) -> String:
+	if path.ends_with(".webp"):
+		return path.substr(0, path.length() - 5) + ".png"
+	if path.ends_with(".png"):
+		return path.substr(0, path.length() - 4) + ".webp"
+	return ""

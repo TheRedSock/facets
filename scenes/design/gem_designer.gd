@@ -1,8 +1,10 @@
 extends Control
 
-## Runtime gem designer: edit visual + cut spec, live traced preview, Fibonacci analysis bake + orbit viewer.
+## Runtime gem designer: edit visual + cut spec, live traced preview, showroom bake + arcball viewer.
 
 const SESSION_TILE_ID := &"gem_designer_session"
+const ANALYSIS_PREVIEW_BASE_PX := 320.0
+const GAMEPLAY_BLEND_SHADER := preload("res://scenes/tile/gameplay_sprite_blend.gdshader")
 const PREVIEW_SIZE := Vector2i(128, 128)
 const DEBOUNCE_SEC := 0.55
 
@@ -10,6 +12,7 @@ const GemDesignSessionScript = preload("res://scenes/design/gem_design_session.g
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
+const GemViewSphereSamplingScript = preload("res://core/visuals/gem_view_sphere_sampling.gd")
 const GemCutModelModifierScript = preload("res://resources/visuals/gem_cut_model_modifier.gd")
 
 var _session: GemDesignSessionScript
@@ -21,30 +24,83 @@ var _preview_gen := 0
 var _preview_thread: Thread
 
 var _visual_scroll: VBoxContainer
+var _visual_json_edit: TextEdit
 var _cut_edit: TextEdit
-var _analysis_tex: TextureRect
+## ColorRect (not TextureRect): UV for the blend shader must span the preview rect.
+## Wrapped in AspectRatioContainer so a wide Tab row does not squash the rect to a strip
+## (which stretches UVs and hides orbit updates).
+var _analysis_aspect: AspectRatioContainer
+var _analysis_viewport: ColorRect
+var _analysis_blend_material: ShaderMaterial
+var _analysis_transparent_tex: Texture2D
 var _analysis_debug_checkbox: CheckBox
 var _analysis_debug_label: RichTextLabel
-var _theta_spin: SpinBox
+var _showroom_axis_steps_spin: SpinBox
+var _showroom_orbit_checkbox: CheckBox
+var _showroom_dir_spin: SpinBox
+var _showroom_roll_spin: SpinBox
+var _showroom_theta_label: Label
+var _showroom_total_label: Label
 var _analysis_draw_spin: SpinBox
 var _analysis_sample_spin: SpinBox
 var _analysis_output: LineEdit
 var _status: Label
 
-var _analysis_entries: Array[Dictionary] = []
-var _analysis_dirs: PackedVector3Array = PackedVector3Array()
-var _analysis_textures: Array[Texture2D] = []
-var _analysis_view_bases: Array[Basis] = []
-var _analysis_selected_index := -1
-
-var _orbit_basis := Basis.IDENTITY
+var _orientation := Quaternion.IDENTITY
+var _zoom := 1.0
+## 0 = free arcball, 1 = pitch (X-axis), 2 = yaw (Y-axis).
+var _showroom_interaction_mode := 1
+var _axis_angle_deg := 0.0
 var _drag_active := false
 var _last_drag: Vector2
+var _has_showroom_bake := false
+var _has_orbit_bake := false
+var _showroom_mode_row: HBoxContainer
+var _free_orbit_btn: Button
+var _analysis_scroll: ScrollContainer
+var _invert_x := false
+var _invert_y := false
+var _invert_x_checkbox: CheckBox
+var _invert_y_checkbox: CheckBox
 
 var _bake_in_progress := false
 var _bake_btn: Button
 var _bake_progress: ProgressBar
 var _bake_progress_label: Label
+
+var _section_collapse_state: Dictionary = {}
+var _updating_property := false
+
+const _PERCENTAGE_EXCLUSIONS := [
+	&"hue_dispersion", &"saturation_boost", &"stylize_shadow_floor",
+	&"stylize_highlight_bloom_threshold", &"optics_dispersion",
+	&"optics_birefringence_strength", &"sparkle_threshold",
+]
+const _ALPHA_EDIT_PROPERTIES := [
+	&"depth_tint", &"gradient_color", &"phenomenon_color", &"edge_color",
+	&"optics_absorption_color", &"material_secondary_color",
+	&"material_tertiary_color", &"reactive_color", &"reactive_secondary_color",
+]
+const _DEFAULT_COLLAPSED_GROUPS := [
+	"Traced Optics", "Stylization", "Detailing",
+]
+const _GROUP_PREFIX_MAP := {
+	"Surface Field": "surface_pattern_",
+	"Volume Field": "volume_pattern_",
+	"Angle Reactive": "reactive_",
+	"Traced Optics": "optics_",
+	"Refraction": "optics_",
+	"Absorption & Scattering": "optics_",
+	"Camera": "optics_",
+	"Environment": "optics_",
+	"Stylization": "stylize_",
+	"Gradient": "gradient_",
+	"Phenomenon": "phenomenon_",
+	"Rim Lighting": "rim_",
+	"Sparkle": "sparkle_",
+	"Secondary Specular": "secondary_",
+	"Edge Rendering": "edge_",
+}
 
 
 func _ready() -> void:
@@ -154,8 +210,42 @@ func _build_ui() -> void:
 
 	_visual_scroll = VBoxContainer.new()
 	_visual_scroll.size_flags_horizontal = SIZE_EXPAND_FILL
-	_visual_scroll.add_theme_constant_override("separation", 6)
+	_visual_scroll.add_theme_constant_override("separation", 4)
 	visual_panel.add_child(_visual_scroll)
+
+	var visual_json_panel := VBoxContainer.new()
+	visual_json_panel.size_flags_vertical = SIZE_EXPAND_FILL
+	tabs.add_child(visual_json_panel)
+	tabs.set_tab_title(visual_json_panel.get_index(), "Visual (JSON)")
+
+	_visual_json_edit = TextEdit.new()
+	_visual_json_edit.size_flags_vertical = SIZE_EXPAND_FILL
+	_visual_json_edit.custom_minimum_size = Vector2(0, 200)
+	visual_json_panel.add_child(_visual_json_edit)
+
+	var vj_row := HBoxContainer.new()
+	vj_row.add_theme_constant_override("separation", 8)
+	visual_json_panel.add_child(vj_row)
+
+	var apply_vj := Button.new()
+	apply_vj.text = "Apply visual JSON"
+	apply_vj.pressed.connect(_on_apply_visual_json)
+	vj_row.add_child(apply_vj)
+
+	var reload_vj := Button.new()
+	reload_vj.text = "Reload from session"
+	reload_vj.pressed.connect(_refresh_visual_json_text)
+	vj_row.add_child(reload_vj)
+
+	var copy_vj := Button.new()
+	copy_vj.text = "Copy to clipboard"
+	copy_vj.pressed.connect(func() -> void: DisplayServer.clipboard_set(_visual_json_edit.text))
+	vj_row.add_child(copy_vj)
+
+	var paste_vj := Button.new()
+	paste_vj.text = "Paste from clipboard"
+	paste_vj.pressed.connect(func() -> void: _visual_json_edit.text = DisplayServer.clipboard_get())
+	vj_row.add_child(paste_vj)
 
 	var cut_panel := VBoxContainer.new()
 	cut_panel.size_flags_vertical = SIZE_EXPAND_FILL
@@ -181,20 +271,46 @@ func _build_ui() -> void:
 	reload_cut.pressed.connect(_refresh_cut_json_text)
 	cut_row.add_child(reload_cut)
 
-	var analysis_panel := VBoxContainer.new()
-	analysis_panel.size_flags_vertical = SIZE_EXPAND_FILL
-	tabs.add_child(analysis_panel)
-	tabs.set_tab_title(analysis_panel.get_index(), "Analysis (Fibonacci)")
+	var analysis_scroll := ScrollContainer.new()
+	analysis_scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	analysis_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	analysis_scroll.follow_focus = true
+	_analysis_scroll = analysis_scroll
+	tabs.add_child(analysis_scroll)
+	tabs.set_tab_title(analysis_scroll.get_index(), "Analysis (Showroom)")
 
-	analysis_panel.add_child(_labeled("Angular resolution θ (°)", _make_theta_spinbox()))
+	var analysis_panel := VBoxContainer.new()
+	analysis_panel.size_flags_horizontal = SIZE_EXPAND_FILL
+	analysis_scroll.add_child(analysis_panel)
+
+	analysis_panel.add_child(_labeled("Axis rotation steps (per axis)", _make_axis_steps_spinbox()))
+	_showroom_orbit_checkbox = CheckBox.new()
+	_showroom_orbit_checkbox.text = "Include free orbit (Fibonacci)"
+	_showroom_orbit_checkbox.toggled.connect(_on_orbit_checkbox_toggled)
+	analysis_panel.add_child(_showroom_orbit_checkbox)
+	analysis_panel.add_child(_labeled("  Fibonacci directions", _make_showroom_dir_spinbox()))
+	_showroom_theta_label = Label.new()
+	_showroom_theta_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
+	analysis_panel.add_child(_showroom_theta_label)
+	analysis_panel.add_child(_labeled("  Roll steps per direction", _make_showroom_roll_spinbox()))
+	_showroom_total_label = Label.new()
+	_showroom_total_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
+	analysis_panel.add_child(_showroom_total_label)
+	_on_orbit_checkbox_toggled(false)
+	_update_showroom_info_labels()
 	analysis_panel.add_child(_labeled("Bake draw size (px)", _make_analysis_draw_spinbox()))
 	analysis_panel.add_child(_labeled("Samples", _make_analysis_sample_spinbox()))
 	analysis_panel.add_child(_labeled("Output folder", _analysis_output_line()))
 
 	_bake_btn = Button.new()
-	_bake_btn.text = "Run full Fibonacci bake"
-	_bake_btn.pressed.connect(_on_run_fibonacci_bake)
+	_bake_btn.text = "Run Showroom Bake"
+	_bake_btn.pressed.connect(_on_run_showroom_bake)
 	analysis_panel.add_child(_bake_btn)
+
+	var _reload_btn := Button.new()
+	_reload_btn.text = "Reload Previous Session"
+	_reload_btn.pressed.connect(_on_reload_showroom_session)
+	analysis_panel.add_child(_reload_btn)
 
 	_bake_progress = ProgressBar.new()
 	_bake_progress.min_value = 0.0
@@ -213,17 +329,65 @@ func _build_ui() -> void:
 	analysis_panel.add_child(_bake_progress_label)
 
 	var hint := Label.new()
-	hint.text = "Drag the preview below to orbit (nearest baked direction)."
+	hint.text = "Drag to rotate. Shift+drag horizontally for roll. Wheel = zoom. Bake first, then inspect."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
 	analysis_panel.add_child(hint)
 
-	_analysis_tex = TextureRect.new()
-	_analysis_tex.custom_minimum_size = Vector2(320, 320)
-	_analysis_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_analysis_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_analysis_tex.gui_input.connect(_on_analysis_gui_input)
-	analysis_panel.add_child(_analysis_tex)
+	var mode_row := HBoxContainer.new()
+	mode_row.add_theme_constant_override("separation", 6)
+	_showroom_mode_row = mode_row
+	var mode_labels := ["Free Orbit", "Pitch", "Yaw"]
+	for mode_i in mode_labels.size():
+		var mbtn := Button.new()
+		mbtn.text = mode_labels[mode_i]
+		mbtn.toggle_mode = true
+		mbtn.set_meta("showroom_mode", mode_i)
+		mbtn.toggled.connect(_on_showroom_mode_toggled.bind(mode_i))
+		mode_row.add_child(mbtn)
+		if mode_i == 0:
+			_free_orbit_btn = mbtn
+			mbtn.disabled = true
+	# Default to Pitch mode (mode 1) since Free Orbit starts disabled.
+	(mode_row.get_child(1) as Button).button_pressed = true
+	_showroom_interaction_mode = 1
+	analysis_panel.add_child(mode_row)
+
+	var invert_row := HBoxContainer.new()
+	invert_row.add_theme_constant_override("separation", 12)
+	_invert_x_checkbox = CheckBox.new()
+	_invert_x_checkbox.text = "Invert X"
+	_invert_x_checkbox.toggled.connect(func(pressed: bool) -> void: _invert_x = pressed)
+	invert_row.add_child(_invert_x_checkbox)
+	_invert_y_checkbox = CheckBox.new()
+	_invert_y_checkbox.text = "Invert Y"
+	_invert_y_checkbox.toggled.connect(func(pressed: bool) -> void: _invert_y = pressed)
+	invert_row.add_child(_invert_y_checkbox)
+	analysis_panel.add_child(invert_row)
+
+	var blank := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	blank.fill(Color(0, 0, 0, 0))
+	_analysis_transparent_tex = ImageTexture.create_from_image(blank)
+	_analysis_aspect = AspectRatioContainer.new()
+	_analysis_aspect.ratio = 1.0
+	_analysis_aspect.alignment_horizontal = AspectRatioContainer.ALIGNMENT_CENTER
+	_analysis_aspect.alignment_vertical = AspectRatioContainer.ALIGNMENT_CENTER
+	_analysis_aspect.custom_minimum_size = Vector2(ANALYSIS_PREVIEW_BASE_PX, ANALYSIS_PREVIEW_BASE_PX)
+	_analysis_aspect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_analysis_aspect.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_analysis_aspect.mouse_filter = Control.MOUSE_FILTER_PASS
+	_analysis_viewport = ColorRect.new()
+	_analysis_viewport.color = Color.WHITE
+	_analysis_viewport.mouse_filter = Control.MOUSE_FILTER_STOP
+	_analysis_viewport.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_analysis_blend_material = ShaderMaterial.new()
+	_analysis_blend_material.shader = GAMEPLAY_BLEND_SHADER
+	_analysis_viewport.material = _analysis_blend_material
+	_clear_showroom_blend_layers()
+	_analysis_viewport.gui_input.connect(_on_analysis_gui_input)
+	_analysis_viewport.resized.connect(_on_analysis_viewport_resized)
+	_analysis_aspect.add_child(_analysis_viewport)
+	analysis_panel.add_child(_analysis_aspect)
 
 	_analysis_debug_checkbox = CheckBox.new()
 	_analysis_debug_checkbox.text = "Show live orbit diagnostics"
@@ -241,14 +405,296 @@ func _build_ui() -> void:
 	_update_analysis_debug_visibility()
 
 
-func _make_theta_spinbox() -> SpinBox:
-	_theta_spin = SpinBox.new()
-	_theta_spin.min_value = 4.0
-	_theta_spin.max_value = 45.0
-	_theta_spin.step = 0.5
-	_theta_spin.value = 12.0
-	_theta_spin.size_flags_horizontal = SIZE_EXPAND_FILL
-	return _theta_spin
+func _make_axis_steps_spinbox() -> SpinBox:
+	_showroom_axis_steps_spin = SpinBox.new()
+	_showroom_axis_steps_spin.min_value = 8.0
+	_showroom_axis_steps_spin.max_value = 360.0
+	_showroom_axis_steps_spin.step = 1.0
+	_showroom_axis_steps_spin.value = 36.0
+	_showroom_axis_steps_spin.size_flags_horizontal = SIZE_EXPAND_FILL
+	_showroom_axis_steps_spin.value_changed.connect(func(_v: float) -> void: _update_showroom_info_labels())
+	return _showroom_axis_steps_spin
+
+
+func _make_showroom_dir_spinbox() -> SpinBox:
+	_showroom_dir_spin = SpinBox.new()
+	_showroom_dir_spin.min_value = 16.0
+	_showroom_dir_spin.max_value = 2000.0
+	_showroom_dir_spin.step = 1.0
+	_showroom_dir_spin.value = 200.0
+	_showroom_dir_spin.size_flags_horizontal = SIZE_EXPAND_FILL
+	_showroom_dir_spin.value_changed.connect(func(_v: float) -> void: _update_showroom_info_labels())
+	return _showroom_dir_spin
+
+
+func _make_showroom_roll_spinbox() -> SpinBox:
+	_showroom_roll_spin = SpinBox.new()
+	_showroom_roll_spin.min_value = 1.0
+	_showroom_roll_spin.max_value = 24.0
+	_showroom_roll_spin.step = 1.0
+	_showroom_roll_spin.value = 6.0
+	_showroom_roll_spin.size_flags_horizontal = SIZE_EXPAND_FILL
+	_showroom_roll_spin.value_changed.connect(func(_v: float) -> void: _update_showroom_info_labels())
+	return _showroom_roll_spin
+
+
+func _on_showroom_mode_toggled(pressed: bool, mode: int) -> void:
+	if not pressed:
+		return
+	if mode == 0 and not _has_orbit_bake:
+		# Re-press the previously active button if Free Orbit isn't available.
+		if _showroom_mode_row != null:
+			for c in _showroom_mode_row.get_children():
+				if c is Button and int(c.get_meta("showroom_mode", -1)) == _showroom_interaction_mode:
+					(c as Button).set_pressed_no_signal(true)
+		return
+	_showroom_interaction_mode = mode
+	if _showroom_mode_row != null:
+		for c in _showroom_mode_row.get_children():
+			if c is Button and int(c.get_meta("showroom_mode", -1)) != mode:
+				(c as Button).set_pressed_no_signal(false)
+	_update_showroom_display()
+
+
+func _on_orbit_checkbox_toggled(enabled: bool) -> void:
+	if _showroom_dir_spin != null:
+		_showroom_dir_spin.editable = enabled
+	if _showroom_roll_spin != null:
+		_showroom_roll_spin.editable = enabled
+	_update_showroom_info_labels()
+
+
+func _update_showroom_info_labels() -> void:
+	var axis_steps := 36
+	if _showroom_axis_steps_spin != null:
+		axis_steps = int(_showroom_axis_steps_spin.value)
+	var axis_total := axis_steps * 2  # pitch + yaw
+	var dirs := 200
+	var rolls := 6
+	if _showroom_dir_spin != null:
+		dirs = int(_showroom_dir_spin.value)
+	if _showroom_roll_spin != null:
+		rolls = int(_showroom_roll_spin.value)
+	var include_orbit := _showroom_orbit_checkbox != null and _showroom_orbit_checkbox.button_pressed
+	if _showroom_theta_label != null:
+		if include_orbit:
+			var theta := GemViewSphereSamplingScript.showroom_angular_resolution_degrees(dirs)
+			_showroom_theta_label.text = "  Approx. angular resolution: ~%.1f°" % theta
+		else:
+			_showroom_theta_label.text = ""
+	if _showroom_total_label != null:
+		if include_orbit:
+			var orbit_total := dirs * rolls
+			_showroom_total_label.text = "Total: %d axis + %d orbit = %d frames" % [
+				axis_total, orbit_total, axis_total + orbit_total
+			]
+		else:
+			_showroom_total_label.text = "Total: %d axis frames (%d pitch + %d yaw)" % [
+				axis_total, axis_steps, axis_steps
+			]
+
+
+func _on_analysis_viewport_resized() -> void:
+	if _analysis_viewport == null:
+		return
+	_analysis_viewport.pivot_offset = _analysis_viewport.size * 0.5
+	if _analysis_blend_material == null:
+		return
+	var a: Variant = _analysis_blend_material.get_shader_parameter("atlas")
+	_update_showroom_texture_size_uniform_atlas(a as Texture2DArray)
+
+
+func _scroll_showroom_to_bottom() -> void:
+	if _analysis_scroll == null:
+		return
+	# Defer so layout has settled after the preview resize.
+	_analysis_scroll.call_deferred("set_v_scroll", 999999)
+
+
+func _clear_showroom_blend_layers() -> void:
+	if _analysis_blend_material == null:
+		return
+	_analysis_blend_material.set_shader_parameter("weights", Vector4.ZERO)
+	_analysis_blend_material.set_shader_parameter("layer_index", Vector4.ZERO)
+	if GemVisualRegistry != null:
+		_analysis_blend_material.set_shader_parameter(
+			"atlas",
+			GemVisualRegistry.get_gameplay_blend_placeholder_atlas()
+		)
+	else:
+		var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		var ta := Texture2DArray.new()
+		ta.create_from_images([img])
+		_analysis_blend_material.set_shader_parameter("atlas", ta)
+	_analysis_blend_material.set_shader_parameter("outline_enabled", false)
+
+
+func _apply_showroom_blend_entries(entries: Array) -> void:
+	if _analysis_blend_material == null or GemVisualRegistry == null:
+		return
+	var texs: Array[Texture2D] = []
+	var weights: Array[float] = []
+	for e in entries:
+		if typeof(e) != TYPE_DICTIONARY:
+			continue
+		var ed: Dictionary = e
+		var w := float(ed.get("weight", 0.0))
+		var tex: Texture2D = ed.get("texture", null)
+		if w <= 0.0001 or tex == null:
+			continue
+		texs.append(tex)
+		weights.append(w)
+	while texs.size() < 4:
+		texs.append(_analysis_transparent_tex)
+		weights.append(0.0)
+	var tw := weights[0] + weights[1] + weights[2] + weights[3]
+	if tw <= 1e-6:
+		_clear_showroom_blend_layers()
+		return
+	var wv := Vector4(
+		weights[0] / tw,
+		weights[1] / tw,
+		weights[2] / tw,
+		weights[3] / tw
+	)
+	var atlas: Texture2DArray = GemVisualRegistry.build_gameplay_sprite_atlas_from_textures(texs)
+	_analysis_blend_material.set_shader_parameter("weights", wv)
+	_analysis_blend_material.set_shader_parameter("layer_index", Vector4(0.0, 1.0, 2.0, 3.0))
+	_analysis_blend_material.set_shader_parameter("atlas", atlas)
+	_update_showroom_texture_size_uniform_atlas(atlas)
+	if _analysis_viewport != null:
+		_analysis_viewport.queue_redraw()
+
+
+func _apply_showroom_snap_entry(entries: Array) -> void:
+	## Display only the single best-matching baked frame (no multi-frame blur).
+	if _analysis_blend_material == null or GemVisualRegistry == null:
+		return
+	if entries.is_empty():
+		_clear_showroom_blend_layers()
+		return
+	var best: Dictionary = entries[0] if typeof(entries[0]) == TYPE_DICTIONARY else {}
+	var tex: Texture2D = best.get("texture", null)
+	if tex == null:
+		_clear_showroom_blend_layers()
+		return
+	var snap_atlas: Texture2DArray = GemVisualRegistry.build_gameplay_sprite_atlas_from_textures(
+		[tex, null, null, null]
+	)
+	_analysis_blend_material.set_shader_parameter("weights", Vector4(1.0, 0.0, 0.0, 0.0))
+	_analysis_blend_material.set_shader_parameter("layer_index", Vector4.ZERO)
+	_analysis_blend_material.set_shader_parameter("atlas", snap_atlas)
+	_update_showroom_texture_size_uniform_atlas(snap_atlas)
+	if _analysis_viewport != null:
+		_analysis_viewport.queue_redraw()
+
+
+func _snap_orientation_to_best_frame() -> void:
+	## On drag release, snap _orientation to the exact baked quaternion of the
+	## nearest frame so the next drag starts from a clean known position.
+	if not _has_showroom_bake or GemVisualRegistry == null:
+		return
+	var q := _current_showroom_query_quaternion().normalized()
+	var q_lookup := q.inverse() if _showroom_interaction_mode == 0 else q
+	var entries := GemVisualRegistry.find_nearest_showroom_frames(SESSION_TILE_ID, q_lookup, 1)
+	if entries.is_empty():
+		return
+	var best: Dictionary = entries[0] if typeof(entries[0]) == TYPE_DICTIONARY else {}
+	var q_frame: Quaternion = best.get("orientation", Quaternion.IDENTITY)
+	if _showroom_interaction_mode == 0:
+		# Free arcball: _orientation.inverse() was the lookup key, so snap to inverse of frame q
+		_orientation = q_frame.inverse().normalized()
+	else:
+		# Axis modes: orientation is used directly
+		var axis_map := {1: Vector3.RIGHT, 2: Vector3.UP}
+		var _ax: Vector3 = axis_map.get(_showroom_interaction_mode, Vector3.UP)
+		# Extract the angle from the frame quaternion projected onto this axis
+		# For simplicity, keep the current axis angle (the snap is mainly for free orbit)
+		pass
+
+
+func _update_showroom_texture_size_uniform_atlas(atlas: Texture2DArray) -> void:
+	if _analysis_blend_material == null or _analysis_viewport == null:
+		return
+	var tex_sz := _analysis_viewport.size.max(Vector2.ONE)
+	if atlas != null:
+		tex_sz = Vector2(atlas.get_width(), atlas.get_height()).max(Vector2.ONE)
+	_analysis_blend_material.set_shader_parameter("texture_size_px", tex_sz)
+
+
+func _map_to_trackball(pixel: Vector2, center: Vector2, radius: float) -> Vector3:
+	var p := (pixel - center) / maxf(radius, 1.0)
+	var len_sq := p.x * p.x + p.y * p.y
+	if len_sq <= 1.0:
+		return Vector3(p.x, -p.y, sqrt(1.0 - len_sq))
+	var inv_len := 1.0 / sqrt(len_sq)
+	return Vector3(p.x * inv_len, -p.y * inv_len, 0.0)
+
+
+func _current_showroom_query_quaternion() -> Quaternion:
+	match _showroom_interaction_mode:
+		1:
+			return Quaternion(Vector3.RIGHT, deg_to_rad(_axis_angle_deg)).normalized()
+		2:
+			return Quaternion(Vector3.UP, deg_to_rad(_axis_angle_deg)).normalized()
+		_:
+			return _orientation.normalized()
+
+
+func _update_showroom_display() -> void:
+	if not _has_showroom_bake or GemVisualRegistry == null:
+		_clear_showroom_blend_layers()
+		return
+	var q := _current_showroom_query_quaternion().normalized()
+	# Free arcball: composition matches camera motion — compare using inverse rotation
+	# vs baked view_basis quaternions. Axis tabs set absolute world-axis quaternions; no inverse.
+	var q_lookup := q.inverse() if _showroom_interaction_mode == 0 else q
+	# Filter to axis-specific frames for Pitch/Yaw modes; search all for Free Orbit.
+	var filter := &""
+	match _showroom_interaction_mode:
+		1: filter = &"pitch"
+		2: filter = &"yaw"
+	var entries := GemVisualRegistry.find_nearest_showroom_frames(SESSION_TILE_ID, q_lookup, 1, filter)
+	# Snap to best frame — no blending, avoids blur.
+	_apply_showroom_snap_entry(entries)
+	if _analysis_aspect != null:
+		var px: float = ANALYSIS_PREVIEW_BASE_PX * _zoom
+		_analysis_aspect.custom_minimum_size = Vector2(px, px)
+	_on_analysis_viewport_resized()
+	_refresh_showroom_debug_text(entries, q, q_lookup)
+	_scroll_showroom_to_bottom()
+
+
+func _refresh_showroom_debug_text(
+	entries: Array,
+	q_arcball: Quaternion = Quaternion.IDENTITY,
+	q_lookup: Quaternion = Quaternion.IDENTITY,
+) -> void:
+	if _analysis_debug_label == null:
+		return
+	if _analysis_debug_checkbox == null or not _analysis_debug_checkbox.button_pressed:
+		return
+	var lines := PackedStringArray()
+	lines.append("mode=%d  zoom=%.2f" % [_showroom_interaction_mode, _zoom])
+	lines.append("arcball_q=(%.4f, %.4f, %.4f, %.4f)" % [q_arcball.x, q_arcball.y, q_arcball.z, q_arcball.w])
+	lines.append("lookup_q=(%.4f, %.4f, %.4f, %.4f)" % [q_lookup.x, q_lookup.y, q_lookup.z, q_lookup.w])
+	var i := 0
+	for e in entries:
+		if typeof(e) != TYPE_DICTIONARY:
+			continue
+		var ed: Dictionary = e
+		lines.append(
+			"  #%d w=%.4f d=%d r=%d tex=%s" % [
+				i,
+				float(ed.get("weight", 0.0)),
+				int(ed.get("direction_index", -1)),
+				int(ed.get("roll_index", -1)),
+				"ok" if ed.get("texture", null) != null else "missing",
+			]
+		)
+		i += 1
+	_analysis_debug_label.text = "\n".join(lines)
 
 
 func _make_analysis_draw_spinbox() -> SpinBox:
@@ -279,9 +725,9 @@ func _analysis_output_line() -> LineEdit:
 
 
 func _update_analysis_debug_visibility() -> void:
-	var visible := _analysis_debug_checkbox != null and _analysis_debug_checkbox.button_pressed
+	var debug_visible := _analysis_debug_checkbox != null and _analysis_debug_checkbox.button_pressed
 	if _analysis_debug_label != null:
-		_analysis_debug_label.visible = visible
+		_analysis_debug_label.visible = debug_visible
 
 
 func _make_preview_panel() -> Control:
@@ -329,6 +775,7 @@ func _on_gem_selected(index: int) -> void:
 	var id: StringName = _gem_dropdown.get_item_metadata(index)
 	if _session.load_from_tile_id(id):
 		_refresh_all()
+		_reset_showroom_viewer()
 		_status.text = "Loaded %s" % String(id)
 
 
@@ -340,6 +787,7 @@ func _on_load_file_pressed() -> void:
 	dlg.file_selected.connect(func(p: String):
 		if _session.load_from_visual_path(p):
 			_refresh_all()
+			_reset_showroom_viewer()
 			_status.text = "Loaded %s" % p
 		dlg.queue_free()
 	)
@@ -386,14 +834,25 @@ func _refresh_all() -> void:
 	_session.compile_geometry(true)
 	_rebuild_visual_inspector()
 	_refresh_cut_json_text()
+	_refresh_visual_json_text()
 	_schedule_preview()
+
+
+func _reset_showroom_viewer() -> void:
+	_has_showroom_bake = false
+	_orientation = Quaternion.IDENTITY
+	_zoom = 1.0
+	_axis_angle_deg = 0.0
+	if GemVisualRegistry != null:
+		GemVisualRegistry.set_showroom_bake_session(SESSION_TILE_ID, [])
+	_clear_showroom_blend_layers()
 
 
 func _refresh_cut_json_text() -> void:
 	if _session.working_cut_spec == null:
 		_cut_edit.text = "{}"
 		return
-	var d := _session.working_cut_spec.build_contract_dict()
+	var d := _session.working_cut_spec.build_json_safe_contract_dict()
 	_cut_edit.text = JSON.stringify(d, "\t")
 
 
@@ -409,13 +868,65 @@ func _on_apply_cut_json() -> void:
 	_status.text = "Cut applied"
 
 
+func _refresh_visual_json_text() -> void:
+	if _visual_json_edit == null:
+		return
+	var d := _session.get_visual_json_dict()
+	_visual_json_edit.text = JSON.stringify(d, "\t")
+
+
+func _on_apply_visual_json() -> void:
+	var parsed = JSON.parse_string(_visual_json_edit.text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_status.text = "Visual JSON: expected object"
+		return
+	_session.apply_visual_json_dict(parsed)
+	_rebuild_visual_inspector()
+	_refresh_visual_json_text()
+	_schedule_preview()
+	_status.text = "Visual JSON applied"
+
+
 func _rebuild_visual_inspector() -> void:
 	for c in _visual_scroll.get_children():
 		c.queue_free()
 	if _session.working_visual == null:
 		return
 	var vis: GemVisualResource = _session.working_visual
+	var current_group := ""
+	var current_subgroup := ""
+	var group_container: VBoxContainer = _visual_scroll
+	var prop_container: VBoxContainer = _visual_scroll
+
 	for prop in vis.get_property_list():
+		# Handle group headers (top-level sections).
+		if prop.type == TYPE_NIL and (prop.usage & PROPERTY_USAGE_GROUP):
+			current_group = String(prop.name)
+			current_subgroup = ""
+			if current_group == "Identity":
+				group_container = null
+				prop_container = null
+				continue
+			var section := _make_section_header(current_group, false)
+			_visual_scroll.add_child(section.header)
+			_visual_scroll.add_child(section.container)
+			group_container = section.container
+			prop_container = section.container
+			continue
+
+		# Handle subgroup headers (nested sections within a group).
+		if prop.type == TYPE_NIL and (prop.usage & PROPERTY_USAGE_SUBGROUP):
+			current_subgroup = String(prop.name)
+			if group_container == null:
+				continue
+			var section := _make_section_header(current_subgroup, true)
+			group_container.add_child(section.header)
+			group_container.add_child(section.container)
+			prop_container = section.container
+			continue
+
+		if prop_container == null:
+			continue
 		if not (prop.usage & PROPERTY_USAGE_EDITOR):
 			continue
 		var n: String = prop.name
@@ -426,47 +937,114 @@ func _rebuild_visual_inspector() -> void:
 			lbl.text = "cut_spec: edit via Cut tab / base gem"
 			lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			lbl.add_theme_color_override("font_color", Color(0.55, 0.58, 0.65))
-			_visual_scroll.add_child(lbl)
+			prop_container.add_child(lbl)
 			continue
 		var val = vis.get(n)
-		var row := _make_property_row(n, prop, val, vis)
+		var display_group := current_subgroup if current_subgroup != "" else current_group
+		var row := _make_property_row(n, prop, val, vis, display_group)
 		if row:
-			_visual_scroll.add_child(row)
+			prop_container.add_child(row)
 
 
-func _make_property_row(n: String, prop: Dictionary, val, vis: GemVisualResource) -> Control:
+func _make_section_header(group_name: String, is_subgroup: bool) -> Dictionary:
+	var is_collapsed: bool = _section_collapse_state.get(group_name,
+		group_name in _DEFAULT_COLLAPSED_GROUPS)
+	var container := VBoxContainer.new()
+	container.add_theme_constant_override("separation", 4)
+	container.visible = not is_collapsed
+
+	var header := VBoxContainer.new()
+	header.add_theme_constant_override("separation", 2)
+
+	if not is_subgroup:
+		var sep := HSeparator.new()
+		sep.add_theme_constant_override("separation", 4)
+		sep.add_theme_color_override("separator", Color(0.25, 0.28, 0.35))
+		header.add_child(sep)
+
+	var btn := Button.new()
+	btn.flat = true
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.text = "%s %s" % ["\u25bc" if not is_collapsed else "\u25b6", group_name]
+	if is_subgroup:
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
+		btn.add_theme_color_override("font_hover_color", Color(0.72, 0.76, 0.86))
+		var indent := MarginContainer.new()
+		indent.add_theme_constant_override("margin_left", 12)
+		indent.add_child(btn)
+		header.add_child(indent)
+	else:
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
+		btn.add_theme_color_override("font_hover_color", Color(0.8, 0.85, 0.95))
+		header.add_child(btn)
+
+	btn.pressed.connect(func() -> void:
+		var collapsed := container.visible
+		container.visible = not collapsed
+		_section_collapse_state[group_name] = collapsed
+		btn.text = "%s %s" % ["\u25b6" if collapsed else "\u25bc", group_name]
+	)
+
+	return {"header": header, "container": container}
+
+
+func _make_property_row(n: String, prop: Dictionary, val, vis: GemVisualResource, group_name: String) -> Control:
 	var t: int = prop.type
 	if t == TYPE_OBJECT or t == TYPE_ARRAY or t == TYPE_DICTIONARY:
 		return null
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
 	var name_l := Label.new()
-	name_l.text = n
-	name_l.custom_minimum_size = Vector2(200, 0)
+	name_l.text = _display_name(n, group_name)
+	name_l.custom_minimum_size = Vector2(160, 0)
 	name_l.add_theme_color_override("font_color", Color(0.78, 0.82, 0.9))
+	name_l.add_theme_font_size_override("font_size", 13)
 	h.add_child(name_l)
 
 	if t == TYPE_FLOAT:
-		var sb := SpinBox.new()
-		sb.step = 0.01
-		sb.allow_greater = true
-		sb.allow_lesser = true
-		sb.min_value = -999999.0
-		sb.max_value = 999999.0
-		sb.value = float(val)
-		sb.value_changed.connect(func(v: float): vis.set(n, v); _on_visual_prop_changed())
-		sb.size_flags_horizontal = SIZE_EXPAND_FILL
-		h.add_child(sb)
+		var range_info := _parse_range_hint(prop)
+		if range_info.has_range:
+			_add_float_slider_row(h, n, val, vis, range_info)
+		else:
+			var sb := SpinBox.new()
+			sb.step = 0.01
+			sb.allow_greater = true
+			sb.allow_lesser = true
+			sb.min_value = -999999.0
+			sb.max_value = 999999.0
+			sb.value = float(val)
+			sb.value_changed.connect(func(v: float): vis.set(n, v); _on_visual_prop_changed())
+			sb.size_flags_horizontal = SIZE_EXPAND_FILL
+			h.add_child(sb)
 		return h
 
 	if t == TYPE_INT:
+		var enum_labels := _parse_enum_hint(prop)
+		if not enum_labels.is_empty():
+			var ob := OptionButton.new()
+			for i in enum_labels.size():
+				ob.add_item(enum_labels[i], i)
+			ob.selected = int(val)
+			ob.item_selected.connect(func(idx: int): vis.set(n, idx); _on_visual_prop_changed())
+			ob.size_flags_horizontal = SIZE_EXPAND_FILL
+			h.add_child(ob)
+			return h
+		var range_info := _parse_range_hint(prop)
 		var sb2 := SpinBox.new()
 		sb2.step = 1.0
 		sb2.rounded = true
-		sb2.allow_greater = true
-		sb2.allow_lesser = true
-		sb2.min_value = -2147483648.0
-		sb2.max_value = 2147483647.0
+		if range_info.has_range:
+			sb2.min_value = range_info.min_val
+			sb2.max_value = range_info.max_val
+			sb2.allow_greater = false
+			sb2.allow_lesser = false
+		else:
+			sb2.allow_greater = true
+			sb2.allow_lesser = true
+			sb2.min_value = -2147483648.0
+			sb2.max_value = 2147483647.0
 		sb2.value = int(val)
 		sb2.value_changed.connect(func(v: float): vis.set(n, int(v)); _on_visual_prop_changed())
 		sb2.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -483,6 +1061,7 @@ func _make_property_row(n: String, prop: Dictionary, val, vis: GemVisualResource
 	if t == TYPE_COLOR:
 		var pb := ColorPickerButton.new()
 		pb.color = val as Color
+		pb.edit_alpha = StringName(n) in _ALPHA_EDIT_PROPERTIES
 		pb.color_changed.connect(func(c: Color): vis.set(n, c); _on_visual_prop_changed())
 		pb.size_flags_horizontal = SIZE_EXPAND_FILL
 		h.add_child(pb)
@@ -521,6 +1100,136 @@ func _make_property_row(n: String, prop: Dictionary, val, vis: GemVisualResource
 		return h
 
 	return null
+
+
+func _add_float_slider_row(h: HBoxContainer, n: String, val, vis: GemVisualResource, range_info: Dictionary) -> void:
+	var is_pct := _is_percentage_property(n, range_info)
+	var is_log_shininess := (n == "shininess")
+	var is_degrees := n.ends_with("_degrees")
+
+	var slider := HSlider.new()
+	slider.size_flags_horizontal = SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(100, 0)
+
+	var sb := SpinBox.new()
+	sb.custom_minimum_size = Vector2(90, 0)
+	sb.allow_greater = false
+	sb.allow_lesser = false
+
+	if is_log_shininess:
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.005
+		sb.min_value = range_info.min_val
+		sb.max_value = range_info.max_val
+		sb.step = 1.0
+		sb.suffix = " exp"
+		slider.value = _shininess_to_slider(float(val))
+		sb.value = float(val)
+	elif is_pct:
+		slider.min_value = 0.0
+		slider.max_value = 100.0
+		slider.step = 1.0
+		sb.min_value = range_info.min_val * 100.0
+		sb.max_value = range_info.max_val * 100.0
+		sb.step = 1.0
+		sb.suffix = "%"
+		slider.value = float(val) * 100.0
+		sb.value = float(val) * 100.0
+	else:
+		slider.min_value = range_info.min_val
+		slider.max_value = range_info.max_val
+		slider.step = range_info.step
+		sb.min_value = range_info.min_val
+		sb.max_value = range_info.max_val
+		sb.step = range_info.step
+		slider.value = float(val)
+		sb.value = float(val)
+		if is_degrees:
+			sb.suffix = "\u00b0"
+
+	slider.value_changed.connect(func(v: float) -> void:
+		if _updating_property:
+			return
+		_updating_property = true
+		if is_log_shininess:
+			var actual := _slider_to_shininess(v)
+			sb.value = actual
+			vis.set(n, actual)
+		elif is_pct:
+			sb.value = v
+			vis.set(n, v / 100.0)
+		else:
+			sb.value = v
+			vis.set(n, v)
+		_on_visual_prop_changed()
+		_updating_property = false
+	)
+
+	sb.value_changed.connect(func(v: float) -> void:
+		if _updating_property:
+			return
+		_updating_property = true
+		if is_log_shininess:
+			slider.value = _shininess_to_slider(v)
+			vis.set(n, v)
+		elif is_pct:
+			slider.value = v
+			vis.set(n, v / 100.0)
+		else:
+			slider.value = v
+			vis.set(n, v)
+		_on_visual_prop_changed()
+		_updating_property = false
+	)
+
+	h.add_child(slider)
+	h.add_child(sb)
+
+
+static func _shininess_to_slider(value: float) -> float:
+	return log(maxf(value, 1.0)) / log(256.0)
+
+
+static func _slider_to_shininess(slider_val: float) -> float:
+	return roundf(pow(256.0, clampf(slider_val, 0.0, 1.0)))
+
+
+static func _parse_range_hint(prop: Dictionary) -> Dictionary:
+	if prop.hint != PROPERTY_HINT_RANGE or prop.hint_string == "":
+		return {"has_range": false}
+	var parts: PackedStringArray = prop.hint_string.split(",")
+	var result := {
+		"has_range": true,
+		"min_val": float(parts[0].strip_edges()) if parts.size() > 0 else 0.0,
+		"max_val": float(parts[1].strip_edges()) if parts.size() > 1 else 1.0,
+		"step": float(parts[2].strip_edges()) if parts.size() > 2 else 0.01,
+	}
+	return result
+
+
+static func _parse_enum_hint(prop: Dictionary) -> PackedStringArray:
+	if prop.hint != PROPERTY_HINT_ENUM or prop.hint_string == "":
+		return PackedStringArray()
+	return prop.hint_string.split(",")
+
+
+static func _display_name(prop_name: String, group_name: String) -> String:
+	var label := prop_name
+	var prefix: String = _GROUP_PREFIX_MAP.get(group_name, "")
+	if prefix != "" and label.begins_with(prefix):
+		label = label.substr(prefix.length())
+	return label.replace("_", " ").capitalize()
+
+
+static func _is_percentage_property(prop_name: String, range_info: Dictionary) -> bool:
+	if not range_info.has_range:
+		return false
+	if range_info.min_val < 0.0 or not is_equal_approx(range_info.max_val, 1.0):
+		return false
+	if StringName(prop_name) in _PERCENTAGE_EXCLUSIONS:
+		return false
+	return true
 
 
 func _vec2_editor(v: Vector2, setter: Callable) -> HBoxContainer:
@@ -664,7 +1373,78 @@ func _on_preview_image_ready(gen: int, img: Image) -> void:
 	_status.text = "Preview updated"
 
 
-func _on_run_fibonacci_bake() -> void:
+func _get_showroom_output_root() -> String:
+	if _analysis_output != null:
+		var out := String(_analysis_output.text).strip_edges()
+		if not out.is_empty():
+			return out
+	return "user://gem_designer_analysis"
+
+
+func _on_reload_showroom_session() -> void:
+	if _bake_in_progress:
+		return
+	var out := _get_showroom_output_root()
+	var manifest_path := out + "/" + GemTracedBakeContractScript.DEFAULT_MANIFEST_NAME
+	_status.text = "Reading manifest…"
+	_bake_progress.visible = true
+	_bake_progress_label.visible = true
+	_bake_progress.value = 0.0
+	_bake_progress_label.text = "Reading manifest…"
+	_bake_in_progress = true
+	_bake_btn.disabled = true
+	await get_tree().process_frame
+	var entries := _read_manifest_entries(manifest_path)
+	if entries.is_empty():
+		_status.text = "No previous session found at %s" % manifest_path
+		_bake_progress.visible = false
+		_bake_progress_label.visible = false
+		_bake_in_progress = false
+		_bake_btn.disabled = false
+		return
+	var showroom_entries: Array = []
+	for e in entries:
+		if typeof(e) == TYPE_DICTIONARY and String(e.get("variant_type", "")) == "showroom":
+			showroom_entries.append(e)
+	if showroom_entries.is_empty():
+		_status.text = "Manifest has no showroom entries"
+		_bake_progress.visible = false
+		_bake_progress_label.visible = false
+		_bake_in_progress = false
+		_bake_btn.disabled = false
+		return
+	var total := showroom_entries.size()
+	_bake_progress_label.text = "Loading %d textures…" % total
+	_bake_progress.value = 0.0
+	await get_tree().process_frame
+	_load_showroom_entries(showroom_entries)
+	_bake_progress.value = 1.0
+	_bake_progress_label.text = "Loaded %d frames" % total
+	await get_tree().process_frame
+	_bake_progress.visible = false
+	_bake_progress_label.visible = false
+	_bake_in_progress = false
+	_bake_btn.disabled = false
+	_status.text = "Reloaded %d showroom frames from manifest" % total
+
+
+func _read_manifest_entries(manifest_path: String) -> Array:
+	var gpath := ProjectSettings.globalize_path(manifest_path)
+	if not FileAccess.file_exists(gpath):
+		return []
+	var file := FileAccess.open(manifest_path, FileAccess.READ)
+	if file == null:
+		return []
+	var text := file.get_as_text()
+	file.close()
+	var parsed = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return []
+	var manifest: Dictionary = parsed
+	return manifest.get("entries", [])
+
+
+func _on_run_showroom_bake() -> void:
 	if _bake_in_progress:
 		return
 	_session.compile_geometry(true)
@@ -672,14 +1452,20 @@ func _on_run_fibonacci_bake() -> void:
 	var cut = _session.get_cached_projected_cut()
 	var vis_snap: GemVisualResource = _session.working_visual.duplicate(true)
 	if model == null or cut == null:
-		_status.text = "Analysis: invalid geometry"
+		_status.text = "Showroom: invalid geometry"
 		return
 	var draw_sz := Vector2i(int(_analysis_draw_spin.value), int(_analysis_draw_spin.value))
+	var axis_steps := int(_showroom_axis_steps_spin.value) if _showroom_axis_steps_spin != null else 36
+	var include_orbit := _showroom_orbit_checkbox != null and _showroom_orbit_checkbox.button_pressed
+	var dir_n := int(_showroom_dir_spin.value) if include_orbit else 0
+	var roll_n := int(_showroom_roll_spin.value) if include_orbit else 0
 	var opts := {
 		"include_lighting": false,
 		"include_rotation_suite": false,
-		"include_view_sphere_fibonacci": true,
-		"fibonacci_theta_degrees": float(_theta_spin.value),
+		"include_showroom": include_orbit,
+		"showroom_axis_steps": axis_steps,
+		"showroom_direction_count": dir_n,
+		"showroom_roll_steps": roll_n,
 	}
 	var raw: Array = GemVisualRegistry.build_explicit_bake_requests(
 		SESSION_TILE_ID,
@@ -691,7 +1477,7 @@ func _on_run_fibonacci_bake() -> void:
 		opts
 	)
 	if raw.is_empty():
-		_status.text = "Analysis: no requests"
+		_status.text = "Showroom: no requests"
 		return
 	_bake_in_progress = true
 	_bake_btn.disabled = true
@@ -701,11 +1487,7 @@ func _on_run_fibonacci_bake() -> void:
 	_bake_progress_label.text = "Preparing %d views…" % raw.size()
 	_status.text = "Baking %d views…" % raw.size()
 	var job := OfflineGemBakeJobScript.new()
-	var out := String(_analysis_output.text).strip_edges()
-	if out.is_empty():
-		out = "user://gem_designer_analysis"
-	# Remove existing manifest so old entries from a prior gem/resolution
-	# are not merged into this bake's results.
+	var out := _get_showroom_output_root()
 	var manifest_path := out + "/" + GemTracedBakeContractScript.DEFAULT_MANIFEST_NAME
 	var manifest_global := ProjectSettings.globalize_path(manifest_path)
 	if FileAccess.file_exists(manifest_global):
@@ -716,19 +1498,19 @@ func _on_run_fibonacci_bake() -> void:
 		"sample_count": int(_analysis_sample_spin.value),
 		"skip_stylize": false,
 	}
-	job.progress_updated.connect(_on_fibonacci_progress)
+	job.progress_updated.connect(_on_showroom_bake_progress)
 	var result: Dictionary = await job.run_explicit_request_batch_async(self, raw, draw_sz, batch_opts)
-	job.progress_updated.disconnect(_on_fibonacci_progress)
+	job.progress_updated.disconnect(_on_showroom_bake_progress)
 	_bake_in_progress = false
 	_bake_btn.disabled = false
 	_bake_progress.visible = false
 	_bake_progress_label.visible = false
 	var entries: Array = result.get("entries", [])
-	_load_analysis_entries(entries)
-	_status.text = "Analysis bake: %s (%d entries)" % [String(result.get("status", "?")), entries.size()]
+	_load_showroom_entries(entries)
+	_status.text = "Showroom bake: %s (%d entries)" % [String(result.get("status", "?")), entries.size()]
 
 
-func _on_fibonacci_progress(p: Dictionary) -> void:
+func _on_showroom_bake_progress(p: Dictionary) -> void:
 	var stage := String(p.get("stage", ""))
 	var completed := int(p.get("completed", 0))
 	var total := int(p.get("total", 0))
@@ -743,305 +1525,103 @@ func _on_fibonacci_progress(p: Dictionary) -> void:
 		_bake_progress_label.text = "Tracing %d / %d…" % [completed + 1, total]
 
 
-func _load_analysis_entries(entries: Array) -> void:
-	_analysis_entries.clear()
-	_analysis_dirs = PackedVector3Array()
-	_analysis_textures.clear()
-	_analysis_view_bases.clear()
-	_analysis_selected_index = -1
+func _load_showroom_entries(entries: Array) -> void:
+	var showroom_entries: Array = []
+	var has_orbit := false
 	for e in entries:
 		if typeof(e) != TYPE_DICTIONARY:
 			continue
-		if String(e.get("variant_type", "")) != "view_sphere":
+		if String(e.get("variant_type", "")) != "showroom":
 			continue
-		_analysis_entries.append(e)
-	var sorted: Array = _analysis_entries.duplicate()
-	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return int(a.get("rotation_bin", 0)) < int(b.get("rotation_bin", 0))
-	)
-	_analysis_entries.clear()
-	for item in sorted:
-		_analysis_entries.append(item)
-	for e in _analysis_entries:
-		var vd = e.get("view_dir_model", null)
-		var dir := Vector3.BACK
-		if vd is Array and (vd as Array).size() >= 3:
-			var arr: Array = vd
-			dir = Vector3(float(arr[0]), float(arr[1]), float(arr[2])).normalized()
-		_analysis_dirs.append(dir)
-		var path := String(e.get("texture_path", ""))
-		var tex: Texture2D = null
-		if path != "":
-			var gpath := ProjectSettings.globalize_path(path)
-			if FileAccess.file_exists(gpath):
-				var img := Image.load_from_file(gpath)
-				if img != null:
-					tex = ImageTexture.create_from_image(img)
-		_analysis_textures.append(tex)
-		var pitch_d := float(e.get("view_pitch_degrees", 0.0))
-		var yaw_d := float(e.get("view_yaw_degrees", 0.0))
-		var roll_d := float(e.get("view_roll_degrees", 0.0))
-		_analysis_view_bases.append(_build_analysis_view_basis(pitch_d, yaw_d, roll_d))
-	_orbit_basis = Basis.IDENTITY
-	_update_analysis_texture()
+		showroom_entries.append(e)
+		if String(e.get("showroom_frame_type", "")) == "orbit":
+			has_orbit = true
+	if GemVisualRegistry != null:
+		GemVisualRegistry.set_showroom_bake_session(SESSION_TILE_ID, showroom_entries)
+	_has_showroom_bake = not showroom_entries.is_empty()
+	_has_orbit_bake = has_orbit
+	_update_free_orbit_availability()
+	_orientation = Quaternion.IDENTITY
+	_zoom = 1.0
+	_axis_angle_deg = 0.0
+	_analysis_viewport.rotation = 0.0
+	_update_showroom_display()
+
+
+func _update_free_orbit_availability() -> void:
+	if _free_orbit_btn == null:
+		return
+	_free_orbit_btn.disabled = not _has_orbit_bake
+	# If Free Orbit was selected but orbit data is gone, switch to Pitch.
+	if _showroom_interaction_mode == 0 and not _has_orbit_bake:
+		_showroom_interaction_mode = 1
+		if _showroom_mode_row != null:
+			for c in _showroom_mode_row.get_children():
+				if c is Button:
+					var m := int(c.get_meta("showroom_mode", -1))
+					(c as Button).set_pressed_no_signal(m == 1)
 
 
 func _on_analysis_gui_input(event: InputEvent) -> void:
+	const ZOOM_MIN := 0.25
+	const ZOOM_MAX := 4.0
+	const ZOOM_STEP := 0.1
+	const ORBIT_SENSITIVITY := 0.007
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
+			_zoom = clampf(_zoom + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX)
+			_update_showroom_display()
+			return
+		if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
+			_zoom = clampf(_zoom - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX)
+			_update_showroom_display()
+			return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
-			_drag_active = mb.pressed
-			_last_drag = mb.position
+			if mb.pressed:
+				_drag_active = true
+				_last_drag = mb.position
+			else:
+				_drag_active = false
+				_snap_orientation_to_best_frame()
+				_update_showroom_display()
 	elif event is InputEventMouseMotion and _drag_active:
 		var mm := event as InputEventMouseMotion
-		var d := mm.position - _last_drag
+		var center := _analysis_viewport.size * 0.5
+		var _radius := minf(center.x, center.y) * 0.95
+		if _showroom_interaction_mode != 0:
+			# Use whichever mouse axis has the larger delta for smooth diagonal drags.
+			var dx := mm.relative.x * 0.35
+			var dy := -mm.relative.y * 0.35
+			if _invert_x:
+				dx = -dx
+			if _invert_y:
+				dy = -dy
+			var axis_delta := dx if absf(dx) >= absf(dy) else dy
+			_axis_angle_deg = wrapf(_axis_angle_deg - axis_delta, 0.0, 360.0)
+			_last_drag = mm.position
+			_update_showroom_display()
+			return
+		if mm.shift_pressed:
+			var roll_delta := mm.relative.x * 0.01
+			if _invert_x:
+				roll_delta = -roll_delta
+			var view_axis := (_orientation * Vector3.BACK).normalized()
+			_orientation = (Quaternion(view_axis, roll_delta) * _orientation).normalized()
+		else:
+			# Relative-motion orbit: unlimited rotation, no 90-degree stall.
+			# Rotate around VIEW-SPACE axes (screen up / screen right) so drag
+			# direction always matches visual rotation regardless of current tilt.
+			var dx := mm.relative.x * ORBIT_SENSITIVITY
+			var dy := mm.relative.y * ORBIT_SENSITIVITY
+			if _invert_x:
+				dx = -dx
+			if _invert_y:
+				dy = -dy
+			var screen_up := (_orientation * Vector3.UP).normalized()
+			var screen_right := (_orientation * Vector3.RIGHT).normalized()
+			var qy := Quaternion(screen_up, -dx)
+			var qx := Quaternion(screen_right, dy)
+			_orientation = (qy * qx * _orientation).normalized()
 		_last_drag = mm.position
-		var sensitivity := 0.01
-		var orbit_up := (_orbit_basis * Vector3.UP).normalized()
-		var orbit_right := (_orbit_basis * Vector3.RIGHT).normalized()
-		var orbit_view_dir := _desired_view_direction()
-		var drag_basis := Basis(orbit_up, -d.x * sensitivity)
-		drag_basis = drag_basis * Basis(orbit_right, -d.y * sensitivity)
-		var dragged_view_dir := (drag_basis * orbit_view_dir).normalized()
-		var dragged_up_hint := (drag_basis * orbit_up).normalized()
-		_orbit_basis = _build_orbit_basis_for_view_dir(dragged_view_dir, dragged_up_hint)
-		_update_analysis_texture()
-
-
-func _desired_view_direction() -> Vector3:
-	return (_orbit_basis * Vector3(0, 0, 1)).normalized()
-
-
-func _build_analysis_camera_basis(pitch_d: float, yaw_d: float, roll_d: float) -> Basis:
-	var cam_basis := Basis(Vector3.RIGHT, deg_to_rad(pitch_d))
-	cam_basis = Basis(Vector3.UP, deg_to_rad(yaw_d)) * cam_basis
-	if not is_zero_approx(roll_d):
-		cam_basis = Basis(Vector3.BACK, deg_to_rad(roll_d)) * cam_basis
-	return cam_basis.orthonormalized()
-
-
-func _build_analysis_view_basis(pitch_d: float, yaw_d: float, roll_d: float) -> Basis:
-	return _build_analysis_camera_basis(pitch_d, yaw_d, roll_d).inverse().orthonormalized()
-
-
-func _build_orbit_basis_for_view_dir(view_dir: Vector3, up_hint: Vector3 = Vector3.UP) -> Basis:
-	var back := view_dir.normalized()
-	if back.is_zero_approx():
-		back = Vector3.BACK
-	var up := _project_onto_view_plane(Vector3.UP, back)
-	if up.length_squared() < 0.001:
-		up = _project_onto_view_plane(up_hint, back)
-	if up.length_squared() < 0.001:
-		up = _project_onto_view_plane(Vector3.BACK, back)
-	if up.length_squared() < 0.001:
-		up = _project_onto_view_plane(Vector3.RIGHT, back)
-	up = up.normalized()
-	var right := up.cross(back).normalized()
-	up = back.cross(right).normalized()
-	return Basis(right, up, back).orthonormalized()
-
-
-func _project_onto_view_plane(v: Vector3, plane_normal: Vector3) -> Vector3:
-	return v - v.dot(plane_normal) * plane_normal
-
-
-func _unwrap_angle_near(current_angle: float, target_angle: float) -> float:
-	return current_angle + wrapf(target_angle - current_angle, -PI, PI)
-
-
-func _format_debug_vector(v: Vector3) -> String:
-	return "(%.3f, %.3f, %.3f)" % [v.x, v.y, v.z]
-
-
-func _refresh_analysis_debug_text(
-	want: Vector3,
-	orbit_up: Vector3,
-	orbit_right: Vector3,
-	candidates: Array[Dictionary],
-	selected: Dictionary,
-	proj_up_len_sq: float,
-	target_rotation: float,
-	rotation_updated: bool
-) -> void:
-	if _analysis_debug_label == null:
-		return
-	if _analysis_debug_checkbox == null or not _analysis_debug_checkbox.button_pressed:
-		return
-	var lines := PackedStringArray()
-	lines.append("want=%s" % _format_debug_vector(want))
-	lines.append("up=%s" % _format_debug_vector(orbit_up))
-	lines.append("right=%s" % _format_debug_vector(orbit_right))
-	if selected.is_empty():
-		lines.append("selected=<none>")
-	else:
-		lines.append("selected=%d %s  score=%.4f  dir=%.4f  up=%.4f  right=%.4f" % [
-			int(selected.get("index", -1)),
-			String(selected.get("label", "")),
-			float(selected.get("score", 0.0)),
-			float(selected.get("view_dot", 0.0)),
-			float(selected.get("up_bonus", 0.0)),
-			float(selected.get("right_bonus", 0.0)),
-		])
-		lines.append("selected_dir=%s" % _format_debug_vector(selected.get("view_dir", Vector3.ZERO)))
-		lines.append("pitch=%.2f yaw=%.2f roll=%.2f" % [
-			float(selected.get("pitch_d", 0.0)),
-			float(selected.get("yaw_d", 0.0)),
-			float(selected.get("roll_d", 0.0)),
-		])
-	lines.append("proj_up_len_sq=%.6f  target_rot=%.2fdeg  current_rot=%.2fdeg  updated=%s" % [
-		proj_up_len_sq,
-		rad_to_deg(target_rotation),
-		rad_to_deg(_analysis_tex.rotation),
-		"yes" if rotation_updated else "no",
-	])
-	if candidates.size() > 1:
-		lines.append("top candidates:")
-		for i in mini(candidates.size(), 4):
-			var c: Dictionary = candidates[i]
-			lines.append("  %d) #%d %s score=%.4f dir=%.4f up=%.4f right=%.4f" % [
-				i + 1,
-				int(c.get("index", -1)),
-				String(c.get("label", "")),
-				float(c.get("score", 0.0)),
-				float(c.get("view_dot", 0.0)),
-				float(c.get("up_bonus", 0.0)),
-				float(c.get("right_bonus", 0.0)),
-			])
-	_analysis_debug_label.text = "\n".join(lines)
-
-
-func _update_analysis_texture() -> void:
-	if _analysis_dirs.is_empty():
-		_refresh_analysis_debug_text(
-			Vector3.ZERO,
-			Vector3.ZERO,
-			Vector3.ZERO,
-			[],
-			{},
-			0.0,
-			0.0,
-			false
-		)
-		return
-	var want := _desired_view_direction()
-	var orbit_up := (_orbit_basis * Vector3.UP).normalized()
-	var orbit_right := (_orbit_basis * Vector3.RIGHT).normalized()
-	# --- Frame selection: view direction + orientation tiebreaker -----------
-	var best_i := 0
-	var best_score := -999.0
-	var scored_candidates: Array[Dictionary] = []
-	for i in _analysis_dirs.size():
-		var view_dot := _analysis_dirs[i].dot(want)
-		var up_bonus := 0.0
-		var right_bonus := 0.0
-		var pitch_d := 0.0
-		var yaw_d := 0.0
-		var roll_d := 0.0
-		var label := ""
-		if i < _analysis_view_bases.size():
-			var bake_basis: Basis = _analysis_view_bases[i]
-			var bake_view_dir := bake_basis * Vector3.BACK
-			var proj_up := _project_onto_view_plane(orbit_up, bake_view_dir)
-			if proj_up.length_squared() > 0.001:
-				up_bonus = (bake_basis * Vector3.UP).dot(proj_up.normalized())
-			var proj_right := _project_onto_view_plane(orbit_right, bake_view_dir)
-			if proj_right.length_squared() > 0.001:
-				right_bonus = (bake_basis * Vector3.RIGHT).dot(proj_right.normalized())
-		if i < _analysis_entries.size():
-			var entry: Dictionary = _analysis_entries[i]
-			pitch_d = float(entry.get("view_pitch_degrees", 0.0))
-			yaw_d = float(entry.get("view_yaw_degrees", 0.0))
-			roll_d = float(entry.get("view_roll_degrees", 0.0))
-			label = String(entry.get("rotation_label", ""))
-		var score := view_dot * 4.0 + up_bonus + right_bonus
-		if i == _analysis_selected_index:
-			score += 0.02
-		scored_candidates.append({
-			"index": i,
-			"label": label,
-			"score": score,
-			"view_dot": view_dot,
-			"up_bonus": up_bonus,
-			"right_bonus": right_bonus,
-			"view_dir": _analysis_dirs[i],
-			"pitch_d": pitch_d,
-			"yaw_d": yaw_d,
-			"roll_d": roll_d,
-		})
-		if score > best_score:
-			best_score = score
-			best_i = i
-	scored_candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return float(a.get("score", 0.0)) > float(b.get("score", 0.0))
-	)
-	_analysis_selected_index = best_i
-	if best_i < _analysis_textures.size() and _analysis_textures[best_i] != null:
-		_analysis_tex.texture = _analysis_textures[best_i]
-	# --- Orbit-relative correction ------------------------------------------
-	# Rebuild the selected frame's camera basis and compute the 2D rotation
-	# that aligns the frame's camera-up with the orbit's expected up on screen.
-	_analysis_tex.pivot_offset = _analysis_tex.size * 0.5
-	if best_i >= _analysis_entries.size():
-		_analysis_tex.rotation = 0.0
-		_refresh_analysis_debug_text(
-			want,
-			orbit_up,
-			orbit_right,
-			scored_candidates,
-			{},
-			0.0,
-			0.0,
-			true
-		)
-		return
-	var e := _analysis_entries[best_i]
-	var pitch_d := float(e.get("view_pitch_degrees", 0.0))
-	var yaw_d := float(e.get("view_yaw_degrees", 0.0))
-	var roll_d := float(e.get("view_roll_degrees", 0.0))
-	var bake_basis := _build_analysis_view_basis(pitch_d, yaw_d, roll_d)
-	var bake_up := bake_basis * Vector3.UP
-	var bake_right := bake_basis * Vector3.RIGHT
-	var bake_view_dir := bake_basis * Vector3.BACK
-	# Project the orbit's up onto the bake frame's view plane.
-	var proj_up := _project_onto_view_plane(orbit_up, bake_view_dir)
-	var proj_up_len_sq := proj_up.length_squared()
-	if proj_up.length_squared() < 0.001:
-		# Near the pole the canonical up becomes ambiguous, so preserve the
-		# previous visual angle instead of injecting a discontinuous 180 deg turn.
-		_refresh_analysis_debug_text(
-			want,
-			orbit_up,
-			orbit_right,
-			scored_candidates,
-			scored_candidates[0] if not scored_candidates.is_empty() else {},
-			proj_up_len_sq,
-			_analysis_tex.rotation,
-			false
-		)
-		return
-	if proj_up.length_squared() < 0.0001:
-		_refresh_analysis_debug_text(
-			want,
-			orbit_up,
-			orbit_right,
-			scored_candidates,
-			scored_candidates[0] if not scored_candidates.is_empty() else {},
-			proj_up_len_sq,
-			_analysis_tex.rotation,
-			false
-		)
-		return
-	proj_up = proj_up.normalized()
-	# Angle from bake camera-up to the orbit's expected up, in screen space.
-	var target_rotation := -atan2(proj_up.dot(bake_right), proj_up.dot(bake_up))
-	_analysis_tex.rotation = _unwrap_angle_near(_analysis_tex.rotation, target_rotation)
-	_refresh_analysis_debug_text(
-		want,
-		orbit_up,
-		orbit_right,
-		scored_candidates,
-		scored_candidates[0] if not scored_candidates.is_empty() else {},
-		proj_up_len_sq,
-		target_rotation,
-		true
-	)
+		_update_showroom_display()

@@ -174,7 +174,8 @@ func run_batch(
 		per_tile_counts,
 		start_usec,
 		variant_settings,
-		profiling
+		profiling,
+		options
 	)
 
 
@@ -292,7 +293,8 @@ func run_explicit_request_batch(
 		per_tile_counts,
 		start_usec,
 		variant_settings,
-		profiling
+		profiling,
+		options
 	)
 
 
@@ -414,7 +416,8 @@ func run_explicit_request_batch_async(
 		per_tile_counts,
 		start_usec,
 		variant_settings,
-		profiling
+		profiling,
+		options
 	)
 
 
@@ -559,7 +562,8 @@ func _run_batch_internal(
 		per_tile_counts,
 		start_usec,
 		variant_settings,
-		profiling
+		profiling,
+		options
 	)
 
 
@@ -570,7 +574,7 @@ func _request_matches_filters(request: Dictionary, options: Dictionary) -> bool:
 		return false
 	if variant_type == &"rotation" and bool(options.get("skip_rotations", false)):
 		return false
-	if variant_type == &"view_sphere" and bool(options.get("skip_view_sphere", false)):
+	if variant_type == &"showroom" and bool(options.get("skip_showroom", false)):
 		return false
 	# Filter to specific bins when provided.
 	var lighting_filters: Array = options.get("lighting_bins", [])
@@ -668,6 +672,14 @@ func _enrich_request_list(base_requests: Array, sample_count: int, options: Dict
 			)
 		if options.has("skip_stylize"):
 			enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
+		# Image format and quality.
+		var image_format := GemTracedBakeContractScript.normalize_image_format(
+			options.get("image_format", GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT)
+		)
+		enriched_request["image_format"] = image_format
+		if image_format == GemTracedBakeContractScript.IMAGE_FORMAT_WEBP:
+			var base_quality := float(options.get("webp_quality", GemTracedBakeContractScript.DEFAULT_WEBP_QUALITY))
+			enriched_request["image_quality"] = GemTracedBakeContractScript.compute_adaptive_webp_quality(visual, base_quality)
 		enriched_request["mesh_resource"] = mesh_resource
 		enriched_request["visual"] = visual
 		enriched_request["mesh_includes_cut_rotation"] = _request_uses_variant_mesh(visual, enriched_request)
@@ -712,7 +724,8 @@ func _resolve_parallel_execution_plan(request_count: int, options: Dictionary = 
 		if requested_variant_workers > 0:
 			variant_worker_count = requested_variant_workers
 		elif requested_trace_threads > 0:
-			variant_worker_count = maxi(cpu_budget / maxi(requested_trace_threads, 1), 1)
+			@warning_ignore("integer_division")
+			variant_worker_count = maxi(int(cpu_budget / maxi(requested_trace_threads, 1)), 1)
 		elif cpu_budget >= 24 and request_count >= 6:
 			variant_worker_count = 4
 		elif cpu_budget >= 16 and request_count >= 4:
@@ -725,10 +738,12 @@ func _resolve_parallel_execution_plan(request_count: int, options: Dictionary = 
 		mini(maxi(request_count, 1), MAX_AUTO_VARIANT_WORKERS)
 	)
 	if requested_trace_threads > 0:
-		var max_safe_workers := maxi(cpu_budget / maxi(requested_trace_threads, 1), 1)
+		@warning_ignore("integer_division")
+		var max_safe_workers := maxi(int(cpu_budget / maxi(requested_trace_threads, 1)), 1)
 		variant_worker_count = mini(variant_worker_count, max_safe_workers)
+	@warning_ignore("integer_division")
 	var trace_thread_budget := requested_trace_threads if requested_trace_threads > 0 else maxi(
-		cpu_budget / maxi(variant_worker_count, 1),
+		int(cpu_budget / maxi(variant_worker_count, 1)),
 		1
 	)
 	return {
@@ -879,10 +894,19 @@ func _process_trace_result(
 	var stylize_elapsed_ms := (Time.get_ticks_usec() - stylize_start_usec) / 1000.0
 	_record_batch_profile_value(profiling, "stylize_elapsed_ms", stylize_elapsed_ms)
 	var variant_key := String(traced_request.get("variant_key", ""))
-	var texture_path := GemTracedBakeContractScript.build_texture_path(output_root, String(tile_id), variant_key)
+	var image_format := GemTracedBakeContractScript.normalize_image_format(
+		traced_request.get("image_format", GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT)
+	)
+	var texture_path := GemTracedBakeContractScript.build_texture_path(output_root, String(tile_id), variant_key, image_format)
 	_ensure_dir(_join_path(output_root, String(tile_id)))
 	var save_start_usec := Time.get_ticks_usec()
-	var save_err := image.save_png(ProjectSettings.globalize_path(texture_path))
+	var save_err: Error
+	if image_format == GemTracedBakeContractScript.IMAGE_FORMAT_WEBP:
+		var quality := float(traced_request.get("image_quality", GemTracedBakeContractScript.DEFAULT_WEBP_QUALITY))
+		var lossy := quality < 1.0
+		save_err = image.save_webp(ProjectSettings.globalize_path(texture_path), lossy, quality)
+	else:
+		save_err = image.save_png(ProjectSettings.globalize_path(texture_path))
 	var save_elapsed_ms := (Time.get_ticks_usec() - save_start_usec) / 1000.0
 	_record_batch_profile_value(profiling, "save_elapsed_ms", save_elapsed_ms)
 	if save_err == OK:
@@ -923,10 +947,11 @@ func _finalize_batch_result(
 	sample_count: int,
 	filtered_requests: Array,
 	entries: Array,
-	per_tile_counts: Dictionary,
+	_per_tile_counts: Dictionary,
 	start_usec: int,
 	variant_settings: Dictionary = {},
 	profiling: Dictionary = {},
+	batch_options: Dictionary = {},
 ) -> Dictionary:
 	var manifest_max_trace_bounces := _resolve_batch_max_trace_bounces(filtered_requests)
 	var merged_entries := _merge_manifest_entries(
@@ -935,6 +960,14 @@ func _finalize_batch_result(
 		{"max_trace_bounces": manifest_max_trace_bounces}
 	)
 	var merged_tile_counts := _count_entries_by_tile(merged_entries)
+	var base_variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(variant_settings)
+	var rotation_layer_count := GemTracedBakeContractScript.infer_rotation_layer_count_from_requests(
+		filtered_requests
+	)
+	var merged_variant_settings := GemTracedBakeContractScript.merge_atlas_metadata_into_variant_settings(
+		base_variant_settings,
+		rotation_layer_count
+	)
 	var manifest := {
 		"backend_id": &"offline_traced",
 		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION,
@@ -943,10 +976,24 @@ func _finalize_batch_result(
 		"draw_size": draw_size,
 		"sample_count": sample_count,
 		"max_trace_bounces": manifest_max_trace_bounces,
-		"variant_settings": GemTracedBakeContractScript.build_manifest_variant_settings(variant_settings),
+		"image_format": String(variant_settings.get(
+			"image_format",
+			GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT
+		)),
+		"variant_settings": merged_variant_settings,
 		"tile_counts": merged_tile_counts,
 		"entries": merged_entries,
 	}
+	var profile_id := String(batch_options.get("profile_id", "")).strip_edges()
+	if not profile_id.is_empty():
+		manifest["profile_id"] = profile_id
+	var bake_profile_path := String(batch_options.get("bake_profile_path", "")).strip_edges()
+	if not bake_profile_path.is_empty():
+		manifest["bake_profile_path"] = bake_profile_path
+	if batch_options.has("vram_compress"):
+		manifest["vram_compress"] = bool(batch_options.get("vram_compress"))
+	if batch_options.has("atlas_output"):
+		manifest["atlas_output"] = bool(batch_options.get("atlas_output"))
 	var manifest_path := _join_path(output_root, DEFAULT_MANIFEST_NAME)
 	var file := FileAccess.open(manifest_path, FileAccess.WRITE)
 	if file == null:

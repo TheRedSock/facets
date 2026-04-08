@@ -42,6 +42,7 @@ func _run() -> void:
 		rotation_variant_options["rotation_step_degrees"] = rotation_step_degrees
 	var entries: Array[Dictionary] = []
 	var tile_counts: Dictionary = {}
+	var all_requests: Array = []
 	for tile_id in tile_ids:
 		var visual: GemVisualResource = registry.get_visual(tile_id)
 		if visual == null:
@@ -53,12 +54,22 @@ func _run() -> void:
 			rotation_variant_options
 		)
 		for request in requests:
+			all_requests.append(request)
 			var variant_key := String(request.get("variant_key", ""))
 			if variant_key.is_empty():
 				continue
-			var texture_path := GemTracedBakeContractScript.build_texture_path(output_root, String(tile_id), variant_key)
-			if not FileAccess.file_exists(texture_path):
+			# Try each supported image format to find existing baked files.
+			var texture_path := ""
+			var found_format := GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT
+			for fmt in GemTracedBakeContractScript.SUPPORTED_IMAGE_FORMATS:
+				var candidate := GemTracedBakeContractScript.build_texture_path(output_root, String(tile_id), variant_key, fmt)
+				if FileAccess.file_exists(candidate):
+					texture_path = candidate
+					found_format = fmt
+					break
+			if texture_path.is_empty():
 				continue
+			request["image_format"] = found_format
 			entries.append(GemTracedBakeContractScript.build_manifest_entry(
 				visual,
 				request,
@@ -69,6 +80,12 @@ func _run() -> void:
 			))
 			tile_counts[tile_id] = int(tile_counts.get(tile_id, 0)) + 1
 
+	var base_vs := GemTracedBakeContractScript.build_manifest_variant_settings(rotation_variant_options)
+	var rot_layers := GemTracedBakeContractScript.infer_rotation_layer_count_from_requests(all_requests)
+	var manifest_vs := GemTracedBakeContractScript.merge_atlas_metadata_into_variant_settings(
+		base_vs,
+		rot_layers
+	)
 	var manifest := {
 		"backend_id": &"offline_traced",
 		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION,
@@ -76,6 +93,7 @@ func _run() -> void:
 		"cell_size": cell_size,
 		"draw_size": draw_size,
 		"sample_count": int(args.get("samples", 1)),
+		"variant_settings": manifest_vs,
 		"tile_counts": tile_counts,
 		"entries": entries,
 	}

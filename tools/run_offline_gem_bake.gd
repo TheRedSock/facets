@@ -119,11 +119,29 @@ func _run() -> void:
 	var rotation_step_degrees := float(args.get("rotation_step_degrees", 0.0))
 	if rotation_step_degrees > 0.0:
 		options["rotation_step_degrees"] = rotation_step_degrees
+	if args.has("showroom_directions"):
+		options["showroom_direction_count"] = maxi(int(args.get("showroom_directions", 0)), 0)
+	if args.has("showroom_roll_steps"):
+		options["showroom_roll_steps"] = clampi(int(args.get("showroom_roll_steps", 6)), 1, 64)
 	var variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(options)
 	# skip_stylize is not a variant setting — add it after variant settings are resolved
 	# so it doesn't pass through normalize_variant_settings.
 	if args.has("skip_stylize"):
 		options["skip_stylize"] = true
+	# Image format: --format=webp|png (default webp).
+	var image_format := GemTracedBakeContractScript.normalize_image_format(
+		args.get("format", GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT)
+	)
+	options["image_format"] = image_format
+	# WebP quality: --quality=N (0-100 mapped to 0.0-1.0) or --lossless for quality 1.0.
+	if args.has("lossless"):
+		options["webp_quality"] = 1.0
+	elif args.has("quality"):
+		var raw_quality := float(args.get("quality", 92))
+		# Accept both 0-1 float and 0-100 integer scale.
+		if raw_quality > 1.0:
+			raw_quality = raw_quality / 100.0
+		options["webp_quality"] = clampf(raw_quality, 0.5, 1.0)
 	_status_context["settings"] = {
 		"tile_ids": tile_ids.duplicate(),
 		"cell_size": Vector2i(size, size),
@@ -155,6 +173,10 @@ func _run() -> void:
 		str(options.get("thread_count", "auto")),
 		str(options.get("variant_worker_count", "auto")),
 		String(options["output_root"]),
+	])
+	print("Image format: %s  Quality: %s" % [
+		String(image_format),
+		"lossless" if float(options.get("webp_quality", 0.92)) >= 1.0 else str(options.get("webp_quality", "adaptive")),
 	])
 	print("Lighting preset: %s  Baked grid: %s  Runtime grid: %s" % [
 		String(variant_settings.get("lighting_grid_preset", &"custom")),

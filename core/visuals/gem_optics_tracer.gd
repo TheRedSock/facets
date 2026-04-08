@@ -74,7 +74,14 @@ func trace_to_image(mesh_resource: GemMeshResource, visual: GemVisualResource, r
 	var radius := maxf(float(trace_view.get("bounding_radius", 0.0)), 0.25)
 	var aspect := float(target_size.x) / maxf(float(target_size.y), 1.0)
 	var view_scale := clampf(float(request.get("view_scale", 1.0)), 0.5, 2.0)
-	var half_height := maxf(bounds.size.y, radius * 2.0) * VIEW_MARGIN * 0.5 / view_scale
+	# uniform_projection: use bounding sphere for consistent scale across rotations
+	# (showroom frames). Default: fit rotated AABB for per-tile gameplay normalization.
+	var projection_extent: float
+	if bool(request.get("uniform_projection", false)):
+		projection_extent = radius * 2.0
+	else:
+		projection_extent = maxf(bounds.size.y, radius * 2.0)
+	var half_height := projection_extent * VIEW_MARGIN * 0.5 / view_scale
 	var half_width := half_height * aspect
 	var origin_z := bounds.position.z + bounds.size.z + radius * 2.4
 	var inverse_basis: Basis = trace_view.get("inverse_basis", Basis.IDENTITY)
@@ -336,7 +343,11 @@ func _build_trace_view(
 ) -> Dictionary:
 	var trace_data: Dictionary = mesh_resource.build_trace_data().duplicate(false)
 	trace_data["optic_axis"] = _resolve_optic_axis(visual)
-	var basis := _build_view_basis(visual, request)
+	var basis: Basis
+	if request.has("view_basis_override"):
+		basis = request["view_basis_override"]
+	else:
+		basis = _build_view_basis(visual, request)
 	var source_bounds: AABB = trace_data.get("bounds", mesh_resource.compute_bounds())
 	return {
 		"trace_data": trace_data,

@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """
-Stitch gem rotation PNGs into a sprite-sheet atlas.
+Stitch gem rotation PNGs/WebPs into a sprite-sheet atlas.
 
-Scans assets/debug_bakes/ for files matching {gem_name}__rot_{number}.png,
-groups them by gem name, and composites one row per gem into a single PNG.
+Scans a production bake output directory for files matching the convention
+  {gem_name}/{gem_name}@rot_{number}.webp   (or .png)
+inside per-gem subdirectories, groups them by gem name, and composites one
+row per gem into a single PNG.
+
+Non-gameplay gems (material studies, debug visuals, and gems without a tile
+definition) are excluded by default.  Use --include-all to override.
 
 Usage:
-    python tools/stitch_rotations.py                        # defaults: 128px, output to assets/debug_bakes/
+    python tools/stitch_rotations.py                        # defaults: 128px, scans generated/traced_bakes/
     python tools/stitch_rotations.py --size 64              # 64x64 per frame
     python tools/stitch_rotations.py --output atlas.png     # custom output path
     python tools/stitch_rotations.py --input path/to/bakes  # custom input directory
     python tools/stitch_rotations.py --labels               # draw gem name labels on the left
     python tools/stitch_rotations.py --padding 4            # 4px gap between frames
+    python tools/stitch_rotations.py --include-all          # include study/debug gems
 """
 
 import argparse
@@ -25,25 +31,47 @@ except ImportError:
     print("Error: Pillow is required. Install with: pip install Pillow", file=sys.stderr)
     sys.exit(1)
 
-ROT_PATTERN = re.compile(r"^(.+)__rot_(\d+)\.png$")
+# Production bake naming: {gem}__rot_{NN}.webp (or .png) inside {gem}/ subdirectory.
+# The variant key uses @ internally but sanitize_variant_key() replaces @ with __
+# in the on-disk filename.
+ROT_PATTERN = re.compile(r"^(.+)__rot_(\d+)\.(webp|png)$")
 
-# Tier order for sorting rows (matches the merge ladder).
-# Gems not in this list are appended alphabetically at the end.
-TIER_ORDER = [
+# Canonical merge-ladder order within each tier for deterministic output.
+# Gems sharing a tier are sub-sorted: ladder gem first, then alphabetical.
+TIER_LADDER_ORDER = [
     "quartz", "amethyst", "peridot", "topaz",
     "sapphire", "emerald", "ruby", "diamond",
 ]
 
+TIER_PATTERN = re.compile(r'^tier\s*=\s*(\d+)', re.MULTILINE)
 
-def gather_rotations(input_dir: Path) -> dict[str, list[Path]]:
-    """Walk input_dir recursively and group rot PNGs by gem name."""
+# Non-gameplay gems excluded from the atlas by default.
+# These have visual definitions but no tile definitions (no tier in the
+# merge ladder).  Includes material study gems, the opaque debug quartz,
+# and the standalone red beryl visual.
+EXCLUDED_GEMS = frozenset([
+    "grandidierite_study",
+    "malachite_study",
+    "tigers_eye_study",
+    "opal_study",
+    "quartz_opaque_debug",
+    "red_beryl",
+])
+
+
+def gather_rotations(input_dir: Path, include_all: bool = False) -> dict[str, list[Path]]:
+    """Walk input_dir recursively and group rotation images by gem name."""
     groups: dict[str, list[Path]] = {}
-    for png in sorted(input_dir.rglob("*.png")):
-        m = ROT_PATTERN.match(png.name)
+    for img_path in sorted(input_dir.rglob("*")):
+        if img_path.suffix.lower() not in (".webp", ".png"):
+            continue
+        m = ROT_PATTERN.match(img_path.name)
         if not m:
             continue
         gem_name = m.group(1)
-        groups.setdefault(gem_name, []).append(png)
+        if not include_all and gem_name in EXCLUDED_GEMS:
+            continue
+        groups.setdefault(gem_name, []).append(img_path)
 
     # Sort each group by rotation index
     for gem in groups:
@@ -51,12 +79,32 @@ def gather_rotations(input_dir: Path) -> dict[str, list[Path]]:
     return groups
 
 
-def sort_gem_names(names: list[str]) -> list[str]:
-    """Sort gem names: tier-order first, then alphabetical remainder."""
-    tier_set = set(TIER_ORDER)
-    ordered = [n for n in TIER_ORDER if n in names]
-    remainder = sorted(n for n in names if n not in tier_set)
-    return ordered + remainder
+def load_tier_map(project_root: Path) -> dict[str, int]:
+    """Parse tier values from data/tiles/*.tres files."""
+    tier_map: dict[str, int] = {}
+    tiles_dir = project_root / "data" / "tiles"
+    if not tiles_dir.is_dir():
+        return tier_map
+    for tres in sorted(tiles_dir.glob("*.tres")):
+        gem_name = tres.stem
+        text = tres.read_text(encoding="utf-8", errors="replace")
+        m = TIER_PATTERN.search(text)
+        if m:
+            tier_map[gem_name] = int(m.group(1))
+    return tier_map
+
+
+def sort_gem_names(names: list[str], tier_map: dict[str, int]) -> list[str]:
+    """Sort gem names by tier (ascending), then ladder-first within tier, then alphabetical."""
+    ladder_set = set(TIER_LADDER_ORDER)
+
+    def sort_key(name: str) -> tuple[int, int, str]:
+        tier = tier_map.get(name, 9999)
+        # Within same tier: ladder gems first (0), others second (1)
+        ladder_priority = 0 if name in ladder_set else 1
+        return (tier, ladder_priority, name)
+
+    return sorted(names, key=sort_key)
 
 
 def stitch(
@@ -64,13 +112,14 @@ def stitch(
     frame_size: int,
     padding: int,
     labels: bool,
+    tier_map: dict[str, int],
 ) -> Image.Image:
     """Build the atlas image."""
     if not groups:
         print("No rotation images found.", file=sys.stderr)
         sys.exit(1)
 
-    gem_names = sort_gem_names(list(groups.keys()))
+    gem_names = sort_gem_names(list(groups.keys()), tier_map)
     max_cols = max(len(groups[g]) for g in gem_names)
     num_rows = len(gem_names)
 
@@ -120,7 +169,7 @@ def stitch(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Stitch gem rotation PNGs into a sprite-sheet atlas.")
+    parser = argparse.ArgumentParser(description="Stitch gem rotation images into a sprite-sheet atlas.")
     parser.add_argument(
         "--size", "-s",
         type=int,
@@ -131,13 +180,13 @@ def main():
         "--input", "-i",
         type=str,
         default=None,
-        help="Input directory to scan (default: assets/debug_bakes/).",
+        help="Input directory to scan (default: generated/traced_bakes/).",
     )
     parser.add_argument(
         "--output", "-o",
         type=str,
         default=None,
-        help="Output PNG path (default: assets/debug_bakes/rotation_atlas.png).",
+        help="Output PNG path (default: <input_dir>/rotation_atlas.png).",
     )
     parser.add_argument(
         "--padding", "-p",
@@ -150,27 +199,44 @@ def main():
         action="store_true",
         help="Draw gem name labels on the left side of each row.",
     )
+    parser.add_argument(
+        "--include-all",
+        action="store_true",
+        help="Include non-gameplay gems (studies, debug visuals) in the atlas.",
+    )
     args = parser.parse_args()
 
     # Resolve paths relative to project root (parent of tools/)
     project_root = Path(__file__).resolve().parent.parent
-    input_dir = Path(args.input) if args.input else project_root / "assets" / "debug_bakes"
+    input_dir = Path(args.input) if args.input else project_root / "generated" / "traced_bakes"
     output_path = Path(args.output) if args.output else input_dir / "rotation_atlas.png"
 
     if not input_dir.is_dir():
         print(f"Error: Input directory not found: {input_dir}", file=sys.stderr)
         sys.exit(1)
 
-    groups = gather_rotations(input_dir)
+    groups = gather_rotations(input_dir, include_all=args.include_all)
     if not groups:
-        print(f"No files matching {{gem_name}}__rot_{{number}}.png found in {input_dir}", file=sys.stderr)
+        print(f"No rotation files matching {{gem}}__rot_{{NN}}.webp/png found in {input_dir}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Found {len(groups)} gems with rotation frames:")
-    for gem in sort_gem_names(list(groups.keys())):
-        print(f"  {gem}: {len(groups[gem])} frames")
+    tier_map = load_tier_map(project_root)
 
-    atlas = stitch(groups, args.size, args.padding, args.labels)
+    excluded_count = 0
+    if not args.include_all:
+        # Count how many excluded gems had files present for reporting.
+        all_groups = gather_rotations(input_dir, include_all=True)
+        excluded_count = len(all_groups) - len(groups)
+
+    print(f"Found {len(groups)} gems with rotation frames:")
+    for gem in sort_gem_names(list(groups.keys()), tier_map):
+        tier = tier_map.get(gem)
+        tier_label = f" (T{tier})" if tier is not None else ""
+        print(f"  {gem}{tier_label}: {len(groups[gem])} frames")
+    if excluded_count > 0:
+        print(f"  ({excluded_count} non-gameplay gem(s) excluded)")
+
+    atlas = stitch(groups, args.size, args.padding, args.labels, tier_map)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     atlas.save(str(output_path), "PNG")

@@ -1,10 +1,8 @@
 shader_type canvas_item;
 render_mode unshaded, blend_mix;
 
-uniform sampler2D texture_a : source_color;
-uniform sampler2D texture_b : source_color;
-uniform sampler2D texture_c : source_color;
-uniform sampler2D texture_d : source_color;
+uniform sampler2DArray atlas : source_color;
+uniform vec4 layer_index = vec4(0.0, 0.0, 0.0, 0.0);
 uniform vec4 weights = vec4(0.0);
 uniform bool outline_enabled = false;
 uniform vec4 outline_color : source_color = vec4(0.0, 0.0, 0.0, 0.5);
@@ -12,14 +10,11 @@ uniform float outline_width_pixels = 1.0;
 uniform vec2 texture_size_px = vec2(112.0, 112.0);
 
 vec4 sample_blended(vec2 uv) {
-	vec4 sample_a = texture(texture_a, uv);
-	vec4 sample_b = texture(texture_b, uv);
-	vec4 sample_c = texture(texture_c, uv);
-	vec4 sample_d = texture(texture_d, uv);
-	vec4 blended = sample_a * weights.x;
-	blended += sample_b * weights.y;
-	blended += sample_c * weights.z;
-	blended += sample_d * weights.w;
+	vec4 sample_a = texture(atlas, vec3(uv, layer_index.x));
+	vec4 sample_b = texture(atlas, vec3(uv, layer_index.y));
+	vec4 sample_c = texture(atlas, vec3(uv, layer_index.z));
+	vec4 sample_d = texture(atlas, vec3(uv, layer_index.w));
+	vec4 blended = sample_a * weights.x + sample_b * weights.y + sample_c * weights.z + sample_d * weights.w;
 	return vec4(blended.rgb, clamp(blended.a, 0.0, 1.0));
 }
 

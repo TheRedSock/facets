@@ -33,6 +33,7 @@ static func validate_model(model, spec = null) -> Dictionary:
 		if vertices.size() < 3:
 			report["errors"].append("Facet %d has fewer than 3 vertices" % facet_index)
 			continue
+		var zone := StringName(model.facet_zones[facet_index] if facet_index < model.facet_zones.size() else &"")
 		var area := _polygon_area_3d(vertices)
 		if area <= AREA_EPSILON:
 			report["errors"].append("Facet %d is degenerate" % facet_index)
@@ -51,7 +52,9 @@ static func validate_model(model, spec = null) -> Dictionary:
 				report["errors"].append("Facet %d contains duplicate vertices" % facet_index)
 			var edge_key := _edge_key(vertices[vertex_index], vertices[next_index])
 			edge_counts[edge_key] = int(edge_counts.get(edge_key, 0)) + 1
-		if not edge_lengths.is_empty():
+		# Girdle band quads are structurally thin (height = girdle thickness,
+		# width = inter-point spacing), so edge-ratio checks do not apply.
+		if zone != &"girdle_band" and not edge_lengths.is_empty():
 			var longest := 0.0
 			var shortest := INF
 			for edge_length in edge_lengths:
@@ -64,7 +67,6 @@ static func validate_model(model, spec = null) -> Dictionary:
 		var min_angle := _min_interior_angle_degrees(vertices)
 		if min_angle < min_interior_angle_degrees:
 			report["warnings"].append("Facet %d falls below the minimum interior-angle threshold" % facet_index)
-		var zone := StringName(model.facet_zones[facet_index] if facet_index < model.facet_zones.size() else &"")
 		if outer_polygon.size() >= 3 and (zone == &"pavilion" or zone == &"culet"):
 			for vertex in vertices:
 				var point_2d := Vector2(vertex.x + 0.5, 0.5 - vertex.y)

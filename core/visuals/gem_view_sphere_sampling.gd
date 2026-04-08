@@ -9,11 +9,57 @@ const MIN_FIBONACCI_POINTS := 16
 const MAX_FIBONACCI_POINTS := 50000
 
 
+## Informational angular spacing for showroom direction count (corrected 4π/n formula).
+static func showroom_angular_resolution_degrees(direction_count: int) -> float:
+	var n := maxi(direction_count, 1)
+	return rad_to_deg(sqrt(4.0 * PI / float(n)))
+
+
 static func fibonacci_point_count_for_theta_degrees(theta_degrees: float) -> int:
 	var theta := maxf(theta_degrees, 0.25)
 	var theta_rad := deg_to_rad(theta)
 	var n := int(ceil(TAU / (theta_rad * theta_rad)))
 	return clampi(n, MIN_FIBONACCI_POINTS, MAX_FIBONACCI_POINTS)
+
+
+static func _least_aligned_world_axis(forward: Vector3) -> Vector3:
+	var ax := absf(forward.x)
+	var ay := absf(forward.y)
+	var az := absf(forward.z)
+	if ax <= ay and ax <= az:
+		return Vector3.RIGHT
+	if ay <= az:
+		return Vector3.UP
+	return Vector3.BACK
+
+
+## Stable orthonormal camera frame with basis.z = view direction (model space).
+## Columns: right, up, forward — matches tracer row convention for view_basis.
+static func build_camera_frame_for_direction(view_dir: Vector3) -> Basis:
+	var z := view_dir.normalized()
+	if z.length_squared() < 1e-10:
+		z = Vector3.BACK
+	var up_ref := _least_aligned_world_axis(z)
+	var x := up_ref.cross(z)
+	if x.length_squared() < 1e-10:
+		x = Vector3.RIGHT.cross(z)
+	x = x.normalized()
+	var y := z.cross(x).normalized()
+	return Basis(x, y, z).orthonormalized()
+
+
+## Full showroom orientation: camera frame + local roll around view axis (radians).
+static func build_showroom_orientation(view_dir: Vector3, roll_radians: float) -> Basis:
+	var basis := build_camera_frame_for_direction(view_dir)
+	if is_zero_approx(roll_radians):
+		return basis
+	var cr := cos(roll_radians)
+	var sr := sin(roll_radians)
+	var rx: Vector3 = basis.x
+	var ry: Vector3 = basis.y
+	basis.x = cr * rx + sr * ry
+	basis.y = -sr * rx + cr * ry
+	return Basis(basis.x, basis.y, basis.z).orthonormalized()
 
 
 static func build_fibonacci_unit_vectors(count: int) -> PackedVector3Array:
@@ -47,8 +93,8 @@ static func pitch_yaw_roll_for_view_dir(
 	# side-on and pitch is degenerate — convention: pitch = 0.
 	var cos_yaw_sq := d.y * d.y + d.z * d.z
 	if cos_yaw_sq < 1e-10:
-		var yaw_deg := -90.0 if d.x > 0.0 else 90.0
-		return Vector3(0.0, yaw_deg, 0.0)
+		var early_yaw_deg := -90.0 if d.x > 0.0 else 90.0
+		return Vector3(0.0, early_yaw_deg, 0.0)
 	var cos_yaw_mag := sqrt(cos_yaw_sq)
 	# Hemisphere: keep pitch in [-90, 90] so cos(pitch) >= 0.
 	# sign(cos(yaw)) = sign(d.z) when cos(pitch) > 0. For d.z = 0 (pitch = +/-90)

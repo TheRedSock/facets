@@ -2,6 +2,8 @@ extends SceneTree
 
 ## Focused checks for gameplay sprite variant blending math.
 
+const GemViewSphereSamplingScript = preload("res://core/visuals/gem_view_sphere_sampling.gd")
+
 var _pass_count := 0
 var _fail_count := 0
 
@@ -27,6 +29,8 @@ func _run() -> void:
 		test_zero_variant_families_are_supported(registry)
 		test_build_requests_are_pure_and_explicit(registry)
 		test_rotation_axis_refinement_expands_request_suite(registry)
+		test_showroom_variant_settings_roundtrip()
+		test_showroom_angular_label()
 		registry.set_gameplay_variant_settings(original_settings, false)
 
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
@@ -173,6 +177,25 @@ func test_rotation_axis_refinement_expands_request_suite(registry: Node) -> void
 			found_pitch = true
 	assert_true(found_roll, "Rotation refinement should include roll-axis verification frames when requested")
 	assert_true(found_pitch, "Rotation refinement should include pitch-axis verification frames when requested")
+
+
+func test_showroom_variant_settings_roundtrip() -> void:
+	var raw := {
+		"showroom_direction_count": 200,
+		"showroom_roll_steps": 8,
+	}
+	var n := GemTracedBakeContract.normalize_variant_settings(raw)
+	assert_eq(int(n.get("showroom_direction_count", 0)), 200, "showroom direction count survives normalization")
+	assert_eq(int(n.get("showroom_roll_steps", 0)), 8, "showroom roll steps survives normalization")
+	var q0 := Quaternion(0.1, 0.2, 0.3, 0.9).normalized()
+	var stored := [q0.w, q0.x, q0.y, q0.z]
+	var q1 := Quaternion(float(stored[1]), float(stored[2]), float(stored[3]), float(stored[0]))
+	assert_true(q0.dot(q1) > 0.9999, "manifest quaternion round-trip")
+
+
+func test_showroom_angular_label() -> void:
+	var theta := GemViewSphereSamplingScript.showroom_angular_resolution_degrees(200)
+	assert_near(theta, 14.4, 0.15, "approx 14.4° for n=200")
 
 
 func assert_true(condition: bool, message: String) -> void:

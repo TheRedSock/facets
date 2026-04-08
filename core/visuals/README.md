@@ -15,6 +15,8 @@ code used by both `TileView._draw()` and the offline-traced bake pipeline.
 - `gem_cut_primitives.gd` — shared outline math, polygon helpers, curve sampling, normalization helpers, and winding-safe polygon clipping
 - `gem_renderer.gd` — pseudo-3D lighting, per-facet colour generation, and pavilion extinction overlay colouring
 - `gem_geometry_validator.gd` — compile-time geometry validation for degeneracy, closure, edge sharing, and symmetry quality checks
+- `gem_traced_bake_contract.gd` — constants and helpers for the traced bake pipeline: default output roots, manifest name, VRAM compression settings (`VRAM_COMPRESS_ON_LOAD`, `VRAM_COMPRESS_FORMAT`, `VRAM_COMPRESS_MIN_SIZE`), supported image formats, lighting grid presets, variant settings normalization, and atlas metadata
+- `gem_atlas_cache.gd` — run-scoped tile scope tracker and VRAM estimation helpers for gameplay texture atlases
 
 ## Generation Flow
 

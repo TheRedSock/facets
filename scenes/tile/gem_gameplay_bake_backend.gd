@@ -3,6 +3,7 @@ extends Node
 
 ## Runtime bake backend contract used by GemVisualRegistry.
 
+@warning_ignore("UNUSED_SIGNAL")
 signal texture_baked(tile_id: StringName, texture: Texture2D, metadata: Dictionary)
 
 var backend_id: StringName = &""

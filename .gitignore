@@ -21,6 +21,9 @@ plans
 # Debug
 assets/debug_bakes/
 
+# Production bake output (build artifacts; add res://generated/ to export includes)
+generated/traced_bakes/
+
 # Native GDExtension build artifacts
 native/lib/
 native/embree/
