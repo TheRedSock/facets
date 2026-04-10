@@ -34,15 +34,7 @@ crown = {
 "table": PackedVector2Array(),
 "table_ratio": 0.5
 }
-pavilion = {
-"depth": 0.35,
-"lower_depth_ratio": 0.82,
-"lower_scale": 0.22,
-"rotation_fraction": 0.0,
-"sector_count": 6,
-"upper_depth_ratio": 0.48,
-"upper_scale": 0.52
-}
+pavilion = {}
 girdle = {
 "boundary_mode": &"circle",
 "boundary_params": {},

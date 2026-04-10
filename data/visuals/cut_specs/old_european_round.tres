@@ -34,15 +34,7 @@ crown = {
 "table": PackedVector2Array(),
 "table_ratio": 0.44
 }
-pavilion = {
-"depth": 0.42,
-"lower_depth_ratio": 0.82,
-"lower_scale": 0.16,
-"rotation_fraction": 0.0,
-"sector_count": 8,
-"upper_depth_ratio": 0.48,
-"upper_scale": 0.42
-}
+pavilion = {}
 girdle = {
 "boundary_mode": &"circle",
 "boundary_params": {},
@@ -52,7 +44,9 @@ girdle = {
 "thickness": 0.012
 }
 culet = {
-"style": "point"
+"flat_sides": 8,
+"flat_size": 0.08,
+"style": "flat"
 }
 constraints = {
 "max_edge_ratio": 45.0,

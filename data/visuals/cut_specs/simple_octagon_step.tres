@@ -34,16 +34,7 @@ crown = {
 "table": PackedVector2Array(0.62, 0.31, 0.69, 0.38, 0.69, 0.62, 0.62, 0.69, 0.38, 0.69, 0.31, 0.62, 0.31, 0.38, 0.38, 0.31),
 "table_ratio": 0.50
 }
-pavilion = {
-"depth": 0.16,
-"lower_depth_ratio": 0.78,
-"lower_scale": 0.14,
-"rotation_fraction": 0.0,
-"sector_count": 4,
-"style": &"mirror_crown",
-"upper_depth_ratio": 0.56,
-"upper_scale": 0.42
-}
+pavilion = {}
 girdle = {
 "boundary_mode": &"",
 "boundary_params": {},

@@ -61,14 +61,7 @@ crown = {
 "table_ratio": 0.5
 }
 pavilion = {
-"depth": 0.30,
-"lower_depth_ratio": 0.82,
-"lower_scale": 0.26,
-"rotation_fraction": 0.5,
-"sector_count": 6,
-"style": &"outline",
-"upper_depth_ratio": 0.52,
-"upper_scale": 0.50
+"rotation_fraction": 0.5
 }
 girdle = {
 "boundary_mode": &"",
