@@ -26,6 +26,7 @@ const GemCutProjectorScript = preload("res://core/visuals/gem_cut_projector.gd")
 const GameplayBakeBackendOfflineTracedScript = preload("res://scenes/tile/gem_gameplay_bake_backend_offline_traced.gd")
 const GemViewSphereSamplingScript = preload("res://core/visuals/gem_view_sphere_sampling.gd")
 const GemAtlasCacheScript = preload("res://core/visuals/gem_atlas_cache.gd")
+const GemPavilionSolverScript = preload("res://core/visuals/gem_pavilion_solver.gd")
 
 signal gameplay_texture_cache_rebuilt(profile: Dictionary)
 signal gameplay_texture_bake_progress(progress: Dictionary)
@@ -2134,7 +2135,13 @@ func _build_visual_geometry_key(visual: GemVisualResource) -> String:
 	var spec = visual.resolve_cut_spec()
 	if spec == null:
 		return ""
-	return spec.build_geometry_signature()
+	# Resolve pavilion from IOR so the geometry signature incorporates
+	# IOR-derived pavilion parameters (different IOR → different key).
+	var ior := visual.optics_ior if visual else GemPavilionSolverScript.DEFAULT_IOR
+	var pavilion_params := GemPavilionSolverScript.resolve(spec, ior)
+	var resolved_spec := spec.duplicate_spec()
+	resolved_spec.apply_pavilion_resolution(pavilion_params)
+	return resolved_spec.build_geometry_signature()
 
 
 func _ensure_visual_geometry_cached(visual: GemVisualResource) -> String:
@@ -2146,7 +2153,13 @@ func _ensure_visual_geometry_cached(visual: GemVisualResource) -> String:
 	var spec = visual.resolve_cut_spec()
 	if spec == null:
 		return ""
-	var cut_model = GemCutCompiler3D.compile_spec(spec)
+	# Resolve pavilion parameters from gem IOR.
+	var ior := visual.optics_ior if visual else GemPavilionSolverScript.DEFAULT_IOR
+	var pavilion_params := GemPavilionSolverScript.resolve(spec, ior)
+	# Apply resolved dimensions to spec for signature + model metadata.
+	var resolved_spec := spec.duplicate_spec()
+	resolved_spec.apply_pavilion_resolution(pavilion_params)
+	var cut_model = GemCutCompiler3D.compile_spec(resolved_spec, pavilion_params)
 	if cut_model == null:
 		return ""
 	_cut_models[geometry_key] = cut_model

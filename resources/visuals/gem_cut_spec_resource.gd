@@ -147,6 +147,38 @@ func get_pavilion_sector_count() -> int:
 	return int(pavilion.get("sector_count", symmetry.get("pavilion_sector_count", 0)))
 
 
+func get_pavilion_auto_depth() -> bool:
+	return _get_bool_from(pavilion, "auto_depth", true)
+
+
+func get_pavilion_auto_crown_height() -> bool:
+	return _get_bool_from(pavilion, "auto_crown_height", true)
+
+
+func get_pavilion_target_angle_degrees() -> float:
+	return float(pavilion.get("target_angle_degrees", -1.0))
+
+
+func get_total_depth_ratio() -> float:
+	return float(pavilion.get("total_depth_ratio", 0.62))
+
+
+func get_crown_pavilion_split() -> Array:
+	return pavilion.get("crown_pavilion_split", [1, 2])
+
+
+func get_culet_style() -> String:
+	return String(culet.get("style", "point"))
+
+
+func get_culet_flat_size() -> float:
+	return float(culet.get("flat_size", 0.06))
+
+
+func get_culet_flat_sides() -> int:
+	return int(culet.get("flat_sides", -1))
+
+
 func get_crown_ring_height_ratios() -> PackedFloat32Array:
 	var ratios := PackedFloat32Array()
 	for ring in rings:
@@ -273,6 +305,46 @@ func get_silhouette_points() -> PackedVector2Array:
 	for v in arr:
 		result.append(v)
 	return result
+
+
+## Apply solver-resolved pavilion parameters into this spec's pavilion/culet
+## dicts and crown height. Used by the registry before geometry signature
+## computation and compilation.
+func apply_pavilion_resolution(params: Dictionary) -> void:
+	if params.has("pavilion_depth"):
+		pavilion["depth"] = params["pavilion_depth"]
+	if params.has("crown_height"):
+		crown["height"] = params["crown_height"]
+	if params.has("upper_depth_ratio"):
+		pavilion["upper_depth_ratio"] = params["upper_depth_ratio"]
+	if params.has("lower_depth_ratio"):
+		pavilion["lower_depth_ratio"] = params["lower_depth_ratio"]
+	if params.has("upper_scale"):
+		pavilion["upper_scale"] = params["upper_scale"]
+	if params.has("lower_scale"):
+		pavilion["lower_scale"] = params["lower_scale"]
+	if params.has("rotation_fraction"):
+		pavilion["rotation_fraction"] = params["rotation_fraction"]
+	if params.has("sector_count") and int(params["sector_count"]) > 0:
+		pavilion["sector_count"] = params["sector_count"]
+	if params.has("culet_style"):
+		culet["style"] = params["culet_style"]
+	if params.has("culet_flat_size"):
+		culet["flat_size"] = params["culet_flat_size"]
+	if params.has("culet_flat_sides"):
+		culet["flat_sides"] = params["culet_flat_sides"]
+	# Mark as explicitly resolved so the solver won't re-derive.
+	pavilion["auto_depth"] = false
+	pavilion["auto_crown_height"] = false
+
+
+func _get_bool_from(dict: Dictionary, key: String, default_value: bool) -> bool:
+	if not dict.has(key):
+		return default_value
+	var value = dict[key]
+	if value is bool:
+		return value
+	return bool(value)
 
 
 func get_orthographic_top_roll_degrees() -> float:

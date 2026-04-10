@@ -12,13 +12,13 @@ static func compile_spec_id(spec_id: StringName):
 	return compile_spec(spec)
 
 
-static func compile_spec(spec):
+static func compile_spec(spec, pavilion_params: Dictionary = {}):
 	if spec == null:
 		return null
 	var builders = load("res://core/visuals/gem_topology_builders_3d.gd")
 	var normalizer = load("res://core/visuals/gem_geometry_normalizer.gd")
 	var validator = load("res://core/visuals/gem_geometry_validator.gd")
-	var model = builders.build(spec)
+	var model = builders.build(spec, pavilion_params)
 	model = normalizer.finalize_model(model)
 	return validator.validate_or_reject(model, spec)
 

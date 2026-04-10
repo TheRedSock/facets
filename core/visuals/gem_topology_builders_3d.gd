@@ -2,34 +2,98 @@ class_name GemTopologyBuilders3D
 extends RefCounted
 
 ## Explicit 3D topology builders for the canonical cut pipeline.
+##
+## Crown construction is family-specific (radial_brilliant, step, rose, etc.).
+## Pavilion construction is unified via GemPavilionBuilder, driven by
+## solver-resolved parameters and the crown's girdle boundary.
 
 const GemCutModelResourceScript = preload("res://resources/visuals/gem_cut_model_resource.gd")
 const GemCutPrimitivesScript = preload("res://core/visuals/gem_cut_primitives.gd")
+const GemPavilionBuilderScript = preload("res://core/visuals/gem_pavilion_builder.gd")
 const GIRDLE_WALL_ZONE := "girdle_band"
 
 
-static func build(spec):
+## Build a complete gem model (crown + pavilion).
+##
+## pavilion_params: Dictionary from GemPavilionSolver.resolve(). If empty,
+## pavilion parameters are read from the spec directly (legacy fallback).
+static func build(spec, pavilion_params: Dictionary = {}) -> GemCutModelResource:
 	if spec == null:
 		return null
+
+	var crown_result: Dictionary = {}
 	match spec.family:
 		&"radial_brilliant":
-			return _build_radial_brilliant(spec)
+			crown_result = _build_radial_brilliant_crown(spec)
 		&"step":
-			return _build_step(spec)
+			crown_result = _build_step_crown(spec)
 		&"rose":
-			return _build_rose(spec)
+			crown_result = _build_rose_crown(spec)
 		&"fan":
-			return _build_fan(spec)
+			crown_result = _build_fan_crown(spec)
 		&"radiant":
-			return _build_radiant(spec)
+			crown_result = _build_radiant_crown(spec)
 		&"princess":
-			return _build_princess(spec)
+			crown_result = _build_princess_crown(spec)
 		&"fan_step":
-			return _build_fan_step(spec)
-	return null
+			crown_result = _build_fan_step_crown(spec)
+		_:
+			return null
+
+	var model = crown_result.get("model")
+	var boundary_info: Dictionary = crown_result.get("boundary_info", {})
+
+	if model == null:
+		return null
+
+	# Resolve pavilion params: use solver output if provided, else build
+	# a params dict from the spec's pavilion/culet sections (legacy path).
+	var resolved_params := pavilion_params
+	if resolved_params.is_empty():
+		resolved_params = _params_from_spec(spec)
+
+	# Apply resolved dimensions to the model metadata.
+	if resolved_params.has("crown_height"):
+		model.crown_height = resolved_params["crown_height"]
+	if resolved_params.has("pavilion_depth"):
+		model.pavilion_depth = resolved_params["pavilion_depth"]
+	if resolved_params.has("girdle_thickness"):
+		model.girdle_thickness = resolved_params["girdle_thickness"]
+
+	# Build unified pavilion.
+	GemPavilionBuilderScript.build(model, boundary_info, resolved_params)
+
+	model.finalize_model()
+	return model
 
 
-static func _build_radial_brilliant(spec):
+## Build legacy-compatible params dict from spec pavilion/culet sections.
+## Used when no solver output is available (direct compilation without IOR).
+static func _params_from_spec(spec) -> Dictionary:
+	return {
+		"pavilion_depth": spec.get_pavilion_depth(),
+		"girdle_thickness": spec.get_girdle_thickness(),
+		"upper_depth_ratio": spec.get_pavilion_upper_depth_ratio(),
+		"lower_depth_ratio": spec.get_pavilion_lower_depth_ratio(),
+		"upper_scale": spec.get_pavilion_upper_scale(),
+		"lower_scale": spec.get_pavilion_lower_scale(),
+		"rotation_fraction": spec.get_pavilion_rotation_fraction(),
+		"sector_count": spec.get_pavilion_sector_count(),
+		"culet_style": spec.get_culet_style(),
+		"culet_flat_size": spec.get_culet_flat_size(),
+		"culet_flat_sides": spec.get_culet_flat_sides(),
+	}
+
+
+# =============================================================================
+# Crown Builders
+#
+# Each returns { "model": GemCutModelResource, "boundary_info": Dictionary }
+# where boundary_info = { "boundary": Array[Vector2] }
+# =============================================================================
+
+
+static func _build_radial_brilliant_crown(spec) -> Dictionary:
 	var model = _make_model(spec)
 	var main_angles = _to_float_array(spec.get_main_angles())
 	if main_angles.is_empty():
@@ -62,12 +126,15 @@ static func _build_radial_brilliant(spec):
 	girdle_h = patched_loops.get("girdle_half", girdle_h)
 	var count = table_v.size()
 
+	# Build interleaved girdle boundary (main + half vertices).
 	var interleaved_girdle: Array[Vector2] = []
 	for i in girdle_m.size():
 		interleaved_girdle.append(girdle_m[i])
 		if i < girdle_h.size():
 			interleaved_girdle.append(girdle_h[i])
 	model.outer_loop = _loop_to_mesh(interleaved_girdle, 0.0)
+
+	# Crown facets: table, star, bezel, girdle.
 	model.add_facet(_polygon3(table_v, table_z), "table")
 
 	for i in count:
@@ -100,17 +167,18 @@ static func _build_radial_brilliant(spec):
 			_p3(girdle_m[next_index], girdle_z),
 		]), "girdle")
 
-	_append_interleaved_pavilion(model, girdle_m, girdle_h, spec)
-	model.finalize_model()
-	return model
+	return {
+		"model": model,
+		"boundary_info": { "boundary": interleaved_girdle },
+	}
 
 
-static func _build_step(spec):
+static func _build_step_crown(spec) -> Dictionary:
 	var model = _make_model(spec)
 	var rings = spec.get_ring_point_loops()
 	if rings.is_empty():
 		model.finalize_model()
-		return model
+		return { "model": model, "boundary_info": { "boundary": [] as Array[Vector2] } }
 
 	var heights = _resolve_ring_heights(spec, rings.size())
 	var ring_patches := {}
@@ -164,19 +232,17 @@ static func _build_step(spec):
 						_p3(o0, heights[ring_index]),
 					]), zone)
 
-	# Pavilion uses original (non-subdivided) boundary so girdle wall
-	# edges match the crown's outermost ring vertices.
-	_append_outline_pavilion(model, _ensure_loop_array(rings[0]), spec)
-	model.finalize_model()
-	return model
+	# Pavilion boundary = outermost ring (non-subdivided).
+	var boundary: Array[Vector2] = _ensure_loop_array(rings[0])
+	return { "model": model, "boundary_info": { "boundary": boundary } }
 
 
-static func _build_rose(spec):
+static func _build_rose_crown(spec) -> Dictionary:
 	var model = _make_model(spec)
 	var rings = spec.get_ring_point_loops()
 	if rings.is_empty():
 		model.finalize_model()
-		return model
+		return { "model": model, "boundary_info": { "boundary": [] as Array[Vector2] } }
 
 	var heights = _resolve_rose_heights(spec, rings.size())
 	var rose_patches := {}
@@ -224,12 +290,11 @@ static func _build_rose(spec):
 				]), "rose")
 		model.add_facet(_polygon3(rings[rings.size() - 1], heights[heights.size() - 1]), "rose_center")
 
-	_append_outline_pavilion(model, _ensure_loop_array(rings[0]), spec)
-	model.finalize_model()
-	return model
+	var boundary: Array[Vector2] = _ensure_loop_array(rings[0])
+	return { "model": model, "boundary_info": { "boundary": boundary } }
 
 
-static func _build_fan(spec):
+static func _build_fan_crown(spec) -> Dictionary:
 	var model = _make_model(spec)
 	var table = spec.get_table_points()
 	var inner_star_facets = spec.get_inner_star_facets()
@@ -283,18 +348,16 @@ static func _build_fan(spec):
 				_p3(boundary[i + 1], 0.0),
 			]), "girdle")
 
-	_append_outline_pavilion(model, crown_boundary, spec)
-	model.finalize_model()
-	return model
+	return { "model": model, "boundary_info": { "boundary": crown_boundary } }
 
 
-static func _build_radiant(spec):
+static func _build_radiant_crown(spec) -> Dictionary:
 	var model = _make_model(spec)
 	var outer = spec.get_outer_points()
 	var count = outer.size()
 	if count < 4:
 		model.finalize_model()
-		return model
+		return { "model": model, "boundary_info": { "boundary": [] as Array[Vector2] } }
 	var table = GemCutPrimitivesScript.scale_points(outer, spec.get_table_ratio())
 	var patched_loops = _apply_named_loop_patches(spec, {
 		"outer": outer,
@@ -332,17 +395,15 @@ static func _build_radiant(spec):
 			_p3(outer_breaks[i], break_z),
 		]), "bezel")
 
-	_append_outline_pavilion(model, outer, spec)
-	model.finalize_model()
-	return model
+	return { "model": model, "boundary_info": { "boundary": outer } }
 
 
-static func _build_princess(spec):
+static func _build_princess_crown(spec) -> Dictionary:
 	var model = _make_model(spec)
 	var outer = spec.get_outer_points()
 	if outer.size() != 4:
 		model.finalize_model()
-		return model
+		return { "model": model, "boundary_info": { "boundary": [] as Array[Vector2] } }
 	var table = GemCutPrimitivesScript.scale_points(outer, spec.get_table_ratio())
 	var patched_loops = _apply_named_loop_patches(spec, {
 		"outer": outer,
@@ -388,12 +449,10 @@ static func _build_princess(spec):
 			_p3(trim_end[prev_side], star_z),
 		]), "girdle")
 
-	_append_outline_pavilion(model, outer, spec)
-	model.finalize_model()
-	return model
+	return { "model": model, "boundary_info": { "boundary": outer } }
 
 
-static func _build_fan_step(spec):
+static func _build_fan_step_crown(spec) -> Dictionary:
 	var model = _make_model(spec)
 	var table = spec.get_table_points()
 	var bezel_facets = spec.get_bezel_facets()
@@ -431,227 +490,13 @@ static func _build_fan_step(spec):
 				_p3(crown_boundary[next_index], 0.0),
 				_p3(crown_boundary[i], 0.0),
 			]), "girdle")
-	_append_outline_pavilion(model, crown_boundary, spec)
-	model.finalize_model()
-	return model
+
+	return { "model": model, "boundary_info": { "boundary": crown_boundary } }
 
 
-static func _append_interleaved_pavilion(
-	model,
-	girdle_main: Array[Vector2],
-	girdle_half: Array[Vector2],
-	spec,
-) -> void:
-	var count = girdle_main.size()
-	if count == 0 or girdle_half.size() != count:
-		return
-	var boundary_ring: Array[Vector2] = []
-	for i in count:
-		boundary_ring.append(girdle_main[i])
-		boundary_ring.append(girdle_half[i])
-	var girdle_lower_ring = []
-	var upper_ring = []
-	var lower_ring = []
-	var pavilion_sector_count: int = spec.get_pavilion_sector_count()
-	var rotation_angle = TAU / float(maxi(pavilion_sector_count, 1)) * spec.get_pavilion_rotation_fraction() if pavilion_sector_count > 0 else 0.0
-	var upper_z = -spec.get_girdle_thickness() - spec.get_pavilion_depth() * spec.get_pavilion_upper_depth_ratio()
-	var lower_z = -spec.get_girdle_thickness() - spec.get_pavilion_depth() * spec.get_pavilion_lower_depth_ratio()
-	for point in boundary_ring:
-		girdle_lower_ring.append(_p3(point, -spec.get_girdle_thickness()))
-		upper_ring.append(_project_pavilion_point(point, spec.get_pavilion_upper_scale(), upper_z, rotation_angle))
-		lower_ring.append(_project_pavilion_point(point, spec.get_pavilion_lower_scale(), lower_z, rotation_angle))
-	var ring_count = boundary_ring.size()
-	var culet = Vector3(0.0, 0.0, -spec.get_girdle_thickness() - spec.get_pavilion_depth())
-
-	# Merge lower-ring points that converge at shape cusps (e.g. pear tip)
-	# to avoid degenerate culet triangles and sliver pavilion quads.
-	var lower_seg_dists: Array[float] = []
-	for i in ring_count:
-		lower_seg_dists.append(lower_ring[i].distance_to(lower_ring[(i + 1) % ring_count]))
-	lower_seg_dists.sort()
-	@warning_ignore("INTEGER_DIVISION")
-	var median_lower_dist := lower_seg_dists[lower_seg_dists.size() / 2] if not lower_seg_dists.is_empty() else 0.0
-	var merge_threshold := median_lower_dist * 0.2
-
-	var merged_lower: Array[Vector3] = []
-	var lower_map: Array[int] = []
-	lower_map.resize(ring_count)
-	merged_lower.append(lower_ring[0])
-	lower_map[0] = 0
-	for i in range(1, ring_count):
-		if lower_ring[i].distance_to(merged_lower.back()) > merge_threshold:
-			merged_lower.append(lower_ring[i])
-		lower_map[i] = merged_lower.size() - 1
-	# Wrap-around: merge trailing points that are close to the first merged point.
-	while merged_lower.size() > 1 and merged_lower.back().distance_to(merged_lower[0]) <= merge_threshold:
-		var last_idx := merged_lower.size() - 1
-		merged_lower[0] = (merged_lower[0] + merged_lower[last_idx]) * 0.5
-		merged_lower.resize(last_idx)
-		for i in ring_count:
-			if lower_map[i] >= last_idx:
-				lower_map[i] = 0
-
-	for i in ring_count:
-		var next_index = (i + 1) % ring_count
-		model.add_facet(PackedVector3Array([
-			_p3(boundary_ring[i], 0.0),
-			_p3(boundary_ring[next_index], 0.0),
-			girdle_lower_ring[next_index],
-			girdle_lower_ring[i],
-		]), GIRDLE_WALL_ZONE)
-		model.add_facet(PackedVector3Array([
-			girdle_lower_ring[i],
-			girdle_lower_ring[next_index],
-			upper_ring[next_index],
-			upper_ring[i],
-		]), "pavilion")
-		var mi := lower_map[i]
-		var mn := lower_map[next_index]
-		if mi != mn:
-			model.add_facet(PackedVector3Array([
-				upper_ring[i],
-				upper_ring[next_index],
-				merged_lower[mn],
-				merged_lower[mi],
-			]), "pavilion")
-			model.add_facet(PackedVector3Array([
-				merged_lower[mi],
-				culet,
-				merged_lower[mn],
-			]), "culet")
-		else:
-			# Converging segment: collapse lower quad to triangle, skip culet.
-			model.add_facet(PackedVector3Array([
-				upper_ring[i],
-				upper_ring[next_index],
-				merged_lower[mi],
-			]), "pavilion")
-
-
-static func _append_outline_pavilion(
-	model,
-	boundary: Array[Vector2],
-	spec,
-) -> void:
-	if boundary.size() < 3:
-		return
-	var pavilion_sector_count: int = spec.get_pavilion_sector_count()
-	var rotation_angle = TAU / float(maxi(pavilion_sector_count, 1)) * spec.get_pavilion_rotation_fraction() if pavilion_sector_count > 0 else 0.0
-	var pavilion_style := String(spec.pavilion.get("style", "outline"))
-	if pavilion_style == "single_step":
-		_append_outline_single_step_pavilion(model, boundary, spec, rotation_angle)
-		return
-	if pavilion_style == "mirror_crown":
-		_append_outline_mirror_crown_pavilion(model, boundary, spec)
-		return
-	var upper_z = -spec.get_girdle_thickness() - spec.get_pavilion_depth() * spec.get_pavilion_upper_depth_ratio()
-	var lower_z = -spec.get_girdle_thickness() - spec.get_pavilion_depth() * spec.get_pavilion_lower_depth_ratio()
-	var outer_ring = []
-	var upper_ring = []
-	var lower_ring = []
-	for index in boundary.size():
-		var point = boundary[index]
-		var sharpness = _loop_vertex_sharpness(PackedVector2Array(boundary), index)
-		var upper_scale = clampf(spec.get_pavilion_upper_scale() - sharpness * 0.04, 0.16, 0.96)
-		var lower_scale = clampf(spec.get_pavilion_lower_scale() - sharpness * 0.06, 0.10, upper_scale - 0.04)
-		model.add_facet(PackedVector3Array([
-			_p3(point, 0.0),
-			_p3(boundary[(index + 1) % boundary.size()], 0.0),
-			_p3(boundary[(index + 1) % boundary.size()], -spec.get_girdle_thickness()),
-			_p3(point, -spec.get_girdle_thickness()),
-		]), GIRDLE_WALL_ZONE)
-		outer_ring.append(_p3(point, -spec.get_girdle_thickness()))
-		upper_ring.append(_project_pavilion_point(point, upper_scale, upper_z, rotation_angle))
-		lower_ring.append(_project_pavilion_point(point, lower_scale, lower_z, rotation_angle))
-	var culet = Vector3(0.0, 0.0, -spec.get_girdle_thickness() - spec.get_pavilion_depth())
-	for index in outer_ring.size():
-		var next_index = (index + 1) % outer_ring.size()
-		model.add_facet(PackedVector3Array([
-			outer_ring[index],
-			outer_ring[next_index],
-			upper_ring[next_index],
-			upper_ring[index],
-		]), "pavilion")
-		model.add_facet(PackedVector3Array([
-			upper_ring[index],
-			upper_ring[next_index],
-			lower_ring[next_index],
-			lower_ring[index],
-		]), "pavilion")
-		model.add_facet(PackedVector3Array([
-			lower_ring[index],
-			lower_ring[next_index],
-			culet,
-		]), "culet")
-
-
-static func _append_outline_single_step_pavilion(
-	model,
-	boundary: Array[Vector2],
-	spec,
-	rotation_angle: float,
-) -> void:
-	if boundary.size() < 3:
-		return
-	var upper_z = -spec.get_girdle_thickness() - spec.get_pavilion_depth() * spec.get_pavilion_upper_depth_ratio()
-	var outer_ring = []
-	var upper_ring = []
-	for index in boundary.size():
-		var point = boundary[index]
-		var sharpness = _loop_vertex_sharpness(PackedVector2Array(boundary), index)
-		var upper_scale = clampf(spec.get_pavilion_upper_scale() - sharpness * 0.03, 0.18, 0.96)
-		model.add_facet(PackedVector3Array([
-			_p3(point, 0.0),
-			_p3(boundary[(index + 1) % boundary.size()], 0.0),
-			_p3(boundary[(index + 1) % boundary.size()], -spec.get_girdle_thickness()),
-			_p3(point, -spec.get_girdle_thickness()),
-		]), GIRDLE_WALL_ZONE)
-		outer_ring.append(_p3(point, -spec.get_girdle_thickness()))
-		upper_ring.append(_project_pavilion_point(point, upper_scale, upper_z, rotation_angle))
-	var culet = Vector3(0.0, 0.0, -spec.get_girdle_thickness() - spec.get_pavilion_depth())
-	for index in outer_ring.size():
-		var next_index = (index + 1) % outer_ring.size()
-		model.add_facet(PackedVector3Array([
-			outer_ring[index],
-			outer_ring[next_index],
-			upper_ring[next_index],
-			upper_ring[index],
-		]), "pavilion")
-		model.add_facet(PackedVector3Array([
-			upper_ring[index],
-			upper_ring[next_index],
-			culet,
-		]), "culet")
-
-
-static func _append_outline_mirror_crown_pavilion(
-	model,
-	boundary: Array[Vector2],
-	spec,
-) -> void:
-	if boundary.size() < 3:
-		return
-	var table: Array[Vector2] = _ensure_loop_array(spec.get_table_points())
-	var bezel_facets: Array = spec.get_bezel_facets()
-	if table.is_empty() or bezel_facets.is_empty():
-		_append_outline_single_step_pavilion(model, boundary, spec, 0.0)
-		return
-	var girdle_z: float = -spec.get_girdle_thickness()
-	var mirrored_table_z: float = girdle_z - spec.get_pavilion_depth()
-	for index in boundary.size():
-		var point = boundary[index]
-		model.add_facet(PackedVector3Array([
-			_p3(point, 0.0),
-			_p3(boundary[(index + 1) % boundary.size()], 0.0),
-			_p3(boundary[(index + 1) % boundary.size()], girdle_z),
-			_p3(point, girdle_z),
-		]), GIRDLE_WALL_ZONE)
-	for polygon in bezel_facets:
-		var facet = PackedVector3Array()
-		for point in _reverse_loop(_ensure_loop_array(polygon)):
-			facet.append(_p3(point, mirrored_table_z if table.has(point) else girdle_z))
-		model.add_facet(facet, "pavilion")
-	model.add_facet(_polygon3(_reverse_loop(table), mirrored_table_z), "culet")
+# =============================================================================
+# Crown Helpers
+# =============================================================================
 
 
 static func _resolve_ring_heights(spec, ring_count: int) -> PackedFloat32Array:
@@ -694,6 +539,11 @@ static func _make_model(spec):
 	model.girdle_thickness = spec.get_girdle_thickness()
 	model.pavilion_depth = spec.get_pavilion_depth()
 	return model
+
+
+# =============================================================================
+# Geometry Utilities
+# =============================================================================
 
 
 static func _polygon3(points: Array[Vector2], z: float) -> PackedVector3Array:
@@ -868,23 +718,6 @@ static func _p3(point: Vector2, z: float) -> Vector3:
 	return Vector3(point.x - 0.5, 0.5 - point.y, z)
 
 
-static func _project_pavilion_point(
-	point: Vector2,
-	scale_factor: float,
-	z: float,
-	rotation_angle: float,
-) -> Vector3:
-	var delta = point - GemCutPrimitivesScript.CENTER
-	var scaled = delta * scale_factor
-	var cos_r = cos(rotation_angle)
-	var sin_r = sin(rotation_angle)
-	var rotated = Vector2(
-		scaled.x * cos_r - scaled.y * sin_r,
-		scaled.x * sin_r + scaled.y * cos_r
-	)
-	return _p3(GemCutPrimitivesScript.CENTER + rotated, z)
-
-
 static func _register_height_points(point_heights: Dictionary, points: Array[Vector2], z: float) -> void:
 	for point in points:
 		_set_point_height(point_heights, point, z)
@@ -903,19 +736,6 @@ static func _point_key(point: Vector2) -> String:
 		int(round(point.x * 100000.0)),
 		int(round(point.y * 100000.0)),
 	]
-
-
-static func _loop_vertex_sharpness(loop: PackedVector2Array, index: int) -> float:
-	if loop.size() < 3:
-		return 0.0
-	var prev_index = (index - 1 + loop.size()) % loop.size()
-	var next_index = (index + 1) % loop.size()
-	var incoming = (loop[index] - loop[prev_index]).normalized()
-	var outgoing = (loop[next_index] - loop[index]).normalized()
-	if incoming.is_zero_approx() or outgoing.is_zero_approx():
-		return 0.0
-	var turn = clampf((1.0 - incoming.dot(outgoing)) * 0.5, 0.0, 1.0)
-	return pow(turn, 0.7)
 
 
 static func _sample_radial_rings(spec, main_angles: Array[float], half_angles: Array[float]) -> Dictionary:
