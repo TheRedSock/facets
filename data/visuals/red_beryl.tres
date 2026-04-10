@@ -54,15 +54,7 @@ crown = {
 "table": "[]",
 "table_ratio": 0.38
 }
-pavilion = {
-"depth": 0.42,
-"lower_depth_ratio": 0.86,
-"lower_scale": 0.45,
-"rotation_fraction": 0.0,
-"sector_count": 6.0,
-"upper_depth_ratio": 0.44,
-"upper_scale": 0.7
-}
+pavilion = {}
 girdle = {
 "boundary_mode": "",
 "boundary_params": {},
