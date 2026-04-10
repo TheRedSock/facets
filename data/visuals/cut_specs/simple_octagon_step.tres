@@ -27,7 +27,7 @@ girdle = {
 }
 culet = {
 "flat_sides": 8,
-"flat_size": 0.07,
+"flat_size": 0.25,
 "style": "flat"
 }
 constraints = {

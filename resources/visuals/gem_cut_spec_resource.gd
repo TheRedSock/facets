@@ -172,10 +172,11 @@ func get_culet_style() -> String:
 
 
 func get_culet_flat_size() -> float:
-	return float(culet.get("flat_size", 0.06))
+	return float(culet.get("flat_size", 0.25))
 
 
 func get_culet_flat_sides() -> int:
+	## -1 = match pavilion sector count (default).
 	return int(culet.get("flat_sides", -1))
 
 

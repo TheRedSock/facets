@@ -32,7 +32,9 @@ const DEFAULT_TOTAL_DEPTH_RATIO := 0.62
 const DEFAULT_CROWN_FRACTION := 1.0 / 3.0
 
 ## Culet defaults.
-const DEFAULT_CULET_FLAT_SIZE := 0.06
+## flat_size is a truncation ratio: 0.0 = point, 1.0 = truncate at lower ring.
+## Typical antique values: 0.15-0.35 for a visible but modest flat culet.
+const DEFAULT_CULET_FLAT_SIZE := 0.25
 const DEFAULT_CULET_FLAT_SIDES := -1  # -1 = match pavilion sector count
 
 

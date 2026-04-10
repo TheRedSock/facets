@@ -143,11 +143,17 @@ static func _build_point_culet_pavilion(
 
 
 ## Build pavilion with a flat culet (Old European, antique styles).
-## The pavilion tip is truncated with an N-sided polygon.
 ##
-## Instead of converging to a point, the upper pavilion ring connects
-## directly to a culet polygon via angle-mapped quads/triangles.
-## This produces clean manifold geometry with each edge shared exactly twice.
+## The pavilion is built identically to a point culet, but the tip is
+## truncated by a horizontal plane, producing an N-sided flat face.
+## culet_flat_size controls the truncation ratio:
+##   0.0 = infinitesimal (near-point), 1.0 = truncation at the lower ring.
+## culet_flat_sides controls how many sides the flat polygon has.
+##   When it matches the merged lower ring count, truncation is exact.
+##   Otherwise, culet vertices are interpolated by angle.
+##
+## Geometry: the culet ring vertices lie ON the pavilion's conical surface
+## (lines from lower ring to the virtual culet point), so no protrusion.
 static func _build_flat_culet_pavilion(
 	model,
 	girdle_lower_ring: Array[Vector3],
@@ -159,17 +165,37 @@ static func _build_flat_culet_pavilion(
 	culet_flat_size: float,
 	culet_flat_sides: int,
 ) -> void:
-	# Generate culet polygon vertices.
 	var culet_sides := maxi(culet_flat_sides, 3)
-	var culet_radius := GemCutPrimitivesScript.GEM_RADIUS * culet_flat_size
-	var culet_ring: Array[Vector3] = []
-	for i in culet_sides:
-		var angle := -PI * 0.5 + TAU * float(i) / float(culet_sides)
-		var x := culet_radius * cos(angle)
-		var y := culet_radius * sin(angle)
-		culet_ring.append(Vector3(x, y, culet_z))
+	var truncation := clampf(culet_flat_size, 0.02, 0.95)
 
-	# Precompute culet vertex angles for mapping.
+	# The virtual point culet (where the pavilion would converge without truncation).
+	var point_culet := Vector3(0.0, 0.0, culet_z)
+
+	# Generate culet ring by truncating the pavilion cone.
+	# Each culet vertex lies on the line from a lower ring vertex to the
+	# virtual culet point, at position controlled by truncation ratio.
+	# truncation=0 → at the point, truncation=1 → at the lower ring.
+	var culet_ring: Array[Vector3] = []
+
+	if culet_sides == merged_lower.size():
+		# Exact match: one culet vertex per lower ring vertex.
+		for v in merged_lower:
+			culet_ring.append(v.lerp(point_culet, 1.0 - truncation))
+	else:
+		# Different count: generate N evenly-spaced culet vertices by angle,
+		# each interpolated from the pavilion surface at that angle.
+		var lower_angles := PackedFloat32Array()
+		for v in merged_lower:
+			lower_angles.append(atan2(v.y, v.x))
+
+		for i in culet_sides:
+			var target_angle := -PI * 0.5 + TAU * float(i) / float(culet_sides)
+			# Find the two lower ring vertices bracketing this angle and interpolate.
+			var surface_point := _interpolate_ring_at_angle(
+				merged_lower, lower_angles, target_angle)
+			culet_ring.append(surface_point.lerp(point_culet, 1.0 - truncation))
+
+	# Precompute culet vertex angles for lower→culet mapping.
 	var culet_angles := PackedFloat32Array()
 	for v in culet_ring:
 		culet_angles.append(atan2(v.y, v.x))
@@ -217,7 +243,6 @@ static func _build_flat_culet_pavilion(
 			]), "pavilion")
 
 	# Lower pavilion facets: connect merged lower ring to culet ring.
-	# Each merged lower edge maps to a culet edge (or vertex).
 	var ml_count := merged_lower.size()
 	for i in ml_count:
 		var next := (i + 1) % ml_count
@@ -239,9 +264,7 @@ static func _build_flat_culet_pavilion(
 				culet_ring[ci],
 			]), "pavilion")
 
-	# Fill any culet polygon edges not covered by lower→culet quads
-	# by connecting adjacent culet vertices through the nearest lower vertex.
-	# This handles cases where a culet edge has no lower ring edge mapping to it.
+	# Fill any culet polygon edges not covered by lower→culet quads.
 	var culet_edge_covered: Array[bool] = []
 	culet_edge_covered.resize(culet_sides)
 	for i in culet_sides:
@@ -251,7 +274,6 @@ static func _build_flat_culet_pavilion(
 		var ci := lower_to_culet[i]
 		var cn := lower_to_culet[next]
 		if ci != cn:
-			# Mark all culet edges between ci and cn as covered.
 			var cur := ci
 			while cur != cn:
 				culet_edge_covered[cur] = true
@@ -360,6 +382,54 @@ static func _project_pavilion_point(
 static func _angle_distance(a: float, b: float) -> float:
 	var d := fmod(b - a + 3.0 * PI, TAU) - PI
 	return absf(d)
+
+
+## Interpolate a position on a 3D ring at a target angle.
+## Finds the two ring vertices bracketing the angle and lerps between them.
+static func _interpolate_ring_at_angle(
+	ring: Array[Vector3],
+	ring_angles: PackedFloat32Array,
+	target_angle: float,
+) -> Vector3:
+	var count := ring.size()
+	if count == 0:
+		return Vector3.ZERO
+	if count == 1:
+		return ring[0]
+
+	# Find the segment that brackets target_angle.
+	var best_i := 0
+	var best_dist := INF
+	for i in count:
+		var d := absf(_angle_distance(target_angle, ring_angles[i]))
+		if d < best_dist:
+			best_dist = d
+			best_i = i
+
+	# Check the two adjacent segments to find which one brackets the target.
+	var prev_i := (best_i - 1 + count) % count
+	var next_i := (best_i + 1) % count
+	var da_prev := _angle_distance(ring_angles[prev_i], target_angle)
+	var da_next := _angle_distance(ring_angles[best_i], target_angle)
+	var da_span := _angle_distance(ring_angles[prev_i], ring_angles[best_i])
+
+	# Use the segment [prev_i, best_i] or [best_i, next_i] depending on
+	# which side of best_i the target falls.
+	var seg_a: int
+	var seg_b: int
+	if da_prev < da_span + 0.001:
+		seg_a = prev_i
+		seg_b = best_i
+	else:
+		seg_a = best_i
+		seg_b = next_i
+
+	var span := _angle_distance(ring_angles[seg_a], ring_angles[seg_b])
+	if span < 0.0001:
+		return ring[seg_a]
+	var t := _angle_distance(ring_angles[seg_a], target_angle) / span
+	t = clampf(t, 0.0, 1.0)
+	return ring[seg_a].lerp(ring[seg_b], t)
 
 
 ## Convert 2D unit-space point to 3D model space.
