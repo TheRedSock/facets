@@ -185,7 +185,7 @@ static func resolve(spec, ior: float = DEFAULT_IOR) -> Dictionary:
 			sector_count = ring_loops[0].size()
 		# Fall back to outer points (radiant/princess).
 		if sector_count <= 0:
-			var outer := spec.get_outer_points()
+			var outer: Array[Vector2] = spec.get_outer_points()
 			sector_count = outer.size()
 
 	# --- Culet ---

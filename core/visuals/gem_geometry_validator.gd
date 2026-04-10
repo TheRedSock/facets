@@ -4,6 +4,7 @@ extends RefCounted
 const EDGE_EPSILON := 0.0001
 const AREA_EPSILON := 0.000001
 const BOUNDARY_TOLERANCE := 0.003
+const GemPavilionSolverScript = preload("res://core/visuals/gem_pavilion_solver.gd")
 
 
 static func validate_model(model, spec = null) -> Dictionary:
@@ -101,6 +102,52 @@ static func validate_or_reject(model, spec = null):
 			push_error("GemGeometryValidator: %s" % error_message)
 		return null
 	return model
+
+
+## Validate pavilion optical properties against the gem's IOR.
+## Returns a report dictionary with "errors" and "warnings" arrays.
+## This is called separately from validate_model because it requires
+## the solver output (pavilion_params) and the IOR.
+static func validate_pavilion_optics(pavilion_params: Dictionary, ior: float) -> Dictionary:
+	return GemPavilionSolverScript.validate_optics(pavilion_params, ior)
+
+
+## Validate the depth proportions of a compiled model.
+## Returns a report dictionary with "warnings" for out-of-range proportions.
+static func validate_proportions(model) -> Dictionary:
+	var report := {
+		"errors": PackedStringArray(),
+		"warnings": PackedStringArray(),
+	}
+	if model == null:
+		return report
+	var crown: float = model.crown_height
+	var girdle: float = model.girdle_thickness
+	var pavilion: float = model.pavilion_depth
+	var total: float = crown + girdle + pavilion
+	if total < 0.001:
+		return report
+
+	var bounds = model.compute_bounds()
+	var horizontal_span := maxf(bounds.size.x, bounds.size.y)
+	if horizontal_span > 0.001:
+		var depth_ratio: float = total / horizontal_span
+		if depth_ratio < 0.45:
+			report["warnings"].append(
+				"Total depth ratio %.0f%% is very shallow (expected 50-80%%)" % [depth_ratio * 100.0])
+		elif depth_ratio > 0.85:
+			report["warnings"].append(
+				"Total depth ratio %.0f%% is very deep (expected 50-80%%)" % [depth_ratio * 100.0])
+
+	var crown_ratio: float = crown / total
+	if crown_ratio < 0.12:
+		report["warnings"].append(
+			"Crown is only %.0f%% of total depth — gem may appear flat" % [crown_ratio * 100.0])
+	elif crown_ratio > 0.48:
+		report["warnings"].append(
+			"Crown is %.0f%% of total depth — unusually tall crown" % [crown_ratio * 100.0])
+
+	return report
 
 
 static func _facet_centroid(vertices: PackedVector3Array) -> Vector3:

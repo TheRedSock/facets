@@ -2139,7 +2139,7 @@ func _build_visual_geometry_key(visual: GemVisualResource) -> String:
 	# IOR-derived pavilion parameters (different IOR → different key).
 	var ior := visual.optics_ior if visual else GemPavilionSolverScript.DEFAULT_IOR
 	var pavilion_params := GemPavilionSolverScript.resolve(spec, ior)
-	var resolved_spec := spec.duplicate_spec()
+	var resolved_spec = spec.duplicate_spec()
 	resolved_spec.apply_pavilion_resolution(pavilion_params)
 	return resolved_spec.build_geometry_signature()
 
@@ -2157,7 +2157,7 @@ func _ensure_visual_geometry_cached(visual: GemVisualResource) -> String:
 	var ior := visual.optics_ior if visual else GemPavilionSolverScript.DEFAULT_IOR
 	var pavilion_params := GemPavilionSolverScript.resolve(spec, ior)
 	# Apply resolved dimensions to spec for signature + model metadata.
-	var resolved_spec := spec.duplicate_spec()
+	var resolved_spec = spec.duplicate_spec()
 	resolved_spec.apply_pavilion_resolution(pavilion_params)
 	var cut_model = GemCutCompiler3D.compile_spec(resolved_spec, pavilion_params)
 	if cut_model == null:

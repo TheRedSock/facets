@@ -144,6 +144,10 @@ static func _build_point_culet_pavilion(
 
 ## Build pavilion with a flat culet (Old European, antique styles).
 ## The pavilion tip is truncated with an N-sided polygon.
+##
+## Instead of converging to a point, the upper pavilion ring connects
+## directly to a culet polygon via angle-mapped quads/triangles.
+## This produces clean manifold geometry with each edge shared exactly twice.
 static func _build_flat_culet_pavilion(
 	model,
 	girdle_lower_ring: Array[Vector3],
@@ -165,7 +169,25 @@ static func _build_flat_culet_pavilion(
 		var y := culet_radius * sin(angle)
 		culet_ring.append(Vector3(x, y, culet_z))
 
-	# Upper pavilion facets (girdle_lower -> upper ring)
+	# Precompute culet vertex angles for mapping.
+	var culet_angles := PackedFloat32Array()
+	for v in culet_ring:
+		culet_angles.append(atan2(v.y, v.x))
+
+	# Map each merged lower ring vertex to its nearest culet polygon vertex.
+	var lower_to_culet: Array[int] = []
+	for v in merged_lower:
+		var v_angle := atan2(v.y, v.x)
+		var best_ci := 0
+		var best_dist := INF
+		for ci in culet_sides:
+			var d := absf(_angle_distance(v_angle, culet_angles[ci]))
+			if d < best_dist:
+				best_dist = d
+				best_ci = ci
+		lower_to_culet.append(best_ci)
+
+	# Upper pavilion facets (girdle_lower -> upper ring).
 	for i in ring_count:
 		var next := (i + 1) % ring_count
 		model.add_facet(PackedVector3Array([
@@ -175,7 +197,7 @@ static func _build_flat_culet_pavilion(
 			upper_ring[i],
 		]), "pavilion")
 
-	# Lower pavilion facets (upper ring -> lower ring)
+	# Middle pavilion facets (upper ring -> lower/merged ring).
 	for i in ring_count:
 		var next := (i + 1) % ring_count
 		var mi := lower_map[i]
@@ -194,69 +216,72 @@ static func _build_flat_culet_pavilion(
 				merged_lower[mi],
 			]), "pavilion")
 
-	# Connect lower ring to culet polygon.
-	# Map each merged_lower vertex to the nearest culet polygon vertex,
-	# then stitch quads/triangles between the two rings.
-	_stitch_to_culet_ring(model, merged_lower, culet_ring)
+	# Lower pavilion facets: connect merged lower ring to culet ring.
+	# Each merged lower edge maps to a culet edge (or vertex).
+	var ml_count := merged_lower.size()
+	for i in ml_count:
+		var next := (i + 1) % ml_count
+		var ci := lower_to_culet[i]
+		var cn := lower_to_culet[next]
+		if ci == cn:
+			# Both lower points map to same culet vertex: triangle.
+			model.add_facet(PackedVector3Array([
+				merged_lower[i],
+				merged_lower[next],
+				culet_ring[ci],
+			]), "pavilion")
+		else:
+			# Lower points map to different culet vertices: quad.
+			model.add_facet(PackedVector3Array([
+				merged_lower[i],
+				merged_lower[next],
+				culet_ring[cn],
+				culet_ring[ci],
+			]), "pavilion")
+
+	# Fill any culet polygon edges not covered by lower→culet quads
+	# by connecting adjacent culet vertices through the nearest lower vertex.
+	# This handles cases where a culet edge has no lower ring edge mapping to it.
+	var culet_edge_covered: Array[bool] = []
+	culet_edge_covered.resize(culet_sides)
+	for i in culet_sides:
+		culet_edge_covered[i] = false
+	for i in ml_count:
+		var next := (i + 1) % ml_count
+		var ci := lower_to_culet[i]
+		var cn := lower_to_culet[next]
+		if ci != cn:
+			# Mark all culet edges between ci and cn as covered.
+			var cur := ci
+			while cur != cn:
+				culet_edge_covered[cur] = true
+				cur = (cur + 1) % culet_sides
+
+	for ci in culet_sides:
+		if culet_edge_covered[ci]:
+			continue
+		var cn := (ci + 1) % culet_sides
+		# Find nearest lower vertex for this uncovered culet edge.
+		var best_li := 0
+		var best_dist := INF
+		var mid_angle := (culet_angles[ci] + culet_angles[cn]) * 0.5
+		for li in ml_count:
+			var la := atan2(merged_lower[li].y, merged_lower[li].x)
+			var d := absf(_angle_distance(la, mid_angle))
+			if d < best_dist:
+				best_dist = d
+				best_li = li
+		model.add_facet(PackedVector3Array([
+			culet_ring[ci],
+			merged_lower[best_li],
+			culet_ring[cn],
+		]), "pavilion")
 
 	# Culet face (flat polygon, wound for outward-facing normal = downward).
 	var culet_face := PackedVector3Array()
 	for i in range(culet_ring.size() - 1, -1, -1):
 		culet_face.append(culet_ring[i])
 	model.add_facet(culet_face, "culet")
-
-
-## Stitch the merged lower ring to the culet polygon ring.
-## Uses angle-based mapping: each lower vertex maps to the culet segment
-## it falls within, producing quads and triangles as needed.
-static func _stitch_to_culet_ring(
-	model,
-	lower_ring: Array[Vector3],
-	culet_ring: Array[Vector3],
-) -> void:
-	if lower_ring.is_empty() or culet_ring.is_empty():
-		return
-
-	var lower_count := lower_ring.size()
-	var culet_count := culet_ring.size()
-
-	# Compute angles for both rings relative to the XY center (0,0).
-	var lower_angles := PackedFloat32Array()
-	for v in lower_ring:
-		lower_angles.append(atan2(v.y, v.x))
-	var culet_angles := PackedFloat32Array()
-	for v in culet_ring:
-		culet_angles.append(atan2(v.y, v.x))
-
-	# For each lower edge, find the culet vertices that fall within it,
-	# and for each culet edge, find the lower vertices that fall within it.
-	# Use a merge-walk by angle to produce a triangle strip.
-	var li := 0
-	var ci := 0
-	var steps := lower_count + culet_count
-	var emitted := 0
-	while emitted < steps:
-		var ln := (li + 1) % lower_count
-		var cn := (ci + 1) % culet_count
-		var lower_advance := _angle_distance(lower_angles[li], lower_angles[ln])
-		var culet_advance := _angle_distance(culet_angles[ci], culet_angles[cn])
-		if lower_advance <= culet_advance:
-			# Emit triangle: lower[li], lower[ln], culet[ci]
-			model.add_facet(PackedVector3Array([
-				lower_ring[li],
-				lower_ring[ln],
-				culet_ring[ci],
-			]), "pavilion")
-			li = ln
-		else:
-			# Emit triangle: culet[ci], lower[li], culet[cn]
-			model.add_facet(PackedVector3Array([
-				culet_ring[ci],
-				lower_ring[li],
-				culet_ring[cn],
-			]), "pavilion")
-			ci = cn
-		emitted += 1
 
 
 ## Merge lower-ring points that converge at shape cusps (e.g. pear tip)
