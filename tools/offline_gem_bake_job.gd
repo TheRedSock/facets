@@ -3,7 +3,6 @@ extends RefCounted
 
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")
 const GemBakeStylizerScript = preload("res://core/visuals/gem_bake_stylizer.gd")
-const GemOpticsTracerScript = preload("res://core/visuals/gem_optics_tracer.gd")
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 
 const DEFAULT_OUTPUT_ROOT := GemTracedBakeContractScript.DEFAULT_OUTPUT_ROOT
@@ -18,7 +17,10 @@ static func is_native_trace_kernel_available() -> bool:
 
 
 static func get_trace_backend_id() -> StringName:
-	return &"native_cpp" if is_native_trace_kernel_available() else &"gdscript_fallback"
+	if is_native_trace_kernel_available():
+		return &"native_cpp"
+	push_error("GemTraceKernel native extension is required but not available. Build the extension: cd native && python -m SCons platform=windows target=template_debug")
+	return &"unavailable"
 
 
 static func create_tracer():
@@ -26,13 +28,20 @@ static func create_tracer():
 		var kernel = ClassDB.instantiate(&"GemTraceKernel")
 		if kernel != null:
 			return kernel
-	return GemOpticsTracerScript.new()
+	push_error("GemTraceKernel native extension is required but not available. The GDScript fallback tracer has been deprecated.")
+	return null
 
 
+## Maximum MSAA sample count supported by the trace kernel (5-point quincunx pattern).
 static func max_supported_sample_count() -> int:
-	# The native kernel mirrors the fallback sample-pattern contract.
-	return GemOpticsTracerScript.max_supported_sample_count()
+	return 5
 
+
+## Thread count heuristic for traced bake jobs. Inlined from the former
+## GemOpticsTracer.resolve_trace_thread_count() to remove the dependency.
+const _MIN_ROWS_PER_TRACE_THREAD := 8
+const _MIN_PIXELS_PER_TRACE_THREAD := 6144
+const _MIN_WORK_UNITS_PER_TRACE_THREAD := 20000
 
 static func resolve_trace_thread_count(
 	request: Dictionary,
@@ -40,12 +49,19 @@ static func resolve_trace_thread_count(
 	sample_count: int,
 	spectral_sample_count: int,
 ) -> int:
-	return GemOpticsTracerScript.resolve_trace_thread_count(
-		request,
-		target_size,
-		sample_count,
-		spectral_sample_count
+	var thread_budget := clampi(
+		int(request.get("thread_budget", request.get("thread_count", OS.get_processor_count() - 1))),
+		1,
+		32
 	)
+	if request.has("thread_count"):
+		return maxi(mini(thread_budget, maxi(target_size.y, 1)), 1)
+	var pixel_count := maxi(target_size.x * target_size.y, 1)
+	var row_limit := maxi(target_size.y / _MIN_ROWS_PER_TRACE_THREAD, 1)
+	var pixel_limit := maxi(pixel_count / _MIN_PIXELS_PER_TRACE_THREAD, 1)
+	var work_units := pixel_count * maxi(sample_count, 1) * maxi(spectral_sample_count, 1)
+	var work_limit := maxi(work_units / _MIN_WORK_UNITS_PER_TRACE_THREAD, 1)
+	return maxi(mini(mini(thread_budget, row_limit), mini(pixel_limit, work_limit)), 1)
 
 
 func run_batch(
@@ -648,6 +664,22 @@ func _enrich_request_list(base_requests: Array, sample_count: int, options: Dict
 		var visual: GemVisualResource = enriched_request.get("visual", null)
 		if visual == null:
 			continue
+		# Resolve environment preset into data dict so the kernel doesn't need compiled presets
+		if not enriched_request.has("environment_profile"):
+			enriched_request["environment_profile"] = GemEnvironmentPresets.resolve_preset(
+				visual.optics_environment_preset
+			)
+		# Pass through request-level overrides from options
+		if options.has("zone_surface_scales") and not enriched_request.has("zone_surface_scales"):
+			enriched_request["zone_surface_scales"] = options.get("zone_surface_scales")
+		if options.has("output_grade") and not enriched_request.has("output_grade"):
+			enriched_request["output_grade"] = options.get("output_grade")
+		if options.has("spectral_wavelengths") and not enriched_request.has("spectral_wavelengths"):
+			enriched_request["spectral_wavelengths"] = options.get("spectral_wavelengths")
+		if options.has("high_fire_dispersion_threshold") and not enriched_request.has("high_fire_dispersion_threshold"):
+			enriched_request["high_fire_dispersion_threshold"] = options.get("high_fire_dispersion_threshold")
+		if options.has("high_fire_sparkle_threshold") and not enriched_request.has("high_fire_sparkle_threshold"):
+			enriched_request["high_fire_sparkle_threshold"] = options.get("high_fire_sparkle_threshold")
 		var mesh_cache_key := _resolve_request_mesh_cache_key(visual, enriched_request)
 		var mesh_resource = mesh_cache.get(mesh_cache_key, null)
 		var mesh_build_elapsed_ms := 0.0

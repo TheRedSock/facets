@@ -81,7 +81,7 @@ plans/          Design docs (reference only, not code)
 ### Deprecated
 
 - `autoloads/perf_monitor.gd` — not autoloaded, unused
-- `core/visuals/gem_optics_tracer.gd` — GDScript tracer, fallback only. Native `GemTraceKernel` is primary.
+- `core/visuals/gem_optics_tracer.gd` — DEPRECATED. GDScript tracer retained as reference only. Native `GemTraceKernel` is mandatory.
 - `core/visuals/gem_material_sampler.gd` — used by procedural 2D renderer; native has C++ port
 - No runtime loading screen in current flow
 
@@ -288,11 +288,11 @@ Gameplay textures use `sampler2DArray` blend shader (`gameplay_sprite_blend.gdsh
 
 ## Native Ray Tracer
 
-C++ GDExtension (`native/`) using Embree for BVH traversal. Complete port of `GemOpticsTracer` (~50-100x faster).
+C++ GDExtension (`native/`) using Embree for BVH traversal. The sole tracer implementation.
 
-**API (identical for native and GDScript fallback):** `trace_to_image(mesh_resource, visual, request) -> Image`, `get_last_trace_profile() -> Dictionary`.
+**API:** `trace_to_image(mesh_resource, visual, request) -> Image`, `get_last_trace_profile() -> Dictionary`.
 
-**Runtime selection:** `ClassDB.class_exists(&"GemTraceKernel")` → native; else GDScript fallback.
+**Required:** The native extension must be compiled. The GDScript fallback (`gem_optics_tracer.gd`) is deprecated and no longer used by the bake pipeline.
 
 **Build:** Requires MSVC 2022, Python 3.x, SCons.
 ```bash

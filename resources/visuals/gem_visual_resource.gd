@@ -14,6 +14,7 @@ const OPTICS_ENVIRONMENT_NEUTRAL := 0
 const OPTICS_ENVIRONMENT_DARK_STUDIO := 1
 const OPTICS_ENVIRONMENT_GEM_BOOTH := 2
 const OPTICS_ENVIRONMENT_GAMEPLAY_STUDIO := 3
+const OPTICS_ENVIRONMENT_DEEP_COLOR := 4
 const MATERIAL_MODE_FACETED_TRANSPARENT := 0
 const MATERIAL_MODE_PATTERNED_OPAQUE := 1
 const MATERIAL_MODE_PATTERNED_TRANSLUCENT := 2
@@ -212,10 +213,51 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 
 @export_subgroup("Environment")
 ## Scales the environment and direct light contribution used during traced baking.
-@export_enum("Neutral Sky", "Dark Studio", "Gem Booth", "Gameplay Studio") var optics_environment_preset: int = OPTICS_ENVIRONMENT_NEUTRAL
+@export_enum("Neutral Sky", "Dark Studio", "Gem Booth", "Gameplay Studio", "Deep Color") var optics_environment_preset: int = OPTICS_ENVIRONMENT_NEUTRAL
 @export_range(-180.0, 180.0) var optics_environment_rotation_degrees: float = 0.0
 @export_range(0.0, 4.0) var optics_environment_energy: float = 1.0
 @export_range(0.0, 8.0) var optics_light_energy: float = 2.4
+## Per-gem ground reflectance override for the virtual ground plane below the gem.
+## -1 = use the environment preset's default ground albedo.
+## 0 = no ground bounce (pavilion stays dark). 0.1-0.5 = typical range.
+@export_range(-1.0, 1.0) var optics_ground_albedo: float = -1.0
+## Per-gem ground surface tint override. Transparent = use preset default.
+## Warm tints add inner glow to pavilion facets; cool tints suit icy gems.
+@export var optics_ground_tint: Color = Color.TRANSPARENT
+## Per-gem ground distance override for the virtual ground plane below the gem.
+## -1 = use the environment preset's default (0.8 for all current presets).
+## Higher values push the ground further away, reducing bounce intensity.
+@export_range(-1.0, 4.0) var optics_ground_distance: float = -1.0
+## Apply a color temperature (Kelvin) to the key light card for this gem.
+## 0 = use the environment preset's default temperature.
+## Typical range: 2800K (warm tungsten) to 8000K (cool overcast).
+@export_range(0, 12000) var optics_light_temperature_kelvin: float = 0
+
+@export_subgroup("Tuning")
+## Scales the interface Fresnel highlight contribution. 1.0 = default behavior.
+@export_range(0.0, 4.0) var optics_interface_highlight_scale: float = 1.0
+## Multiplier for sparkle power in the surface lighting model.
+@export_range(0.0, 4.0) var optics_sparkle_power_multiplier: float = 1.0
+## Multiplier for rim lighting strength.
+@export_range(0.0, 4.0) var optics_rim_strength_multiplier: float = 1.0
+## Multiplier for environment blocker strength. 1.0 = default preset behavior.
+## 0 = no blocker, >1 = stronger shadow/obstruction zone.
+@export_range(0.0, 4.0) var optics_blocker_strength_multiplier: float = 1.0
+## Override the auto-computed cloudiness. -1 = auto from scattering/roughness/translucency.
+## Effective range is 0.0-0.5 (values above 0.5 are clamped by the tracer).
+@export_range(-1.0, 0.5) var optics_cloudiness_override: float = -1.0
+## Override the material-mode transmission factor. -1 = auto from material_mode.
+## 0 = fully opaque, 1 = fully transparent to internal rays.
+@export_range(-1.0, 1.0) var optics_transmission_override: float = -1.0
+
+@export_subgroup("Output Grade")
+## Per-gem exposure override for the output tonemapping pass.
+## -1 = use the auto exposure formula. Positive values replace the entire
+## exposure calculation, giving direct control over final brightness.
+@export_range(-1.0, 4.0) var optics_grade_exposure: float = -1.0
+## Per-gem saturation override for the output tonemapping pass.
+## -1 = use the auto saturation formula.
+@export_range(-1.0, 1.0) var optics_grade_saturation: float = -1.0
 
 # ==== Stylization ====
 

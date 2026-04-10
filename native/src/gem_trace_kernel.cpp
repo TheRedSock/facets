@@ -3,6 +3,7 @@
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <thread>
 #include <cmath>
 
@@ -139,7 +140,23 @@ VisualProps GemTraceKernel::extract_visual_props(Ref<Resource> visual) const {
     props.optics_environment_energy = (double)(float)visual->get("optics_environment_energy");
     props.optics_light_energy = (double)(float)visual->get("optics_light_energy");
 
+    // Per-gem environment overrides
+    props.optics_ground_albedo_override = (double)(float)visual->get("optics_ground_albedo");
+    props.optics_ground_tint_override = Color(visual->get("optics_ground_tint"));
+    props.optics_ground_distance_override = (double)(float)visual->get("optics_ground_distance");
+    props.optics_light_temperature_kelvin = (double)(float)visual->get("optics_light_temperature_kelvin");
+
     props.rotation_degrees = (double)(float)visual->get("rotation_degrees");
+
+    // Per-gem tuning overrides
+    props.optics_interface_highlight_scale = (double)(float)visual->get("optics_interface_highlight_scale");
+    props.optics_sparkle_power_multiplier = (double)(float)visual->get("optics_sparkle_power_multiplier");
+    props.optics_rim_strength_multiplier = (double)(float)visual->get("optics_rim_strength_multiplier");
+    props.optics_blocker_strength_multiplier = (double)(float)visual->get("optics_blocker_strength_multiplier");
+    props.optics_cloudiness_override = (double)(float)visual->get("optics_cloudiness_override");
+    props.optics_transmission_override = (double)(float)visual->get("optics_transmission_override");
+    props.optics_grade_exposure = (double)(float)visual->get("optics_grade_exposure");
+    props.optics_grade_saturation = (double)(float)visual->get("optics_grade_saturation");
 
     return props;
 }
@@ -305,14 +322,14 @@ TraceContext GemTraceKernel::build_context(
     ctx.flags = build_trace_flags(v);
 
     // Build environment and surface setup
-    EnvironmentSetup env_setup = build_environment_setup(light_dir, lighting_uv, v);
+    EnvironmentSetup env_setup = build_environment_setup(light_dir, lighting_uv, v, request);
     StringName variant_type = StringName(request.get("variant_type", StringName()));
     SurfaceSetup surface_setup = build_surface_setup(v, env_setup, light_dir, lighting_uv, variant_type);
     ctx.environment = env_setup;
     ctx.surface = surface_setup;
 
     // Spectral samples
-    ctx.spectral_samples = build_spectral_samples(v);
+    ctx.spectral_samples = build_spectral_samples(v, request);
     ctx.sample_count = clampi(
         (int)(int64_t)request.get("sample_count", DEFAULT_SAMPLE_COUNT),
         1, MAX_SAMPLE_COUNT);
@@ -321,6 +338,24 @@ TraceContext GemTraceKernel::build_context(
     ctx.max_bounces = clampi(
         (int)(int64_t)request.get("max_trace_bounces", MAX_TRACE_BOUNCES),
         1, MAX_OVERRIDE_TRACE_BOUNCES);
+
+    // Request-level overrides: zone surface scales
+    if (request.has("zone_surface_scales")) {
+        ctx.zone_surface_scale_overrides = Dictionary(request["zone_surface_scales"]);
+    }
+
+    // Request-level overrides: output grade
+    if (request.has("output_grade")) {
+        Dictionary grade = Dictionary(request["output_grade"]);
+        ctx.grade_exposure_base = (double)(float)grade.get("exposure_base", -1.0);
+        ctx.grade_range_compression_base = (double)(float)grade.get("range_compression_base", -1.0);
+        ctx.grade_highlight_rolloff_base = (double)(float)grade.get("highlight_rolloff_base", -1.0);
+        ctx.grade_saturation_base = (double)(float)grade.get("saturation_base", -1.0);
+        ctx.grade_body_push_cap = (double)(float)grade.get("body_push_cap", -1.0);
+        ctx.grade_post_saturation_base = (double)(float)grade.get("post_saturation_base", -1.0);
+        ctx.grade_opaque_exposure_scale = (double)(float)grade.get("opaque_exposure_scale", -1.0);
+        ctx.grade_translucent_exposure_scale = (double)(float)grade.get("translucent_exposure_scale", -1.0);
+    }
 
     // Texture image
     if (v.use_texture) {
@@ -494,7 +529,7 @@ void GemTraceKernel::trace_row_band(
             if (hit_count <= 0.0) {
                 out_pixels[pixel_index] = Color(0.0, 0.0, 0.0, 0.0);
             } else {
-                Vector3 color = apply_output_grade(rgb_sum / hit_count, ctx.visual);
+                Vector3 color = apply_output_grade(rgb_sum / hit_count, ctx);
                 out_pixels[pixel_index] = Color(
                     color.x, color.y, color.z,
                     clampd(hit_count / (double)ctx.sample_count, 0.0, 1.0));
@@ -627,7 +662,7 @@ double GemTraceKernel::trace_wavelength_from_hit(
         total += compute_interface_highlight(
             ctx, hit.zone, shading_normal,
             (-dir).normalized(), wavelength_t
-        ) * (0.12 + fresnel * 0.34);
+        ) * (0.14 + fresnel * 0.40);
     }
 
     total += scattering_contribution;
@@ -811,6 +846,77 @@ double GemTraceKernel::sample_color_wavelength(Color color, double wavelength_t)
 }
 
 // ===========================================================================
+// planckian_radiance — Planck blackbody spectral radiance, normalized to peak=1
+// ===========================================================================
+
+double GemTraceKernel::planckian_radiance(double wavelength_t, double temperature_kelvin) {
+    if (temperature_kelvin < 500.0) return 1.0;
+
+    // Map wavelength_t [0,1] to physical wavelength.
+    // spectral_rgb_basis(0) = RED = long wavelength, so t=0 → 720nm, t=1 → 380nm.
+    double lambda_nm = lerpd(720.0, 380.0, clampd(wavelength_t, 0.0, 1.0));
+    double lambda_m = lambda_nm * 1e-9;
+
+    // Planck constants: h = 6.626e-34, c = 2.998e8, k = 1.381e-23
+    // B(λ,T) = 2hc² / λ⁵ · 1/(exp(hc/λkT) - 1)
+    double hc_over_lkt = 0.014388 / (lambda_m * temperature_kelvin); // hc/k ≈ 0.014388 m·K
+    double exponent = dmin(hc_over_lkt, 700.0); // prevent overflow
+    double spectral = 1.0 / (lambda_m * lambda_m * lambda_m * lambda_m * lambda_m)
+                    / (std::exp(exponent) - 1.0);
+
+    // Normalize: evaluate at Wien peak wavelength for this temperature
+    // Wien displacement: λ_peak = 2.898e-3 / T (meters)
+    double lambda_peak = 2.898e-3 / temperature_kelvin;
+    double peak_hc = 0.014388 / (lambda_peak * temperature_kelvin);
+    double peak_spectral = 1.0 / (lambda_peak * lambda_peak * lambda_peak * lambda_peak * lambda_peak)
+                         / (std::exp(peak_hc) - 1.0);
+
+    return clampd(spectral / dmax(peak_spectral, 1e-30), 0.0, 8.0);
+}
+
+// ===========================================================================
+// ground_bounce_radiance — virtual Lambertian ground plane single-bounce
+// ===========================================================================
+
+double GemTraceKernel::ground_bounce_radiance(
+    Vector3 dir, const EnvironmentSetup& env,
+    double wavelength_t, double roughness, double light_energy)
+{
+    if (env.ground_albedo < 0.001 || dir.y >= 0.0) return 0.0;
+
+    // Downward ray hits virtual ground plane — compute diffuse bounce from cards
+    double card_contribution = 0.0;
+    for (const auto& card : env.cards) {
+        // card.dir is the light travel direction; negative Y = light pointing down toward ground
+        double card_to_ground = dmax(-card.dir.y, 0.0);
+        if (card_to_ground <= 0.0) continue;
+
+        double card_energy = lerpd(card.sharp_strength, card.broad_strength, roughness);
+
+        // Sample card color at this wavelength (gradient: use center color for ground)
+        double card_radiance;
+        if (card.temperature_kelvin > 0.0) {
+            card_radiance = planckian_radiance(wavelength_t, card.temperature_kelvin);
+            card_radiance *= sample_color_wavelength(card.color, wavelength_t);
+        } else {
+            card_radiance = sample_color_wavelength(card.color, wavelength_t);
+        }
+
+        card_contribution += card_to_ground * card_energy * card_radiance;
+    }
+
+    // Lambertian diffuse: albedo / π, tinted by ground surface color
+    double ground_tint_spectral = sample_color_wavelength(env.ground_tint, wavelength_t);
+    double distance_falloff = 1.0 / (1.0 + env.ground_distance * 0.5);
+
+    // Upward component of the ray after bounce (cosine weighting)
+    double up_component = dmax(-dir.y, 0.0);
+
+    return card_contribution * env.ground_albedo * (1.0 / 3.14159265)
+         * ground_tint_spectral * distance_falloff * up_component * light_energy;
+}
+
+// ===========================================================================
 // build_trace_flags
 // ===========================================================================
 
@@ -824,12 +930,16 @@ TraceFlags GemTraceKernel::build_trace_flags(const VisualProps& v) const {
         || v.use_texture);
     flags.has_reactive = (v.reactive_strength > 0.0001
         && v.reactive_effect_type != MATERIAL_REACTIVE_NONE);
-    flags.transmission_factor = material::transmission_factor(v);
-    flags.cloudiness = clampd(
-        v.optics_scattering_strength * 1.2
-        + v.optics_surface_roughness * 0.3
-        + v.translucency * 0.1,
-        0.0, 0.5);
+    flags.transmission_factor = (v.optics_transmission_override >= 0.0)
+        ? clampd(v.optics_transmission_override, 0.0, 1.0)
+        : material::transmission_factor(v);
+    flags.cloudiness = (v.optics_cloudiness_override >= 0.0)
+        ? clampd(v.optics_cloudiness_override, 0.0, 0.5)
+        : clampd(
+            v.optics_scattering_strength * 1.2
+            + v.optics_surface_roughness * 0.3
+            + v.translucency * 0.1,
+            0.0, 0.5);
     return flags;
 }
 
@@ -837,9 +947,49 @@ TraceFlags GemTraceKernel::build_trace_flags(const VisualProps& v) const {
 // build_spectral_samples
 // ===========================================================================
 
-std::vector<SpectralSample> GemTraceKernel::build_spectral_samples(const VisualProps& v) const {
-    // Choose wavelength set
-    bool high_fire = (v.optics_dispersion >= 0.02 || v.sparkle_intensity >= 0.8);
+std::vector<SpectralSample> GemTraceKernel::build_spectral_samples(
+    const VisualProps& v,
+    const Dictionary& request) const {
+
+    // Check for request-supplied wavelength override
+    if (request.has("spectral_wavelengths")) {
+        Array wl_array = Array(request["spectral_wavelengths"]);
+        int count = (int)wl_array.size();
+        if (count > 0) {
+            Vector3 normalizer(0, 0, 0);
+            std::vector<double> wavelengths;
+            std::vector<Vector3> raw_weights;
+            wavelengths.reserve(count);
+            raw_weights.reserve(count);
+            for (int i = 0; i < count; i++) {
+                double wl = clampd((double)(float)wl_array[i], 0.0, 1.0);
+                wavelengths.push_back(wl);
+                Vector3 basis = spectral_rgb_basis(wl);
+                raw_weights.push_back(basis);
+                normalizer += basis;
+            }
+            normalizer.x = dmax(normalizer.x, 0.0001);
+            normalizer.y = dmax(normalizer.y, 0.0001);
+            normalizer.z = dmax(normalizer.z, 0.0001);
+            std::vector<SpectralSample> result;
+            result.reserve(count);
+            for (int i = 0; i < count; i++) {
+                SpectralSample s;
+                s.t = wavelengths[i];
+                s.weight = Vector3(
+                    raw_weights[i].x / normalizer.x,
+                    raw_weights[i].y / normalizer.y,
+                    raw_weights[i].z / normalizer.z);
+                result.push_back(s);
+            }
+            return result;
+        }
+    }
+
+    // Choose wavelength set based on thresholds (overridable via request)
+    double disp_threshold = (double)(float)request.get("high_fire_dispersion_threshold", 0.012);
+    double spark_threshold = (double)(float)request.get("high_fire_sparkle_threshold", 0.8);
+    bool high_fire = (v.optics_dispersion >= disp_threshold || v.sparkle_intensity >= spark_threshold);
 
     static const double LOW_FIRE[] = {0.0, 0.5, 1.0};
     static const double HIGH_FIRE[] = {0.0, 0.16, 0.32, 0.5, 0.68, 0.84, 1.0};
@@ -910,8 +1060,29 @@ double GemTraceKernel::sample_environment(
         double alignment = dmax((double)dir.dot(card.dir), 0.0);
         double power = lerpd(card.sharp_power, card.broad_power, roughness);
         double strength = lerpd(card.sharp_strength, card.broad_strength, roughness);
-        total += sample_color_wavelength(card.color, wavelength_t)
-            * std::pow(alignment, power) * strength * ctx.visual.optics_light_energy;
+
+        // Gradient card: lerp from edge_color to center color based on alignment
+        double grad_t = std::pow(clampd(alignment, 0.0, 1.0), card.gradient_power);
+        Color card_c = color_lerp(card.edge_color, card.color, grad_t);
+
+        // Spectral temperature: Planck blackbody modulated by card color luminance
+        double card_radiance;
+        if (card.temperature_kelvin > 0.0) {
+            double planck = planckian_radiance(wavelength_t, card.temperature_kelvin);
+            double color_mod = sample_color_wavelength(card_c, wavelength_t);
+            card_radiance = planck * color_mod;
+        } else {
+            card_radiance = sample_color_wavelength(card_c, wavelength_t);
+        }
+
+        total += card_radiance * std::pow(alignment, power) * strength
+            * ctx.visual.optics_light_energy;
+    }
+
+    // Ground plane bounce: virtual Lambertian surface below the gem
+    if (env.ground_albedo > 0.001 && dir.y < -0.001) {
+        total += ground_bounce_radiance(dir, env, wavelength_t, roughness,
+                                        ctx.visual.optics_light_energy);
     }
 
     double blocker_alignment = dmax((double)dir.dot(env.blocker_dir), 0.0);
@@ -930,15 +1101,22 @@ static LightCard make_light_card(
     double sharp_power,
     double broad_power,
     double sharp_strength,
-    double broad_strength)
+    double broad_strength,
+    double temperature_kelvin = 0.0,
+    Color edge_color = Color(0, 0, 0, 0),  // transparent = auto-derive from color
+    double gradient_power = 1.0)
 {
     LightCard card;
-    card.dir = local_dir.normalized(); // will be overwritten during rotation, but store local_dir for now
+    card.dir = local_dir.normalized();
     card.color = color;
     card.sharp_power = sharp_power;
     card.broad_power = broad_power;
     card.sharp_strength = sharp_strength;
     card.broad_strength = broad_strength;
+    card.temperature_kelvin = temperature_kelvin;
+    // If edge_color was left transparent, default to the card's center color (no gradient)
+    card.edge_color = (edge_color.a < 0.01f) ? color : edge_color;
+    card.gradient_power = gradient_power;
     return card;
 }
 
@@ -952,6 +1130,10 @@ struct EnvironmentProfile {
     Vector3 blocker_local_dir;
     double blocker_power;
     double blocker_strength;
+    // Ground plane bounce defaults
+    double ground_albedo   = 0.0;
+    Color  ground_tint     = Color(0.90f, 0.85f, 0.78f, 1.0f);
+    double ground_distance = 0.8;
 };
 
 static EnvironmentProfile resolve_environment_profile(const VisualProps& v) {
@@ -959,71 +1141,185 @@ static EnvironmentProfile resolve_environment_profile(const VisualProps& v) {
 
     switch (v.optics_environment_preset) {
         case OPTICS_ENVIRONMENT_GAMEPLAY_STUDIO:
-            p.sky_low = Color(0.08f, 0.09f, 0.12f, 1.0f);
-            p.sky_top = Color(0.20f, 0.23f, 0.30f, 1.0f);
-            p.horizon = Color(0.46f, 0.40f, 0.34f, 1.0f);
-            p.ground_dark = Color(0.016f, 0.014f, 0.014f, 1.0f);
-            p.ground_lift = Color(0.06f, 0.052f, 0.048f, 1.0f);
+            p.sky_low = Color(0.11f, 0.12f, 0.16f, 1.0f);
+            p.sky_top = Color(0.26f, 0.30f, 0.39f, 1.0f);
+            p.horizon = Color(0.52f, 0.46f, 0.38f, 1.0f);
+            p.ground_dark = Color(0.020f, 0.018f, 0.018f, 1.0f);
+            p.ground_lift = Color(0.08f, 0.068f, 0.062f, 1.0f);
             p.cards = {
-                make_light_card(Vector3(0.02, 0.30, 0.95), Color(1.0f, 0.99f, 0.97f, 1.0f), 820.0, 12.0, 2.4, 2.0),
-                make_light_card(Vector3(0.72, 0.12, 0.68), Color(1.0f, 0.94f, 0.88f, 1.0f), 92.0, 8.0, 0.34, 0.36),
-                make_light_card(Vector3(-0.72, 0.14, 0.64), Color(0.92f, 0.97f, 1.0f, 1.0f), 92.0, 8.0, 0.32, 0.34),
-                make_light_card(Vector3(-0.06, -0.54, 0.84), Color(1.0f, 0.92f, 0.82f, 1.0f), 24.0, 6.0, 0.10, 0.14),
+                // Key: 5400K warm daylight, soft gradient to neutral edge
+                make_light_card(Vector3(0.02, 0.30, 0.95), Color(1.0f, 0.99f, 0.97f, 1.0f), 820.0, 12.0, 2.30, 1.70,
+                    5400.0, Color(0.92f, 0.95f, 1.0f, 1.0f), 0.7),
+                // Right fill: 6000K slightly cool, gentle gradient
+                make_light_card(Vector3(0.72, 0.12, 0.68), Color(1.0f, 0.94f, 0.88f, 1.0f), 92.0, 8.0, 0.32, 0.34,
+                    6000.0, Color(0.94f, 0.96f, 1.0f, 1.0f), 0.8),
+                // Left fill: cool white, gentle gradient
+                make_light_card(Vector3(-0.72, 0.14, 0.64), Color(0.92f, 0.97f, 1.0f, 1.0f), 92.0, 8.0, 0.30, 0.32,
+                    6000.0, Color(0.88f, 0.94f, 1.0f, 1.0f), 0.8),
+                // Under fill: warm, no gradient (small lobe)
+                make_light_card(Vector3(-0.06, -0.54, 0.84), Color(1.0f, 0.92f, 0.82f, 1.0f), 24.0, 6.0, 0.12, 0.14,
+                    4800.0),
             };
             p.blocker_local_dir = Vector3(-0.10, -0.18, 0.98);
             p.blocker_power = 8.0;
             p.blocker_strength = 0.10;
+            p.ground_albedo = 0.12;
+            p.ground_tint = Color(0.90f, 0.86f, 0.80f, 1.0f);
+            p.ground_distance = 0.8;
+            break;
+
+        case OPTICS_ENVIRONMENT_DEEP_COLOR:
+            // Very dark ambient, extremely intense focused light cards.
+            // Creates dramatic extinction contrast for deeply colored gems:
+            // dark facets stay truly dark, lit facets show vivid saturated color.
+            p.sky_low = Color(0.008f, 0.009f, 0.014f, 1.0f);
+            p.sky_top = Color(0.025f, 0.028f, 0.042f, 1.0f);
+            p.horizon = Color(0.08f, 0.06f, 0.04f, 1.0f);
+            p.ground_dark = Color(0.002f, 0.002f, 0.003f, 1.0f);
+            p.ground_lift = Color(0.012f, 0.010f, 0.008f, 1.0f);
+            p.cards = {
+                // Key: 4200K warm halogen, pronounced gradient — hot white center to warm amber edge
+                make_light_card(Vector3(0.02, 0.48, 0.88), Color(1.0f, 0.99f, 0.97f, 1.0f), 1400.0, 16.0, 5.8, 3.2,
+                    4200.0, Color(1.0f, 0.88f, 0.72f, 1.0f), 0.6),
+                // Right fill: 5500K cool white, subtle gradient
+                make_light_card(Vector3(0.68, 0.16, 0.72), Color(0.98f, 0.96f, 1.0f, 1.0f), 180.0, 10.0, 0.72, 0.52,
+                    5500.0, Color(0.92f, 0.94f, 1.0f, 1.0f), 0.75),
+                // Left fill: warm white, subtle gradient
+                make_light_card(Vector3(-0.74, 0.20, 0.58), Color(1.0f, 0.99f, 0.96f, 1.0f), 280.0, 12.0, 0.78, 0.56,
+                    5500.0, Color(0.94f, 0.96f, 1.0f, 1.0f), 0.75),
+                // Under fill: very warm bounce
+                make_light_card(Vector3(-0.08, -0.64, 0.76), Color(1.0f, 0.92f, 0.84f, 1.0f), 54.0, 8.0, 0.34, 0.24,
+                    3800.0),
+            };
+            p.blocker_local_dir = Vector3(-0.22, -0.36, 0.90);
+            p.blocker_power = 12.0;
+            p.blocker_strength = 0.42;
+            // Minimal ground albedo — preserve dramatic darkness but add hint of return
+            p.ground_albedo = 0.06;
+            p.ground_tint = Color(0.80f, 0.72f, 0.62f, 1.0f);
+            p.ground_distance = 0.8;
             break;
 
         case OPTICS_ENVIRONMENT_DARK_STUDIO:
-            p.sky_low = Color(0.018f, 0.020f, 0.028f, 1.0f);
-            p.sky_top = Color(0.055f, 0.060f, 0.085f, 1.0f);
-            p.horizon = Color(0.16f, 0.12f, 0.09f, 1.0f);
-            p.ground_dark = Color(0.003f, 0.003f, 0.004f, 1.0f);
-            p.ground_lift = Color(0.020f, 0.016f, 0.012f, 1.0f);
+            p.sky_low = Color(0.024f, 0.026f, 0.036f, 1.0f);
+            p.sky_top = Color(0.072f, 0.078f, 0.11f, 1.0f);
+            p.horizon = Color(0.20f, 0.15f, 0.11f, 1.0f);
+            p.ground_dark = Color(0.005f, 0.005f, 0.006f, 1.0f);
+            p.ground_lift = Color(0.026f, 0.021f, 0.016f, 1.0f);
             p.cards = {
-                make_light_card(Vector3(0.02, 0.44, 0.90), Color(1.0f, 0.99f, 0.97f, 1.0f), 1150.0, 14.0, 4.8, 2.8),
-                make_light_card(Vector3(0.72, 0.12, 0.68), Color(0.96f, 0.94f, 1.0f, 1.0f), 120.0, 8.0, 0.56, 0.44),
-                make_light_card(Vector3(-0.78, 0.18, 0.56), Color(1.0f, 0.985f, 0.95f, 1.0f), 220.0, 10.0, 0.62, 0.48),
-                make_light_card(Vector3(-0.10, -0.70, 0.70), Color(1.0f, 0.90f, 0.80f, 1.0f), 42.0, 6.0, 0.28, 0.22),
+                // Key: 4800K warm studio, gradient to cooler edge
+                make_light_card(Vector3(0.02, 0.44, 0.90), Color(1.0f, 0.99f, 0.97f, 1.0f), 1150.0, 14.0, 4.4, 2.40,
+                    4800.0, Color(0.94f, 0.96f, 1.0f, 1.0f), 0.65),
+                // Right fill: 5800K cool
+                make_light_card(Vector3(0.72, 0.12, 0.68), Color(0.96f, 0.94f, 1.0f, 1.0f), 120.0, 8.0, 0.52, 0.42,
+                    5800.0, Color(0.90f, 0.93f, 1.0f, 1.0f), 0.8),
+                // Left fill: warm white
+                make_light_card(Vector3(-0.78, 0.18, 0.56), Color(1.0f, 0.985f, 0.95f, 1.0f), 220.0, 10.0, 0.56, 0.44,
+                    5800.0, Color(0.93f, 0.95f, 1.0f, 1.0f), 0.8),
+                // Under: warm bounce
+                make_light_card(Vector3(-0.10, -0.70, 0.70), Color(1.0f, 0.90f, 0.80f, 1.0f), 42.0, 6.0, 0.26, 0.20,
+                    4000.0),
             };
             p.blocker_local_dir = Vector3(-0.26, -0.30, 0.92);
             p.blocker_power = 10.0;
             p.blocker_strength = 0.30;
+            p.ground_albedo = 0.08;
+            p.ground_tint = Color(0.85f, 0.80f, 0.72f, 1.0f);
+            p.ground_distance = 0.8;
             break;
 
         case OPTICS_ENVIRONMENT_GEM_BOOTH:
-            p.sky_low = Color(0.06f, 0.07f, 0.09f, 1.0f);
-            p.sky_top = Color(0.16f, 0.18f, 0.22f, 1.0f);
-            p.horizon = Color(0.36f, 0.30f, 0.24f, 1.0f);
-            p.ground_dark = Color(0.012f, 0.010f, 0.010f, 1.0f);
-            p.ground_lift = Color(0.05f, 0.04f, 0.03f, 1.0f);
+            p.sky_low = Color(0.08f, 0.09f, 0.12f, 1.0f);
+            p.sky_top = Color(0.21f, 0.24f, 0.29f, 1.0f);
+            p.horizon = Color(0.42f, 0.36f, 0.28f, 1.0f);
+            p.ground_dark = Color(0.016f, 0.013f, 0.013f, 1.0f);
+            p.ground_lift = Color(0.065f, 0.052f, 0.039f, 1.0f);
             p.cards = {
-                make_light_card(Vector3(0.00, 0.36, 0.94), Color(1.0f, 0.985f, 0.96f, 1.0f), 900.0, 14.0, 3.8, 2.4),
-                make_light_card(Vector3(0.86, 0.08, 0.50), Color(1.0f, 0.96f, 0.92f, 1.0f), 160.0, 8.0, 0.48, 0.38),
-                make_light_card(Vector3(-0.72, 0.10, 0.62), Color(0.92f, 0.96f, 1.0f, 1.0f), 120.0, 8.0, 0.44, 0.36),
+                // Key: 5200K neutral-warm, gradient to neutral
+                make_light_card(Vector3(0.00, 0.36, 0.94), Color(1.0f, 0.985f, 0.96f, 1.0f), 900.0, 14.0, 3.8, 2.3,
+                    5200.0, Color(0.94f, 0.96f, 1.0f, 1.0f), 0.7),
+                // Right fill: warm, gradient
+                make_light_card(Vector3(0.86, 0.08, 0.50), Color(1.0f, 0.96f, 0.92f, 1.0f), 160.0, 8.0, 0.46, 0.36,
+                    5800.0, Color(0.94f, 0.96f, 1.0f, 1.0f), 0.8),
+                // Left fill: cool
+                make_light_card(Vector3(-0.72, 0.10, 0.62), Color(0.92f, 0.96f, 1.0f, 1.0f), 120.0, 8.0, 0.42, 0.34,
+                    6200.0, Color(0.88f, 0.92f, 1.0f, 1.0f), 0.8),
             };
             p.blocker_local_dir = Vector3(-0.14, -0.24, 0.96);
             p.blocker_power = 9.0;
-            p.blocker_strength = 0.16;
+            p.blocker_strength = 0.17;
+            p.ground_albedo = 0.20;
+            p.ground_tint = Color(0.94f, 0.90f, 0.84f, 1.0f);
+            p.ground_distance = 0.8;
             break;
 
         default: // OPTICS_ENVIRONMENT_NEUTRAL
-            p.sky_low = Color(0.12f, 0.15f, 0.20f, 1.0f);
-            p.sky_top = Color(0.28f, 0.33f, 0.42f, 1.0f);
-            p.horizon = Color(0.62f, 0.48f, 0.32f, 1.0f);
-            p.ground_dark = Color(0.015f, 0.012f, 0.010f, 1.0f);
-            p.ground_lift = Color(0.08f, 0.06f, 0.04f, 1.0f);
+            p.sky_low = Color(0.16f, 0.19f, 0.26f, 1.0f);
+            p.sky_top = Color(0.36f, 0.42f, 0.54f, 1.0f);
+            p.horizon = Color(0.68f, 0.54f, 0.36f, 1.0f);
+            p.ground_dark = Color(0.020f, 0.016f, 0.013f, 1.0f);
+            p.ground_lift = Color(0.10f, 0.078f, 0.052f, 1.0f);
             p.cards = {
-                make_light_card(Vector3(0.00, 0.24, 0.97), Color(1.0f, 0.96f, 0.88f, 1.0f), 900.0, 90.0, 4.6, 2.0),
-                make_light_card(Vector3(0.56, 0.18, 0.80), Color(0.95f, 0.92f, 0.98f, 1.0f), 48.0, 14.0, 0.42, 0.26),
-                make_light_card(Vector3(-0.74, 0.14, 0.62), Color(1.0f, 0.99f, 0.97f, 1.0f), 64.0, 18.0, 0.34, 0.20),
+                // Key: 5500K daylight, warm center to neutral edge
+                make_light_card(Vector3(0.00, 0.24, 0.97), Color(1.0f, 0.96f, 0.88f, 1.0f), 900.0, 90.0, 4.6, 2.1,
+                    5500.0, Color(0.94f, 0.96f, 1.0f, 1.0f), 0.7),
+                // Right fill: 6200K cool
+                make_light_card(Vector3(0.56, 0.18, 0.80), Color(0.95f, 0.92f, 0.98f, 1.0f), 48.0, 14.0, 0.42, 0.28,
+                    6200.0, Color(0.90f, 0.92f, 1.0f, 1.0f), 0.8),
+                // Left fill: neutral
+                make_light_card(Vector3(-0.74, 0.14, 0.62), Color(1.0f, 0.99f, 0.97f, 1.0f), 64.0, 18.0, 0.36, 0.24,
+                    6200.0, Color(0.93f, 0.96f, 1.0f, 1.0f), 0.8),
             };
             p.blocker_local_dir = Vector3(-0.18, -0.30, 0.94);
             p.blocker_power = 10.0;
-            p.blocker_strength = 0.18;
+            p.blocker_strength = 0.19;
+            p.ground_albedo = 0.15;
+            p.ground_tint = Color(0.92f, 0.87f, 0.80f, 1.0f);
+            p.ground_distance = 0.8;
             break;
     }
+
+    return p;
+}
+
+// ===========================================================================
+// parse_environment_profile_from_dict
+// ===========================================================================
+
+static EnvironmentProfile parse_environment_profile_from_dict(const Dictionary& dict) {
+    EnvironmentProfile p;
+    // Initialize with neutral-ish defaults for partial dicts
+    p.sky_low = Color(dict.get("sky_low", Color(0.16f, 0.19f, 0.26f, 1.0f)));
+    p.sky_top = Color(dict.get("sky_top", Color(0.36f, 0.42f, 0.54f, 1.0f)));
+    p.horizon = Color(dict.get("horizon", Color(0.68f, 0.54f, 0.36f, 1.0f)));
+    p.ground_dark = Color(dict.get("ground_dark", Color(0.020f, 0.016f, 0.013f, 1.0f)));
+    p.ground_lift = Color(dict.get("ground_lift", Color(0.10f, 0.078f, 0.052f, 1.0f)));
+
+    if (dict.has("cards")) {
+        Array cards_array = Array(dict["cards"]);
+        for (int i = 0; i < (int)cards_array.size(); i++) {
+            Dictionary cd = Dictionary(cards_array[i]);
+            LightCard card;
+            card.dir = Vector3(cd.get("dir", Vector3(0, 0, 1))).normalized();
+            card.color = Color(cd.get("color", Color(1, 1, 1, 1)));
+            card.sharp_power = (double)(float)cd.get("sharp_power", 72.0);
+            card.broad_power = (double)(float)cd.get("broad_power", 14.0);
+            card.sharp_strength = (double)(float)cd.get("sharp_strength", 0.5);
+            card.broad_strength = (double)(float)cd.get("broad_strength", 0.3);
+            card.temperature_kelvin = (double)(float)cd.get("temperature_kelvin", 0.0);
+            Color ec = Color(cd.get("edge_color", Color(0, 0, 0, 0)));
+            card.edge_color = (ec.a < 0.01f) ? card.color : ec;
+            card.gradient_power = (double)(float)cd.get("gradient_power", 1.0);
+            p.cards.push_back(card);
+        }
+    }
+
+    p.blocker_local_dir = Vector3(dict.get("blocker_dir", Vector3(-0.18, -0.30, 0.94)));
+    p.blocker_power = (double)(float)dict.get("blocker_power", 10.0);
+    p.blocker_strength = (double)(float)dict.get("blocker_strength", 0.19);
+    p.ground_albedo = (double)(float)dict.get("ground_albedo", 0.15);
+    p.ground_tint = Color(dict.get("ground_tint", Color(0.92f, 0.87f, 0.80f, 1.0f)));
+    p.ground_distance = (double)(float)dict.get("ground_distance", 0.8);
 
     return p;
 }
@@ -1035,9 +1331,21 @@ static EnvironmentProfile resolve_environment_profile(const VisualProps& v) {
 EnvironmentSetup GemTraceKernel::build_environment_setup(
     Vector3 light_dir,
     Vector2 lighting_uv,
-    const VisualProps& v) const
+    const VisualProps& v,
+    const Dictionary& request) const
 {
-    EnvironmentProfile profile = resolve_environment_profile(v);
+    // Resolve environment profile: prefer request-supplied data, fall back to compiled presets
+    EnvironmentProfile profile;
+    if (request.has("environment_profile")) {
+        Dictionary env_dict = Dictionary(request["environment_profile"]);
+        if (!env_dict.is_empty() && env_dict.has("cards")) {
+            profile = parse_environment_profile_from_dict(env_dict);
+        } else {
+            profile = resolve_environment_profile(v);
+        }
+    } else {
+        profile = resolve_environment_profile(v);
+    }
 
     Vector3 side_axis = light_dir.cross(Vector3(0, 1, 0));
     if (side_axis.length_squared() <= 0.0001) {
@@ -1079,6 +1387,9 @@ EnvironmentSetup GemTraceKernel::build_environment_setup(
         card.broad_power = src_card.broad_power;
         card.sharp_strength = src_card.sharp_strength;
         card.broad_strength = src_card.broad_strength;
+        card.temperature_kelvin = src_card.temperature_kelvin;
+        card.edge_color = src_card.edge_color;
+        card.gradient_power = src_card.gradient_power;
         env.cards.push_back(card);
     }
 
@@ -1089,7 +1400,28 @@ EnvironmentSetup GemTraceKernel::build_environment_setup(
         + key_dir * blocker_local.z
     ).normalized();
     env.blocker_power = profile.blocker_power;
-    env.blocker_strength = profile.blocker_strength * (1.0 + lighting_uv.length() * 0.08);
+    env.blocker_strength = profile.blocker_strength * (1.0 + lighting_uv.length() * 0.08)
+        * clampd(v.optics_blocker_strength_multiplier, 0.0, 4.0);
+
+    // Ground plane: start from profile defaults, apply per-gem overrides
+    env.ground_albedo = profile.ground_albedo;
+    env.ground_tint = profile.ground_tint;
+    env.ground_distance = profile.ground_distance;
+
+    if (v.optics_ground_albedo_override >= 0.0) {
+        env.ground_albedo = clampd(v.optics_ground_albedo_override, 0.0, 1.0);
+    }
+    if (v.optics_ground_tint_override.a > 0.01) {
+        env.ground_tint = v.optics_ground_tint_override;
+    }
+    if (v.optics_ground_distance_override >= 0.0) {
+        env.ground_distance = clampd(v.optics_ground_distance_override, 0.0, 4.0);
+    }
+
+    // Per-gem key card temperature override: apply to first (key) card
+    if (v.optics_light_temperature_kelvin > 0.0 && !env.cards.empty()) {
+        env.cards[0].temperature_kelvin = v.optics_light_temperature_kelvin;
+    }
 
     return env;
 }
@@ -1228,16 +1560,16 @@ Color GemTraceKernel::resolve_highlight_tint(const VisualProps& v, Color body) c
 double GemTraceKernel::zone_light_multiplier(StringName zone, const VisualProps& v) {
     double contrast = clampd(v.brilliance_contrast, 0.0, 1.0);
     if (zone == StringName("table")) {
-        return 1.0 + contrast * 0.28;
+        return 1.0 + contrast * 0.18;
     }
     if (zone == StringName("star")) {
-        return 1.0 + contrast * 0.16;
+        return 1.0 + contrast * 0.12;
     }
     if (zone == StringName("girdle")) {
-        return 1.0 - contrast * 0.18;
+        return 1.0 - contrast * 0.12;
     }
     if (zone == StringName("pavilion") || zone == StringName("culet")) {
-        return 1.0 - v.extinction * 0.42;
+        return 1.0 - v.extinction * 0.30;
     }
     return 1.0;
 }
@@ -1246,7 +1578,21 @@ double GemTraceKernel::zone_light_multiplier(StringName zone, const VisualProps&
 // resolve_zone_surface_scales
 // ===========================================================================
 
-ZoneSurfaceScales GemTraceKernel::resolve_zone_surface_scales(StringName zone) {
+ZoneSurfaceScales GemTraceKernel::resolve_zone_surface_scales(StringName zone,
+    const Dictionary& zone_overrides) {
+    // Check for request-level overrides first
+    if (!zone_overrides.is_empty() && zone_overrides.has(zone)) {
+        Dictionary zd = Dictionary(zone_overrides[zone]);
+        ZoneSurfaceScales s;
+        s.front     = (double)(float)zd.get("front", 1.0);
+        s.back      = (double)(float)zd.get("back", 1.0);
+        s.spec      = (double)(float)zd.get("spec", 1.0);
+        s.body      = (double)(float)zd.get("body", 1.0);
+        s.caustic   = (double)(float)zd.get("caustic", 1.0);
+        s.interface_ = (double)(float)zd.get("interface", 1.0);
+        return s;
+    }
+    // Compiled defaults
     ZoneSurfaceScales s;
     if (zone == StringName("table")) {
         s.front = 0.56; s.back = 0.90; s.spec = 0.62;
@@ -1354,17 +1700,17 @@ Vector3 GemTraceKernel::compute_surface_lighting(
     double back_alignment = dmax(-(double)normal.dot(effective_light_dir), 0.0);
     double front_power = lerpd(18.0, 4.0, roughness);
     double front_strength = std::pow(front_alignment, front_power)
-        * v.optics_light_energy * (0.08 + v.contrast * 0.18);
+        * v.optics_light_energy * (0.06 + v.contrast * 0.15);
     double scatter_strength = dmax(v.optics_scattering_strength, v.translucency * 0.55);
     double back_strength = std::pow(back_alignment, 3.2)
-        * v.optics_light_energy * scatter_strength * 0.08;
+        * v.optics_light_energy * scatter_strength * 0.06;
 
     // Blinn-Phong specular
     Vector3 half_vec = (effective_light_dir + view_dir).normalized();
     double spec_alignment = dmax((double)normal.dot(half_vec), 0.0);
     double spec_power = lerpd(120.0, 16.0, roughness);
     double spec_strength = std::pow(spec_alignment, spec_power)
-        * v.optics_light_energy * (0.12 + v.specular_intensity * 0.52) * specular_mult;
+        * v.optics_light_energy * (0.09 + v.specular_intensity * 0.40) * specular_mult;
 
     // Secondary specular
     Vector3 secondary_light_dir = Basis(Vector3(0, 1, 0), Math::deg_to_rad(v.secondary_light_angle))
@@ -1372,7 +1718,7 @@ Vector3 GemTraceKernel::compute_surface_lighting(
     Vector3 secondary_half = (secondary_light_dir + view_dir).normalized();
     double secondary_alignment = dmax((double)normal.dot(secondary_half), 0.0);
     double secondary_strength = std::pow(secondary_alignment, lerpd(96.0, 18.0, roughness))
-        * v.secondary_specular * v.optics_light_energy * 0.16 * specular_mult;
+        * v.secondary_specular * v.optics_light_energy * 0.12 * specular_mult;
 
     // Environment card contributions
     double card_glare_strength = 0.0;
@@ -1388,15 +1734,15 @@ Vector3 GemTraceKernel::compute_surface_lighting(
         double card_power = lerpd(card.sharp_power, dmax(card.broad_power, 8.0), roughness);
         double card_energy = lerpd(card.sharp_strength, card.broad_strength, roughness);
 
-        card_glare_strength += std::pow(card_spec_alignment, card_power) * card_energy * 0.16;
-        card_fill_strength += std::pow(card_front, lerpd(10.0, 3.5, roughness)) * card_energy * 0.05;
+        card_glare_strength += std::pow(card_spec_alignment, card_power) * card_energy * 0.11;
+        card_fill_strength += std::pow(card_front, lerpd(10.0, 3.5, roughness)) * card_energy * 0.035;
 
         Vector3 refracted_card = refract_ray(-card.dir, normal, AIR_IOR, optics_ior);
         if (refracted_card.length_squared() < 1e-12) continue;
         double return_alignment = dmax((double)(-refracted_card).dot(view_dir), 0.0);
         double fresnel_in = fresnel_dielectric(-card.dir, normal, AIR_IOR, optics_ior);
         card_return_strength += std::pow(return_alignment, lerpd(42.0, 10.0, roughness))
-            * card_energy * (1.0 - fresnel_in) * (0.24 + v.extinction * 0.10);
+            * card_energy * (1.0 - fresnel_in) * (0.18 + v.extinction * 0.08);
     }
 
     // Lateral mask and caustic band
@@ -1414,14 +1760,13 @@ Vector3 GemTraceKernel::compute_surface_lighting(
     }
 
     if (variant_type == StringName("lighting")) {
-        front_strength *= lerpd(0.80, 1.16, lateral_mask);
-        spec_strength *= lerpd(0.50, 1.45, lateral_mask);
-        back_strength *= lerpd(0.28, 0.52, 1.0 - lateral_mask);
+        front_strength *= lerpd(0.84, 1.12, lateral_mask);
+        spec_strength *= lerpd(0.60, 1.26, lateral_mask);
+        back_strength *= lerpd(0.30, 0.48, 1.0 - lateral_mask);
     }
 
     double zone_mult = zone_light_multiplier(zone, v);
-    ZoneSurfaceScales zs = resolve_zone_surface_scales(zone);
-
+    ZoneSurfaceScales zs = resolve_zone_surface_scales(zone, ctx.zone_surface_scale_overrides);
     front_strength *= zone_mult * zs.front;
     back_strength *= zs.back;
     spec_strength += card_glare_strength * lerpd(zone_mult, 1.0 + v.sparkle_intensity * 0.10, 0.4);
@@ -1432,10 +1777,10 @@ Vector3 GemTraceKernel::compute_surface_lighting(
     Color caustic_color = color_lerp(body_color, caustic_base, 0.42 + v.hue_dispersion * 0.20);
 
     double body_strength = (
-        0.006
-        + scatter_strength * 0.10
-        + roughness * 0.03
-        + v.translucency * 0.02
+        0.004
+        + scatter_strength * 0.08
+        + roughness * 0.022
+        + v.translucency * 0.015
         + card_fill_strength
     ) * v.optics_light_energy * lerpd(0.82, 1.02, front_alignment);
 
@@ -1444,18 +1789,39 @@ Vector3 GemTraceKernel::compute_surface_lighting(
     }
     body_strength *= lerpd(0.82, 1.04, zone_mult - 1.0 + 0.5) * zs.body;
 
+    // Ground-reflected fill: virtual ground plane bounces card light back into pavilion
+    double ground_fill_strength = 0.0;
+    const EnvironmentSetup& env_sl = ctx.environment;
+    if (env_sl.ground_albedo > 0.001) {
+        double down_facing = dmax(-normal.y, 0.0); // pavilion facets face downward
+        if (down_facing > 0.001) {
+            double card_ground_sum = 0.0;
+            for (const auto& card : env_sl.cards) {
+                double card_to_ground = dmax(-card.dir.y, 0.0);
+                if (card_to_ground <= 0.0) continue;
+                double card_energy = lerpd(card.sharp_strength, card.broad_strength, roughness);
+                card_ground_sum += card_to_ground * card_energy;
+            }
+            double distance_falloff = 1.0 / (1.0 + env_sl.ground_distance * 0.5);
+            ground_fill_strength = card_ground_sum * env_sl.ground_albedo
+                * down_facing * distance_falloff * v.optics_light_energy * 0.08;
+        }
+    }
+
     double caustic_strength = (
         card_return_strength
-        + caustic_band * (0.018 + v.sparkle_intensity * 0.012)
+        + caustic_band * (0.012 + v.sparkle_intensity * 0.010)
     ) * v.optics_light_energy * zs.caustic;
 
     double sparkle_strength = dmax(
         std::pow(spec_alignment, lerpd(260.0, 48.0, roughness)) - v.sparkle_threshold, 0.0)
-        * v.sparkle_intensity * v.optics_light_energy * 2.4 * specular_mult;
+        * v.sparkle_intensity * v.optics_light_energy * 1.9 * specular_mult
+        * v.optics_sparkle_power_multiplier;
 
     double rim_alignment = dmax(1.0 - dmax((double)normal.dot(view_dir), 0.0), 0.0);
     double rim_strength = std::pow(rim_alignment, lerpd(5.8, 2.2, v.rim_power / 5.0))
-        * v.rim_intensity * v.optics_light_energy * 0.26;
+        * v.rim_intensity * v.optics_light_energy * 0.26
+        * v.optics_rim_strength_multiplier;
 
     double facet_glare_strength = 0.0;
 
@@ -1490,17 +1856,26 @@ Vector3 GemTraceKernel::compute_surface_lighting(
 
     double surface_absorption_scale = 1.0 / (1.0 + v.optics_absorption_strength * 0.42);
 
+    // Ground fill contributes as a tinted body-like term
+    Color ground_fill_color = Color(
+        body_color.r * env_sl.ground_tint.r,
+        body_color.g * env_sl.ground_tint.g,
+        body_color.b * env_sl.ground_tint.b, 1.0);
+
     double combined_spec = spec_strength + secondary_strength + sparkle_strength + facet_glare_strength;
     return Vector3(
         face_color.r * front_strength + scatter_color.r * back_strength
             + specular_color.r * combined_spec + rim_tint.r * rim_strength
-            + caustic_color.r * caustic_strength + body_color.r * body_strength + reactive_color.r,
+            + caustic_color.r * caustic_strength + body_color.r * body_strength
+            + ground_fill_color.r * ground_fill_strength + reactive_color.r,
         face_color.g * front_strength + scatter_color.g * back_strength
             + specular_color.g * combined_spec + rim_tint.g * rim_strength
-            + caustic_color.g * caustic_strength + body_color.g * body_strength + reactive_color.g,
+            + caustic_color.g * caustic_strength + body_color.g * body_strength
+            + ground_fill_color.g * ground_fill_strength + reactive_color.g,
         face_color.b * front_strength + scatter_color.b * back_strength
             + specular_color.b * combined_spec + rim_tint.b * rim_strength
-            + caustic_color.b * caustic_strength + body_color.b * body_strength + reactive_color.b
+            + caustic_color.b * caustic_strength + body_color.b * body_strength
+            + ground_fill_color.b * ground_fill_strength + reactive_color.b
     ) * surface_absorption_scale;
 }
 
@@ -1561,8 +1936,9 @@ double GemTraceKernel::compute_interface_highlight(
         }
     }
 
-    ZoneSurfaceScales zs = resolve_zone_surface_scales(zone);
-    return sample_color_wavelength(highlight_tint, wavelength_t) * total * zs.interface_;
+    ZoneSurfaceScales zs = resolve_zone_surface_scales(zone, ctx.zone_surface_scale_overrides);
+    return sample_color_wavelength(highlight_tint, wavelength_t) * total * zs.interface_
+        * v.optics_interface_highlight_scale;
 }
 
 // ===========================================================================
@@ -1583,7 +1959,7 @@ double GemTraceKernel::compute_segment_attenuation(
     double absorption_mult = (medium != nullptr) ? medium->absorption_mult : 1.0;
     double coeff = dmax(1.0 - channel_tint, 0.0) * dmax(
         v.optics_absorption_strength * absorption_mult, 0.0);
-    return std::exp(-coeff * dmax(distance, 0.0));
+    return std::exp(-coeff * dmax(distance, 0.0) * 0.78);
 }
 
 // ===========================================================================
@@ -1693,8 +2069,8 @@ Vector3 GemTraceKernel::soft_highlight_rolloff(Vector3 color, double amount) {
     Vector3 rolled;
     for (int i = 0; i < 3; i++) {
         double channel = (i == 0) ? color.x : ((i == 1) ? color.y : color.z);
-        double shoulder = smoothstepd(0.58, 1.0, channel);
-        double result = clampd(channel - shoulder * amount * (channel - 0.58), 0.0, 1.0);
+        double shoulder = smoothstepd(0.54, 0.96, channel);
+        double result = clampd(channel - shoulder * amount * (channel - 0.54), 0.0, 1.0);
         if (i == 0) rolled.x = result;
         else if (i == 1) rolled.y = result;
         else rolled.z = result;
@@ -1732,19 +2108,28 @@ Vector3 GemTraceKernel::set_luma(Vector3 color, double target_luma) {
 // apply_output_grade
 // ===========================================================================
 
-Vector3 GemTraceKernel::apply_output_grade(Vector3 color, const VisualProps& v) const {
-    double exposure = (
-        0.72
-        + v.optics_light_energy * 0.08
-        + v.specular_intensity * 0.06
-        + v.sparkle_intensity * 0.008
-    );
+Vector3 GemTraceKernel::apply_output_grade(Vector3 color, const TraceContext& ctx) const {
+    const VisualProps& v = ctx.visual;
+    double exposure_base = (ctx.grade_exposure_base >= 0.0) ? ctx.grade_exposure_base : 0.74;
+    double exposure;
+    if (v.optics_grade_exposure >= 0.0) {
+        exposure = v.optics_grade_exposure;
+    } else {
+        exposure = (
+            exposure_base
+            + v.optics_light_energy * 0.07
+            + v.specular_intensity * 0.04
+            + v.sparkle_intensity * 0.005
+        );
+    }
+    double opaque_scale = (ctx.grade_opaque_exposure_scale >= 0.0) ? ctx.grade_opaque_exposure_scale : 0.60;
+    double translucent_scale = (ctx.grade_translucent_exposure_scale >= 0.0) ? ctx.grade_translucent_exposure_scale : 0.82;
     switch (v.material_mode) {
         case MATERIAL_MODE_PATTERNED_OPAQUE:
-            exposure *= 0.60;
+            exposure *= opaque_scale;
             break;
         case MATERIAL_MODE_PATTERNED_TRANSLUCENT:
-            exposure *= 0.82;
+            exposure *= translucent_scale;
             break;
         default:
             break;
@@ -1756,29 +2141,37 @@ Vector3 GemTraceKernel::apply_output_grade(Vector3 color, const VisualProps& v) 
         apply_aces_channel(graded.y),
         apply_aces_channel(graded.z));
 
+    double rc_base = (ctx.grade_range_compression_base >= 0.0) ? ctx.grade_range_compression_base : 0.03;
     double range_compression = clampd(
-        0.04
+        rc_base
         + v.specular_intensity * 0.03
-        + v.contrast * 0.05
-        + dmin(v.sparkle_intensity, 1.2) * 0.01,
-        0.04, 0.14);
+        + v.contrast * 0.04
+        + dmin(v.sparkle_intensity, 1.2) * 0.008,
+        0.03, 0.10);
     graded = compress_luma_range(graded, range_compression);
 
+    double hr_base = (ctx.grade_highlight_rolloff_base >= 0.0) ? ctx.grade_highlight_rolloff_base : 0.05;
     double highlight_rolloff = clampd(
-        0.08
-        + v.specular_intensity * 0.08
+        hr_base
+        + v.specular_intensity * 0.06
         + dmin(v.sparkle_intensity, 1.2) * 0.03,
-        0.08, 0.22);
+        0.05, 0.16);
     graded = soft_highlight_rolloff(graded, highlight_rolloff);
 
-    double saturation = clampd(
-        v.saturation_boost
-        + v.contrast * 0.08
-        + v.hue_dispersion * 0.16
-        + v.specular_intensity * 0.03
-        + dmin(v.optics_absorption_strength, 3.0) * 0.022
-        + 0.01,
-        -0.2, 0.48);
+    double sat_base = (ctx.grade_saturation_base >= 0.0) ? ctx.grade_saturation_base : 0.02;
+    double saturation;
+    if (v.optics_grade_saturation >= 0.0) {
+        saturation = v.optics_grade_saturation;
+    } else {
+        saturation = clampd(
+            v.saturation_boost
+            + v.contrast * 0.10
+            + v.hue_dispersion * 0.14
+            + v.specular_intensity * 0.015
+            + dmin(v.optics_absorption_strength, 3.0) * 0.030
+            + sat_base,
+            -0.1, 0.56);
+    }
     graded = adjust_saturation(graded, saturation);
 
     // Gamma
@@ -1789,7 +2182,8 @@ Vector3 GemTraceKernel::apply_output_grade(Vector3 color, const VisualProps& v) 
     post_gamma = soft_highlight_rolloff(post_gamma, highlight_rolloff * 0.5);
 
     // Body-color saturation floor
-    double body_push_strength = clampd(v.optics_absorption_strength * 0.18, 0.0, 0.55);
+    double body_push_cap = (ctx.grade_body_push_cap >= 0.0) ? ctx.grade_body_push_cap : 0.55;
+    double body_push_strength = clampd(v.optics_absorption_strength * 0.18, 0.0, body_push_cap);
     if (body_push_strength > 0.01) {
         Vector3 body_hue(v.base_color.r, v.base_color.g, v.base_color.b);
         double body_hue_len = body_hue.length();
@@ -1804,11 +2198,12 @@ Vector3 GemTraceKernel::apply_output_grade(Vector3 color, const VisualProps& v) 
         }
     }
 
+    double ps_base = (ctx.grade_post_saturation_base >= 0.0) ? ctx.grade_post_saturation_base : 0.015;
     double post_sat = clampd(
-        0.01
-        + dmin(v.optics_absorption_strength, 2.5) * 0.016
-        + dmax(v.saturation_boost, 0.0) * 0.10,
-        0.01, 0.08);
+        ps_base
+        + dmin(v.optics_absorption_strength, 2.5) * 0.020
+        + dmax(v.saturation_boost, 0.0) * 0.12,
+        0.015, 0.12);
     return adjust_saturation(post_gamma, post_sat);
 }
 

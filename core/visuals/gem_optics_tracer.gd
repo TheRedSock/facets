@@ -1,23 +1,22 @@
 class_name GemOpticsTracer
 extends RefCounted
 
-## GDScript CPU traced gemstone bake — **FALLBACK ONLY**.
+## DEPRECATED — GDScript CPU traced gemstone bake.
 ##
-## The primary tracer is the native C++ GemTraceKernel GDExtension (native/).
-## This GDScript version is kept as:
-##   1. A readable reference implementation of the trace algorithm
-##   2. A fallback for environments where the C++ extension is not compiled
+## This class is NO LONGER used by the bake pipeline. The native C++
+## GemTraceKernel GDExtension (native/) is now the sole tracer. The bake
+## job will error if the native extension is unavailable rather than falling
+## back to this implementation.
 ##
-## Do not instantiate this class directly from gameplay tooling or regression
-## tests. Route tracer selection through `OfflineGemBakeJob.create_tracer()` and
-## related helper methods so the repo-facing pipeline stays native-first.
+## This file is retained as a readable reference of the original trace
+## algorithm. It is NOT kept in sync with kernel changes and MUST NOT be
+## instantiated by any production or tooling code path.
 ##
-## The bake pipeline (OfflineGemBakeJob) auto-selects the native kernel when
-## available, falling back to this class otherwise. Both expose the same API:
-## trace_to_image() and get_last_trace_profile().
+## To build the required native extension:
+##   cd native && python -m SCons platform=windows target=template_debug
 ##
-## If modifying the trace algorithm, update native/src/gem_trace_kernel.cpp
-## first (primary), then mirror the change here (fallback).
+## History: prior to BAKED_LOOK_VERSION 5, the bake pipeline would
+## auto-select this class when the C++ extension was not compiled.
 
 const GemMaterialSamplerScript = preload("res://core/visuals/gem_material_sampler.gd")
 
@@ -566,7 +565,7 @@ func _trace_wavelength_from_hit(
 			request,
 			(-dir).normalized(),
 			wavelength_t
-		) * (0.12 + fresnel * 0.34)
+		) * (0.08 + fresnel * 0.24)
 	total += scattering_contribution
 	return clampf(total, 0.0, 18.0)
 
@@ -855,37 +854,37 @@ func _resolve_environment_profile(visual: GemVisualResource) -> Dictionary:
 						Color(1.0, 0.99, 0.97, 1.0),
 						820.0,
 						12.0,
-						2.4,
-						2.0
+						1.95,
+						1.45
 					),
 					_environment_card(
 						Vector3(0.72, 0.12, 0.68),
 						Color(1.0, 0.94, 0.88, 1.0),
 						92.0,
 						8.0,
-						0.34,
-						0.36
+						0.26,
+						0.28
 					),
 					_environment_card(
 						Vector3(-0.72, 0.14, 0.64),
 						Color(0.92, 0.97, 1.0, 1.0),
 						92.0,
 						8.0,
-						0.32,
-						0.34
+						0.24,
+						0.26
 					),
 					_environment_card(
 						Vector3(-0.06, -0.54, 0.84),
 						Color(1.0, 0.92, 0.82, 1.0),
 						24.0,
 						6.0,
-						0.10,
-						0.14
+						0.08,
+						0.10
 					),
 				],
 				"blocker_local_dir": Vector3(-0.10, -0.18, 0.98),
 				"blocker_power": 8.0,
-				"blocker_strength": 0.10,
+				"blocker_strength": 0.12,
 			}
 		GemVisualResource.OPTICS_ENVIRONMENT_DARK_STUDIO:
 			return {
@@ -900,37 +899,37 @@ func _resolve_environment_profile(visual: GemVisualResource) -> Dictionary:
 						Color(1.0, 0.99, 0.97, 1.0),
 						1150.0,
 						14.0,
-						4.8,
-						2.8
+						3.8,
+						2.05
 					),
 					_environment_card(
 						Vector3(0.72, 0.12, 0.68),
 						Color(0.96, 0.94, 1.0, 1.0),
 						120.0,
 						8.0,
-						0.56,
-						0.44
+						0.42,
+						0.34
 					),
 					_environment_card(
 						Vector3(-0.78, 0.18, 0.56),
 						Color(1.0, 0.985, 0.95, 1.0),
 						220.0,
 						10.0,
-						0.62,
-						0.48
+						0.46,
+						0.36
 					),
 					_environment_card(
 						Vector3(-0.10, -0.70, 0.70),
 						Color(1.0, 0.90, 0.80, 1.0),
 						42.0,
 						6.0,
-						0.28,
-						0.22
+						0.20,
+						0.16
 					),
 				],
 				"blocker_local_dir": Vector3(-0.26, -0.30, 0.92),
 				"blocker_power": 10.0,
-				"blocker_strength": 0.30,
+				"blocker_strength": 0.34,
 			}
 		GemVisualResource.OPTICS_ENVIRONMENT_GEM_BOOTH:
 			return {
@@ -945,29 +944,74 @@ func _resolve_environment_profile(visual: GemVisualResource) -> Dictionary:
 						Color(1.0, 0.985, 0.96, 1.0),
 						900.0,
 						14.0,
-						3.8,
-						2.4
+						3.3,
+						2.0
 					),
 					_environment_card(
 						Vector3(0.86, 0.08, 0.50),
 						Color(1.0, 0.96, 0.92, 1.0),
 						160.0,
 						8.0,
-						0.48,
-						0.38
+						0.38,
+						0.30
 					),
 					_environment_card(
 						Vector3(-0.72, 0.10, 0.62),
 						Color(0.92, 0.96, 1.0, 1.0),
 						120.0,
 						8.0,
-						0.44,
-						0.36
+						0.34,
+						0.28
 					),
 				],
 				"blocker_local_dir": Vector3(-0.14, -0.24, 0.96),
 				"blocker_power": 9.0,
-				"blocker_strength": 0.16,
+				"blocker_strength": 0.20,
+			}
+		GemVisualResource.OPTICS_ENVIRONMENT_DEEP_COLOR:
+			return {
+				"sky_low": Color(0.008, 0.009, 0.014, 1.0),
+				"sky_top": Color(0.025, 0.028, 0.042, 1.0),
+				"horizon": Color(0.08, 0.06, 0.04, 1.0),
+				"ground_dark": Color(0.002, 0.002, 0.003, 1.0),
+				"ground_lift": Color(0.012, 0.010, 0.008, 1.0),
+				"cards": [
+					_environment_card(
+						Vector3(0.02, 0.48, 0.88),
+						Color(1.0, 0.99, 0.97, 1.0),
+						1400.0,
+						16.0,
+						5.8,
+						3.2
+					),
+					_environment_card(
+						Vector3(0.68, 0.16, 0.72),
+						Color(0.98, 0.96, 1.0, 1.0),
+						180.0,
+						10.0,
+						0.72,
+						0.52
+					),
+					_environment_card(
+						Vector3(-0.74, 0.20, 0.58),
+						Color(1.0, 0.99, 0.96, 1.0),
+						280.0,
+						12.0,
+						0.78,
+						0.56
+					),
+					_environment_card(
+						Vector3(-0.08, -0.64, 0.76),
+						Color(1.0, 0.92, 0.84, 1.0),
+						54.0,
+						8.0,
+						0.34,
+						0.24
+					),
+				],
+				"blocker_local_dir": Vector3(-0.22, -0.36, 0.90),
+				"blocker_power": 12.0,
+				"blocker_strength": 0.42,
 			}
 		_:
 			return {
@@ -982,29 +1026,29 @@ func _resolve_environment_profile(visual: GemVisualResource) -> Dictionary:
 						Color(1.0, 0.96, 0.88, 1.0),
 						900.0,
 						90.0,
-						4.6,
-						2.0
+						4.0,
+						1.8
 					),
 					_environment_card(
 						Vector3(0.56, 0.18, 0.80),
 						Color(0.95, 0.92, 0.98, 1.0),
 						48.0,
 						14.0,
-						0.42,
-						0.26
+						0.34,
+						0.22
 					),
 					_environment_card(
 						Vector3(-0.74, 0.14, 0.62),
 						Color(1.0, 0.99, 0.97, 1.0),
 						64.0,
 						18.0,
-						0.34,
-						0.20
+						0.28,
+						0.18
 					),
 				],
 				"blocker_local_dir": Vector3(-0.18, -0.30, 0.94),
 				"blocker_power": 10.0,
-				"blocker_strength": 0.18,
+				"blocker_strength": 0.22,
 			}
 
 
@@ -1211,18 +1255,18 @@ func _compute_surface_lighting(
 	var front_alignment := maxf(normal.dot(effective_light_dir), 0.0)
 	var back_alignment := maxf(-normal.dot(effective_light_dir), 0.0)
 	var front_power := lerpf(18.0, 4.0, roughness)
-	var front_strength := pow(front_alignment, front_power) * visual.optics_light_energy * (0.08 + visual.contrast * 0.18)
+	var front_strength := pow(front_alignment, front_power) * visual.optics_light_energy * (0.06 + visual.contrast * 0.15)
 	var scatter_strength := maxf(visual.optics_scattering_strength, visual.translucency * 0.55)
-	var back_strength := pow(back_alignment, 3.2) * visual.optics_light_energy * scatter_strength * 0.08
+	var back_strength := pow(back_alignment, 3.2) * visual.optics_light_energy * scatter_strength * 0.06
 	# Blinn-Phong specular (matches procedural renderer model).
 	var half_vec := (effective_light_dir + view_dir).normalized()
 	var spec_alignment := maxf(normal.dot(half_vec), 0.0)
 	var spec_power := lerpf(120.0, 16.0, roughness)
-	var spec_strength := pow(spec_alignment, spec_power) * visual.optics_light_energy * (0.12 + visual.specular_intensity * 0.52) * specular_mult
+	var spec_strength := pow(spec_alignment, spec_power) * visual.optics_light_energy * (0.09 + visual.specular_intensity * 0.40) * specular_mult
 	var secondary_light_dir: Vector3 = (Basis(Vector3.UP, deg_to_rad(visual.secondary_light_angle)) * effective_light_dir).normalized()
 	var secondary_half: Vector3 = (secondary_light_dir + view_dir).normalized()
 	var secondary_alignment := maxf(normal.dot(secondary_half), 0.0)
-	var secondary_strength := pow(secondary_alignment, lerpf(96.0, 18.0, roughness)) * visual.secondary_specular * visual.optics_light_energy * 0.16 * specular_mult
+	var secondary_strength := pow(secondary_alignment, lerpf(96.0, 18.0, roughness)) * visual.secondary_specular * visual.optics_light_energy * 0.12 * specular_mult
 	var card_glare_strength := 0.0
 	var card_return_strength := 0.0
 	var card_fill_strength := 0.0
@@ -1246,14 +1290,14 @@ func _compute_surface_lighting(
 			float(card.get("broad_strength", 0.3)),
 			roughness
 		)
-		card_glare_strength += pow(card_spec_alignment, card_power) * card_energy * 0.16
-		card_fill_strength += pow(card_front, lerpf(10.0, 3.5, roughness)) * card_energy * 0.05
+		card_glare_strength += pow(card_spec_alignment, card_power) * card_energy * 0.11
+		card_fill_strength += pow(card_front, lerpf(10.0, 3.5, roughness)) * card_energy * 0.035
 		var refracted_card := _refract(-card_dir, normal, AIR_IOR, optics_ior)
 		if refracted_card.is_zero_approx():
 			continue
 		var return_alignment := maxf((-refracted_card).dot(view_dir), 0.0)
 		var fresnel_in := _fresnel_dielectric(-card_dir, normal, AIR_IOR, optics_ior)
-		card_return_strength += pow(return_alignment, lerpf(42.0, 10.0, roughness)) * card_energy * (1.0 - fresnel_in) * (0.24 + visual.extinction * 0.10)
+		card_return_strength += pow(return_alignment, lerpf(42.0, 10.0, roughness)) * card_energy * (1.0 - fresnel_in) * (0.18 + visual.extinction * 0.08)
 	var planar_light := Vector2(effective_light_dir.x, effective_light_dir.y)
 	var normalized_position := Vector2(object_position.x, object_position.y)
 	var lateral_mask := 0.5
@@ -1264,9 +1308,9 @@ func _compute_surface_lighting(
 		lateral_mask = clampf(side_alignment * 0.5 + 0.5, 0.0, 1.0)
 		caustic_band = exp(-pow((side_alignment - 0.24) / 0.46, 2.0)) * maxf(front_alignment, 0.0)
 	if variant_type == &"lighting":
-		front_strength *= lerpf(0.80, 1.16, lateral_mask)
-		spec_strength *= lerpf(0.50, 1.45, lateral_mask)
-		back_strength *= lerpf(0.28, 0.52, 1.0 - lateral_mask)
+		front_strength *= lerpf(0.84, 1.12, lateral_mask)
+		spec_strength *= lerpf(0.60, 1.26, lateral_mask)
+		back_strength *= lerpf(0.30, 0.48, 1.0 - lateral_mask)
 	var zone_multiplier := _zone_light_multiplier(zone, visual)
 	var zone_surface := _resolve_zone_surface_scales(zone, visual)
 	front_strength *= zone_multiplier * float(zone_surface.get("front", 1.0))
@@ -1277,10 +1321,10 @@ func _compute_surface_lighting(
 	secondary_strength *= lerpf(zone_multiplier, 1.0, 0.35) * float(zone_surface.get("spec", 1.0))
 	var caustic_color := body_color.lerp(caustic_base, 0.42 + visual.hue_dispersion * 0.20)
 	var body_strength := (
-		0.006
-		+ scatter_strength * 0.10
-		+ roughness * 0.03
-		+ visual.translucency * 0.02
+		0.004
+		+ scatter_strength * 0.08
+		+ roughness * 0.022
+		+ visual.translucency * 0.015
 		+ card_fill_strength
 	) * visual.optics_light_energy * lerpf(0.82, 1.02, front_alignment)
 	if variant_type == &"lighting":
@@ -1288,9 +1332,9 @@ func _compute_surface_lighting(
 	body_strength *= lerpf(0.82, 1.04, zone_multiplier - 1.0 + 0.5) * float(zone_surface.get("body", 1.0))
 	var caustic_strength := (
 		card_return_strength
-		+ caustic_band * (0.018 + visual.sparkle_intensity * 0.012)
+		+ caustic_band * (0.012 + visual.sparkle_intensity * 0.010)
 	) * visual.optics_light_energy * float(zone_surface.get("caustic", 1.0))
-	var sparkle_strength := maxf(pow(spec_alignment, lerpf(260.0, 48.0, roughness)) - visual.sparkle_threshold, 0.0) * visual.sparkle_intensity * visual.optics_light_energy * 2.4 * specular_mult
+	var sparkle_strength := maxf(pow(spec_alignment, lerpf(260.0, 48.0, roughness)) - visual.sparkle_threshold, 0.0) * visual.sparkle_intensity * visual.optics_light_energy * 1.9 * specular_mult
 	var rim_alignment := maxf(1.0 - maxf(normal.dot(view_dir), 0.0), 0.0)
 	var rim_strength := pow(rim_alignment, lerpf(5.8, 2.2, visual.rim_power / 5.0)) * visual.rim_intensity * visual.optics_light_energy * 0.26
 	var facet_glare_strength := 0.0
@@ -1670,13 +1714,13 @@ func _zone_light_multiplier(zone: StringName, visual: GemVisualResource) -> floa
 	var contrast := clampf(visual.brilliance_contrast, 0.0, 1.0)
 	match zone:
 		&"table":
-			return 1.0 + contrast * 0.28
+			return 1.0 + contrast * 0.18
 		&"star":
-			return 1.0 + contrast * 0.16
+			return 1.0 + contrast * 0.12
 		&"girdle":
-			return 1.0 - contrast * 0.18
+			return 1.0 - contrast * 0.12
 		&"pavilion", &"culet":
-			return 1.0 - visual.extinction * 0.42
+			return 1.0 - visual.extinction * 0.30
 		_:
 			return 1.0
 
@@ -1759,10 +1803,10 @@ func _resolve_zone_surface_scales(zone: StringName, visual: GemVisualResource) -
 
 func _apply_output_grade(color: Vector3, visual: GemVisualResource) -> Vector3:
 	var exposure := (
-		0.72
-		+ visual.optics_light_energy * 0.08
-		+ visual.specular_intensity * 0.06
-		+ visual.sparkle_intensity * 0.008
+		0.64
+		+ visual.optics_light_energy * 0.07
+		+ visual.specular_intensity * 0.04
+		+ visual.sparkle_intensity * 0.005
 	)
 	match visual.material_mode:
 		GemVisualResource.MATERIAL_MODE_PATTERNED_OPAQUE:
@@ -1776,31 +1820,31 @@ func _apply_output_grade(color: Vector3, visual: GemVisualResource) -> Vector3:
 		_apply_aces_channel(graded.z)
 	)
 	var range_compression := clampf(
-		0.04
-		+ visual.specular_intensity * 0.03
-		+ visual.contrast * 0.05
-		+ minf(visual.sparkle_intensity, 1.2) * 0.01,
-		0.04,
-		0.14
+		0.06
+		+ visual.specular_intensity * 0.04
+		+ visual.contrast * 0.06
+		+ minf(visual.sparkle_intensity, 1.2) * 0.012,
+		0.06,
+		0.18
 	)
 	graded = _compress_luma_range(graded, range_compression)
 	var highlight_rolloff := clampf(
-		0.08
-		+ visual.specular_intensity * 0.08
-		+ minf(visual.sparkle_intensity, 1.2) * 0.03,
-		0.08,
-		0.22
+		0.10
+		+ visual.specular_intensity * 0.10
+		+ minf(visual.sparkle_intensity, 1.2) * 0.04,
+		0.10,
+		0.28
 	)
 	graded = _soft_highlight_rolloff(graded, highlight_rolloff)
 	var saturation := clampf(
 		visual.saturation_boost
-		+ visual.contrast * 0.08
-		+ visual.hue_dispersion * 0.16
-		+ visual.specular_intensity * 0.03
-		+ minf(visual.optics_absorption_strength, 3.0) * 0.022
-		+ 0.01,
-		-0.2,
-		0.48
+		+ visual.contrast * 0.10
+		+ visual.hue_dispersion * 0.14
+		+ visual.specular_intensity * 0.015
+		+ minf(visual.optics_absorption_strength, 3.0) * 0.030
+		+ 0.02,
+		-0.1,
+		0.56
 	)
 	graded = _adjust_saturation(graded, saturation)
 	# Apply a second saturation pass after gamma to counteract gamma's
@@ -1829,11 +1873,11 @@ func _apply_output_grade(color: Vector3, visual: GemVisualResource) -> Vector3:
 				var hue_distance := clampf((pg_dir - body_hue).length() * 0.7, 0.0, 1.0)
 				post_gamma = post_gamma.lerp(body_hue * pg_len, body_push_strength * hue_distance)
 	var post_sat := clampf(
-		0.01
-		+ minf(visual.optics_absorption_strength, 2.5) * 0.016
-		+ maxf(visual.saturation_boost, 0.0) * 0.10,
-		0.01,
-		0.08
+		0.015
+		+ minf(visual.optics_absorption_strength, 2.5) * 0.020
+		+ maxf(visual.saturation_boost, 0.0) * 0.12,
+		0.015,
+		0.12
 	)
 	return _adjust_saturation(post_gamma, post_sat)
 
@@ -1903,8 +1947,8 @@ func _soft_highlight_rolloff(color: Vector3, amount: float) -> Vector3:
 	var rolled := Vector3.ZERO
 	for i in 3:
 		var channel := color[i]
-		var shoulder := smoothstep(0.58, 1.0, channel)
-		rolled[i] = clampf(channel - shoulder * amount * (channel - 0.58), 0.0, 1.0)
+		var shoulder := smoothstep(0.54, 0.96, channel)
+		rolled[i] = clampf(channel - shoulder * amount * (channel - 0.54), 0.0, 1.0)
 	return rolled
 
 

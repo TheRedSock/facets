@@ -45,7 +45,7 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if GemVisualRegistry != null:
 		GemVisualRegistry.unload_run_gameplay_textures()
-	super._exit_tree()
+
 
 
 func _process(_delta: float) -> void:

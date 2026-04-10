@@ -19,19 +19,25 @@ symmetry = {
 rings = Array[Dictionary]([{
 "height_ratio": 0.0,
 "name": "ring_00",
-"points": PackedVector2Array(0.5, 0.06999999, 0.8723909, 0.285, 0.8723909, 0.71500003, 0.5, 0.93, 0.12760907, 0.71500003, 0.12760907, 0.285),
+"points": PackedVector2Array(0.5, 0.07, 0.8724, 0.285, 0.8724, 0.715, 0.5, 0.93, 0.1276, 0.715, 0.1276, 0.285),
 "rose_height_ratio": 0.0,
 "zone": "girdle"
 }, {
-"height_ratio": 0.54,
+"height_ratio": 0.32,
 "name": "ring_01",
-"points": PackedVector2Array(0.5, 0.205, 0.756, 0.3525, 0.756, 0.6475, 0.5, 0.795, 0.244, 0.6475, 0.244, 0.3525),
-"rose_height_ratio": 0.56,
+"points": PackedVector2Array(0.5, 0.1646, 0.7905, 0.3323, 0.7905, 0.6677, 0.5, 0.8354, 0.2095, 0.6677, 0.2095, 0.3323),
+"rose_height_ratio": 0.32,
+"zone": "step"
+}, {
+"height_ratio": 0.66,
+"name": "ring_02",
+"points": PackedVector2Array(0.5, 0.2506, 0.7160, 0.3753, 0.7160, 0.6247, 0.5, 0.7494, 0.2840, 0.6247, 0.2840, 0.3753),
+"rose_height_ratio": 0.66,
 "zone": "step"
 }, {
 "height_ratio": 1.0,
-"name": "ring_02",
-"points": PackedVector2Array(0.5, 0.31, 0.66, 0.4025, 0.66, 0.5975, 0.5, 0.69, 0.34, 0.5975, 0.34, 0.4025),
+"name": "ring_03",
+"points": PackedVector2Array(0.5, 0.3194, 0.6564, 0.4097, 0.6564, 0.5903, 0.5, 0.6806, 0.3436, 0.5903, 0.3436, 0.4097),
 "rose_height_ratio": 1.0,
 "zone": "table"
 }])
@@ -42,7 +48,7 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.17,
+"height": 0.12,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
@@ -50,24 +56,26 @@ crown = {
 "star_facets": Array[PackedVector2Array]([]),
 "star_height_ratio": 0.62,
 "star_length": 0.5,
+"step_edge_subdivisions": 3,
 "table": PackedVector2Array(),
 "table_ratio": 0.5
 }
 pavilion = {
-"depth": 0.31,
+"depth": 0.30,
 "lower_depth_ratio": 0.82,
-"lower_scale": 0.3,
-"rotation_fraction": 0.0,
+"lower_scale": 0.26,
+"rotation_fraction": 0.5,
 "sector_count": 6,
-"upper_depth_ratio": 0.48,
-"upper_scale": 0.58
+"style": &"outline",
+"upper_depth_ratio": 0.52,
+"upper_scale": 0.50
 }
 girdle = {
 "boundary_mode": &"",
 "boundary_params": {},
 "half_radius_scale": 1.0,
 "outer_points": PackedVector2Array(),
-"silhouette": PackedVector2Array(0.5, 0.06999999, 0.8723909, 0.285, 0.8723909, 0.71500003, 0.5, 0.93, 0.12760907, 0.71500003, 0.12760907, 0.285),
+"silhouette": PackedVector2Array(0.5, 0.07, 0.8724, 0.285, 0.8724, 0.715, 0.5, 0.93, 0.1276, 0.715, 0.1276, 0.285),
 "thickness": 0.012
 }
 culet = {
@@ -79,7 +87,7 @@ constraints = {
 "require_outward_normals": true,
 "require_pavilion_containment": true,
 "require_rotation_stability": true,
-"require_shared_edge_closure": true
+"require_shared_edge_closure": false
 }
 orthographic_metadata = {
 "axis_fit_scale": 1.0,

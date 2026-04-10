@@ -134,19 +134,38 @@ static func _build_step(spec):
 	var table_index = rings.size() - 1
 	model.add_facet(_polygon3(rings[table_index], heights[table_index]), "table")
 
+	var subdivisions: int = maxi(int(spec.crown.get("step_edge_subdivisions", 1)), 1)
+
 	for ring_index in rings.size() - 1:
 		var outer = rings[ring_index]
 		var inner = rings[ring_index + 1]
 		var zone = ring_zones[ring_index] if ring_index < ring_zones.size() else "step"
 		for i in outer.size():
 			var next_index = (i + 1) % outer.size()
-			model.add_facet(PackedVector3Array([
-				_p3(inner[i], heights[ring_index + 1]),
-				_p3(inner[next_index], heights[ring_index + 1]),
-				_p3(outer[next_index], heights[ring_index]),
-				_p3(outer[i], heights[ring_index]),
-			]), zone)
+			if subdivisions <= 1:
+				model.add_facet(PackedVector3Array([
+					_p3(inner[i], heights[ring_index + 1]),
+					_p3(inner[next_index], heights[ring_index + 1]),
+					_p3(outer[next_index], heights[ring_index]),
+					_p3(outer[i], heights[ring_index]),
+				]), zone)
+			else:
+				for s in subdivisions:
+					var t0 := float(s) / float(subdivisions)
+					var t1 := float(s + 1) / float(subdivisions)
+					var o0: Vector2 = Vector2(outer[i]).lerp(Vector2(outer[next_index]), t0)
+					var o1: Vector2 = Vector2(outer[i]).lerp(Vector2(outer[next_index]), t1)
+					var i0: Vector2 = Vector2(inner[i]).lerp(Vector2(inner[next_index]), t0)
+					var i1: Vector2 = Vector2(inner[i]).lerp(Vector2(inner[next_index]), t1)
+					model.add_facet(PackedVector3Array([
+						_p3(i0, heights[ring_index + 1]),
+						_p3(i1, heights[ring_index + 1]),
+						_p3(o1, heights[ring_index]),
+						_p3(o0, heights[ring_index]),
+					]), zone)
 
+	# Pavilion uses original (non-subdivided) boundary so girdle wall
+	# edges match the crown's outermost ring vertices.
 	_append_outline_pavilion(model, _ensure_loop_array(rings[0]), spec)
 	model.finalize_model()
 	return model
@@ -518,6 +537,13 @@ static func _append_outline_pavilion(
 		return
 	var pavilion_sector_count: int = spec.get_pavilion_sector_count()
 	var rotation_angle = TAU / float(maxi(pavilion_sector_count, 1)) * spec.get_pavilion_rotation_fraction() if pavilion_sector_count > 0 else 0.0
+	var pavilion_style := String(spec.pavilion.get("style", "outline"))
+	if pavilion_style == "single_step":
+		_append_outline_single_step_pavilion(model, boundary, spec, rotation_angle)
+		return
+	if pavilion_style == "mirror_crown":
+		_append_outline_mirror_crown_pavilion(model, boundary, spec)
+		return
 	var upper_z = -spec.get_girdle_thickness() - spec.get_pavilion_depth() * spec.get_pavilion_upper_depth_ratio()
 	var lower_z = -spec.get_girdle_thickness() - spec.get_pavilion_depth() * spec.get_pavilion_lower_depth_ratio()
 	var outer_ring = []
@@ -557,6 +583,75 @@ static func _append_outline_pavilion(
 			lower_ring[next_index],
 			culet,
 		]), "culet")
+
+
+static func _append_outline_single_step_pavilion(
+	model,
+	boundary: Array[Vector2],
+	spec,
+	rotation_angle: float,
+) -> void:
+	if boundary.size() < 3:
+		return
+	var upper_z = -spec.get_girdle_thickness() - spec.get_pavilion_depth() * spec.get_pavilion_upper_depth_ratio()
+	var outer_ring = []
+	var upper_ring = []
+	for index in boundary.size():
+		var point = boundary[index]
+		var sharpness = _loop_vertex_sharpness(PackedVector2Array(boundary), index)
+		var upper_scale = clampf(spec.get_pavilion_upper_scale() - sharpness * 0.03, 0.18, 0.96)
+		model.add_facet(PackedVector3Array([
+			_p3(point, 0.0),
+			_p3(boundary[(index + 1) % boundary.size()], 0.0),
+			_p3(boundary[(index + 1) % boundary.size()], -spec.get_girdle_thickness()),
+			_p3(point, -spec.get_girdle_thickness()),
+		]), GIRDLE_WALL_ZONE)
+		outer_ring.append(_p3(point, -spec.get_girdle_thickness()))
+		upper_ring.append(_project_pavilion_point(point, upper_scale, upper_z, rotation_angle))
+	var culet = Vector3(0.0, 0.0, -spec.get_girdle_thickness() - spec.get_pavilion_depth())
+	for index in outer_ring.size():
+		var next_index = (index + 1) % outer_ring.size()
+		model.add_facet(PackedVector3Array([
+			outer_ring[index],
+			outer_ring[next_index],
+			upper_ring[next_index],
+			upper_ring[index],
+		]), "pavilion")
+		model.add_facet(PackedVector3Array([
+			upper_ring[index],
+			upper_ring[next_index],
+			culet,
+		]), "culet")
+
+
+static func _append_outline_mirror_crown_pavilion(
+	model,
+	boundary: Array[Vector2],
+	spec,
+) -> void:
+	if boundary.size() < 3:
+		return
+	var table: Array[Vector2] = _ensure_loop_array(spec.get_table_points())
+	var bezel_facets: Array = spec.get_bezel_facets()
+	if table.is_empty() or bezel_facets.is_empty():
+		_append_outline_single_step_pavilion(model, boundary, spec, 0.0)
+		return
+	var girdle_z: float = -spec.get_girdle_thickness()
+	var mirrored_table_z: float = girdle_z - spec.get_pavilion_depth()
+	for index in boundary.size():
+		var point = boundary[index]
+		model.add_facet(PackedVector3Array([
+			_p3(point, 0.0),
+			_p3(boundary[(index + 1) % boundary.size()], 0.0),
+			_p3(boundary[(index + 1) % boundary.size()], girdle_z),
+			_p3(point, girdle_z),
+		]), GIRDLE_WALL_ZONE)
+	for polygon in bezel_facets:
+		var facet = PackedVector3Array()
+		for point in _reverse_loop(_ensure_loop_array(polygon)):
+			facet.append(_p3(point, mirrored_table_z if table.has(point) else girdle_z))
+		model.add_facet(facet, "pavilion")
+	model.add_facet(_polygon3(_reverse_loop(table), mirrored_table_z), "culet")
 
 
 static func _resolve_ring_heights(spec, ring_count: int) -> PackedFloat32Array:
@@ -630,6 +725,12 @@ static func _loop_to_mesh(points: Array[Vector2], z: float) -> PackedVector3Arra
 	return loop
 
 
+static func _reverse_loop(points: Array[Vector2]) -> Array[Vector2]:
+	var reversed_points := points.duplicate()
+	reversed_points.reverse()
+	return reversed_points
+
+
 static func _to_float_array(source: Array) -> Array[float]:
 	var result: Array[float] = []
 	for value in source:
@@ -648,6 +749,16 @@ static func _packed_to_array(points: PackedVector2Array) -> Array[Vector2]:
 	var result: Array[Vector2] = []
 	for point in points:
 		result.append(point)
+	return result
+
+
+static func _subdivide_loop(loop: Array[Vector2], subdivisions: int) -> Array[Vector2]:
+	var result: Array[Vector2] = []
+	for i in loop.size():
+		var next := (i + 1) % loop.size()
+		for s in subdivisions:
+			var t := float(s) / float(subdivisions)
+			result.append(loop[i].lerp(loop[next], t))
 	return result
 
 

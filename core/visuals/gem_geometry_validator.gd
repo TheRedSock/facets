@@ -24,9 +24,12 @@ static func validate_model(model, spec = null) -> Dictionary:
 	var edge_counts: Dictionary = {}
 	var min_interior_angle_degrees := 4.0
 	var max_edge_ratio := 45.0
+	var require_edge_closure := true
 	if spec != null and typeof(spec.constraints) == TYPE_DICTIONARY:
 		min_interior_angle_degrees = float(spec.constraints.get("min_interior_angle_degrees", min_interior_angle_degrees))
 		max_edge_ratio = float(spec.constraints.get("max_edge_ratio", max_edge_ratio))
+		if not spec.constraints.get("require_shared_edge_closure", true):
+			require_edge_closure = false
 
 	for facet_index in model.facet_count():
 		var vertices: PackedVector3Array = model.facet_vertices[facet_index]
@@ -77,7 +80,10 @@ static func validate_model(model, spec = null) -> Dictionary:
 	for edge_key in edge_counts.keys():
 		var count := int(edge_counts.get(edge_key, 0))
 		if count != 2:
-			report["errors"].append("Edge %s is shared %d times" % [String(edge_key), count])
+			if require_edge_closure:
+				report["errors"].append("Edge %s is shared %d times" % [String(edge_key), count])
+			else:
+				report["warnings"].append("Edge %s is shared %d times" % [String(edge_key), count])
 
 	if spec != null and int(spec.get_symmetry_sector_count()) <= 0:
 		report["warnings"].append("Spec does not declare positive symmetry sectors")

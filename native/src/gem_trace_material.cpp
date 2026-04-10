@@ -397,6 +397,9 @@ static Color sample_iridescence(const VisualProps& v, Vector3 rcoord,
 // -------------------------------------------------------------------------
 
 double transmission_factor(const VisualProps& v) {
+    if (v.optics_transmission_override >= 0.0) {
+        return clampd(v.optics_transmission_override, 0.0, 1.0);
+    }
     switch (v.material_mode) {
         case MATERIAL_MODE_PATTERNED_OPAQUE:      return 0.0;
         case MATERIAL_MODE_PATTERNED_TRANSLUCENT:  return 0.78;

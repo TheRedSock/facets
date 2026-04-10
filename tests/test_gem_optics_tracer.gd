@@ -42,19 +42,15 @@ func _run() -> void:
 
 func test_trace_pipeline_selects_runtime_backend() -> void:
 	var tracer = OfflineGemBakeJobScript.create_tracer()
-	assert_true(tracer != null, "Tracer pipeline should construct a tracer instance")
+	assert_true(tracer != null, "Tracer pipeline should construct a tracer instance (native kernel required)")
 	if tracer == null:
 		return
 	var backend_id := OfflineGemBakeJobScript.get_trace_backend_id()
-	if OfflineGemBakeJobScript.is_native_trace_kernel_available():
-		assert_eq(backend_id, &"native_cpp", "Tracer pipeline should prefer the native kernel when available")
-		assert_true(
-			StringName(tracer.get_class()) != &"GemOpticsTracer",
-			"Native kernel selection should avoid the fallback tracer class"
-		)
-	else:
-		assert_eq(backend_id, &"gdscript_fallback", "Tracer pipeline should report fallback mode when the extension is unavailable")
-		assert_eq(StringName(tracer.get_class()), &"GemOpticsTracer", "Fallback mode should construct the GDScript tracer")
+	assert_eq(backend_id, &"native_cpp", "Tracer pipeline must use the native kernel (GDScript fallback is deprecated)")
+	assert_true(
+		StringName(tracer.get_class()) != &"GemOpticsTracer",
+		"Native kernel selection must not return the deprecated GDScript tracer"
+	)
 
 
 func test_trace_image_has_visible_pixels() -> void:

@@ -1545,12 +1545,13 @@ func _collect_lighting_bake_requests(
 		"lighting_grid_size",
 		DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE
 	)
+	var rig_config: Dictionary = variant_settings.get("lighting_rig", {})
 	if lighting_grid.x > 0 and lighting_grid.y > 0:
 		for y in lighting_grid.y:
 			for x in lighting_grid.x:
 				var lighting_bin := Vector2i(x, y)
 				var lighting_uv := _lighting_bin_to_centered(lighting_bin, variant_settings)
-				requests.append({
+				var request := {
 					"tile_id": tile_id,
 					"visual_id": visual.visual_id,
 					"spec_id": cut.spec_id,
@@ -1574,7 +1575,14 @@ func _collect_lighting_bake_requests(
 					"lighting_uv": lighting_uv,
 					"light_dir": _compute_variant_light_dir(lighting_bin, variant_settings),
 					"view_scale": view_scale,
-				})
+				}
+				if not rig_config.is_empty():
+					var perturbed := _build_perturbed_environment_profile(
+						visual, lighting_bin, lighting_grid, rig_config
+					)
+					if not perturbed.is_empty():
+						request["environment_profile"] = perturbed
+				requests.append(request)
 	return requests
 
 
@@ -1893,17 +1901,31 @@ func _make_rotation_view(
 ## _lighting_bin_to_centered().  This UV drives TWO offsets that stack:
 ## 1. The global light direction is rotated by ±46° horizontally and ±30°
 ##    vertically relative to the base light dir (applied here).
-## 2. GemOpticsTracer._compute_surface_lighting() further offsets the
+## 2. GemTraceKernel.compute_surface_lighting() further offsets the
 ##    effective point-light origin by the same lighting_uv, creating a
 ##    position-dependent parallax shift on each facet.
 ## Both offsets use the same centered UV, so corner bins (e.g. 0,0 or 4,4
 ## in a 5x5 grid) have the most exaggerated combined variation.  The centre
 ## bin (2,2) is the neutral position where both offsets are zero.
 func _compute_variant_light_dir(lighting_bin: Vector2i, settings: Dictionary = {}) -> Vector3:
-	var base_dir := GemRenderer.DEFAULT_LIGHT_DIR.normalized()
+	var rig_config: Dictionary = settings.get("lighting_rig", {})
+	var base_dir: Vector3
+	if rig_config.has("base_azimuth_degrees") or rig_config.has("base_elevation_degrees"):
+		var azimuth := deg_to_rad(float(rig_config.get("base_azimuth_degrees", -28.0)))
+		var elevation := deg_to_rad(float(rig_config.get("base_elevation_degrees", -30.0)))
+		# Spherical to cartesian: azimuth=0 faces +Z, elevation=0 is horizontal
+		base_dir = Vector3(
+			sin(azimuth) * cos(elevation),
+			sin(elevation),
+			cos(azimuth) * cos(elevation)
+		).normalized()
+	else:
+		base_dir = GemRenderer.DEFAULT_LIGHT_DIR.normalized()
+	var sweep_x := float(rig_config.get("sweep_x_degrees", GAMEPLAY_LIGHTING_SWEEP_X_DEGREES))
+	var sweep_y := float(rig_config.get("sweep_y_degrees", GAMEPLAY_LIGHTING_SWEEP_Y_DEGREES))
 	var centered := _lighting_bin_to_centered(lighting_bin, settings)
-	var yaw := Basis(Vector3.UP, deg_to_rad(centered.x * GAMEPLAY_LIGHTING_SWEEP_X_DEGREES))
-	var pitch := Basis(Vector3.RIGHT, deg_to_rad(-centered.y * GAMEPLAY_LIGHTING_SWEEP_Y_DEGREES))
+	var yaw := Basis(Vector3.UP, deg_to_rad(centered.x * sweep_x))
+	var pitch := Basis(Vector3.RIGHT, deg_to_rad(-centered.y * sweep_y))
 	return (yaw * pitch * base_dir).normalized()
 
 
@@ -1919,6 +1941,143 @@ func _lighting_bin_to_centered(lighting_bin: Vector2i, settings: Dictionary = {}
 	if lighting_grid.y > 1:
 		centered.y = (float(lighting_bin.y) / float(lighting_grid.y - 1)) * 2.0 - 1.0
 	return centered
+
+
+## Builds a per-bin perturbed environment profile for the multi-light rig system.
+## Each lighting bin gets a deterministically different lighting setup by jittering
+## card directions, strengths, and temperatures using a seed derived from the bin
+## index.  Extra fill lights are generated at evenly distributed azimuth angles
+## with per-bin positional jitter so that different bins see meaningfully different
+## lighting rigs rather than a uniform directional sweep.
+func _build_perturbed_environment_profile(
+	visual: GemVisualResource,
+	lighting_bin: Vector2i,
+	lighting_grid: Vector2i,
+	rig_config: Dictionary,
+) -> Dictionary:
+	var base_profile := GemEnvironmentPresets.resolve_preset(
+		visual.optics_environment_preset if visual != null else 0
+	)
+	if rig_config.is_empty():
+		return base_profile
+
+	# Deterministic RNG per bin
+	var rig_seed := int(rig_config.get("rig_seed", 42))
+	var bin_index := lighting_bin.y * lighting_grid.x + lighting_bin.x
+	var rng := RandomNumberGenerator.new()
+	rng.seed = rig_seed * 100003 + bin_index * 7919
+
+	var dir_jitter_deg := float(rig_config.get("direction_jitter_degrees", 8.0))
+	var intensity_jitter := float(rig_config.get("intensity_jitter", 0.15))
+	var temp_jitter_k := float(rig_config.get("temperature_jitter_kelvin", 200.0))
+	var extra_fill_count := int(rig_config.get("extra_fill_count", 2))
+	var fill_intensity := float(rig_config.get("fill_intensity", 0.35))
+	var fill_jitter := float(rig_config.get("fill_jitter", 0.3))
+
+	# Deep-copy the profile
+	var profile := base_profile.duplicate(true)
+
+	# Perturb existing cards
+	var cards: Array = profile.get("cards", [])
+	for card_index in cards.size():
+		var card: Dictionary = cards[card_index]
+		cards[card_index] = _perturb_card(card, rng, dir_jitter_deg, intensity_jitter, temp_jitter_k)
+
+	# Generate extra fill lights distributed around the gem
+	if extra_fill_count > 0 and fill_intensity > 0.0:
+		var generated_fills := _generate_fill_cards(
+			extra_fill_count, fill_intensity, fill_jitter, rng, temp_jitter_k
+		)
+		cards.append_array(generated_fills)
+
+	profile["cards"] = cards
+	return profile
+
+
+## Perturbs a single light card's direction, strength, and temperature using the
+## provided RNG.  The jitter is symmetric (centered on zero) so the average across
+## many bins remains close to the original card values.
+func _perturb_card(
+	card: Dictionary,
+	rng: RandomNumberGenerator,
+	dir_jitter_deg: float,
+	intensity_jitter: float,
+	temp_jitter_k: float,
+) -> Dictionary:
+	var perturbed := card.duplicate(true)
+
+	# Direction jitter: rotate the card direction by a random small angle
+	if dir_jitter_deg > 0.0:
+		var dir: Vector3 = perturbed.get("dir", Vector3(0, 0.3, 0.95))
+		var jitter_yaw := deg_to_rad(rng.randf_range(-dir_jitter_deg, dir_jitter_deg))
+		var jitter_pitch := deg_to_rad(rng.randf_range(-dir_jitter_deg * 0.7, dir_jitter_deg * 0.7))
+		var yaw_basis := Basis(Vector3.UP, jitter_yaw)
+		var pitch_basis := Basis(Vector3.RIGHT, jitter_pitch)
+		perturbed["dir"] = (yaw_basis * pitch_basis * dir).normalized()
+
+	# Intensity jitter: scale sharp/broad strength
+	if intensity_jitter > 0.0:
+		var scale_factor := 1.0 + rng.randf_range(-intensity_jitter, intensity_jitter)
+		scale_factor = maxf(scale_factor, 0.05)
+		if perturbed.has("sharp_strength"):
+			perturbed["sharp_strength"] = float(perturbed["sharp_strength"]) * scale_factor
+		if perturbed.has("broad_strength"):
+			perturbed["broad_strength"] = float(perturbed["broad_strength"]) * scale_factor
+
+	# Temperature jitter
+	if temp_jitter_k > 0.0 and perturbed.has("temperature_kelvin"):
+		var base_temp := float(perturbed["temperature_kelvin"])
+		if base_temp > 0.0:
+			var jittered := base_temp + rng.randf_range(-temp_jitter_k, temp_jitter_k)
+			perturbed["temperature_kelvin"] = maxf(jittered, 2000.0)
+
+	return perturbed
+
+
+## Generates extra fill light cards distributed evenly in azimuth around the gem,
+## with per-bin jitter applied to direction, intensity, and temperature.  Each
+## fill sits at a different base azimuth angle so the combined rig provides
+## multi-directional illumination that varies between bins.
+func _generate_fill_cards(
+	count: int,
+	base_intensity: float,
+	jitter_amount: float,
+	rng: RandomNumberGenerator,
+	temp_jitter_k: float,
+) -> Array[Dictionary]:
+	var fills: Array[Dictionary] = []
+	var golden_angle := 2.399963  # radians, for even angular distribution
+	for i in count:
+		# Distribute fills around the upper hemisphere using golden angle
+		var azimuth := golden_angle * float(i)
+		var elevation := 0.15 + 0.25 * float(i) / maxf(float(count), 1.0)
+		# Per-bin jitter on direction
+		if jitter_amount > 0.0:
+			azimuth += rng.randf_range(-jitter_amount * 1.2, jitter_amount * 1.2)
+			elevation += rng.randf_range(-jitter_amount * 0.3, jitter_amount * 0.3)
+		elevation = clampf(elevation, -0.2, 0.8)
+		var dir := Vector3(sin(azimuth) * cos(elevation), elevation, cos(azimuth) * cos(elevation)).normalized()
+		# Per-bin intensity jitter
+		var sharp := base_intensity * (1.0 + rng.randf_range(-jitter_amount, jitter_amount))
+		sharp = maxf(sharp, 0.02)
+		var broad := sharp * 0.7
+		# Temperature: warm-to-cool spread across fills with jitter
+		var base_temp := 5200.0 + 400.0 * float(i)
+		if temp_jitter_k > 0.0:
+			base_temp += rng.randf_range(-temp_jitter_k * 0.5, temp_jitter_k * 0.5)
+		base_temp = maxf(base_temp, 2500.0)
+		fills.append({
+			"dir": dir,
+			"color": Color(0.96, 0.94, 0.98, 1.0),
+			"sharp_power": 80.0 + rng.randf_range(-20.0, 20.0),
+			"broad_power": 10.0 + rng.randf_range(-3.0, 3.0),
+			"sharp_strength": sharp,
+			"broad_strength": broad,
+			"temperature_kelvin": base_temp,
+			"edge_color": Color(0.92, 0.94, 1.0, 1.0),
+			"gradient_power": 0.8,
+		})
+	return fills
 
 
 ## Computes a view scale factor for the traced bake camera.  Gems pre-rotated

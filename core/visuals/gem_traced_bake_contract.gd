@@ -4,7 +4,7 @@ extends RefCounted
 const DEFAULT_OUTPUT_ROOT := "user://traced_bakes"
 const DEFAULT_MANIFEST_NAME := "gameplay_manifest.json"
 const GENERATED_OUTPUT_ROOT := "res://generated/traced_bakes"
-const BAKED_LOOK_VERSION := 4
+const BAKED_LOOK_VERSION := 5
 
 ## Image output format constants.
 const IMAGE_FORMAT_PNG := &"png"
@@ -119,7 +119,7 @@ static func normalize_variant_settings(raw_value: Dictionary = {}) -> Dictionary
 		1,
 		64
 	)
-	return {
+	var result := {
 		"lighting_grid_preset": detect_lighting_grid_preset(lighting_grid),
 		"lighting_grid_size": lighting_grid,
 		"lighting_runtime_grid_size": runtime_lighting_grid,
@@ -138,6 +138,11 @@ static func normalize_variant_settings(raw_value: Dictionary = {}) -> Dictionary
 		),
 		"rotation_atlas_layers": maxi(0, int(raw_value.get("rotation_atlas_layers", 0))),
 	}
+	# Pass through lighting rig config if present (not a variant grid setting itself,
+	# but consumed by the registry when building per-bin environment profiles).
+	if raw_value.has("lighting_rig") and typeof(raw_value.get("lighting_rig")) == TYPE_DICTIONARY:
+		result["lighting_rig"] = raw_value.get("lighting_rig")
+	return result
 
 
 static func sanitize_variant_key(value: String) -> String:

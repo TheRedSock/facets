@@ -123,6 +123,14 @@ func _run() -> void:
 		options["showroom_direction_count"] = maxi(int(args.get("showroom_directions", 0)), 0)
 	if args.has("showroom_roll_steps"):
 		options["showroom_roll_steps"] = clampi(int(args.get("showroom_roll_steps", 6)), 1, 64)
+	# Lighting rig: --lighting_rig=<json> passes per-bin light perturbation config.
+	var rig_json := String(args.get("lighting_rig", "")).strip_edges()
+	if not rig_json.is_empty():
+		var parsed_rig = JSON.parse_string(rig_json)
+		if typeof(parsed_rig) == TYPE_DICTIONARY:
+			options["lighting_rig"] = parsed_rig
+		else:
+			push_warning("Ignoring malformed --lighting_rig JSON: %s" % rig_json)
 	var variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(options)
 	# skip_stylize is not a variant setting — add it after variant settings are resolved
 	# so it doesn't pass through normalize_variant_settings.

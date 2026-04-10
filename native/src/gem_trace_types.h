@@ -66,6 +66,7 @@ constexpr int OPTICS_ENVIRONMENT_NEUTRAL         = 0;
 constexpr int OPTICS_ENVIRONMENT_DARK_STUDIO     = 1;
 constexpr int OPTICS_ENVIRONMENT_GEM_BOOTH       = 2;
 constexpr int OPTICS_ENVIRONMENT_GAMEPLAY_STUDIO = 3;
+constexpr int OPTICS_ENVIRONMENT_DEEP_COLOR      = 4;
 
 // ---------------------------------------------------------------------------
 // MSAA sample pattern (matching GDScript SAMPLE_PATTERN)
@@ -111,6 +112,11 @@ struct LightCard {
     double broad_power    = 14.0;
     double sharp_strength = 0.5;
     double broad_strength = 0.3;
+    // Spectral temperature: 0 = use color directly, >0 = Planck blackbody (Kelvin)
+    double temperature_kelvin = 0.0;
+    // Gradient card: edge_color at lobe periphery, gradient_power controls ramp shape
+    godot::Color edge_color    = godot::Color(1, 1, 1, 1);
+    double gradient_power      = 1.0;
 };
 
 // ---------------------------------------------------------------------------
@@ -126,6 +132,10 @@ struct EnvironmentSetup {
     godot::Vector3 blocker_dir;
     double blocker_power       = 10.0;
     double blocker_strength    = 0.0;
+    // Ground plane bounce: virtual Lambertian surface below the gem
+    double ground_albedo       = 0.0;   // 0 = disabled (current behavior)
+    godot::Color ground_tint   = godot::Color(0.90f, 0.85f, 0.78f, 1.0f);
+    double ground_distance     = 0.8;   // Normalized gem-radii below center
 };
 
 // ---------------------------------------------------------------------------
@@ -307,7 +317,23 @@ struct VisualProps {
     double optics_environment_energy = 1.0;
     double optics_light_energy = 2.4;
 
+    // Per-gem environment overrides (-1 / transparent = use preset default)
+    double optics_ground_albedo_override   = -1.0;
+    godot::Color optics_ground_tint_override = godot::Color(0, 0, 0, 0);
+    double optics_ground_distance_override = -1.0;
+    double optics_light_temperature_kelvin = 0.0;
+
     double rotation_degrees = 0.0;
+
+    // Per-gem tuning overrides (-1.0 = use default/auto, 1.0 = no change for multipliers)
+    double optics_interface_highlight_scale = 1.0;
+    double optics_sparkle_power_multiplier = 1.0;
+    double optics_rim_strength_multiplier = 1.0;
+    double optics_blocker_strength_multiplier = 1.0;
+    double optics_cloudiness_override = -1.0;      // -1 = auto from scattering/roughness/translucency
+    double optics_transmission_override = -1.0;     // -1 = auto from material_mode
+    double optics_grade_exposure = -1.0;            // -1 = auto formula
+    double optics_grade_saturation = -1.0;          // -1 = auto formula
 };
 
 // ---------------------------------------------------------------------------
@@ -333,6 +359,17 @@ struct TraceContext {
     TraceFlags      flags;
     EnvironmentSetup environment;
     SurfaceSetup    surface;
+
+    // Request-level overrides (empty/negative = use compiled defaults)
+    godot::Dictionary zone_surface_scale_overrides;
+    double grade_exposure_base = -1.0;
+    double grade_range_compression_base = -1.0;
+    double grade_highlight_rolloff_base = -1.0;
+    double grade_saturation_base = -1.0;
+    double grade_body_push_cap = -1.0;
+    double grade_post_saturation_base = -1.0;
+    double grade_opaque_exposure_scale = -1.0;
+    double grade_translucent_exposure_scale = -1.0;
 
     // Optional texture image (null if not used)
     godot::Ref<godot::Image> texture_image;

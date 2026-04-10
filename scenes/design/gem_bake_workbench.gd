@@ -52,12 +52,24 @@ var _rotation_axis_checkboxes: Dictionary = {}
 var _rotation_cards: Dictionary = {}
 var _skip_lighting_checkbox: CheckBox
 var _skip_rotations_checkbox: CheckBox
+var _skip_stylize_checkbox: CheckBox
 var _lighting_bins_filter_edit: LineEdit
 var _rotation_bins_filter_edit: LineEdit
 var _rotation_labels_filter_edit: LineEdit
 var _include_showroom_checkbox: CheckBox
 var _showroom_dirs_spin: SpinBox
 var _showroom_roll_spin: SpinBox
+var _lighting_sweep_x_spin: SpinBox
+var _lighting_sweep_y_spin: SpinBox
+var _lighting_azimuth_spin: SpinBox
+var _lighting_elevation_spin: SpinBox
+var _rig_direction_jitter_spin: SpinBox
+var _rig_intensity_jitter_spin: SpinBox
+var _rig_temperature_jitter_spin: SpinBox
+var _rig_fill_count_spin: SpinBox
+var _rig_fill_intensity_spin: SpinBox
+var _rig_fill_jitter_spin: SpinBox
+var _rig_seed_spin: SpinBox
 var _preview_tile_id: StringName = &""
 var _preview_tier := 1
 var _preview_drag_active := false
@@ -260,11 +272,11 @@ func _build_form_panel(parent: HBoxContainer) -> void:
 	_lighting_preset_dropdown.item_selected.connect(_on_lighting_preset_selected)
 	content.add_child(_labeled_control("Lighting Grid Preset", _lighting_preset_dropdown))
 
-	_cell_size_spin = _make_int_spinbox(48, 256, GameConfig.DEFAULT_CELL_SIZE.x)
+	_cell_size_spin = _make_int_spinbox(16, 256, GameConfig.DEFAULT_CELL_SIZE.x)
 	_cell_size_spin.value_changed.connect(_on_cell_size_changed)
 	content.add_child(_labeled_control("Cell Size", _cell_size_spin))
 
-	_draw_size_spin = _make_int_spinbox(48, 512, GameConfig.DEFAULT_CELL_SIZE.x)
+	_draw_size_spin = _make_int_spinbox(16, 512, GameConfig.DEFAULT_CELL_SIZE.x)
 	_draw_size_spin.value_changed.connect(func(_value: float): _refresh_selection_summary())
 	content.add_child(_labeled_control("Bake Draw Size", _draw_size_spin))
 
@@ -276,19 +288,19 @@ func _build_form_panel(parent: HBoxContainer) -> void:
 	_thread_count_spin.value_changed.connect(func(_value: float): _refresh_selection_summary())
 	content.add_child(_labeled_control("Threads (0 = auto)", _thread_count_spin))
 
-	_lighting_x_spin = _make_int_spinbox(0, 9, 5)
+	_lighting_x_spin = _make_int_spinbox(0, 16, 5)
 	_lighting_x_spin.value_changed.connect(_on_baked_lighting_grid_changed)
 	content.add_child(_labeled_control("Baked Lighting Bins X", _lighting_x_spin))
 
-	_lighting_y_spin = _make_int_spinbox(0, 9, 5)
+	_lighting_y_spin = _make_int_spinbox(0, 16, 5)
 	_lighting_y_spin.value_changed.connect(_on_baked_lighting_grid_changed)
 	content.add_child(_labeled_control("Baked Lighting Bins Y", _lighting_y_spin))
 
-	_runtime_lighting_x_spin = _make_int_spinbox(1, 9, 5)
+	_runtime_lighting_x_spin = _make_int_spinbox(1, 16, 5)
 	_runtime_lighting_x_spin.value_changed.connect(_on_runtime_lighting_grid_changed)
 	content.add_child(_labeled_control("Runtime Lighting Regions X", _runtime_lighting_x_spin))
 
-	_runtime_lighting_y_spin = _make_int_spinbox(1, 9, 5)
+	_runtime_lighting_y_spin = _make_int_spinbox(1, 16, 5)
 	_runtime_lighting_y_spin.value_changed.connect(_on_runtime_lighting_grid_changed)
 	content.add_child(_labeled_control("Runtime Lighting Regions Y", _runtime_lighting_y_spin))
 
@@ -334,6 +346,62 @@ func _build_form_panel(parent: HBoxContainer) -> void:
 	content.add_child(_labeled_control("Showroom Roll Steps", _showroom_roll_spin))
 
 	content.add_child(_make_separator())
+	content.add_child(_make_section_title("Lighting Rig"))
+
+	_lighting_sweep_x_spin = _make_float_spinbox(0.0, 90.0, 46.0, 1.0)
+	_lighting_sweep_x_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	content.add_child(_labeled_control("Sweep X Degrees", _lighting_sweep_x_spin))
+
+	_lighting_sweep_y_spin = _make_float_spinbox(0.0, 90.0, 30.0, 1.0)
+	_lighting_sweep_y_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	content.add_child(_labeled_control("Sweep Y Degrees", _lighting_sweep_y_spin))
+
+	_lighting_azimuth_spin = _make_float_spinbox(-180.0, 180.0, -28.0, 1.0)
+	_lighting_azimuth_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_lighting_azimuth_spin.tooltip_text = "Horizontal angle of base light direction (0 = front, negative = left)"
+	content.add_child(_labeled_control("Base Light Azimuth", _lighting_azimuth_spin))
+
+	_lighting_elevation_spin = _make_float_spinbox(-90.0, 90.0, -30.0, 1.0)
+	_lighting_elevation_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_lighting_elevation_spin.tooltip_text = "Vertical angle of base light direction (negative = above)"
+	content.add_child(_labeled_control("Base Light Elevation", _lighting_elevation_spin))
+
+	_rig_direction_jitter_spin = _make_float_spinbox(0.0, 45.0, 8.0, 0.5)
+	_rig_direction_jitter_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_rig_direction_jitter_spin.tooltip_text = "Per-bin random angular offset applied to all card directions"
+	content.add_child(_labeled_control("Direction Jitter (deg)", _rig_direction_jitter_spin))
+
+	_rig_intensity_jitter_spin = _make_float_spinbox(0.0, 1.0, 0.15, 0.01)
+	_rig_intensity_jitter_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_rig_intensity_jitter_spin.tooltip_text = "Per-bin random intensity scale variation (0 = uniform, 1 = ±100%)"
+	content.add_child(_labeled_control("Intensity Jitter", _rig_intensity_jitter_spin))
+
+	_rig_temperature_jitter_spin = _make_float_spinbox(0.0, 1500.0, 200.0, 25.0)
+	_rig_temperature_jitter_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_rig_temperature_jitter_spin.tooltip_text = "Per-bin random color temperature offset in Kelvin"
+	content.add_child(_labeled_control("Temperature Jitter (K)", _rig_temperature_jitter_spin))
+
+	_rig_fill_count_spin = _make_int_spinbox(0, 6, 2)
+	_rig_fill_count_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_rig_fill_count_spin.tooltip_text = "Number of additional fill lights distributed around the gem"
+	content.add_child(_labeled_control("Extra Fill Lights", _rig_fill_count_spin))
+
+	_rig_fill_intensity_spin = _make_float_spinbox(0.0, 2.0, 0.35, 0.05)
+	_rig_fill_intensity_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_rig_fill_intensity_spin.tooltip_text = "Base sharp_strength of generated fill lights"
+	content.add_child(_labeled_control("Fill Intensity", _rig_fill_intensity_spin))
+
+	_rig_fill_jitter_spin = _make_float_spinbox(0.0, 1.0, 0.3, 0.05)
+	_rig_fill_jitter_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_rig_fill_jitter_spin.tooltip_text = "Per-bin random variation applied to fill light directions and strengths"
+	content.add_child(_labeled_control("Fill Jitter", _rig_fill_jitter_spin))
+
+	_rig_seed_spin = _make_int_spinbox(0, 99999, 42)
+	_rig_seed_spin.value_changed.connect(func(_v: float): _refresh_selection_summary())
+	_rig_seed_spin.tooltip_text = "Deterministic seed for per-bin rig variation"
+	content.add_child(_labeled_control("Rig Variation Seed", _rig_seed_spin))
+
+	content.add_child(_make_separator())
 	content.add_child(_make_section_title("Selective Baking Filters"))
 
 	_skip_lighting_checkbox = CheckBox.new()
@@ -345,6 +413,11 @@ func _build_form_panel(parent: HBoxContainer) -> void:
 	_skip_rotations_checkbox.text = "Skip all rotation variants"
 	_skip_rotations_checkbox.toggled.connect(func(_pressed: bool): _refresh_selection_summary())
 	content.add_child(_labeled_control("Skip Rotations", _skip_rotations_checkbox))
+
+	_skip_stylize_checkbox = CheckBox.new()
+	_skip_stylize_checkbox.text = "Skip stylization post-process"
+	_skip_stylize_checkbox.toggled.connect(func(_pressed: bool): _refresh_selection_summary())
+	content.add_child(_labeled_control("Skip Stylizer", _skip_stylize_checkbox))
 
 	_lighting_bins_filter_edit = LineEdit.new()
 	_lighting_bins_filter_edit.placeholder_text = "e.g. 2x2;4x4 (empty = all)"
@@ -773,6 +846,22 @@ func _get_form_baked_lighting_grid() -> Vector2i:
 	return lighting_grid
 
 
+func _build_lighting_rig_config() -> Dictionary:
+	return {
+		"sweep_x_degrees": float(_lighting_sweep_x_spin.value) if _lighting_sweep_x_spin != null else 46.0,
+		"sweep_y_degrees": float(_lighting_sweep_y_spin.value) if _lighting_sweep_y_spin != null else 30.0,
+		"base_azimuth_degrees": float(_lighting_azimuth_spin.value) if _lighting_azimuth_spin != null else -28.0,
+		"base_elevation_degrees": float(_lighting_elevation_spin.value) if _lighting_elevation_spin != null else -30.0,
+		"direction_jitter_degrees": float(_rig_direction_jitter_spin.value) if _rig_direction_jitter_spin != null else 8.0,
+		"intensity_jitter": float(_rig_intensity_jitter_spin.value) if _rig_intensity_jitter_spin != null else 0.15,
+		"temperature_jitter_kelvin": float(_rig_temperature_jitter_spin.value) if _rig_temperature_jitter_spin != null else 200.0,
+		"extra_fill_count": int(_rig_fill_count_spin.value) if _rig_fill_count_spin != null else 2,
+		"fill_intensity": float(_rig_fill_intensity_spin.value) if _rig_fill_intensity_spin != null else 0.35,
+		"fill_jitter": float(_rig_fill_jitter_spin.value) if _rig_fill_jitter_spin != null else 0.3,
+		"rig_seed": int(_rig_seed_spin.value) if _rig_seed_spin != null else 42,
+	}
+
+
 func _get_form_runtime_lighting_grid() -> Vector2i:
 	var baked_grid := _get_form_baked_lighting_grid()
 	if baked_grid == Vector2i.ZERO:
@@ -1083,12 +1172,14 @@ func _build_job_settings() -> Dictionary:
 		"rotation_axes": _get_selected_rotation_axes(),
 		"skip_lighting": _skip_lighting_checkbox.button_pressed if _skip_lighting_checkbox != null else false,
 		"skip_rotations": _skip_rotations_checkbox.button_pressed if _skip_rotations_checkbox != null else false,
+		"skip_stylize": _skip_stylize_checkbox.button_pressed if _skip_stylize_checkbox != null else false,
 		"lighting_bins_filter": _lighting_bins_filter_edit.text.strip_edges() if _lighting_bins_filter_edit != null else "",
 		"rotation_bins_filter": _rotation_bins_filter_edit.text.strip_edges() if _rotation_bins_filter_edit != null else "",
 		"rotation_labels_filter": _rotation_labels_filter_edit.text.strip_edges() if _rotation_labels_filter_edit != null else "",
 		"include_showroom": _include_showroom_checkbox.button_pressed if _include_showroom_checkbox != null else false,
 		"showroom_direction_count": int(_showroom_dirs_spin.value) if _showroom_dirs_spin != null else 0,
 		"showroom_roll_steps": int(_showroom_roll_spin.value) if _showroom_roll_spin != null else 6,
+		"lighting_rig": _build_lighting_rig_config(),
 	}
 
 
@@ -1135,6 +1226,8 @@ func _start_bake_job() -> void:
 		args.append("--skip_lighting")
 	if bool(settings.get("skip_rotations", false)):
 		args.append("--skip_rotations")
+	if bool(settings.get("skip_stylize", false)):
+		args.append("--skip_stylize")
 	var lighting_bins_filter := String(settings.get("lighting_bins_filter", ""))
 	if not lighting_bins_filter.is_empty():
 		args.append("--lighting_bins=%s" % lighting_bins_filter)
@@ -1153,6 +1246,9 @@ func _start_bake_job() -> void:
 	var variant_worker_count := int(settings["variant_worker_count"])
 	if variant_worker_count > 0:
 		args.append("--variant_workers=%d" % variant_worker_count)
+	var rig_config: Dictionary = settings.get("lighting_rig", {})
+	if not rig_config.is_empty():
+		args.append("--lighting_rig=%s" % JSON.stringify(rig_config))
 	var pid := OS.create_process(OS.get_executable_path(), args, false)
 	if pid <= 0:
 		_status_label.text = "Failed to launch bake job"

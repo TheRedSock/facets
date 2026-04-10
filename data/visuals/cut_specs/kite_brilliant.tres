@@ -23,7 +23,7 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.19,
+"height": 0.15,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
@@ -32,7 +32,7 @@ crown = {
 "star_height_ratio": 0.57,
 "star_length": 0.54,
 "table": PackedVector2Array(),
-"table_ratio": 0.46
+"table_ratio": 0.52
 }
 pavilion = {
 "depth": 0.31,

@@ -1,6 +1,6 @@
 #pragma once
 // GemTraceKernel — GDExtension class exposed to GDScript.
-// Drop-in replacement for GemOpticsTracer with Embree acceleration.
+// The sole tracer implementation for the gem bake pipeline.
 
 #include "gem_trace_types.h"
 #include "gem_trace_scene.h"
@@ -19,7 +19,7 @@ public:
     GemTraceKernel() = default;
     ~GemTraceKernel() override = default;
 
-    /// Same signature as GemOpticsTracer.trace_to_image().
+    /// Trace a gem to an image. Primary entry point for the bake pipeline.
     godot::Ref<godot::Image> trace_to_image(
         godot::Ref<godot::Resource> mesh_resource,
         godot::Ref<godot::Resource> visual,
@@ -46,14 +46,17 @@ private:
     EnvironmentSetup build_environment_setup(
         godot::Vector3 light_dir,
         godot::Vector2 lighting_uv,
-        const VisualProps& v) const;
+        const VisualProps& v,
+        const godot::Dictionary& request) const;
     SurfaceSetup build_surface_setup(
         const VisualProps& v,
         const EnvironmentSetup& env,
         godot::Vector3 light_dir,
         godot::Vector2 lighting_uv,
         godot::StringName variant_type) const;
-    std::vector<SpectralSample> build_spectral_samples(const VisualProps& v) const;
+    std::vector<SpectralSample> build_spectral_samples(
+        const VisualProps& v,
+        const godot::Dictionary& request) const;
 
     // --- Per-pixel tracing ---
     void trace_row_band(const TraceContext& ctx, const TraceScene& scene,
@@ -110,18 +113,23 @@ private:
         godot::Vector3 start, godot::Vector3 end, double radius) const;
 
     // --- Output grading ---
-    godot::Vector3 apply_output_grade(godot::Vector3 color, const VisualProps& v) const;
+    godot::Vector3 apply_output_grade(godot::Vector3 color, const TraceContext& ctx) const;
     void clean_alpha_edges(godot::Ref<godot::Image> image) const;
 
     // --- Helpers ---
     static godot::Vector3 spectral_rgb_basis(double wavelength_t);
     static double sample_color_wavelength(godot::Color color, double wavelength_t);
+    static double planckian_radiance(double wavelength_t, double temperature_kelvin);
+    static double ground_bounce_radiance(
+        godot::Vector3 dir, const EnvironmentSetup& env,
+        double wavelength_t, double roughness, double light_energy);
     static double apply_aces_channel(double value);
     static godot::Vector3 compress_luma_range(godot::Vector3 color, double amount);
     static godot::Vector3 soft_highlight_rolloff(godot::Vector3 color, double amount);
     static godot::Vector3 adjust_saturation(godot::Vector3 color, double amount);
     static godot::Vector3 set_luma(godot::Vector3 color, double target_luma);
-    static ZoneSurfaceScales resolve_zone_surface_scales(godot::StringName zone);
+    static ZoneSurfaceScales resolve_zone_surface_scales(godot::StringName zone,
+        const godot::Dictionary& zone_overrides);
     static double zone_light_multiplier(godot::StringName zone, const VisualProps& v);
     godot::Color resolve_body_color(godot::Vector3 position, godot::Vector3 normal,
                                     double radius, const VisualProps& v) const;
