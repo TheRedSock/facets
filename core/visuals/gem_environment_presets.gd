@@ -223,8 +223,8 @@ static func default_zone_surface_scales() -> Dictionary:
 		"table":       {"front": 0.56, "back": 0.90, "spec": 0.62, "body": 0.92, "caustic": 1.06, "interface": 0.48},
 		"rose_center": {"front": 0.54, "back": 0.92, "spec": 0.60, "body": 0.94, "caustic": 1.08, "interface": 0.50},
 		"rose":        {"front": 0.72, "back": 1.00, "spec": 0.76, "body": 1.08, "caustic": 1.04, "interface": 0.72},
-		"girdle":      {"front": 0.78, "back": 1.00, "spec": 0.80, "body": 1.06, "caustic": 1.02, "interface": 0.80},
-		"step":        {"front": 0.80, "back": 1.00, "spec": 0.82, "body": 1.06, "caustic": 1.03, "interface": 0.78},
+		"girdle":      {"front": 0.78, "back": 1.00, "spec": 0.80, "body": 0.86, "caustic": 1.02, "interface": 0.80},
+		"step":        {"front": 0.80, "back": 1.00, "spec": 0.82, "body": 0.82, "caustic": 1.03, "interface": 0.78},
 		"star":        {"front": 0.68, "back": 1.00, "spec": 0.72, "body": 0.96, "caustic": 1.02, "interface": 0.70},
 		"bezel":       {"front": 0.76, "back": 1.00, "spec": 0.78, "body": 0.98, "caustic": 1.02, "interface": 0.76},
 	}

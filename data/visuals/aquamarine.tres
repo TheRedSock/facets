@@ -1,13 +1,13 @@
 [gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
-[ext_resource type="Resource" path="res://data/visuals/cut_specs/hex_brilliant.tres" id="1_m7x0k"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/kite_brilliant.tres" id="1_m7x0k"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"aquamarine"
 cut_spec = ExtResource("1_m7x0k")
-cut_id = &"hex_brilliant"
+cut_id = &"kite_brilliant"
 base_color = Color(0.38, 0.78, 0.96, 1)
 shininess = 34.0
 specular_intensity = 0.50

@@ -520,9 +520,18 @@ void GemTraceKernel::trace_row_band(
                         weight.z * intensity);
                 }
 
-                // Surface lighting
-                rgb_sum += compute_surface_lighting(
-                    ctx, first_hit.position, first_hit.normal, first_hit.zone);
+                // Surface lighting: only for opaque/translucent gems.
+                // For transparent gems (transmission >= 0.9), the traced spectral
+                // path already handles EVERYTHING: surface Fresnel reflection
+                // (at depth 0, reflected ray samples environment), internal TIR,
+                // Beer-Lambert absorption.  Adding surface lighting on top would
+                // triple-count the surface specular (traced reflection + interface
+                // highlight + surface Blinn-Phong), creating a uniform blue wash
+                // that masks the extinction pattern.
+                if (ctx.flags.transmission_factor < 0.9) {
+                    rgb_sum += compute_surface_lighting(
+                        ctx, first_hit.position, first_hit.normal, first_hit.zone);
+                }
             }
 
             int pixel_index = y * width + x;
@@ -553,6 +562,14 @@ double GemTraceKernel::trace_wavelength(
     int last_tri) const
 {
     if (depth >= ctx.max_bounces) {
+        // Ray exhausted its bounce budget without escaping the gem.
+        // This represents a trapped/extinct path.  Returning environment
+        // radiance here was a light leak — the ray is still INSIDE the gem,
+        // not looking at the environment.  Return 0: this light is absorbed.
+        if (current_ior > AIR_IOR + 0.0001) {
+            return 0.0;
+        }
+        // If outside the gem (in air), the ray genuinely escaped — sample env.
         return sample_environment(ctx, dir, wavelength_t);
     }
     if (ctx.flags.is_patterned_opaque) {
@@ -657,12 +674,18 @@ double GemTraceKernel::trace_wavelength_from_hit(
 
     total *= segment_attenuation;
 
-    // Interface highlight only on exterior front-face hits (depth 0)
+    // Interface highlight only on exterior front-face hits (depth 0).
+    // For transparent gems, the surface is nearly invisible — scale by
+    // physical Fresnel only (no artistic floor).  For opaque/translucent
+    // gems, keep the 0.14 floor for surface visibility.
     if (hit.front_face && depth == 0) {
+        double transmission = ctx.flags.transmission_factor;
+        double ihl_floor = 0.14 * (1.0 - transmission);
+        double ihl_fresnel_scale = 0.40 + transmission * 0.60;
         total += compute_interface_highlight(
             ctx, hit.zone, shading_normal,
             (-dir).normalized(), wavelength_t
-        ) * (0.14 + fresnel * 0.40);
+        ) * (ihl_floor + fresnel * ihl_fresnel_scale);
     }
 
     total += scattering_contribution;
@@ -1558,18 +1581,23 @@ Color GemTraceKernel::resolve_highlight_tint(const VisualProps& v, Color body) c
 // ===========================================================================
 
 double GemTraceKernel::zone_light_multiplier(StringName zone, const VisualProps& v) {
+    // Brilliance contrast: table/star brighter, girdle/step darker.
+    // This is the table-to-girdle brightness gradient seen in well-cut gems.
+    // Extinction is NOT applied here — it's handled per-facet in body_strength
+    // using the facet normal's view-facing angle, which creates per-facet
+    // variation matching real extinction patterns.
     double contrast = clampd(v.brilliance_contrast, 0.0, 1.0);
     if (zone == StringName("table")) {
         return 1.0 + contrast * 0.18;
     }
-    if (zone == StringName("star")) {
-        return 1.0 + contrast * 0.12;
+    if (zone == StringName("star") || zone == StringName("rose_center")) {
+        return 1.0 + contrast * 0.10;
     }
-    if (zone == StringName("girdle")) {
+    if (zone == StringName("step") || zone == StringName("bezel") || zone == StringName("rose")) {
+        return 1.0 - contrast * 0.06;
+    }
+    if (zone == StringName("girdle") || zone == StringName("girdle_band")) {
         return 1.0 - contrast * 0.12;
-    }
-    if (zone == StringName("pavilion") || zone == StringName("culet")) {
-        return 1.0 - v.extinction * 0.30;
     }
     return 1.0;
 }
@@ -1605,10 +1633,10 @@ ZoneSurfaceScales GemTraceKernel::resolve_zone_surface_scales(StringName zone,
         s.body = 1.08; s.caustic = 1.04; s.interface_ = 0.72;
     } else if (zone == StringName("girdle")) {
         s.front = 0.78; s.back = 1.0; s.spec = 0.80;
-        s.body = 1.06; s.caustic = 1.02; s.interface_ = 0.80;
+        s.body = 0.86; s.caustic = 1.02; s.interface_ = 0.80;
     } else if (zone == StringName("step")) {
         s.front = 0.80; s.back = 1.0; s.spec = 0.82;
-        s.body = 1.06; s.caustic = 1.03; s.interface_ = 0.78;
+        s.body = 0.82; s.caustic = 1.03; s.interface_ = 0.78;
     } else if (zone == StringName("star")) {
         s.front = 0.68; s.back = 1.0; s.spec = 0.72;
         s.body = 0.96; s.caustic = 1.02; s.interface_ = 0.70;
@@ -1667,8 +1695,12 @@ Vector3 GemTraceKernel::compute_surface_lighting(
     Color highlight_tint = resolve_highlight_tint(v,
         (body_color.a > 0.001) ? body_color : Color(0, 0, 0, 0));
 
-    // Absorption tint factor for specular bias toward body color
+    // Absorption tint factor for specular bias toward body color.
+    // For transparent gems, surface Fresnel reflection is nearly achromatic —
+    // you're seeing light bouncing off the polish, not through the gem.
+    // Scale back body-color tinting proportional to transmission.
     double absorption_tint_factor = clampd(v.optics_absorption_strength * 0.25, 0.0, 0.72);
+    absorption_tint_factor *= (1.0 - ctx.flags.transmission_factor * 0.85);
     Color specular_color = color_lerp(highlight_tint, body_color, absorption_tint_factor);
 
     Color rim_tint = ss.rim_tint;
@@ -1741,8 +1773,11 @@ Vector3 GemTraceKernel::compute_surface_lighting(
         if (refracted_card.length_squared() < 1e-12) continue;
         double return_alignment = dmax((double)(-refracted_card).dot(view_dir), 0.0);
         double fresnel_in = fresnel_dielectric(-card.dir, normal, AIR_IOR, optics_ior);
+        // Caustic return: refracted light that exits toward the viewer.
+        // Extinction should NOT boost this — it was an artifact from a prior
+        // fix for gray star facets.  Caustic return is purely geometric.
         card_return_strength += std::pow(return_alignment, lerpd(42.0, 10.0, roughness))
-            * card_energy * (1.0 - fresnel_in) * (0.18 + v.extinction * 0.08);
+            * card_energy * (1.0 - fresnel_in) * 0.18;
     }
 
     // Lateral mask and caustic band
@@ -1769,25 +1804,41 @@ Vector3 GemTraceKernel::compute_surface_lighting(
     ZoneSurfaceScales zs = resolve_zone_surface_scales(zone, ctx.zone_surface_scale_overrides);
     front_strength *= zone_mult * zs.front;
     back_strength *= zs.back;
-    spec_strength += card_glare_strength * lerpd(zone_mult, 1.0 + v.sparkle_intensity * 0.10, 0.4);
-    spec_strength *= lerpd(zone_mult, 1.0 + v.sparkle_intensity * 0.14, 0.35);
-    spec_strength *= zs.spec;
-    secondary_strength *= lerpd(zone_mult, 1.0, 0.35) * zs.spec;
+    // Zone extinction now fully modulates specular — previously blended at
+    // only 40%/35%, preventing extinction from suppressing highlights in
+    // dark crown regions.
+    spec_strength += card_glare_strength * zone_mult;
+    spec_strength *= zone_mult * zs.spec;
+    secondary_strength *= zone_mult * zs.spec;
 
     Color caustic_color = color_lerp(body_color, caustic_base, 0.42 + v.hue_dispersion * 0.20);
 
+    // Body fill: scattering, roughness, and translucency contribute a diffuse
+    // body-color wash.  card_fill_strength is intentionally excluded — card
+    // light reaching the surface is already captured by the ray-traced path.
     double body_strength = (
-        0.004
+        0.002
         + scatter_strength * 0.08
         + roughness * 0.022
         + v.translucency * 0.015
-        + card_fill_strength
-    ) * v.optics_light_energy * lerpd(0.82, 1.02, front_alignment);
+    ) * v.optics_light_energy * lerpd(0.58, 1.0, front_alignment);
 
     if (variant_type == StringName("lighting")) {
         body_strength *= lerpd(0.84, 1.08, lateral_mask);
     }
-    body_strength *= lerpd(0.82, 1.04, zone_mult - 1.0 + 0.5) * zs.body;
+
+    // Normal-dependent extinction: facets tilted away from the viewer have
+    // longer internal optical paths and poorer light return via TIR.
+    // This varies per-facet based on individual normal orientation, creating
+    // the facet-by-facet extinction pattern seen in real step-cut gems
+    // rather than the uniform per-zone darkening that was here previously.
+    if (v.extinction > 0.001) {
+        double facing = clampd((double)normal.dot(ctx.view_dir), 0.0, 1.0);
+        double normal_extinction = v.extinction * std::pow(1.0 - facing, 1.6) * 0.40;
+        body_strength *= (1.0 - normal_extinction);
+    }
+
+    body_strength *= zone_mult * zs.body;
 
     // Ground-reflected fill: virtual ground plane bounces card light back into pavilion
     double ground_fill_strength = 0.0;
@@ -1855,6 +1906,27 @@ Vector3 GemTraceKernel::compute_surface_lighting(
     }
 
     double surface_absorption_scale = 1.0 / (1.0 + v.optics_absorption_strength * 0.42);
+
+    // Transmission-based surface term scaling.
+    // For transparent gems (transmission_factor ≈ 1.0), the polished surface
+    // is nearly invisible — only ~7-8% Fresnel reflection at normal incidence
+    // for typical gem IORs.  You look THROUGH the surface into the gem.
+    // Body-colored diffuse, back-scatter, rim, and ground fill all represent
+    // light that in reality enters the gem and is handled by the traced path.
+    // Zeroing these out for transparent gems enables pitch-black extinction
+    // zones where no internal light returns — the defining visual of well-cut
+    // deeply colored gems like sapphire.
+    // Specular terms (spec, secondary, sparkle, caustic) are kept: they
+    // represent real surface Fresnel reflection.
+    double transmission = ctx.flags.transmission_factor;
+    if (transmission > 0.001) {
+        double scatter_suppress = 1.0 - transmission * 0.95;
+        front_strength *= scatter_suppress;
+        back_strength *= scatter_suppress;
+        body_strength *= scatter_suppress;
+        ground_fill_strength *= scatter_suppress;
+        rim_strength *= 1.0 - transmission * 0.80;
+    }
 
     // Ground fill contributes as a tinted body-like term
     Color ground_fill_color = Color(
@@ -1959,7 +2031,10 @@ double GemTraceKernel::compute_segment_attenuation(
     double absorption_mult = (medium != nullptr) ? medium->absorption_mult : 1.0;
     double coeff = dmax(1.0 - channel_tint, 0.0) * dmax(
         v.optics_absorption_strength * absorption_mult, 0.0);
-    return std::exp(-coeff * dmax(distance, 0.0) * 0.78);
+    // Standard Beer-Lambert: no softening factor.  Previously multiplied by
+    // 0.78, which reduced effective absorption by 22% with no optical basis.
+    // Per-gem absorption_strength now controls the full extinction curve.
+    return std::exp(-coeff * dmax(distance, 0.0));
 }
 
 // ===========================================================================
@@ -2181,19 +2256,24 @@ Vector3 GemTraceKernel::apply_output_grade(Vector3 color, const TraceContext& ct
         clampd(std::pow(dmax(graded.z, 0.0), 1.0 / 2.2), 0.0, 1.0));
     post_gamma = soft_highlight_rolloff(post_gamma, highlight_rolloff * 0.5);
 
-    // Body-color saturation floor
-    double body_push_cap = (ctx.grade_body_push_cap >= 0.0) ? ctx.grade_body_push_cap : 0.55;
-    double body_push_strength = clampd(v.optics_absorption_strength * 0.18, 0.0, body_push_cap);
+    // Body-color saturation floor — pull hue toward base_color for absorbing
+    // gems.  Only applied above a luminance threshold so that near-black
+    // extinction pixels are not pulled toward the body color.
+    double body_push_cap = (ctx.grade_body_push_cap >= 0.0) ? ctx.grade_body_push_cap : 0.40;
+    double body_push_strength = clampd(v.optics_absorption_strength * 0.12, 0.0, body_push_cap);
     if (body_push_strength > 0.01) {
         Vector3 body_hue(v.base_color.r, v.base_color.g, v.base_color.b);
         double body_hue_len = body_hue.length();
         if (body_hue_len > 0.001) {
             body_hue /= body_hue_len;
             double pg_len = post_gamma.length();
-            if (pg_len > 0.001) {
+            // Gate: only push pixels above a luminance threshold.
+            // Near-black pixels (extinction) should stay black, not shift to body hue.
+            double luma_gate = smoothstepd(0.06, 0.20, pg_len);
+            if (pg_len > 0.001 && luma_gate > 0.001) {
                 Vector3 pg_dir = post_gamma / pg_len;
                 double hue_distance = clampd((pg_dir - body_hue).length() * 0.7, 0.0, 1.0);
-                post_gamma = post_gamma.lerp(body_hue * pg_len, body_push_strength * hue_distance);
+                post_gamma = post_gamma.lerp(body_hue * pg_len, body_push_strength * hue_distance * luma_gate);
             }
         }
     }

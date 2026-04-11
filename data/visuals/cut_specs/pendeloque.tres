@@ -1,12 +1,12 @@
 [gd_resource type="Resource" script_class="GemCutSpecResource" format=3]
 
-[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_dlukq"]
+[ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_pdl01"]
 
 [resource]
-script = ExtResource("1_dlukq")
-spec_id = &"pear_brilliant"
-display_name = "Pear Brilliant"
-compatibility_cut_id = &"pear_brilliant"
+script = ExtResource("1_pdl01")
+spec_id = &"pendeloque"
+display_name = "Pendeloque"
+compatibility_cut_id = &"pendeloque"
 shape_category = &"pear"
 family = &"radial_brilliant"
 symmetry = {
@@ -23,25 +23,25 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.19,
+"height": 0.2,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,
 "outer_shoulder_scale": 1.0,
 "star_facets": Array[PackedVector2Array]([]),
-"star_height_ratio": 0.6,
-"star_length": 0.52,
+"star_height_ratio": 0.62,
+"star_length": 0.48,
 "table": PackedVector2Array(),
-"table_ratio": 0.48
+"table_ratio": 0.44
 }
 pavilion = {}
 girdle = {
 "boundary_mode": &"pear",
 "boundary_params": {
-"shift_y": 0.055,
-"shoulder_bias": 0.84,
-"tip_power": 0.8,
-"y_stretch": 1.2
+"shift_y": 0.08,
+"shoulder_bias": 0.7,
+"tip_power": 0.65,
+"y_stretch": 1.35
 },
 "half_radius_scale": 1.0,
 "outer_points": PackedVector2Array(),

@@ -1,13 +1,13 @@
 [gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
-[ext_resource type="Resource" path="res://data/visuals/cut_specs/shield_brilliant.tres" id="1_aomwr"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/pendeloque.tres" id="1_aomwr"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"blue_garnet"
 cut_spec = ExtResource("1_aomwr")
-cut_id = &"shield_brilliant"
+cut_id = &"pendeloque"
 base_color = Color(0.09, 0.18, 0.54, 1)
 shininess = 96.0
 specular_intensity = 0.5

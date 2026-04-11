@@ -46,8 +46,8 @@ The rotation offset ensures pavilion edges cross through crown facets at angles,
 
 ## Builder Families
 
-- `radial_brilliant` for round, oval, pear, marquise, heart, and polygon brilliants
-- `step` for emerald, asscher, octagon, baguette, and tapered baguette style cuts
+- `radial_brilliant` for round, oval, marquise, pear, heart, and polygon brilliants
+- `step` for emerald, asscher, octagon, baguette, lozenge, and tapered baguette style cuts
 - `fan` for triangular cuts such as curved and straight trillion variants
 - `radiant` for stylized or square/clipped-corner radiant-like cuts
 - `rose` for rose-family cuts that do not use a flat table

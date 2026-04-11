@@ -1,13 +1,13 @@
 [gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
-[ext_resource type="Resource" path="res://data/visuals/cut_specs/oval_brilliant.tres" id="1_7sbl0"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/marquise_brilliant.tres" id="1_7sbl0"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"ruby"
 cut_spec = ExtResource("1_7sbl0")
-cut_id = &"oval_brilliant"
+cut_id = &"marquise_brilliant"
 base_color = Color(0.56, 0.02, 0.06, 1)
 shininess = 88.0
 specular_intensity = 0.52

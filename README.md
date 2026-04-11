@@ -76,13 +76,18 @@ Each tier has a distinct **silhouette shape** for instant visual identification:
 | T1 | Quartz | Octagon | Simple Octagon Step |
 | T2 | Amethyst | Square (rounded) | Cushion |
 | T3 | Peridot | Triangle (bowed edges) | Trillion |
-| T4 | Topaz | Rotated Square ◆ | Lozenge |
-| T5 | Sapphire | Hexagon | Hexagon Step |
+| T4 | Topaz | Oval | Oval Brilliant |
+| T5 | Sapphire | Rotated Square ◆ | Lozenge |
 | T6 | Emerald | Rectangle (portrait) | Emerald Step |
-| T7 | Ruby | Oval (portrait) | Oval Brilliant |
+| T7 | Ruby | Marquise | Marquise Brilliant |
 | T8 | Diamond | Pear/Teardrop | Pear Brilliant |
 
-The spec library also includes alternate cuts such as Asscher, baguette, tapered baguette, octagon step, marquise, heart, old European round, princess square, radiant octagon, and a rose-cut family for future use.
+Two additional shape categories are reserved for future non-standard tiers:
+
+- **T0 (Polygon):** Regular 5--7 sided shapes (pentagon, hexagon, heptagon) reserved for hazard/obstacle gems. Their equilateral geometry signals "not a normal gem" on the board.
+- **T9 (Special):** Ornate asymmetric shapes (heart, star, shield, etc.) reserved for transcendent artifact gems.
+
+The spec library includes alternate cuts per tier shape: Asscher, octagon step, radiant octagon, and princess for the square family; antique oval for oval; lozenge radiant and kite for diamond; baguette and tapered baguette for rectangle; navette for marquise; pendeloque for pear. The library also includes old European round, rose-cut family variants, and hexagon/pentagon polygon cuts for future T0 use.
 
 Higher tiers have progressively more dramatic shading, brighter specular highlights, deeper depth tints, stronger rim lighting, and more pronounced pavilion extinction patterns. Diamond features prismatic hue dispersion ("fire"), maximum sparkle, and strong secondary specular.
 

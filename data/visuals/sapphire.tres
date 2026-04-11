@@ -1,20 +1,20 @@
 [gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
-[ext_resource type="Resource" path="res://data/visuals/cut_specs/hexagon_step.tres" id="1_xxx8n"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/lozenge.tres" id="1_xxx8n"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"sapphire"
 cut_spec = ExtResource("1_xxx8n")
-cut_id = &"hexagon_step"
+cut_id = &"lozenge"
 base_color = Color(0.05, 0.12, 0.70, 1)
 shininess = 80.0
-specular_intensity = 0.52
-depth_tint = Color(0.01, 0.02, 0.14, 0.60)
-saturation_boost = 0.20
-contrast = 0.75
-rim_intensity = 0.18
+specular_intensity = 0.48
+depth_tint = Color(0.008, 0.015, 0.10, 0.55)
+saturation_boost = 0.24
+contrast = 0.78
+rim_intensity = 0.10
 rim_color = Color(0.82, 0.9, 1, 1)
 secondary_specular = 0.18
 secondary_light_angle = 110.0
@@ -23,31 +23,32 @@ sparkle_threshold = 0.82
 gradient_color = Color(0.04, 0.08, 0.58, 1)
 gradient_strength = 0.12
 brilliance_contrast = 0.50
-extinction = 0.58
+extinction = 0.65
 optics_ior = 1.76
 optics_dispersion = 0.014
-optics_absorption_color = Color(0.04, 0.09, 0.62, 1)
-optics_absorption_strength = 2.80
-optics_surface_roughness = 0.024
-optics_scattering_strength = 0.015
+optics_absorption_color = Color(0.003, 0.012, 0.88, 1)
+optics_absorption_strength = 8.50
+optics_surface_roughness = 0.022
+optics_scattering_strength = 0.0
 optics_scattering_color = Color(0.10, 0.18, 0.80, 1)
 optics_birefringence_strength = 0.008
 optics_optic_axis = Vector3(0, 1, 0.22)
 optics_environment_preset = 4
 optics_environment_rotation_degrees = 14.0
-optics_environment_energy = 0.90
-optics_light_energy = 1.80
-optics_ground_albedo = 0.14
+optics_environment_energy = 0.70
+optics_light_energy = 2.20
+optics_ground_albedo = 0.0
 optics_ground_tint = Color(0.78, 0.80, 0.88, 1)
-optics_light_temperature_kelvin = 5800
+optics_light_temperature_kelvin = 6500
 optics_interface_highlight_scale = 1.60
+optics_blocker_strength_multiplier = 1.30
 stylize_mix = 0.86
 stylize_facet_edge_gain = 0.82
-stylize_plane_contrast = 0.6
-stylize_shadow_floor = 0.06
+stylize_plane_contrast = 0.72
+stylize_shadow_floor = 0.03
 stylize_highlight_bloom_gain = 0.18
 stylize_highlight_bloom_threshold = 0.86
 stylize_microdetail_suppression = 0.34
 stylize_internal_color_shift_gain = 0.28
-stylize_tone_steps = 4
+stylize_tone_steps = 5
 stylize_edge_ink_strength = 0.18

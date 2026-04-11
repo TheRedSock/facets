@@ -504,7 +504,7 @@ func _build_ui() -> void:
 
 func _make_axis_steps_spinbox() -> SpinBox:
 	_showroom_axis_steps_spin = SpinBox.new()
-	_showroom_axis_steps_spin.min_value = 8.0
+	_showroom_axis_steps_spin.min_value = 1.0
 	_showroom_axis_steps_spin.max_value = 360.0
 	_showroom_axis_steps_spin.step = 1.0
 	_showroom_axis_steps_spin.value = 36.0

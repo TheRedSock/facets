@@ -1,13 +1,13 @@
 [gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
-[ext_resource type="Resource" path="res://data/visuals/cut_specs/antique_oval.tres" id="1_qakh2"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/navette.tres" id="1_qakh2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"painite"
 cut_spec = ExtResource("1_qakh2")
-cut_id = &"antique_oval"
+cut_id = &"navette"
 base_color = Color(0.42, 0.16, 0.08, 1)
 shininess = 64.0
 specular_intensity = 0.34

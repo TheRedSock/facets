@@ -1,13 +1,13 @@
 [gd_resource type="Resource" script_class="GemVisualResource" format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
-[ext_resource type="Resource" path="res://data/visuals/cut_specs/lozenge.tres" id="1_pvyw8"]
+[ext_resource type="Resource" path="res://data/visuals/cut_specs/oval_brilliant.tres" id="1_pvyw8"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"topaz"
 cut_spec = ExtResource("1_pvyw8")
-cut_id = &"lozenge"
+cut_id = &"oval_brilliant"
 base_color = Color(0.88, 0.58, 0.18, 1)
 shininess = 52.0
 specular_intensity = 0.46

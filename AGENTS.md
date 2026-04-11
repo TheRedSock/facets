@@ -382,9 +382,9 @@ godot --headless --script tests/test_rng_cross_platform.gd    # Cross-platform R
 
 Designed but excluded from current scaffold. See `plans/deferred-systems-reference.md`.
 
-- Modifier Pipeline, Floor Progression, Boon System, Hazard System (T0 tiles)
+- Modifier Pipeline, Floor Progression, Boon System, Hazard System (T0 tiles — polygon silhouettes: pentagon, hexagon, heptagon)
 - Extended Effects (DOWNGRADE, CONVERT, SPAWN, MOVE, PROTECT, AWARD_MOVE, APPLY_STATUS)
-- Protection Mechanics, Cell Tags, T9 Transcendent Gems
+- Protection Mechanics, Cell Tags, T9 Transcendent Gems (special silhouettes: heart, star, shield, etc.)
 
 ---
 
