@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"quartz"
+mineral_name = "Quartz (SiO2) o-ray"
+sellmeier_b = Vector3(0.6962, 0.4079, 0.8975)
+sellmeier_c = Vector3(0.00468, 0.01351, 97.934)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.009
+default_surface_roughness = 0.01
+display_color = Color(0.95, 0.92, 0.96, 1)

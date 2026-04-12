@@ -2,41 +2,20 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/pear_brilliant.tres" id="1_5ao3n"]
+[ext_resource type="Resource" path="res://data/minerals/diamond.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"diamond"
 cut_spec = ExtResource("1_5ao3n")
 cut_id = &"pear_brilliant"
-base_color = Color(0.97, 0.98, 1, 1)
-shininess = 200.0
-specular_intensity = 0.92
-depth_tint = Color(0.7, 0.78, 0.9, 0.24)
-saturation_boost = 0.04
-contrast = 0.74
-hue_dispersion = 0.44
-rim_intensity = 0.08
-rim_color = Color(0.98, 0.99, 1, 1)
-secondary_specular = 0.58
-secondary_light_angle = 100.0
-sparkle_intensity = 2.2
-sparkle_threshold = 0.74
-brilliance_contrast = 0.90
-extinction = 0.4
-optics_ior = 2.42
-optics_dispersion = 0.044
-optics_absorption_color = Color(0.92, 0.95, 1, 1)
-optics_absorption_strength = 0.03
-optics_surface_roughness = 0.005
-optics_scattering_color = Color(0.96, 0.98, 1, 1)
+display_color = Color(0.97, 0.98, 1, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 optics_trace_view_scale = 1.06
-optics_environment_preset = 1
 optics_environment_rotation_degrees = 20.0
-optics_environment_energy = 0.86
-optics_light_energy = 1.72
-optics_ground_albedo = 0.35
-optics_ground_tint = Color(0.94, 0.93, 0.92, 1)
-optics_light_temperature_kelvin = 5000
 stylize_mix = 0.76
 stylize_facet_edge_gain = 0.82
 stylize_plane_contrast = 0.44

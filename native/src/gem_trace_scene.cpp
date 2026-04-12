@@ -92,7 +92,7 @@ HitResult TraceScene::intersect(godot::Vector3 origin, godot::Vector3 dir,
     rayhit.ray.dir_x = (float)dir.x;
     rayhit.ray.dir_y = (float)dir.y;
     rayhit.ray.dir_z = (float)dir.z;
-    rayhit.ray.tnear  = (float)EPSILON;
+    rayhit.ray.tnear  = (float)TRACE_EPSILON;
     rayhit.ray.tfar   = 1e30f;
     rayhit.ray.mask    = (unsigned)-1;
     rayhit.ray.flags   = 0;

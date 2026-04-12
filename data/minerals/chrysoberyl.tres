@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"chrysoberyl"
+mineral_name = "Chrysoberyl (BeAl2O4)"
+sellmeier_b = Vector3(1.0580, 0.5490, 0)
+sellmeier_c = Vector3(0.00667, 0.02000, 0)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+absorption_spectrum = PackedFloat32Array(3.62352, 3.94887, 4.23686, 4.47571, 4.65539, 4.76863, 4.81177, 4.78557, 4.69586, 4.55379, 4.37543, 4.18031, 3.98876, 3.81806, 3.67822, 3.56883, 3.4784, 3.38736, 3.27429, 3.12364, 2.93214, 2.71142, 2.48561, 2.28524, 2.13944, 2.06963, 2.08611, 2.18817, 2.36653, 2.60678, 2.89243, 3.20699, 3.53496, 3.86217, 4.17566, 4.46361, 4.71539, 4.92168, 5.07481, 5.16897, 5.20058, 5.16833, 5.07337, 4.9191, 4.71103, 4.45642, 4.16385, 3.84276, 3.50292, 3.15396, 2.80492, 2.4639, 2.13778, 1.83207, 1.55082, 1.29663, 1.07081, 0.87346, 0.70374, 0.56005, 0.44022, 0.34179, 0.26211, 0.19854, 0.14854, 0.10977, 0.08012, 0.05777, 0.04114, 0.02893, 0.0201, 0.01379, 0.00935, 0.00626, 0.00414, 0.0027, 0.00174, 0.00111, 0.0007, 0.00044, 0.00027)
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.009
+default_surface_roughness = 0.008
+display_color = Color(0.55, 0.72, 0.42, 1)

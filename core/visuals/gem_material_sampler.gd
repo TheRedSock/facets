@@ -54,7 +54,7 @@ static func sample_volume_material(
 	visual: GemVisualResource,
 	object_position: Vector3,
 ) -> Dictionary:
-	var color := visual.base_color if visual != null else Color.WHITE
+	var color := visual.display_color if visual != null else Color.WHITE
 	if visual == null or visual.volume_pattern_type == GemVisualResource.MATERIAL_PATTERN_NONE:
 		return {
 			"color": color,
@@ -117,18 +117,6 @@ static func sample_reactive_color(
 			return _sample_iridescence(visual, reactive_coord, normal, half_vec)
 		_:
 			return Color(0.0, 0.0, 0.0, 0.0)
-
-
-static func transmission_factor(visual: GemVisualResource) -> float:
-	if visual == null:
-		return 1.0
-	match visual.material_mode:
-		GemVisualResource.MATERIAL_MODE_PATTERNED_OPAQUE:
-			return 0.0
-		GemVisualResource.MATERIAL_MODE_PATTERNED_TRANSLUCENT:
-			return 0.78
-		_:
-			return 1.0
 
 
 static func _sample_surface_pattern(
@@ -355,7 +343,7 @@ static func _sample_chatoyancy(
 	var sweep := reactive_coord.x * visual.reactive_density + half_vec.dot(tangent) * 2.8
 	var band := exp(-pow(sweep, 2.0) * lerpf(1.4, 6.0, minf(visual.reactive_sharpness / 8.0, 1.0)))
 	var angle_term := pow(maxf(absf(half_vec.dot(axis)), 0.0), maxf(visual.reactive_sharpness, 0.5))
-	var base_color := visual.reactive_color if visual.reactive_color.a > 0.001 else _resolve_secondary_color(visual, visual.base_color)
+	var base_color := visual.reactive_color if visual.reactive_color.a > 0.001 else _resolve_secondary_color(visual, visual.display_color)
 	var strength := band * angle_term * visual.reactive_strength
 	return base_color * clampf(strength, 0.0, 4.0)
 
@@ -445,11 +433,11 @@ static func _resolve_tertiary_color(visual: GemVisualResource, base_color: Color
 
 static func _sample_texture(texture_image: Image, uv: Vector2, normal: Vector3, visual: GemVisualResource) -> Color:
 	if texture_image == null:
-		return visual.base_color
+		return visual.display_color
 	var width := texture_image.get_width()
 	var height := texture_image.get_height()
 	if width <= 0 or height <= 0:
-		return visual.base_color
+		return visual.display_color
 	var warped_uv := uv
 	if visual.texture_facet_warp > 0.001:
 		var normal_offset := Vector2(normal.x, -normal.y) * visual.texture_facet_warp * 0.08

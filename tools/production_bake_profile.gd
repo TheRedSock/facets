@@ -84,8 +84,8 @@ static func profile_to_bake_options(profile: Dictionary, profile_res_path: Strin
 		1,
 		OfflineGemBakeJobScript.max_supported_sample_count()
 	)
-	var mb := int(profile.get("max_trace_bounces", GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES))
-	opts["max_trace_bounces"] = GemTracedBakeContractScript.resolve_max_trace_bounces(mb)
+	var spp := clampi(int(profile.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)), 16, 512)
+	opts["samples_per_pixel"] = spp
 	if profile.has("thread_count"):
 		opts["thread_count"] = maxi(int(profile.get("thread_count", 0)), 0)
 	if profile.has("variant_workers"):
@@ -142,4 +142,7 @@ static func profile_to_bake_options(profile: Dictionary, profile_res_path: Strin
 		opts["vram_compress"] = bool(profile.get("vram_compress"))
 	if profile.has("atlas_output"):
 		opts["atlas_output"] = bool(profile.get("atlas_output"))
+	var default_env := String(profile.get("default_environment", "")).strip_edges()
+	if not default_env.is_empty():
+		opts["default_environment"] = default_env
 	return opts

@@ -2,19 +2,15 @@ class_name GemVisualResource
 extends Resource
 
 ## Defines the visual appearance of a specific gem type.
-## References a GemCutSpecResource (resolved at runtime by GemVisualRegistry)
-## and specifies colour, material properties, and edge rendering.
+## References a GemCutSpecResource (resolved at runtime by GemVisualRegistry),
+## a GemMineralTemplate for crystal physics, and specifies colour, material
+## properties, and edge rendering.
 
 const GemCutSpecResourceScript = preload("res://resources/visuals/gem_cut_spec_resource.gd")
 
 const GRADIENT_MODE_LINEAR := 0
 const GRADIENT_MODE_RADIAL := 1
 const GRADIENT_MODE_RADIAL_INVERSE := 2
-const OPTICS_ENVIRONMENT_NEUTRAL := 0
-const OPTICS_ENVIRONMENT_DARK_STUDIO := 1
-const OPTICS_ENVIRONMENT_GEM_BOOTH := 2
-const OPTICS_ENVIRONMENT_GAMEPLAY_STUDIO := 3
-const OPTICS_ENVIRONMENT_DEEP_COLOR := 4
 const MATERIAL_MODE_FACETED_TRANSPARENT := 0
 const MATERIAL_MODE_PATTERNED_OPAQUE := 1
 const MATERIAL_MODE_PATTERNED_TRANSLUCENT := 2
@@ -41,29 +37,32 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 ## This keeps cut families axis-aligned while allowing per-gem orientation.
 @export_range(-180.0, 180.0) var rotation_degrees: float = 0.0
 
+# ==== Physical Source ====
+
+@export_group("Physical Source")
+## Reference to the mineral template for crystal physics (Sellmeier, absorption, etc.).
+## All gems of the same mineral species share one template.
+@export var mineral_template: Resource = null
+## Per-gem absorption spectrum override. If non-empty (81 floats at 5nm intervals),
+## REPLACES the template's absorption_spectrum. Use this for different chromophores
+## in the same crystal (e.g., ruby vs sapphire are both corundum, different Cr/Fe/Ti).
+@export var absorption_spectrum_override: PackedFloat32Array = PackedFloat32Array()
+## Multiplier on the active absorption spectrum. 1.0 = use as-is.
+## >1.0 = deeper color, <1.0 = lighter color. Scales the extinction coefficient.
+@export_range(0.01, 10.0) var absorption_strength_scale: float = 1.0
+## Per-gem surface roughness override. -1 = use mineral template default.
+@export_range(-1.0, 1.0) var surface_roughness_override: float = -1.0
+## Per-gem scattering coefficient override. -1 = use mineral template default.
+@export_range(-1.0, 50.0) var scattering_coefficient_override: float = -1.0
+
 # ==== Color ====
 
 @export_group("Color")
-@export var base_color: Color = Color.WHITE
-## Colour shift applied to facets facing away from the viewer,
-## simulating light passing through a transparent stone.
-@export var depth_tint: Color = Color.TRANSPARENT
-@export_range(-0.5, 0.5) var saturation_boost: float = 0.0
-## Prismatic hue dispersion ("fire").  Each facet shifts its hue
-## based on its angle, simulating light splitting into a spectrum.
-## 0.0 = no dispersion (most gems).  0.3+ = visible rainbow fire (diamond).
-@export_range(0.0, 0.5) var hue_dispersion: float = 0.0
-## Brightens table/star facets and darkens girdle facets, simulating the
-## characteristic "window" of light through a well-cut gem's table.
-@export_range(0.0, 1.0) var brilliance_contrast: float = 0.0
-## Simulates pavilion extinction — the geometric dark patterns caused by
-## light bouncing off internal facets and failing to return to the viewer.
-## Higher values produce stronger dark patches — effective for
-## transparent/brilliant gems, should be low for opaque/matte stones.
-@export_range(0.0, 1.0) var extinction: float = 0.0
+## Display color for UI and procedural fallback. NOT used in ray transport.
+@export var display_color: Color = Color.WHITE
 
 @export_subgroup("Gradient")
-## Blends the base colour toward this colour using the selected zoning mode,
+## Blends the display colour toward this colour using the selected zoning mode,
 ## simulating natural colour zoning (e.g. amethyst purple-to-white or
 ## tourmaline-style edge/core separation).
 @export var gradient_color: Color = Color.TRANSPARENT
@@ -80,46 +79,9 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_range(-180.0, 180.0) var phenomenon_angle_degrees: float = 0.0
 @export_range(0.5, 4.0) var phenomenon_sharpness: float = 1.0
 
-@export_subgroup("Rim Lighting")
-## Bright edge glow on facets facing away from the viewer (Fresnel effect).
-## Simulates light catching the gem perimeter.
-@export_range(0.0, 1.0) var rim_intensity: float = 0.0
-@export var rim_color: Color = Color.WHITE
-## Controls the falloff curve: higher = tighter rim, lower = broader glow.
-@export_range(1.0, 5.0) var rim_power: float = 2.0
-
-@export_subgroup("Translucency")
-## Simulates light entering from behind the gem and bleeding through to the
-## front (subsurface scattering approximation).  Additive on front-facing
-## facets, unlike depth_tint which replaces colour on back-facing facets.
-@export_range(0.0, 1.0) var translucency: float = 0.0
-@export var translucency_color: Color = Color.WHITE
-
-@export_subgroup("Sparkle")
-## Dramatic brightness boost on facets whose specular alignment exceeds the
-## threshold.  Simulates the intense white flashes seen in real gems.
-@export_range(0.0, 3.0) var sparkle_intensity: float = 0.0
-## Specular alignment above which the sparkle kicks in (0 = all facets, 1 = none).
-@export_range(0.0, 1.0) var sparkle_threshold: float = 0.85
-
 # ==== Lighting ====
 
 @export_group("Lighting")
-@export_range(1.0, 256.0) var shininess: float = 32.0
-@export_range(0.0, 1.0) var specular_intensity: float = 0.4
-@export_range(0.0, 1.0) var transparency: float = 0.0
-## Controls the light-to-dark range across facets.
-## 0.0 = flat, uniform shading (common stones).
-## 1.0 = dramatic, high-contrast faceting (precious gems).
-@export_range(0.0, 1.0) var contrast: float = 0.3
-
-@export_subgroup("Secondary Specular")
-## A second Blinn-Phong specular highlight from a different light angle,
-## simulating internal reflections within a faceted stone.
-@export_range(0.0, 1.0) var secondary_specular: float = 0.0
-## Angle offset (degrees) from the primary light for the secondary highlight.
-@export_range(0.0, 360.0) var secondary_light_angle: float = 120.0
-
 @export_subgroup("Edge Rendering")
 @export var edge_color: Color = Color(1.0, 1.0, 1.0, 0.0)
 @export_range(0.0, 3.0) var edge_width: float = 0.0
@@ -131,7 +93,7 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_enum("Faceted Transparent", "Patterned Opaque", "Patterned Translucent") var material_mode: int = MATERIAL_MODE_FACETED_TRANSPARENT
 @export var material_secondary_color: Color = Color.TRANSPARENT
 @export var material_tertiary_color: Color = Color.TRANSPARENT
-## If true, sample from color_texture instead of flat base_color.
+## If true, sample from color_texture instead of flat display_color.
 ## Useful for opals, agates, and other patterned gems.
 @export var use_texture: bool = false
 @export var color_texture: Texture2D = null
@@ -178,29 +140,6 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 
 @export_group("Traced Optics")
 
-@export_subgroup("Refraction")
-## Dielectric index of refraction used by the offline traced bake path.
-## Typical gemstones live roughly in the 1.45-2.45 range.
-@export_range(1.0, 3.0) var optics_ior: float = 1.62
-## Channel-to-channel IOR spread used for spectral splitting.
-## Blue gets a slightly higher IOR than red when this is non-zero.
-@export_range(0.0, 0.2) var optics_dispersion: float = 0.018
-## Uniaxial birefringence amount for the traced path.
-## 0.0 disables double refraction. Corundum is roughly 0.008.
-@export_range(0.0, 0.05) var optics_birefringence_strength: float = 0.0
-@export var optics_optic_axis: Vector3 = Vector3.UP
-
-@export_subgroup("Absorption & Scattering")
-## Beer-Lambert absorption tint for the traced path. If left transparent, the
-## traced bake derives a tint from base_color and depth_tint.
-@export var optics_absorption_color: Color = Color.TRANSPARENT
-@export_range(0.0, 8.0) var optics_absorption_strength: float = 1.1
-## Surface polish / microsurface roughness for the traced path.
-@export_range(0.0, 1.0) var optics_surface_roughness: float = 0.02
-## Forward-scattering approximation for cloudy or silky gems.
-@export_range(0.0, 1.0) var optics_scattering_strength: float = 0.0
-@export var optics_scattering_color: Color = Color.WHITE
-
 @export_subgroup("Camera")
 ## Additional traced-bake framing scale applied after cut-specific fit compensation.
 ## Increase for stones that read too small in the traced showroom camera.
@@ -212,52 +151,10 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_range(-180.0, 180.0) var optics_rotation_view_yaw_degrees: float = 36.0
 
 @export_subgroup("Environment")
-## Scales the environment and direct light contribution used during traced baking.
-@export_enum("Neutral Sky", "Dark Studio", "Gem Booth", "Gameplay Studio", "Deep Color") var optics_environment_preset: int = OPTICS_ENVIRONMENT_NEUTRAL
+## Environment to use for baking. If null, uses the default gameplay environment.
+@export var bake_environment: Resource = null
+## Rotates the entire environment (sky + cards + blocker) around the vertical axis.
 @export_range(-180.0, 180.0) var optics_environment_rotation_degrees: float = 0.0
-@export_range(0.0, 4.0) var optics_environment_energy: float = 1.0
-@export_range(0.0, 8.0) var optics_light_energy: float = 2.4
-## Per-gem ground reflectance override for the virtual ground plane below the gem.
-## -1 = use the environment preset's default ground albedo.
-## 0 = no ground bounce (pavilion stays dark). 0.1-0.5 = typical range.
-@export_range(-1.0, 1.0) var optics_ground_albedo: float = -1.0
-## Per-gem ground surface tint override. Transparent = use preset default.
-## Warm tints add inner glow to pavilion facets; cool tints suit icy gems.
-@export var optics_ground_tint: Color = Color.TRANSPARENT
-## Per-gem ground distance override for the virtual ground plane below the gem.
-## -1 = use the environment preset's default (0.8 for all current presets).
-## Higher values push the ground further away, reducing bounce intensity.
-@export_range(-1.0, 4.0) var optics_ground_distance: float = -1.0
-## Apply a color temperature (Kelvin) to the key light card for this gem.
-## 0 = use the environment preset's default temperature.
-## Typical range: 2800K (warm tungsten) to 8000K (cool overcast).
-@export_range(0, 12000) var optics_light_temperature_kelvin: float = 0
-
-@export_subgroup("Tuning")
-## Scales the interface Fresnel highlight contribution. 1.0 = default behavior.
-@export_range(0.0, 4.0) var optics_interface_highlight_scale: float = 1.0
-## Multiplier for sparkle power in the surface lighting model.
-@export_range(0.0, 4.0) var optics_sparkle_power_multiplier: float = 1.0
-## Multiplier for rim lighting strength.
-@export_range(0.0, 4.0) var optics_rim_strength_multiplier: float = 1.0
-## Multiplier for environment blocker strength. 1.0 = default preset behavior.
-## 0 = no blocker, >1 = stronger shadow/obstruction zone.
-@export_range(0.0, 4.0) var optics_blocker_strength_multiplier: float = 1.0
-## Override the auto-computed cloudiness. -1 = auto from scattering/roughness/translucency.
-## Effective range is 0.0-0.5 (values above 0.5 are clamped by the tracer).
-@export_range(-1.0, 0.5) var optics_cloudiness_override: float = -1.0
-## Override the material-mode transmission factor. -1 = auto from material_mode.
-## 0 = fully opaque, 1 = fully transparent to internal rays.
-@export_range(-1.0, 1.0) var optics_transmission_override: float = -1.0
-
-@export_subgroup("Output Grade")
-## Per-gem exposure override for the output tonemapping pass.
-## -1 = use the auto exposure formula. Positive values replace the entire
-## exposure calculation, giving direct control over final brightness.
-@export_range(-1.0, 4.0) var optics_grade_exposure: float = -1.0
-## Per-gem saturation override for the output tonemapping pass.
-## -1 = use the auto saturation formula.
-@export_range(-1.0, 1.0) var optics_grade_saturation: float = -1.0
 
 # ==== Stylization ====
 
@@ -313,7 +210,7 @@ func get_cut_spec_id() -> StringName:
 	return &""
 
 
-const _VISUAL_JSON_SKIP := [&"cut_spec", &"cut_overrides", &"cut_id", &"color_texture"]
+const _VISUAL_JSON_SKIP := [&"cut_spec", &"cut_overrides", &"cut_id", &"color_texture", &"mineral_template", &"bake_environment"]
 
 
 ## Serialize all visual (non-geometry) properties to a JSON-safe dictionary.
@@ -360,6 +257,8 @@ static func _to_json_safe_value(value) -> Variant:
 			return [value.x, value.y, value.z]
 		TYPE_STRING_NAME:
 			return String(value)
+		TYPE_PACKED_FLOAT32_ARRAY:
+			return Array(value)
 		_:
 			return value
 
@@ -387,4 +286,10 @@ static func _from_json_value(value, target_type: int) -> Variant:
 			return bool(value)
 		TYPE_STRING:
 			return String(value)
+		TYPE_PACKED_FLOAT32_ARRAY:
+			if typeof(value) == TYPE_ARRAY:
+				var arr := PackedFloat32Array()
+				for v in value:
+					arr.append(float(v))
+				return arr
 	return value

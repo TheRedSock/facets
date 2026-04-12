@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"opal"
+mineral_name = "Opal (SiO2·nH2O, amorphous)"
+sellmeier_b = Vector3(0.4830, 0.3500, 0)
+sellmeier_c = Vector3(0.00450, 0.01400, 0)
+scattering_coefficient = 8.0
+scattering_anisotropy = 0.3
+absorption_spectrum = PackedFloat32Array(0.24022, 0.26475, 0.28379, 0.29586, 0.3, 0.29586, 0.28379, 0.26475, 0.24022, 0.21199, 0.18196, 0.1519, 0.12333, 0.0974, 0.07481, 0.05588, 0.0406, 0.02869, 0.01972, 0.01319, 0.00858, 0.00543, 0.00335, 0.00203, 0.00121, 0.00073, 0.00047, 0.00035, 0.00033, 0.00038, 0.00049, 0.00066, 0.0009, 0.00123, 0.00167, 0.00224, 0.00298, 0.00392, 0.00511, 0.00659, 0.00842, 0.01065, 0.01334, 0.01654, 0.0203, 0.02467, 0.02968, 0.03536, 0.04171, 0.0487, 0.0563, 0.06443, 0.07301, 0.08191, 0.09098, 0.10005, 0.10892, 0.11741, 0.12529, 0.13237, 0.13847, 0.1434, 0.14703, 0.14925, 0.15, 0.14925, 0.14703, 0.1434, 0.13847, 0.13237, 0.12529, 0.11741, 0.10892, 0.10005, 0.09098, 0.08191, 0.07301, 0.06443, 0.0563, 0.0487, 0.04171)
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.0
+default_surface_roughness = 0.02
+display_color = Color(0.92, 0.90, 0.88, 1)

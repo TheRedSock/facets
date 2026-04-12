@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"tourmaline"
+mineral_name = "Tourmaline (complex borosilicate)"
+sellmeier_b = Vector3(0.9420, 0.5600, 0)
+sellmeier_c = Vector3(0.00680, 0.02050, 0)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+absorption_spectrum = PackedFloat32Array(0.27904, 0.37034, 0.4846, 0.62479, 0.79333, 0.99167, 1.21999, 1.47692, 1.75927, 2.06205, 2.37858, 2.70081, 3.01978, 3.32632, 3.61169, 3.86827, 4.09015, 4.27352, 4.41683, 4.52072, 4.58769, 4.62162, 4.62716, 4.60917, 4.57212, 4.51967, 4.45448, 4.37807, 4.29098, 4.19293, 4.08317, 3.96077, 3.82499, 3.67543, 3.51232, 3.33651, 3.14957, 2.95367, 2.75149, 2.54609, 2.34074, 2.13877, 1.94344, 1.7578, 1.58462, 1.42629, 1.28479, 1.16166, 1.058, 0.97443, 0.91114, 0.8679, 0.84407, 0.83861, 0.85015, 0.87695, 0.91699, 0.96798, 1.02743, 1.09265, 1.16087, 1.22928, 1.29512, 1.35575, 1.40874, 1.45194, 1.48357, 1.50225, 1.50708, 1.49763, 1.47395, 1.43659, 1.3865, 1.32502, 1.25379, 1.17466, 1.08964, 1.00074, 0.90998, 0.81924, 0.73021)
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.018
+default_surface_roughness = 0.01
+display_color = Color(0.30, 0.72, 0.55, 1)

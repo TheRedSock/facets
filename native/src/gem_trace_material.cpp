@@ -1,3 +1,5 @@
+// gem_trace_material.cpp — Procedural material sampling.
+// Updated for new GemTraceProps interface.
 #include "gem_trace_material.h"
 #include <cmath>
 
@@ -15,13 +17,13 @@ static double apply_contrast(double value, double contrast) {
     return clampd(0.5 + centered * scale, 0.0, 1.0);
 }
 
-static Color resolve_secondary_color(const VisualProps& v, Color base) {
+static Color resolve_secondary_color(const GemTraceProps& v, Color base) {
     if (v.material_secondary_color.a > 0.001) return v.material_secondary_color;
     if (v.gradient_color.a > 0.001) return v.gradient_color;
     return base.darkened(0.18);
 }
 
-static Color resolve_tertiary_color(const VisualProps& v, Color base) {
+static Color resolve_tertiary_color(const GemTraceProps& v, Color base) {
     if (v.material_tertiary_color.a > 0.001) return v.material_tertiary_color;
     if (v.phenomenon_color.a > 0.001) return v.phenomenon_color;
     return base.lightened(0.12);
@@ -53,7 +55,7 @@ static Vector3 project_point(Vector3 point, const BasisAxes& b) {
     return Vector3(point.dot(b.tangent), point.dot(b.bitangent), point.dot(b.axis));
 }
 
-static Vector2 surface_coord(Vector2 uv, Vector3 obj_pos, const VisualProps& v) {
+static Vector2 surface_coord(Vector2 uv, Vector3 obj_pos, const GemTraceProps& v) {
     Vector2 centered = uv - Vector2(0.5, 0.5);
     centered += Vector2(obj_pos.z, -obj_pos.z) * 0.08;
     double angle = Math::deg_to_rad(v.surface_pattern_rotation_degrees);
@@ -64,7 +66,7 @@ static Vector2 surface_coord(Vector2 uv, Vector3 obj_pos, const VisualProps& v) 
                    rotated.y * fmax(v.surface_pattern_scale.y, 0.1));
 }
 
-static Vector2 surface_object_coord(Vector3 obj_pos, const VisualProps& v) {
+static Vector2 surface_object_coord(Vector3 obj_pos, const GemTraceProps& v) {
     Vector2 centered(obj_pos.x, obj_pos.y);
     double angle = Math::deg_to_rad(v.surface_pattern_rotation_degrees);
     double ca = cos(angle), sa = sin(angle);
@@ -94,10 +96,10 @@ static Vector2 apply_procedural_facet_warp(Vector2 coord, Vector3 obj_pos,
 }
 
 static Color sample_texture(Image* tex, Vector2 uv, Vector3 normal,
-                             const VisualProps& v) {
-    if (!tex) return v.base_color;
+                             const GemTraceProps& v) {
+    if (!tex) return v.display_color;
     int w = tex->get_width(), h = tex->get_height();
-    if (w <= 0 || h <= 0) return v.base_color;
+    if (w <= 0 || h <= 0) return v.display_color;
     Vector2 warped = uv;
     if (v.texture_facet_warp > 0.001) {
         warped += Vector2(normal.x, -normal.y) * v.texture_facet_warp * 0.08;
@@ -112,7 +114,7 @@ static Color sample_texture(Image* tex, Vector2 uv, Vector3 normal,
 }
 
 // -------------------------------------------------------------------------
-// Noise primitives
+// Noise primitives (unchanged)
 // -------------------------------------------------------------------------
 
 double fract(double value) { return value - floor(value); }
@@ -204,7 +206,7 @@ CellularResult cellular3(Vector3 point) {
 }
 
 // -------------------------------------------------------------------------
-// Pattern sampling
+// Pattern sampling (unchanged)
 // -------------------------------------------------------------------------
 
 PatternSample band_sample(Vector2 coord, double density, double contrast) {
@@ -291,7 +293,7 @@ PatternSample volume_layer_sample(Vector3 coord, double density, double contrast
 // Surface pattern dispatch
 // -------------------------------------------------------------------------
 
-static PatternSample sample_surface_pattern(const VisualProps& v, Vector2 uv,
+static PatternSample sample_surface_pattern(const GemTraceProps& v, Vector2 uv,
                                             Vector3 obj_pos, Vector3 normal) {
     Vector2 coord = (v.surface_pattern_type == MATERIAL_PATTERN_CONCENTRIC)
         ? surface_object_coord(obj_pos, v)
@@ -320,7 +322,7 @@ static PatternSample sample_surface_pattern(const VisualProps& v, Vector2 uv,
 // Volume pattern dispatch
 // -------------------------------------------------------------------------
 
-static PatternSample sample_volume_pattern(const VisualProps& v, Vector3 obj_pos) {
+static PatternSample sample_volume_pattern(const GemTraceProps& v, Vector3 obj_pos) {
     double density = fmax(v.volume_pattern_density, 0.1);
     auto basis = basis_from_axis(v.volume_pattern_axis);
     Vector3 coord = project_point(obj_pos, basis);
@@ -345,17 +347,17 @@ static PatternSample sample_volume_pattern(const VisualProps& v, Vector3 obj_pos
 // Reactive effects
 // -------------------------------------------------------------------------
 
-static Color sample_chatoyancy(const VisualProps& v, Vector3 rcoord,
+static Color sample_chatoyancy(const GemTraceProps& v, Vector3 rcoord,
                                Vector3 half_vec, const BasisAxes& basis) {
     double sweep = rcoord.x * v.reactive_density + half_vec.dot(basis.tangent) * 2.8;
     double band = exp(-sweep * sweep * lerpd(1.4, 6.0, fmin(v.reactive_sharpness / 8.0, 1.0)));
     double angle_term = pow(fmax(fabs(half_vec.dot(basis.axis)), 0.0), fmax(v.reactive_sharpness, 0.5));
-    Color base = v.reactive_color.a > 0.001 ? v.reactive_color : resolve_secondary_color(v, v.base_color);
+    Color base = v.reactive_color.a > 0.001 ? v.reactive_color : resolve_secondary_color(v, v.display_color);
     double strength = band * angle_term * v.reactive_strength;
     return base * clampd(strength, 0.0, 4.0);
 }
 
-static Color sample_opalescence(const VisualProps& v, Vector3 rcoord,
+static Color sample_opalescence(const GemTraceProps& v, Vector3 rcoord,
                                 Vector3 obj_pos, Vector3 normal, Vector3 half_vec) {
     double scale = v.reactive_density * 1.3;
     double ca = fbm3(rcoord * scale + obj_pos * 0.8 + Vector3(5, 11, 2));
@@ -380,7 +382,7 @@ static Color sample_opalescence(const VisualProps& v, Vector3 rcoord,
     return flash * clampd(zone_mask * glint * v.reactive_strength, 0.0, 5.0);
 }
 
-static Color sample_iridescence(const VisualProps& v, Vector3 rcoord,
+static Color sample_iridescence(const GemTraceProps& v, Vector3 rcoord,
                                 Vector3 normal, Vector3 half_vec) {
     static const Vector3 VIEW_DIR(0, 0, 1);
     double facing = clampd(1.0 - fmax(normal.normalized().dot(VIEW_DIR), 0.0), 0.0, 1.0);
@@ -396,19 +398,8 @@ static Color sample_iridescence(const VisualProps& v, Vector3 rcoord,
 // Public API
 // -------------------------------------------------------------------------
 
-double transmission_factor(const VisualProps& v) {
-    if (v.optics_transmission_override >= 0.0) {
-        return clampd(v.optics_transmission_override, 0.0, 1.0);
-    }
-    switch (v.material_mode) {
-        case MATERIAL_MODE_PATTERNED_OPAQUE:      return 0.0;
-        case MATERIAL_MODE_PATTERNED_TRANSLUCENT:  return 0.78;
-        default: return 1.0;
-    }
-}
-
 SurfaceMaterialSample apply_surface_material(
-    const VisualProps& v, Color base_color, Vector2 uv,
+    const GemTraceProps& v, Color base_color, Vector2 uv,
     Vector3 obj_pos, Vector3 normal, Image* texture_image) {
 
     Color color = base_color;
@@ -432,8 +423,8 @@ SurfaceMaterialSample apply_surface_material(
     };
 }
 
-VolumeMaterialSample sample_volume_material(const VisualProps& v, Vector3 obj_pos) {
-    Color color = v.base_color;
+VolumeMaterialSample sample_volume_material(const GemTraceProps& v, Vector3 obj_pos) {
+    Color color = v.display_color;
     if (v.volume_pattern_type == MATERIAL_PATTERN_NONE) {
         return { color, 0.5, 0.5, 1.0, 1.0 };
     }
@@ -448,7 +439,7 @@ VolumeMaterialSample sample_volume_material(const VisualProps& v, Vector3 obj_po
     };
 }
 
-Color sample_reactive_color(const VisualProps& v, Vector3 obj_pos,
+Color sample_reactive_color(const GemTraceProps& v, Vector3 obj_pos,
                             Vector3 normal, Vector3 light_dir, Vector3 view_dir) {
     if (v.reactive_effect_type == MATERIAL_REACTIVE_NONE) return Color(0, 0, 0, 0);
     if (v.reactive_strength <= 0.0001) return Color(0, 0, 0, 0);
@@ -458,10 +449,28 @@ Color sample_reactive_color(const VisualProps& v, Vector3 obj_pos,
     auto basis = basis_from_axis(v.reactive_axis);
     Vector3 rcoord = project_point(obj_pos * fmax(v.reactive_scale, 0.1), basis);
     switch (v.reactive_effect_type) {
-        case MATERIAL_REACTIVE_CHATTOYANCY:  return sample_chatoyancy(v, rcoord, half_vec, basis);
-        case MATERIAL_REACTIVE_OPALESCENCE:  return sample_opalescence(v, rcoord, obj_pos, normal, half_vec);
-        case MATERIAL_REACTIVE_IRIDESCENCE:  return sample_iridescence(v, rcoord, normal, half_vec);
+        case MATERIAL_REACTIVE_CHATOYANCY:  return sample_chatoyancy(v, rcoord, half_vec, basis);
+        case MATERIAL_REACTIVE_OPALESCENCE: return sample_opalescence(v, rcoord, obj_pos, normal, half_vec);
+        case MATERIAL_REACTIVE_IRIDESCENCE: return sample_iridescence(v, rcoord, normal, half_vec);
         default: return Color(0, 0, 0, 0);
+    }
+}
+
+double transmission_factor(const GemTraceProps& props) {
+    switch (props.material_mode) {
+        case MATERIAL_MODE_PATTERNED_OPAQUE:      return 0.0;
+        case MATERIAL_MODE_FACETED_TRANSPARENT:    return 1.0;
+        case MATERIAL_MODE_PATTERNED_TRANSLUCENT: {
+            // Derive from scattering: higher scattering = more opaque appearance.
+            double sigma_s = props.effective_scattering();
+            double roughness = props.effective_roughness();
+            // Map scattering to a 0..1 translucent factor.
+            // Low scattering → nearly transparent, high → nearly opaque.
+            double scatter_opacity = 1.0 - std::exp(-sigma_s * 0.25);
+            double roughness_bias = clampd(roughness * 0.5, 0.0, 0.2);
+            return clampd(1.0 - scatter_opacity - roughness_bias, 0.05, 0.95);
+        }
+        default: return 1.0;
     }
 }
 

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"fluorite"
+mineral_name = "Fluorite (CaF2)"
+sellmeier_b = Vector3(0.5676, 0.4711, 3.8485)
+sellmeier_c = Vector3(0.00253, 0.01008, 1200.6)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+absorption_spectrum = PackedFloat32Array(0.5599, 0.6569, 0.75225, 0.84134, 0.91984, 0.98429, 1.03257, 1.06426, 1.08071, 1.08494, 1.08125, 1.07472, 1.07062, 1.07383, 1.08838, 1.11715, 1.16178, 1.22264, 1.29903, 1.38939, 1.49157, 1.60305, 1.72114, 1.84311, 1.96632, 2.08822, 2.20643, 2.31874, 2.4231, 2.51762, 2.60064, 2.67068, 2.72649, 2.76709, 2.79174, 2.80001, 2.79173, 2.76706, 2.72643, 2.67054, 2.60037, 2.51711, 2.42213, 2.31699, 2.20334, 2.0829, 1.95743, 1.82866, 1.69829, 1.5679, 1.43899, 1.31288, 1.19076, 1.07362, 0.9623, 0.85743, 0.75948, 0.66876, 0.58539, 0.5094, 0.44066, 0.37894, 0.32394, 0.2753, 0.23257, 0.19532, 0.16307, 0.13534, 0.11166, 0.09158, 0.07467, 0.06053, 0.04877, 0.03906, 0.03111, 0.02462, 0.01937, 0.01516, 0.01179, 0.00911, 0.007)
+fluorescence_quantum_yield = 0.15
+fluorescence_excitation_center_nm = 370.0
+fluorescence_excitation_width_nm = 30.0
+fluorescence_emission_center_nm = 420.0
+fluorescence_emission_width_nm = 30.0
+birefringence_delta_n = 0.0
+default_surface_roughness = 0.01
+display_color = Color(0.70, 0.82, 0.95, 1)

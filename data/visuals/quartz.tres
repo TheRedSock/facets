@@ -2,44 +2,28 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/simple_octagon_step.tres" id="1_axqya"]
+[ext_resource type="Resource" path="res://data/minerals/quartz.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"quartz"
 cut_spec = ExtResource("1_axqya")
 cut_id = &"simple_octagon_step"
-base_color = Color(0.91, 0.93, 0.96, 1)
-shininess = 24.0
-specular_intensity = 0.20
-depth_tint = Color(0.72, 0.78, 0.86, 0.12)
-saturation_boost = 0.0
-contrast = 0.12
-rim_intensity = 0.03
-rim_color = Color(0.94, 0.97, 1, 1)
-translucency = 0.12
-translucency_color = Color(0.96, 0.98, 1, 1)
+display_color = Color(0.91, 0.93, 0.96, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+absorption_spectrum_override = PackedFloat32Array(0.06406, 0.07568, 0.08, 0.07568, 0.06406, 0.04852, 0.03289, 0.01995, 0.01083, 0.00526, 0.00229, 0.00089, 0.00031, 0.0001, 0.00003, 0.00001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+surface_roughness_override = 0.018
+scattering_coefficient_override = -1.0
 gradient_color = Color(0.9, 0.93, 0.98, 1)
 gradient_strength = 0.06
 gradient_mode = 2
 phenomenon_color = Color(0.9, 0.8, 0.58, 1)
+phenomenon_strength = 0.15
 phenomenon_angle_degrees = 12.0
 phenomenon_sharpness = 1.6
-brilliance_contrast = 0.14
-optics_ior = 1.544
-optics_dispersion = 0.013
-optics_absorption_color = Color(0.92, 0.95, 0.98, 1)
-optics_absorption_strength = 0.32
-optics_surface_roughness = 0.1
-optics_scattering_strength = 0.1
-optics_scattering_color = Color(0.96, 0.98, 1, 1)
-optics_birefringence_strength = 0.009
-optics_optic_axis = Vector3(0, 1, 0.05)
-optics_environment_preset = 3
+optics_trace_view_scale = 1.0
 optics_environment_rotation_degrees = 10.0
-optics_environment_energy = 0.56
-optics_light_energy = 1.04
-optics_ground_albedo = 0.30
-optics_ground_tint = Color(0.92, 0.88, 0.82, 1)
 stylize_mix = 0.64
 stylize_facet_edge_gain = 0.26
 stylize_plane_contrast = 0.3

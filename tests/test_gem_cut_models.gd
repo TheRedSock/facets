@@ -158,6 +158,7 @@ func test_focused_visual_alignment_coverage() -> void:
 		assert_true(visual != null, "%s visual should exist for atlas regression coverage" % str(visual_id))
 		if visual == null:
 			continue
+		assert_true(visual.mineral_template != null, "%s should reference a non-null mineral_template" % str(visual_id))
 		var cut_model = registry.get_visual_cut_model(visual)
 		var projected_cut = registry.get_visual_cut(visual)
 		assert_true(cut_model != null, "%s should resolve a canonical cut model" % str(visual_id))

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"garnet_pyrope_spessartine"
+mineral_name = "Garnet — Pyrope-Spessartine series"
+sellmeier_b = Vector3(1.1200, 0.5900, 0)
+sellmeier_c = Vector3(0.00730, 0.02200, 0)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+absorption_spectrum = PackedFloat32Array(0.24366, 0.35632, 0.50065, 0.67589, 0.87672, 1.09272, 1.30868, 1.50615, 1.66593, 1.77128, 1.81091, 1.78129, 1.68747, 1.54238, 1.36467, 1.17574, 0.99672, 0.84601, 0.73774, 0.68149, 0.68275, 0.744, 0.86587, 1.04811, 1.29014, 1.59123, 1.95025, 2.36527, 2.83306, 3.34858, 3.90471, 4.49201, 5.09885, 5.71155, 6.31484, 6.89234, 7.4272, 7.90277, 8.30332, 8.61474, 8.82522, 8.92591, 8.91148, 8.7805, 8.5358, 8.18444, 7.73757, 7.20996, 6.61925, 5.98501, 5.32766, 4.66725, 4.02237, 3.4092, 2.84075, 2.32645, 1.87205, 1.47977, 1.14875, 0.87564, 0.65526, 0.48131, 0.34697, 0.24545, 0.17037, 0.11602, 0.07751, 0.0508, 0.03266, 0.0206, 0.01274, 0.00773, 0.0046, 0.00269, 0.00154, 0.00086, 0.00048, 0.00026, 0.00014, 0.00007, 0.00004)
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.0
+default_surface_roughness = 0.008
+display_color = Color(0.35, 0.28, 0.72, 1)

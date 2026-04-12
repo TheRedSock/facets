@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_cut_spec_resource.gd" id="1_pcxa7"]
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="2_pfaq8"]
+[ext_resource type="Resource" path="res://data/minerals/beryl.tres" id="3"]
 
 [sub_resource type="Resource" id="Resource_pcxa7"]
 script = ExtResource("1_pcxa7")
@@ -84,32 +85,15 @@ orthographic_metadata = {
 script = ExtResource("2_pfaq8")
 visual_id = &"red_beryl"
 cut_spec = SubResource("Resource_pcxa7")
-base_color = Color(0.8666667, 0.24705882, 0.43529412, 1)
-shininess = 44.0
-specular_intensity = 0.3800000000046566
-depth_tint = Color(0.6262097, 0, 0.3133042, 0.45000002)
-saturation_boost = 0.21999999997206032
-contrast = 0.3800000000046566
-rim_intensity = 0.14000000001396984
-rim_color = Color(0.9911565, 0.9063318, 0.9452769, 1)
-translucency = 0.07999999995809048
-translucency_color = Color(0.785777, 0.38109186, 0.48452926, 1)
+display_color = Color(0.8666667, 0.24705882, 0.43529412, 1)
+mineral_template = ExtResource("3")
+absorption_strength_scale = 1.0
+absorption_spectrum_override = PackedFloat32Array(1.23037, 1.43645, 1.62237, 1.77688, 1.8938, 1.97383, 2.02508, 2.06221, 2.10424, 2.17142, 2.28206, 2.44967, 2.6811, 2.9757, 3.32567, 3.71726, 4.1326, 4.5518, 4.95515, 5.325, 5.64729, 5.91254, 6.11612, 6.25796, 6.34174, 6.3737, 6.36128, 6.31192, 6.23208, 6.12663, 5.99871, 5.84986, 5.68051, 5.49048, 5.27958, 5.04805, 4.7969, 4.52799, 4.24412, 3.94879, 3.64606, 3.34029, 3.03588, 2.73703, 2.44759, 2.17092, 1.90977, 1.66626, 1.44186, 1.23742, 1.05323, 0.88909, 0.74435, 0.61804, 0.50894, 0.41566, 0.33667, 0.27046, 0.21547, 0.17025, 0.13342, 0.10369, 0.07993, 0.0611, 0.04632, 0.03483, 0.02598, 0.01921, 0.01409, 0.01025, 0.0074, 0.00529, 0.00376, 0.00264, 0.00185, 0.00128, 0.00088, 0.0006, 0.0004, 0.00027, 0.00018)
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 gradient_color = Color(0.6651851, 0, 0.2716998, 1)
 gradient_strength = 0.21999999997206032
-brilliance_contrast = 0.4200000000419095
-extinction = 0.2800000000279397
-optics_ior = 1.5699999999487773
-optics_dispersion = 0.010000000009313226
-optics_absorption_color = Color(0.80946815, 0.15170373, 0.3491902, 1)
-optics_absorption_strength = 3.099999999976717
-optics_surface_roughness = 0.05000000004656613
-optics_scattering_strength = 0.1199999999953434
-optics_scattering_color = Color(0.886004, 0.4100209, 0.5271128, 1)
-optics_optic_axis = Vector3(0.1, 0.98, 0.06)
-optics_environment_preset = 2
 optics_environment_rotation_degrees = 12.0
-optics_environment_energy = 0.5200000000186265
-optics_light_energy = 1.2199999999720603
 stylize_mix = 0.5799999999580905
 stylize_facet_edge_gain = 0.8399999999674037
 stylize_plane_contrast = 0.5

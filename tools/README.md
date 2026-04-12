@@ -46,7 +46,7 @@ Exit code 0 on success, 1 on failure. Prints manifest path and entry count on co
 
 ### `validate_production_bake.gd` — Production Bake Validator
 
-Validates that a production bake matches its profile specification. Checks manifest identity (`profile_id`, `stylize_version`, `max_trace_bounces`), geometry (`cell_size`, `draw_size`, `image_format`), variant settings (atlas layers, grid size, rotation params), tile coverage (all gems in TileRegistry present), texture file existence, and orphan texture detection.
+Validates that a production bake matches its profile specification. Checks manifest identity (`profile_id`, `stylize_version`, `samples_per_pixel`), geometry (`cell_size`, `draw_size`, `image_format`), variant settings (atlas layers, grid size, rotation params), tile coverage (all gems in TileRegistry present), mineral template references, texture file existence, and orphan texture detection.
 
 Usage:
 ```bash

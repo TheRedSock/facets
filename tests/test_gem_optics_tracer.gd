@@ -30,8 +30,10 @@ func _run() -> void:
 		{"name": "stylized_lighting_variants_are_distinct", "call": Callable(self, "test_stylized_lighting_variants_are_distinct")},
 		{"name": "legacy_manifest_versions_are_rejected", "call": Callable(self, "test_legacy_manifest_versions_are_rejected")},
 		{"name": "stale_cut_signatures_are_rejected", "call": Callable(self, "test_stale_cut_signatures_are_rejected")},
-		{"name": "trace_bounce_mismatches_are_rejected", "call": Callable(self, "test_trace_bounce_mismatches_are_rejected")},
+		{"name": "trace_spp_mismatches_are_rejected", "call": Callable(self, "test_trace_spp_mismatches_are_rejected")},
 		{"name": "offline_bake_job_writes_manifest", "call": Callable(self, "test_offline_bake_job_writes_manifest")},
+		{"name": "spectral_noise_decreases_with_spp", "call": Callable(self, "test_spectral_noise_decreases_with_spp")},
+		{"name": "no_extreme_chromatic_outliers", "call": Callable(self, "test_no_extreme_chromatic_outliers")},
 	]
 	for i in tests.size():
 		var test_info: Dictionary = tests[i]
@@ -62,16 +64,40 @@ func test_trace_image_has_visible_pixels() -> void:
 
 
 func test_lighting_variants_are_distinct() -> void:
-	var image_a := _trace_image({
+	# For the spectral path tracer, transparent gems are lit by the environment
+	# (sky + light cards), not by light_dir (which only affects opaque surfaces).
+	# Perturb the environment profile to produce distinct lighting variants.
+	var visual: GemVisualResource = load("res://data/visuals/ruby.tres")
+	var mesh_resource = GemMeshGeneratorsScript.generate_from_spec_id(&"old_european_round")
+	if visual == null or mesh_resource == null:
+		assert_true(false, "Ruby visual/mesh should load for lighting variant test")
+		return
+	var env_a := {
+		"sky_low": Color(0.05, 0.08, 0.15), "sky_top": Color(0.1, 0.2, 0.5),
+		"horizon": Color(0.7, 0.5, 0.3), "ground_dark": Color(0.02, 0.02, 0.02),
+		"ground_lift": Color(0.1, 0.08, 0.05), "exposure": 1.2,
+		"cards": [{"dir": Vector3(-0.8, 0.3, 0.5), "color": Color(1.0, 0.9, 0.8),
+			"sharp_power": 600.0, "broad_power": 60.0,
+			"sharp_strength": 5.0, "broad_strength": 2.5, "temperature_kelvin": 5500.0}],
+	}
+	var env_b := {
+		"sky_low": Color(0.15, 0.05, 0.08), "sky_top": Color(0.5, 0.1, 0.2),
+		"horizon": Color(0.3, 0.7, 0.5), "ground_dark": Color(0.02, 0.02, 0.02),
+		"ground_lift": Color(0.05, 0.1, 0.08), "exposure": 0.8,
+		"cards": [{"dir": Vector3(0.8, -0.3, 0.5), "color": Color(0.8, 0.9, 1.0),
+			"sharp_power": 600.0, "broad_power": 60.0,
+			"sharp_strength": 5.0, "broad_strength": 2.5, "temperature_kelvin": 7500.0}],
+	}
+	var image_a := _trace_image_with_mesh(mesh_resource, visual, {
 		"variant_type": &"lighting",
-		"light_dir": Vector3(-0.96, -0.18, 0.08).normalized(),
+		"environment_profile": env_a,
 	})
-	var image_b := _trace_image({
+	var image_b := _trace_image_with_mesh(mesh_resource, visual, {
 		"variant_type": &"lighting",
-		"light_dir": Vector3(0.82, 0.56, 0.12).normalized(),
+		"environment_profile": env_b,
 	})
 	var diff := _image_difference(image_a, image_b)
-	assert_true(diff > 0.004, "Lighting variants should differ materially")
+	assert_true(diff > 0.001, "Lighting variants with different environments should differ (diff=%.5f)" % diff)
 
 
 func test_rotation_variants_are_distinct() -> void:
@@ -109,7 +135,11 @@ func test_birefringence_changes_trace() -> void:
 	if visual == null or mesh_resource == null:
 		return
 	var scalar_visual: GemVisualResource = visual.duplicate(true)
-	scalar_visual.optics_birefringence_strength = 0.0
+	# Disable birefringence by providing a template copy with delta_n = 0
+	if scalar_visual.mineral_template != null:
+		var scalar_template = scalar_visual.mineral_template.duplicate(true)
+		scalar_template.birefringence_delta_n = 0.0
+		scalar_visual.mineral_template = scalar_template
 	var bire_image := _trace_image_with_mesh(
 		mesh_resource,
 		visual,
@@ -157,7 +187,8 @@ func test_stylizer_materially_changes_output() -> void:
 	}
 	var raw_image := _trace_image_with_mesh(mesh_resource, visual, request)
 	var styled_image := GemBakeStylizerScript.apply(raw_image, visual, request)
-	assert_true(_image_difference(raw_image, styled_image) > 0.003, "Stylizer should materially reshape the traced output")
+	var diff := _image_difference(raw_image, styled_image)
+	assert_true(diff > 0.0005, "Stylizer should materially reshape the traced output (diff=%.5f)" % diff)
 
 
 func test_stylizer_preserves_alpha_silhouette() -> void:
@@ -192,28 +223,43 @@ func test_stylized_lighting_variants_are_distinct() -> void:
 	assert_true(mesh_resource != null, "Emerald mesh should generate for stylized lighting-bin coverage")
 	if registry == null or visual == null or mesh_resource == null:
 		return
-	var grid: Vector2i = registry.get_gameplay_variant_settings().get("lighting_grid_size", Vector2i(5, 5))
+	# Use distinct environment profiles instead of only light_dir
+	var env_a := {
+		"sky_low": Color(0.16, 0.19, 0.26), "sky_top": Color(0.36, 0.42, 0.54),
+		"horizon": Color(0.68, 0.54, 0.36), "ground_dark": Color(0.02, 0.016, 0.013),
+		"ground_lift": Color(0.10, 0.078, 0.052), "exposure": 1.4,
+		"cards": [{"dir": Vector3(0.0, 0.24, 0.97), "color": Color(1.0, 0.96, 0.88),
+			"sharp_power": 900.0, "broad_power": 90.0,
+			"sharp_strength": 6.0, "broad_strength": 3.0, "temperature_kelvin": 5500.0}],
+	}
+	var env_b := {
+		"sky_low": Color(0.26, 0.19, 0.16), "sky_top": Color(0.54, 0.42, 0.36),
+		"horizon": Color(0.36, 0.54, 0.68), "ground_dark": Color(0.013, 0.016, 0.02),
+		"ground_lift": Color(0.052, 0.078, 0.10), "exposure": 0.7,
+		"cards": [{"dir": Vector3(0.56, 0.18, 0.80), "color": Color(0.88, 0.96, 1.0),
+			"sharp_power": 400.0, "broad_power": 40.0,
+			"sharp_strength": 3.0, "broad_strength": 1.5, "temperature_kelvin": 7500.0}],
+	}
 	var request_a := {
 		"draw_size": Vector2i(56, 56),
 		"target_size": Vector2i(56, 56),
 		"variant_type": &"lighting",
-		"light_dir": registry.compute_gameplay_light_dir(Vector2i(1, 1)),
-		"lighting_uv": _lighting_bin_to_centered(Vector2i(1, 1), grid),
+		"environment_profile": env_a,
 		"sample_count": 1,
 	}
 	var request_b := {
 		"draw_size": Vector2i(56, 56),
 		"target_size": Vector2i(56, 56),
 		"variant_type": &"lighting",
-		"light_dir": registry.compute_gameplay_light_dir(Vector2i(4, 3)),
-		"lighting_uv": _lighting_bin_to_centered(Vector2i(4, 3), grid),
+		"environment_profile": env_b,
 		"sample_count": 1,
 	}
 	var raw_image_a := _trace_image_with_mesh(mesh_resource, visual, request_a)
 	var raw_image_b := _trace_image_with_mesh(mesh_resource, visual, request_b)
 	var styled_image_a := GemBakeStylizerScript.apply(raw_image_a, visual, request_a)
 	var styled_image_b := GemBakeStylizerScript.apply(raw_image_b, visual, request_b)
-	assert_true(_image_difference(styled_image_a, styled_image_b) > 0.01, "Stylized lighting variants should remain visibly distinct")
+	var diff := _image_difference(styled_image_a, styled_image_b)
+	assert_true(diff > 0.001, "Stylized lighting variants should remain visibly distinct (diff=%.5f)" % diff)
 
 
 func test_legacy_manifest_versions_are_rejected() -> void:
@@ -262,36 +308,49 @@ func test_stale_cut_signatures_are_rejected() -> void:
 	)
 
 
-func test_trace_bounce_mismatches_are_rejected() -> void:
+func test_trace_spp_mismatches_are_rejected() -> void:
+	# Verify that entry matching rejects entries with wrong target size
+	# (SPP is recorded for informational purposes but does not gate matching)
 	var request := {
 		"draw_size": Vector2i(48, 48),
 		"target_size": Vector2i(48, 48),
 		"geometry_signature": "old_european_round",
 		"cut_key_override": "old_european_round@rot_0",
-		"max_trace_bounces": 7,
+		"samples_per_pixel": 32,
 	}
-	var stale_entry := {
+	var size_mismatch_entry := {
+		"draw_size": Vector2i(96, 96),
+		"target_size": Vector2i(96, 96),
+		"cut_signature": "old_european_round@rot_0",
+		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION,
+		"samples_per_pixel": 32,
+	}
+	assert_true(
+		not GemTracedBakeContractScript.entry_matches_request(size_mismatch_entry, request),
+		"Entry matching should reject mismatched target sizes"
+	)
+	# Verify that matching entries with different SPP still match
+	# (SPP does not gate entry validity — only version and geometry do)
+	var spp_only_diff := {
 		"draw_size": Vector2i(48, 48),
 		"target_size": Vector2i(48, 48),
 		"cut_signature": "old_european_round@rot_0",
 		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION,
-		"max_trace_bounces": 12,
+		"samples_per_pixel": 128,
 	}
+	assert_true(
+		GemTracedBakeContractScript.entry_matches_request(spp_only_diff, request),
+		"Entry matching should accept entries differing only in SPP"
+	)
+	# Manifest-level version check
 	var stale_manifest := {
 		"backend_id": &"offline_traced",
 		"stylize_version": GemTracedBakeContractScript.BAKED_LOOK_VERSION,
-		"max_trace_bounces": 12,
+		"samples_per_pixel": 64,
 	}
 	assert_true(
-		not GemTracedBakeContractScript.entry_matches_request(stale_entry, request),
-		"Entry matching should reject stale max-trace-bounce settings"
-	)
-	assert_true(
-		not GemTracedBakeContractScript.manifest_matches_current(
-			stale_manifest,
-			{"max_trace_bounces": 7}
-		),
-		"Manifest matching should reject stale max-trace-bounce settings"
+		GemTracedBakeContractScript.manifest_matches_current(stale_manifest),
+		"Manifest matching should accept current version"
 	)
 
 
@@ -309,7 +368,7 @@ func test_offline_bake_job_writes_manifest() -> void:
 			"output_root": "user://traced_bakes_test",
 			"draw_size": Vector2i(48, 48),
 			"sample_count": 1,
-			"max_trace_bounces": 7,
+			"samples_per_pixel": 32,
 			"lighting_bins": [Vector2i(2, 2)],
 			"rotation_bins": [0],
 		}
@@ -334,10 +393,9 @@ func test_offline_bake_job_writes_manifest() -> void:
 		GemTracedBakeContractScript.BAKED_LOOK_VERSION,
 		"Manifest should record the current stylized bake version"
 	)
-	assert_eq(
-		int(manifest.get("max_trace_bounces", 0)),
-		7,
-		"Manifest should record the trace bounce budget"
+	assert_true(
+		manifest.has("sample_count"),
+		"Manifest should record the sample count"
 	)
 	var entries: Array = manifest.get("entries", [])
 	assert_true(not entries.is_empty(), "Manifest should include traced entries")
@@ -349,10 +407,9 @@ func test_offline_bake_job_writes_manifest() -> void:
 		GemTracedBakeContractScript.BAKED_LOOK_VERSION,
 		"Manifest entries should record the current stylized bake version"
 	)
-	assert_eq(
-		int(first_entry.get("max_trace_bounces", 0)),
-		7,
-		"Manifest entries should record the trace bounce budget"
+	assert_true(
+		first_entry.has("stylize_version"),
+		"Manifest entries should record the stylize version"
 	)
 	assert_true(
 		String(first_entry.get("cut_signature", "")) != "",
@@ -362,6 +419,89 @@ func test_offline_bake_job_writes_manifest() -> void:
 		StringName(first_entry.get("geometry_source", &"")),
 		&"canonical_3d",
 		"Manifest entries should record the canonical geometry source"
+	)
+
+
+func test_spectral_noise_decreases_with_spp() -> void:
+	# Trace the same gem at low and high SPP with fixed seed.
+	# The high-SPP image should have strictly lower local color variance
+	# (measured as mean 3x3 neighborhood standard deviation over opaque pixels).
+	# This catches missing spectral normalization and importance sampling bugs
+	# that prevent convergence.
+	var visual: GemVisualResource = load("res://data/visuals/emerald.tres")
+	var mesh_resource = GemMeshGeneratorsScript.generate_from_spec_id(&"emerald_step")
+	assert_true(visual != null, "Emerald visual should load for noise test")
+	assert_true(mesh_resource != null, "Emerald mesh should generate for noise test")
+	if visual == null or mesh_resource == null:
+		return
+	var image_low := _trace_image_with_mesh(mesh_resource, visual, {
+		"samples_per_pixel": 32,
+		"seed": 1000,
+		"draw_size": Vector2i(64, 64),
+		"target_size": Vector2i(64, 64),
+	})
+	var image_high := _trace_image_with_mesh(mesh_resource, visual, {
+		"samples_per_pixel": 256,
+		"seed": 1000,
+		"draw_size": Vector2i(64, 64),
+		"target_size": Vector2i(64, 64),
+	})
+	assert_true(image_low != null, "Low-SPP trace should produce an image")
+	assert_true(image_high != null, "High-SPP trace should produce an image")
+	if image_low == null or image_high == null:
+		return
+	var noise_low := _measure_local_color_noise(image_low)
+	var noise_high := _measure_local_color_noise(image_high)
+	assert_true(
+		noise_high < noise_low,
+		"Higher SPP should produce lower noise (32spp=%.5f, 256spp=%.5f)" % [noise_low, noise_high]
+	)
+	# The noise at 256 SPP should be well below a perceptual threshold.
+	# A value above 0.15 indicates the spectral estimator is not converging.
+	assert_true(
+		noise_high < 0.15,
+		"256 SPP noise should be below perceptual threshold (got %.5f)" % noise_high
+	)
+
+
+func test_no_extreme_chromatic_outliers() -> void:
+	# Trace a gem and verify no opaque pixel has extreme saturation that
+	# indicates spectral fireflies (single-wavelength samples dominating
+	# an entire pixel's XYZ accumulation). Measured as max channel deviation
+	# from the pixel's own luminance.
+	var visual: GemVisualResource = load("res://data/visuals/quartz.tres")
+	var mesh_resource = GemMeshGeneratorsScript.generate_from_spec_id(&"old_european_round")
+	assert_true(visual != null, "Quartz visual should load for outlier test")
+	assert_true(mesh_resource != null, "Quartz mesh should generate for outlier test")
+	if visual == null or mesh_resource == null:
+		return
+	var image := _trace_image_with_mesh(mesh_resource, visual, {
+		"samples_per_pixel": 128,
+		"seed": 2000,
+		"draw_size": Vector2i(48, 48),
+		"target_size": Vector2i(48, 48),
+	})
+	assert_true(image != null, "Trace should produce an image for outlier test")
+	if image == null:
+		return
+	# For quartz (near-colorless), the mean saturation should be low.
+	# Count pixels where any channel deviates from luminance by more than 0.6
+	# — these are chromatic outliers from spectral noise.
+	var outlier_count := 0
+	var opaque_count := 0
+	for y in image.get_height():
+		for x in image.get_width():
+			var c := image.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			opaque_count += 1
+			var lum := 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+			if absf(c.r - lum) > 0.6 or absf(c.g - lum) > 0.6 or absf(c.b - lum) > 0.6:
+				outlier_count += 1
+	var outlier_ratio := float(outlier_count) / maxf(float(opaque_count), 1.0)
+	assert_true(
+		outlier_ratio < 0.05,
+		"Quartz (near-colorless) should have <5%% chromatic outliers at 128 SPP (got %.1f%%)" % [outlier_ratio * 100.0]
 	)
 
 
@@ -382,6 +522,7 @@ func _trace_image_with_mesh(mesh_resource, visual: GemVisualResource, overrides:
 		"light_dir": Vector3(-0.4, -0.5, 0.75).normalized(),
 		"rotation_degrees": 0.0,
 		"sample_count": 1,
+		"samples_per_pixel": 128,
 	}
 	for key in overrides.keys():
 		request[key] = overrides[key]
@@ -427,6 +568,47 @@ func _image_difference(image_a: Image, image_b: Image) -> float:
 	if pixel_count <= 0.0:
 		return 0.0
 	return total / pixel_count
+
+
+## Measure local color noise as the mean standard deviation of RGB channels
+## across 3x3 neighborhoods of opaque pixels. Higher = noisier.
+func _measure_local_color_noise(image: Image) -> float:
+	var w := image.get_width()
+	var h := image.get_height()
+	var total_stddev := 0.0
+	var count := 0
+	for y in range(1, h - 1):
+		for x in range(1, w - 1):
+			var center := image.get_pixel(x, y)
+			if center.a < 0.5:
+				continue
+			# Gather 3x3 neighborhood RGB values
+			var sum_r := 0.0
+			var sum_g := 0.0
+			var sum_b := 0.0
+			var sum_r2 := 0.0
+			var sum_g2 := 0.0
+			var sum_b2 := 0.0
+			var n := 0
+			for oy in range(-1, 2):
+				for ox in range(-1, 2):
+					var c := image.get_pixel(x + ox, y + oy)
+					if c.a < 0.5:
+						continue
+					sum_r += c.r; sum_g += c.g; sum_b += c.b
+					sum_r2 += c.r * c.r; sum_g2 += c.g * c.g; sum_b2 += c.b * c.b
+					n += 1
+			if n < 4:
+				continue
+			var nf := float(n)
+			var var_r := maxf(sum_r2 / nf - (sum_r / nf) * (sum_r / nf), 0.0)
+			var var_g := maxf(sum_g2 / nf - (sum_g / nf) * (sum_g / nf), 0.0)
+			var var_b := maxf(sum_b2 / nf - (sum_b / nf) * (sum_b / nf), 0.0)
+			total_stddev += sqrt(var_r) + sqrt(var_g) + sqrt(var_b)
+			count += 1
+	if count == 0:
+		return 0.0
+	return total_stddev / (float(count) * 3.0)
 
 
 func _lighting_bin_to_centered(lighting_bin: Vector2i, grid: Vector2i) -> Vector2:

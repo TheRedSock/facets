@@ -2,43 +2,23 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/trillion.tres" id="1_6kjvu"]
+[ext_resource type="Resource" path="res://data/minerals/olivine.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"peridot"
 cut_spec = ExtResource("1_6kjvu")
 cut_id = &"trillion"
-base_color = Color(0.58, 0.82, 0.18, 1)
-shininess = 44.0
-specular_intensity = 0.44
-depth_tint = Color(0.28, 0.4, 0.04, 0.24)
-saturation_boost = 0.20
-contrast = 0.42
-rim_intensity = 0.18
-rim_color = Color(0.94, 1, 0.62, 1)
-translucency = 0.1
-translucency_color = Color(0.84, 0.96, 0.32, 1)
+display_color = Color(0.58, 0.82, 0.18, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+absorption_spectrum_override = PackedFloat32Array(2.77356, 2.84629, 2.90429, 2.9593, 3.02103, 3.09518, 3.18254, 3.2791, 3.377, 3.46611, 3.53576, 3.57618, 3.57978, 3.54179, 3.46056, 3.33743, 3.1764, 2.98352, 2.76626, 2.53283, 2.2916, 2.05044, 1.8164, 1.59531, 1.39165, 1.2085, 1.04761, 0.90952, 0.79383, 0.69939, 0.62459, 0.56754, 0.52631, 0.49908, 0.48423, 0.48041, 0.48659, 0.50205, 0.52633, 0.55921, 0.6006, 0.65054, 0.70905, 0.7761, 0.85154, 0.93502, 1.02594, 1.12343, 1.22628, 1.33301, 1.4418, 1.55058, 1.65708, 1.75887, 1.85349, 1.9385, 2.01161, 2.0708, 2.11436, 2.14102, 2.15, 2.14102, 2.11436, 2.0708, 2.01161, 1.93849, 1.85349, 1.75887, 1.65707, 1.55056, 1.44176, 1.33293, 1.22615, 1.1232, 1.02556, 0.93437, 0.85047, 0.77434, 0.70622, 0.64605, 0.5936)
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 gradient_color = Color(0.5, 0.68, 0.14, 1)
 gradient_strength = 0.12
-brilliance_contrast = 0.36
-extinction = 0.2
-optics_ior = 1.65
-optics_dispersion = 0.020
-optics_absorption_color = Color(0.70, 0.88, 0.16, 1)
-optics_absorption_strength = 1.2
-optics_surface_roughness = 0.05
-optics_scattering_strength = 0.015
-optics_scattering_color = Color(0.82, 0.94, 0.34, 1)
-optics_birefringence_strength = 0.036
-optics_optic_axis = Vector3(0.18, 1, 0.08)
 optics_trace_view_scale = 1.14
-optics_environment_preset = 2
 optics_environment_rotation_degrees = 10.0
-optics_environment_energy = 0.66
-optics_light_energy = 1.34
-optics_ground_albedo = 0.20
-optics_ground_tint = Color(0.90, 0.86, 0.70, 1)
-optics_light_temperature_kelvin = 5200
 stylize_mix = 0.74
 stylize_facet_edge_gain = 0.76
 stylize_plane_contrast = 0.56

@@ -14,7 +14,6 @@ const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 const GemViewSphereSamplingScript = preload("res://core/visuals/gem_view_sphere_sampling.gd")
 const GemCutModelModifierScript = preload("res://resources/visuals/gem_cut_model_modifier.gd")
-const GemEnvironmentPresetsScript = preload("res://core/visuals/gem_environment_presets.gd")
 
 var _session: GemDesignSessionScript
 
@@ -77,51 +76,20 @@ var _bake_progress_label: Label
 var _section_collapse_state: Dictionary = {}
 var _updating_property := false
 
-## Tracks sentinel-aware compound widgets keyed by property name.
-## Each entry: { "checkbox": CheckBox, "slider": HSlider, "spinbox": SpinBox,
-##   "color_picker": ColorPickerButton (for color sentinels), "auto_key": String }
-var _sentinel_widgets: Dictionary = {}
 ## Tracks all property row Controls keyed by property name (for dependency dimming).
 var _prop_row_controls: Dictionary = {}
 
 # ---------------------------------------------------------------------------
-# Sentinel property definitions
-# ---------------------------------------------------------------------------
-# Float sentinels: property_name -> { sentinel, auto_key, override_min, override_max, override_step }
-const _FLOAT_SENTINEL_PROPERTIES := {
-	&"optics_ground_albedo": { "sentinel": -1.0, "auto_key": "ground_albedo", "override_min": 0.0, "override_max": 1.0, "override_step": 0.01 },
-	&"optics_ground_distance": { "sentinel": -1.0, "auto_key": "ground_distance", "override_min": 0.1, "override_max": 4.0, "override_step": 0.01 },
-	&"optics_light_temperature_kelvin": { "sentinel": 0.0, "auto_key": "light_temperature_kelvin", "override_min": 2500.0, "override_max": 10000.0, "override_step": 50.0 },
-	&"optics_cloudiness_override": { "sentinel": -1.0, "auto_key": "cloudiness", "override_min": 0.0, "override_max": 0.5, "override_step": 0.005 },
-	&"optics_transmission_override": { "sentinel": -1.0, "auto_key": "transmission", "override_min": 0.0, "override_max": 1.0, "override_step": 0.01 },
-	&"optics_grade_exposure": { "sentinel": -1.0, "auto_key": "grade_exposure", "override_min": 0.0, "override_max": 4.0, "override_step": 0.01 },
-	&"optics_grade_saturation": { "sentinel": -1.0, "auto_key": "grade_saturation", "override_min": -0.1, "override_max": 0.56, "override_step": 0.01 },
-}
-# Color sentinels: property_name -> { auto_key }
-const _COLOR_SENTINEL_PROPERTIES := {
-	&"optics_ground_tint": { "auto_key": "ground_tint" },
-}
-
-# ---------------------------------------------------------------------------
 # Dependency rules: property -> { requires: { prop: condition }, reason: String }
-# Condition strings: "> 0", "!= 0", "> 0 (effective)"
+# Condition strings: "> 0", "!= 0"
 # ---------------------------------------------------------------------------
 const _DEPENDENCY_RULES := {
-	&"sparkle_threshold": { "requires": { &"sparkle_intensity": "> 0" }, "reason": "Requires sparkle intensity > 0" },
-	&"optics_sparkle_power_multiplier": { "requires": { &"sparkle_intensity": "> 0" }, "reason": "Requires sparkle intensity > 0" },
-	&"rim_color": { "requires": { &"rim_intensity": "> 0" }, "reason": "Requires rim intensity > 0" },
-	&"rim_power": { "requires": { &"rim_intensity": "> 0" }, "reason": "Requires rim intensity > 0" },
-	&"optics_rim_strength_multiplier": { "requires": { &"rim_intensity": "> 0" }, "reason": "Requires rim intensity > 0" },
-	&"optics_ground_tint": { "requires": { &"optics_ground_albedo": "> 0 (effective)" }, "reason": "Ground albedo must be > 0 for tint to apply" },
-	&"optics_ground_distance": { "requires": { &"optics_ground_albedo": "> 0 (effective)" }, "reason": "Ground albedo must be > 0 for distance to apply" },
 	&"gradient_mode": { "requires": { &"gradient_strength": "> 0" }, "reason": "Requires gradient strength > 0" },
 	&"gradient_angle_degrees": { "requires": { &"gradient_strength": "> 0" }, "reason": "Requires gradient strength > 0" },
 	&"gradient_color": { "requires": { &"gradient_strength": "> 0" }, "reason": "Requires gradient strength > 0" },
 	&"phenomenon_angle_degrees": { "requires": { &"phenomenon_strength": "> 0" }, "reason": "Requires phenomenon strength > 0" },
 	&"phenomenon_sharpness": { "requires": { &"phenomenon_strength": "> 0" }, "reason": "Requires phenomenon strength > 0" },
 	&"phenomenon_color": { "requires": { &"phenomenon_strength": "> 0" }, "reason": "Requires phenomenon strength > 0" },
-	&"translucency_color": { "requires": { &"translucency": "> 0" }, "reason": "Requires translucency > 0" },
-	&"secondary_light_angle": { "requires": { &"secondary_specular": "> 0" }, "reason": "Requires secondary specular > 0" },
 	&"surface_pattern_mix": { "requires": { &"surface_pattern_type": "!= 0" }, "reason": "Requires surface pattern type != None" },
 	&"surface_pattern_scale": { "requires": { &"surface_pattern_type": "!= 0", &"surface_pattern_mix": "> 0" }, "reason": "Requires surface pattern active" },
 	&"surface_pattern_rotation_degrees": { "requires": { &"surface_pattern_type": "!= 0", &"surface_pattern_mix": "> 0" }, "reason": "Requires surface pattern active" },
@@ -159,15 +127,11 @@ const _DEPENDENCY_RULES := {
 }
 
 const _PERCENTAGE_EXCLUSIONS := [
-	&"hue_dispersion", &"saturation_boost", &"stylize_shadow_floor",
-	&"stylize_highlight_bloom_threshold", &"optics_dispersion",
-	&"optics_birefringence_strength", &"sparkle_threshold",
-	&"optics_cloudiness_override", &"optics_transmission_override",
-	&"optics_grade_exposure", &"optics_grade_saturation",
+	&"stylize_shadow_floor", &"stylize_highlight_bloom_threshold",
 ]
 const _ALPHA_EDIT_PROPERTIES := [
-	&"depth_tint", &"gradient_color", &"phenomenon_color", &"edge_color",
-	&"optics_absorption_color", &"material_secondary_color",
+	&"gradient_color", &"phenomenon_color", &"edge_color",
+	&"material_secondary_color",
 	&"material_tertiary_color", &"reactive_color", &"reactive_secondary_color",
 ]
 const _DEFAULT_COLLAPSED_GROUPS := [
@@ -178,18 +142,11 @@ const _GROUP_PREFIX_MAP := {
 	"Volume Field": "volume_pattern_",
 	"Angle Reactive": "reactive_",
 	"Traced Optics": "optics_",
-	"Refraction": "optics_",
-	"Absorption & Scattering": "optics_",
 	"Camera": "optics_",
 	"Environment": "optics_",
-	"Tuning": "optics_",
-	"Output Grade": "optics_grade_",
 	"Stylization": "stylize_",
 	"Gradient": "gradient_",
 	"Phenomenon": "phenomenon_",
-	"Rim Lighting": "rim_",
-	"Sparkle": "sparkle_",
-	"Secondary Specular": "secondary_",
 	"Edge Rendering": "edge_",
 }
 
@@ -391,7 +348,7 @@ func _build_ui() -> void:
 	_update_showroom_info_labels()
 	analysis_panel.add_child(_labeled("Bake draw size (px)", _make_analysis_draw_spinbox()))
 	analysis_panel.add_child(_labeled("Samples", _make_analysis_sample_spinbox()))
-	analysis_panel.add_child(_labeled("Max trace bounces", _make_showroom_bounces_spinbox()))
+	analysis_panel.add_child(_labeled("Samples per pixel", _make_showroom_bounces_spinbox()))
 	analysis_panel.add_child(_labeled("Output folder", _analysis_output_line()))
 
 	_showroom_stylize_checkbox = CheckBox.new()
@@ -816,10 +773,10 @@ func _make_analysis_sample_spinbox() -> SpinBox:
 
 func _make_showroom_bounces_spinbox() -> SpinBox:
 	_showroom_bounces_spin = SpinBox.new()
-	_showroom_bounces_spin.min_value = 1.0
-	_showroom_bounces_spin.max_value = 24.0
+	_showroom_bounces_spin.min_value = 16.0
+	_showroom_bounces_spin.max_value = 512.0
 	_showroom_bounces_spin.step = 1.0
-	_showroom_bounces_spin.value = 12.0
+	_showroom_bounces_spin.value = float(GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)
 	_showroom_bounces_spin.size_flags_horizontal = SIZE_EXPAND_FILL
 	return _showroom_bounces_spin
 
@@ -851,16 +808,16 @@ func _make_preview_panel() -> Control:
 	box.add_child(_preview_stylize_checkbox)
 	var settings_row := HBoxContainer.new()
 	settings_row.add_theme_constant_override("separation", 8)
-	var bounces_label := Label.new()
-	bounces_label.text = "Bounces"
-	bounces_label.add_theme_font_size_override("font_size", 12)
-	bounces_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
-	settings_row.add_child(bounces_label)
+	var spp_label := Label.new()
+	spp_label.text = "SPP"
+	spp_label.add_theme_font_size_override("font_size", 12)
+	spp_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
+	settings_row.add_child(spp_label)
 	_preview_bounces_spin = SpinBox.new()
-	_preview_bounces_spin.min_value = 1.0
-	_preview_bounces_spin.max_value = 24.0
+	_preview_bounces_spin.min_value = 16.0
+	_preview_bounces_spin.max_value = 512.0
 	_preview_bounces_spin.step = 1.0
-	_preview_bounces_spin.value = 12.0
+	_preview_bounces_spin.value = float(GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)
 	_preview_bounces_spin.custom_minimum_size = Vector2(70, 0)
 	_preview_bounces_spin.value_changed.connect(func(_v: float) -> void: _schedule_preview())
 	settings_row.add_child(_preview_bounces_spin)
@@ -1031,7 +988,6 @@ func _on_apply_visual_json() -> void:
 func _rebuild_visual_inspector() -> void:
 	for c in _visual_scroll.get_children():
 		c.queue_free()
-	_sentinel_widgets.clear()
 	_prop_row_controls.clear()
 	if _session.working_visual == null:
 		return
@@ -1141,13 +1097,7 @@ func _make_property_row(n: String, prop: Dictionary, val, vis: GemVisualResource
 	if t == TYPE_OBJECT or t == TYPE_ARRAY or t == TYPE_DICTIONARY:
 		return null
 
-	# Sentinel float properties get a compound "Auto" checkbox + slider widget.
-	var sn := StringName(n)
-	if t == TYPE_FLOAT and sn in _FLOAT_SENTINEL_PROPERTIES:
-		return _make_sentinel_float_row(sn, val, vis, group_name)
-	# Sentinel color properties get a compound "Auto" checkbox + color picker widget.
-	if t == TYPE_COLOR and sn in _COLOR_SENTINEL_PROPERTIES:
-		return _make_sentinel_color_row(sn, val, vis, group_name)
+	# Sentinel float/color properties removed (environment presets no longer exist).
 
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
@@ -1259,7 +1209,6 @@ func _make_property_row(n: String, prop: Dictionary, val, vis: GemVisualResource
 
 func _add_float_slider_row(h: HBoxContainer, n: String, val, vis: GemVisualResource, range_info: Dictionary) -> void:
 	var is_pct := _is_percentage_property(n, range_info)
-	var is_log_shininess := (n == "shininess")
 	var is_degrees := n.ends_with("_degrees")
 
 	var slider := HSlider.new()
@@ -1271,17 +1220,7 @@ func _add_float_slider_row(h: HBoxContainer, n: String, val, vis: GemVisualResou
 	sb.allow_greater = false
 	sb.allow_lesser = false
 
-	if is_log_shininess:
-		slider.min_value = 0.0
-		slider.max_value = 1.0
-		slider.step = 0.005
-		sb.min_value = range_info.min_val
-		sb.max_value = range_info.max_val
-		sb.step = 1.0
-		sb.suffix = " exp"
-		slider.value = _shininess_to_slider(float(val))
-		sb.value = float(val)
-	elif is_pct:
+	if is_pct:
 		slider.min_value = 0.0
 		slider.max_value = 100.0
 		slider.step = 1.0
@@ -1307,11 +1246,7 @@ func _add_float_slider_row(h: HBoxContainer, n: String, val, vis: GemVisualResou
 		if _updating_property:
 			return
 		_updating_property = true
-		if is_log_shininess:
-			var actual := _slider_to_shininess(v)
-			sb.value = actual
-			vis.set(n, actual)
-		elif is_pct:
+		if is_pct:
 			sb.value = v
 			vis.set(n, v / 100.0)
 		else:
@@ -1325,10 +1260,7 @@ func _add_float_slider_row(h: HBoxContainer, n: String, val, vis: GemVisualResou
 		if _updating_property:
 			return
 		_updating_property = true
-		if is_log_shininess:
-			slider.value = _shininess_to_slider(v)
-			vis.set(n, v)
-		elif is_pct:
+		if is_pct:
 			slider.value = v
 			vis.set(n, v / 100.0)
 		else:
@@ -1340,237 +1272,6 @@ func _add_float_slider_row(h: HBoxContainer, n: String, val, vis: GemVisualResou
 
 	h.add_child(slider)
 	h.add_child(sb)
-
-
-# ---------------------------------------------------------------------------
-# Sentinel compound widgets
-# ---------------------------------------------------------------------------
-
-func _make_sentinel_float_row(prop_name: StringName, val, vis: GemVisualResource, group_name: String) -> Control:
-	var cfg: Dictionary = _FLOAT_SENTINEL_PROPERTIES[prop_name]
-	var sentinel_val: float = cfg.sentinel
-	var auto_key: String = cfg.auto_key
-	var override_min: float = cfg.override_min
-	var override_max: float = cfg.override_max
-	var override_step: float = cfg.get("override_step", 0.01)
-
-	var is_auto: bool = float(val) <= sentinel_val + 0.001
-
-	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 8)
-
-	var name_l := Label.new()
-	name_l.text = _display_name(String(prop_name), group_name)
-	name_l.custom_minimum_size = Vector2(160, 0)
-	name_l.add_theme_color_override("font_color", Color(0.78, 0.82, 0.9))
-	name_l.add_theme_font_size_override("font_size", 13)
-	h.add_child(name_l)
-
-	var auto_cb := CheckBox.new()
-	auto_cb.text = "Auto"
-	auto_cb.button_pressed = is_auto
-	auto_cb.add_theme_font_size_override("font_size", 11)
-	h.add_child(auto_cb)
-
-	var slider := HSlider.new()
-	slider.size_flags_horizontal = SIZE_EXPAND_FILL
-	slider.custom_minimum_size = Vector2(80, 0)
-	slider.min_value = override_min
-	slider.max_value = override_max
-	slider.step = override_step
-
-	var sb := SpinBox.new()
-	sb.custom_minimum_size = Vector2(90, 0)
-	sb.allow_greater = false
-	sb.allow_lesser = false
-	sb.min_value = override_min
-	sb.max_value = override_max
-	sb.step = override_step
-
-	# Resolve the effective auto value from the preset.
-	var defaults := GemEnvironmentPresetsScript.resolve_effective_defaults(vis)
-	var auto_val: float = defaults.get(auto_key, override_min)
-
-	if is_auto:
-		slider.value = auto_val
-		sb.value = auto_val
-		slider.editable = false
-		sb.editable = false
-		slider.modulate.a = 0.45
-		sb.modulate.a = 0.45
-	else:
-		slider.value = float(val)
-		sb.value = float(val)
-
-	auto_cb.toggled.connect(func(on: bool) -> void:
-		if _updating_property:
-			return
-		_updating_property = true
-		if on:
-			vis.set(prop_name, sentinel_val)
-			var defs := GemEnvironmentPresetsScript.resolve_effective_defaults(vis)
-			var av: float = defs.get(auto_key, override_min)
-			slider.value = av
-			sb.value = av
-			slider.editable = false
-			sb.editable = false
-			slider.modulate.a = 0.45
-			sb.modulate.a = 0.45
-		else:
-			var defs := GemEnvironmentPresetsScript.resolve_effective_defaults(vis)
-			var av: float = defs.get(auto_key, override_min)
-			slider.value = av
-			sb.value = av
-			vis.set(prop_name, av)
-			slider.editable = true
-			sb.editable = true
-			slider.modulate.a = 1.0
-			sb.modulate.a = 1.0
-		_on_visual_prop_changed()
-		_updating_property = false
-	)
-
-	slider.value_changed.connect(func(v: float) -> void:
-		if _updating_property:
-			return
-		_updating_property = true
-		sb.value = v
-		vis.set(prop_name, v)
-		_on_visual_prop_changed()
-		_updating_property = false
-	)
-
-	sb.value_changed.connect(func(v: float) -> void:
-		if _updating_property:
-			return
-		_updating_property = true
-		slider.value = v
-		vis.set(prop_name, v)
-		_on_visual_prop_changed()
-		_updating_property = false
-	)
-
-	h.add_child(slider)
-	h.add_child(sb)
-
-	_sentinel_widgets[prop_name] = {
-		"checkbox": auto_cb,
-		"slider": slider,
-		"spinbox": sb,
-		"auto_key": auto_key,
-		"sentinel_val": sentinel_val,
-		"override_min": override_min,
-	}
-	return h
-
-
-func _make_sentinel_color_row(prop_name: StringName, val, vis: GemVisualResource, group_name: String) -> Control:
-	var cfg: Dictionary = _COLOR_SENTINEL_PROPERTIES[prop_name]
-	var auto_key: String = cfg.auto_key
-	var current_color: Color = val as Color
-	var is_auto: bool = current_color.a <= 0.01
-
-	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 8)
-
-	var name_l := Label.new()
-	name_l.text = _display_name(String(prop_name), group_name)
-	name_l.custom_minimum_size = Vector2(160, 0)
-	name_l.add_theme_color_override("font_color", Color(0.78, 0.82, 0.9))
-	name_l.add_theme_font_size_override("font_size", 13)
-	h.add_child(name_l)
-
-	var auto_cb := CheckBox.new()
-	auto_cb.text = "Auto"
-	auto_cb.button_pressed = is_auto
-	auto_cb.add_theme_font_size_override("font_size", 11)
-	h.add_child(auto_cb)
-
-	var pb := ColorPickerButton.new()
-	pb.edit_alpha = false
-	pb.size_flags_horizontal = SIZE_EXPAND_FILL
-
-	var defaults := GemEnvironmentPresetsScript.resolve_effective_defaults(vis)
-	var auto_color: Color = defaults.get(auto_key, Color.WHITE)
-
-	if is_auto:
-		pb.color = auto_color
-		pb.disabled = true
-		pb.modulate.a = 0.45
-	else:
-		pb.color = current_color
-
-	auto_cb.toggled.connect(func(on: bool) -> void:
-		if _updating_property:
-			return
-		_updating_property = true
-		if on:
-			vis.set(prop_name, Color.TRANSPARENT)
-			var defs := GemEnvironmentPresetsScript.resolve_effective_defaults(vis)
-			var ac: Color = defs.get(auto_key, Color.WHITE)
-			pb.color = ac
-			pb.disabled = true
-			pb.modulate.a = 0.45
-		else:
-			var defs := GemEnvironmentPresetsScript.resolve_effective_defaults(vis)
-			var ac: Color = defs.get(auto_key, Color.WHITE)
-			pb.color = ac
-			vis.set(prop_name, ac)
-			pb.disabled = false
-			pb.modulate.a = 1.0
-		_on_visual_prop_changed()
-		_updating_property = false
-	)
-
-	pb.color_changed.connect(func(c: Color) -> void:
-		if _updating_property:
-			return
-		_updating_property = true
-		vis.set(prop_name, c)
-		_on_visual_prop_changed()
-		_updating_property = false
-	)
-
-	h.add_child(pb)
-
-	_sentinel_widgets[prop_name] = {
-		"checkbox": auto_cb,
-		"color_picker": pb,
-		"auto_key": auto_key,
-	}
-	return h
-
-
-## Refresh the displayed auto values for all sentinel widgets in auto mode.
-## Called when any property changes (preset, scattering, roughness, etc. can
-## affect the resolved auto value).
-func _refresh_sentinel_auto_values() -> void:
-	if _session.working_visual == null:
-		return
-	var vis: GemVisualResource = _session.working_visual
-	var defaults := GemEnvironmentPresetsScript.resolve_effective_defaults(vis)
-
-	for prop_name in _sentinel_widgets:
-		var w: Dictionary = _sentinel_widgets[prop_name]
-		var auto_key: String = w.auto_key
-		if w.has("checkbox") and w.checkbox is CheckBox:
-			if not w.checkbox.button_pressed:
-				continue  # Not in auto mode — skip.
-		if w.has("slider") and w.slider is HSlider:
-			var cb: CheckBox = w.checkbox
-			if cb.button_pressed:
-				_updating_property = true
-				var av: float = defaults.get(auto_key, w.get("override_min", 0.0))
-				w.slider.value = av
-				w.spinbox.value = av
-				_updating_property = false
-		elif w.has("color_picker") and w.color_picker is ColorPickerButton:
-			var cb: CheckBox = w.checkbox
-			if cb.button_pressed:
-				_updating_property = true
-				var ac: Color = defaults.get(auto_key, Color.WHITE)
-				w.color_picker.color = ac
-				_updating_property = false
 
 
 # ---------------------------------------------------------------------------
@@ -1578,21 +1279,6 @@ func _refresh_sentinel_auto_values() -> void:
 # ---------------------------------------------------------------------------
 
 func _evaluate_prop_condition(vis: GemVisualResource, prop_name: StringName, condition: String) -> bool:
-	var effective_val: float
-	if condition == "> 0 (effective)":
-		# For sentinel properties, check whether the effective value (after preset fallback) is > 0.
-		if prop_name in _FLOAT_SENTINEL_PROPERTIES:
-			var raw: float = vis.get(prop_name)
-			var cfg: Dictionary = _FLOAT_SENTINEL_PROPERTIES[prop_name]
-			if raw <= cfg.sentinel + 0.001:
-				# Auto mode: resolve the preset default.
-				var defaults := GemEnvironmentPresetsScript.resolve_effective_defaults(vis)
-				effective_val = defaults.get(cfg.auto_key, 0.0)
-			else:
-				effective_val = raw
-		else:
-			effective_val = float(vis.get(prop_name))
-		return effective_val > 0.001
 	var raw_val = vis.get(prop_name)
 	if condition == "> 0":
 		return float(raw_val) > 0.001
@@ -1624,14 +1310,6 @@ func _update_dependency_states() -> void:
 		else:
 			row.modulate.a = 0.4
 			row.tooltip_text = rule.reason
-
-
-static func _shininess_to_slider(value: float) -> float:
-	return log(maxf(value, 1.0)) / log(256.0)
-
-
-static func _slider_to_shininess(slider_val: float) -> float:
-	return roundf(pow(256.0, clampf(slider_val, 0.0, 1.0)))
 
 
 static func _parse_range_hint(prop: Dictionary) -> Dictionary:
@@ -1716,7 +1394,6 @@ func _vec3_editor(v: Vector3, setter: Callable) -> HBoxContainer:
 
 func _on_visual_prop_changed() -> void:
 	_session.mark_visual_dirty()
-	_refresh_sentinel_auto_values()
 	_update_dependency_states()
 	_schedule_preview()
 
@@ -1754,9 +1431,9 @@ func _start_preview_trace(gen: int) -> void:
 		PREVIEW_SIZE
 	)
 	req["mesh_includes_cut_rotation"] = true
-	var preview_bounces := 12
+	var preview_spp := GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL
 	if _preview_bounces_spin != null:
-		preview_bounces = int(_preview_bounces_spin.value)
+		preview_spp = clampi(int(_preview_bounces_spin.value), 16, 512)
 	var preview_samples := 1
 	if _preview_samples_spin != null:
 		preview_samples = int(_preview_samples_spin.value)
@@ -1767,9 +1444,8 @@ func _start_preview_trace(gen: int) -> void:
 		"request": req,
 		"weak_self": weakref(self),
 		"skip_stylize": not (_preview_stylize_checkbox != null and _preview_stylize_checkbox.button_pressed),
-		"max_trace_bounces": preview_bounces,
+		"samples_per_pixel": preview_spp,
 		"sample_count": preview_samples,
-		"environment_profile": GemEnvironmentPresetsScript.resolve_preset(vis_snap.optics_environment_preset),
 	}
 	_preview_thread = Thread.new()
 	var err := _preview_thread.start(Callable(self, "_preview_thread_body").bind(pack))
@@ -1800,11 +1476,8 @@ func _preview_thread_body(pack: Dictionary) -> void:
 	var tracer = OfflineGemBakeJobScript.create_tracer()
 	req["mesh_resource"] = mesh
 	req["sample_count"] = int(pack.get("sample_count", 1))
-	req["max_trace_bounces"] = int(pack.get("max_trace_bounces", 12))
+	req["samples_per_pixel"] = int(pack.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL))
 	req["skip_stylize"] = bool(pack.get("skip_stylize", true))
-	var env_profile = pack.get("environment_profile", null)
-	if env_profile != null:
-		req["environment_profile"] = env_profile
 	var img: Image = tracer.trace_to_image(mesh, visual, req)
 	var node = w.get_ref()
 	if node != null:
@@ -1951,7 +1624,7 @@ func _on_run_showroom_bake() -> void:
 		"output_root": out,
 		"draw_size": draw_sz,
 		"sample_count": int(_analysis_sample_spin.value),
-		"max_trace_bounces": int(_showroom_bounces_spin.value) if _showroom_bounces_spin != null else 12,
+		"samples_per_pixel": int(_showroom_bounces_spin.value) if _showroom_bounces_spin != null else GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL,
 		"skip_stylize": not (_showroom_stylize_checkbox != null and _showroom_stylize_checkbox.button_pressed),
 	}
 	job.progress_updated.connect(_on_showroom_bake_progress)

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"painite"
+mineral_name = "Painite (CaZrBAl9O18)"
+sellmeier_b = Vector3(1.0100, 0.5500, 0)
+sellmeier_c = Vector3(0.00690, 0.02100, 0)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+absorption_spectrum = PackedFloat32Array(5.88762, 6.11761, 6.27568, 6.36952, 6.4117, 6.41789, 6.40468, 6.38765, 6.37975, 6.39023, 6.42434, 6.48346, 6.56577, 6.66712, 6.78196, 6.90417, 7.02769, 7.14702, 7.25737, 7.35475, 7.43594, 7.49831, 7.53974, 7.55846, 7.55299, 7.52208, 7.46466, 7.37991, 7.26727, 7.1265, 6.95774, 6.76156, 6.53899, 6.29159, 6.02138, 5.73091, 5.42314, 5.10141, 4.76934, 4.43076, 4.08957, 3.74963, 3.41468, 3.08819, 2.77331, 2.47278, 2.18887, 1.92338, 1.67758, 1.45225, 1.2477, 1.06381, 0.90007, 0.75567, 0.62951, 0.52032, 0.42671, 0.34718, 0.28025, 0.22443, 0.1783, 0.14052, 0.10986, 0.08521, 0.06556, 0.05003, 0.03788, 0.02844, 0.02119, 0.01566, 0.01147, 0.00834, 0.00602, 0.0043, 0.00305, 0.00215, 0.0015, 0.00104, 0.00071, 0.00049, 0.00033)
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.029
+default_surface_roughness = 0.01
+display_color = Color(0.58, 0.22, 0.12, 1)

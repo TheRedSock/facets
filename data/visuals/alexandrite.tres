@@ -2,50 +2,25 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/octagon_step.tres" id="1_xyiju"]
+[ext_resource type="Resource" path="res://data/minerals/chrysoberyl.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"alexandrite"
 cut_spec = ExtResource("1_xyiju")
 cut_id = &"octagon_step"
-base_color = Color(0.10, 0.44, 0.32, 1)
-shininess = 58.0
-specular_intensity = 0.38
-depth_tint = Color(0.1, 0.08, 0.14, 0.44)
-saturation_boost = 0.26
-contrast = 0.52
-rim_intensity = 0.08
-rim_color = Color(0.74, 0.9, 0.72, 1)
-translucency = 0.12
-translucency_color = Color(0.72, 0.24, 0.42, 1)
-secondary_specular = 0.16
-secondary_light_angle = 118.0
-sparkle_intensity = 0.12
-sparkle_threshold = 0.84
+display_color = Color(0.10, 0.44, 0.32, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 gradient_color = Color(0.58, 0.2, 0.5, 1)
 gradient_strength = 0.3
 gradient_angle_degrees = 30.0
 phenomenon_color = Color(0.78, 0.18, 0.60, 1)
 phenomenon_strength = 0.82
 phenomenon_angle_degrees = 35.0
-brilliance_contrast = 0.38
-extinction = 0.42
-optics_ior = 1.745
-optics_dispersion = 0.015
-optics_absorption_color = Color(0.12, 0.28, 0.22, 1)
-optics_absorption_strength = 2.10
-optics_surface_roughness = 0.032
-optics_scattering_strength = 0.025
-optics_scattering_color = Color(0.68, 0.28, 0.48, 1)
-optics_birefringence_strength = 0.009
-optics_optic_axis = Vector3(0, 1, 0.18)
-optics_environment_preset = 4
 optics_environment_rotation_degrees = 8.0
-optics_environment_energy = 0.74
-optics_light_energy = 1.56
-optics_ground_albedo = 0.14
-optics_ground_tint = Color(0.86, 0.84, 0.84, 1)
-optics_light_temperature_kelvin = 4800
 stylize_mix = 0.76
 stylize_facet_edge_gain = 0.68
 stylize_plane_contrast = 0.5

@@ -2,47 +2,21 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/navette.tres" id="1_qakh2"]
+[ext_resource type="Resource" path="res://data/minerals/painite.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"painite"
 cut_spec = ExtResource("1_qakh2")
 cut_id = &"navette"
-base_color = Color(0.42, 0.16, 0.08, 1)
-shininess = 64.0
-specular_intensity = 0.34
-depth_tint = Color(0.18, 0.06, 0.03, 0.5)
-saturation_boost = 0.16
-contrast = 0.56
-rim_intensity = 0.12
-rim_color = Color(0.86, 0.44, 0.18, 1)
-rim_power = 2.4
-translucency = 0.1
-translucency_color = Color(0.66, 0.24, 0.1, 1)
-secondary_specular = 0.12
-secondary_light_angle = 128.0
-sparkle_intensity = 0.1
-sparkle_threshold = 0.86
+display_color = Color(0.42, 0.16, 0.08, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 0.72
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 gradient_color = Color(0.52, 0.2, 0.1, 1)
 gradient_strength = 0.24
-brilliance_contrast = 0.34
-extinction = 0.56
-optics_ior = 1.80
-optics_dispersion = 0.028
-optics_absorption_color = Color(0.44, 0.14, 0.05, 1)
-optics_absorption_strength = 2.35
-optics_surface_roughness = 0.034
-optics_scattering_strength = 0.022
-optics_scattering_color = Color(0.62, 0.24, 0.14, 1)
-optics_birefringence_strength = 0.029
-optics_optic_axis = Vector3(0.12, 1, 0.08)
-optics_environment_preset = 1
 optics_environment_rotation_degrees = 4.0
-optics_environment_energy = 0.52
-optics_light_energy = 1.56
-optics_ground_albedo = 0.10
-optics_ground_tint = Color(0.86, 0.78, 0.68, 1)
-optics_light_temperature_kelvin = 4000
 stylize_mix = 0.72
 stylize_facet_edge_gain = 0.68
 stylize_plane_contrast = 0.58

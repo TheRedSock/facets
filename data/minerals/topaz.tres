@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"topaz"
+mineral_name = "Topaz (Al2SiO4(F,OH)2)"
+sellmeier_b = Vector3(0.8738, 0.4851, 0)
+sellmeier_c = Vector3(0.006, 0.018, 0)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+absorption_spectrum = PackedFloat32Array(2.48196, 2.65923, 2.82833, 2.98715, 3.13383, 3.26673, 3.38437, 3.48544, 3.56866, 3.63277, 3.67648, 3.69848, 3.69747, 3.67221, 3.62171, 3.54532, 3.44291, 3.315, 3.16291, 2.98875, 2.79549, 2.58681, 2.367, 2.14073, 1.91283, 1.68802, 1.47069, 1.26467, 1.07308, 0.89822, 0.74155, 0.60372, 0.48461, 0.3835, 0.29916, 0.23002, 0.17431, 0.13019, 0.09582, 0.0695, 0.04968, 0.03499, 0.02429, 0.01662, 0.0112, 0.00745, 0.00488, 0.00315, 0.002, 0.00126, 0.00078, 0.00048, 0.00029, 0.00017, 0.0001, 0.00006, 0.00003, 0.00002, 0.00001, 0.00001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.008
+default_surface_roughness = 0.008
+display_color = Color(0.95, 0.85, 0.55, 1)

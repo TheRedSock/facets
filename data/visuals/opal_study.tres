@@ -2,13 +2,18 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/opal_cushion.tres" id="1_3dv2o"]
+[ext_resource type="Resource" path="res://data/minerals/opal.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"opal_study"
 cut_spec = ExtResource("1_3dv2o")
 cut_id = &"opal_cushion"
-base_color = Color(0.72, 0.82, 0.88, 1)
+display_color = Color(0.72, 0.82, 0.88, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 material_mode = 2
 material_secondary_color = Color(0.52, 0.72, 0.86, 1)
 material_tertiary_color = Color(1, 0.74, 0.44, 1)
@@ -36,35 +41,10 @@ reactive_sharpness = 1.4
 reactive_density = 1.32
 reactive_scale = 2.8
 reactive_axis = Vector3(0.18, 0.95, 0.27)
-shininess = 46.0
-specular_intensity = 0.12
-depth_tint = Color(0.3, 0.42, 0.52, 0.24)
-saturation_boost = 0.14
-contrast = 0.12
-rim_intensity = 0.04
-rim_color = Color(0.92, 0.98, 1, 1)
-translucency = 0.34
-translucency_color = Color(0.78, 0.88, 0.96, 1)
-secondary_specular = 0.1
-secondary_light_angle = 108.0
-sparkle_intensity = 0.08
-sparkle_threshold = 0.9
 gradient_color = Color(0.9, 0.96, 1, 1)
 gradient_strength = 0.1
 gradient_mode = 2
-brilliance_contrast = 0.1
-extinction = 0.06
-optics_ior = 1.46
-optics_dispersion = 0.022
-optics_absorption_color = Color(0.42, 0.58, 0.7, 1)
-optics_absorption_strength = 0.78
-optics_surface_roughness = 0.18
-optics_scattering_strength = 0.54
-optics_scattering_color = Color(0.86, 0.92, 0.98, 1)
-optics_environment_preset = 2
 optics_environment_rotation_degrees = 14.0
-optics_environment_energy = 0.34
-optics_light_energy = 0.78
 stylize_mix = 0.56
 stylize_facet_edge_gain = 0.46
 stylize_plane_contrast = 0.2

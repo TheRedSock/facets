@@ -2,44 +2,20 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/marquise_brilliant.tres" id="1_7sbl0"]
+[ext_resource type="Resource" path="res://data/minerals/corundum.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"ruby"
 cut_spec = ExtResource("1_7sbl0")
 cut_id = &"marquise_brilliant"
-base_color = Color(0.56, 0.02, 0.06, 1)
-shininess = 88.0
-specular_intensity = 0.52
-depth_tint = Color(0.22, 0.01, 0.04, 0.44)
-saturation_boost = 0.12
-contrast = 0.58
-rim_intensity = 0.22
-rim_color = Color(1, 0.96, 0.94, 1)
-translucency = 0.1
-translucency_color = Color(0.84, 0.1, 0.08, 1)
-secondary_specular = 0.2
-secondary_light_angle = 122.0
-sparkle_intensity = 0.14
-sparkle_threshold = 0.84
-brilliance_contrast = 0.5
-extinction = 0.6
-optics_ior = 1.765
-optics_dispersion = 0.018
-optics_absorption_color = Color(0.66, 0.03, 0.06, 1)
-optics_absorption_strength = 2.30
-optics_surface_roughness = 0.02
-optics_scattering_strength = 0.006
-optics_scattering_color = Color(0.74, 0.08, 0.08, 1)
-optics_birefringence_strength = 0.008
-optics_optic_axis = Vector3(0, 1, 0.36)
-optics_environment_preset = 4
+display_color = Color(0.56, 0.02, 0.06, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+absorption_spectrum_override = PackedFloat32Array(2.52814, 2.93563, 3.31558, 3.64394, 3.90001, 4.06925, 4.1451, 4.12947, 4.03193, 3.86771, 3.65511, 3.4128, 3.1578, 2.9042, 2.66295, 2.44234, 2.24901, 2.08897, 1.96831, 1.89346, 1.87094, 1.90669, 2.00511, 2.1682, 2.3947, 2.67963, 3.0141, 3.38551, 3.77808, 4.17364, 4.55273, 4.8958, 5.18446, 5.4028, 5.5384, 5.58328, 5.5344, 5.39378, 5.16827, 4.86888, 4.50984, 4.10743, 3.67875, 3.24052, 2.80801, 2.39428, 2.0096, 1.66124, 1.35354, 1.0881, 0.8643, 0.6797, 0.53069, 0.41288, 0.32165, 0.25241, 0.2009, 0.16333, 0.13644, 0.11758, 0.10459, 0.09581, 0.08999, 0.08621, 0.08379, 0.08227, 0.08134, 0.08078, 0.08044, 0.08025, 0.08014, 0.08007, 0.08004, 0.08002, 0.08001, 0.08001, 0.08, 0.08, 0.08, 0.08, 0.08)
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 optics_environment_rotation_degrees = -10.0
-optics_environment_energy = 0.76
-optics_light_energy = 1.62
-optics_ground_albedo = 0.14
-optics_ground_tint = Color(0.90, 0.78, 0.76, 1)
-optics_light_temperature_kelvin = 4200
 stylize_mix = 0.72
 stylize_facet_edge_gain = 0.9
 stylize_plane_contrast = 0.6

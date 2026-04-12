@@ -2,13 +2,18 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/patterned_cushion.tres" id="1_50ccg"]
+[ext_resource type="Resource" path="res://data/minerals/tigers_eye.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"tigers_eye_study"
 cut_spec = ExtResource("1_50ccg")
 cut_id = &"patterned_cushion"
-base_color = Color(0.27, 0.16, 0.07, 1)
+display_color = Color(0.27, 0.16, 0.07, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 material_mode = 1
 material_secondary_color = Color(0.64, 0.42, 0.14, 1)
 material_tertiary_color = Color(0.96, 0.74, 0.3, 1)
@@ -36,32 +41,9 @@ reactive_sharpness = 3.2
 reactive_density = 0.78
 reactive_scale = 1.08
 reactive_axis = Vector3(0, 1, 0.02)
-shininess = 64.0
-specular_intensity = 0.58
-depth_tint = Color(0.24, 0.12, 0.05, 0.14)
-saturation_boost = 0.06
-contrast = 0.24
-rim_intensity = 0.06
-rim_color = Color(0.96, 0.8, 0.42, 1)
-translucency = 0.08
-translucency_color = Color(0.82, 0.58, 0.26, 1)
-secondary_specular = 0.14
-secondary_light_angle = 72.0
 gradient_color = Color(0.58, 0.32, 0.1, 1)
 gradient_strength = 0.1
-brilliance_contrast = 0.1
-extinction = 0.04
-optics_ior = 1.55
-optics_dispersion = 0.005
-optics_absorption_color = Color(0.48, 0.26, 0.08, 1)
-optics_absorption_strength = 1.18
-optics_surface_roughness = 0.05
-optics_scattering_strength = 0.12
-optics_scattering_color = Color(0.84, 0.61, 0.28, 1)
-optics_environment_preset = 2
 optics_environment_rotation_degrees = -8.0
-optics_environment_energy = 0.7
-optics_light_energy = 1.24
 stylize_mix = 0.5
 stylize_facet_edge_gain = 0.38
 stylize_plane_contrast = 0.22

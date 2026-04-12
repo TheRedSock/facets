@@ -10,6 +10,8 @@ extends Node
 ## Depends on: GemCutGenerators, GemVisualResource, GemProjectedCutResource, GemRenderer.
 
 const VISUAL_DATA_PATH := "res://data/visuals/"
+const MINERAL_DATA_PATH := "res://data/minerals/"
+const ENVIRONMENT_DATA_PATH := "res://data/environments/"
 const GAMEPLAY_BAKE_SUPERSAMPLE := 2
 const GAMEPLAY_BAKE_BACKEND_OFFLINE_TRACED := &"offline_traced"
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
@@ -18,6 +20,9 @@ const GAMEPLAY_VARIANT_TYPE_ROTATION := &"rotation"
 const GAMEPLAY_VARIANT_TYPE_SHOWROOM := GemTracedBakeContractScript.GAMEPLAY_VARIANT_TYPE_SHOWROOM
 const DEFAULT_GAMEPLAY_LIGHTING_GRID_SIZE := GemTracedBakeContract.DEFAULT_LIGHTING_GRID_SIZE
 const DEFAULT_GAMEPLAY_BASE_ROTATION_VIEW_COUNT := GemTracedBakeContract.DEFAULT_ROTATION_BASE_VIEW_COUNT
+
+var _mineral_templates: Dictionary = {} # StringName mineral_id -> GemMineralTemplate
+var _bake_environments: Dictionary = {} # StringName environment_id -> GemBakeEnvironment
 const GAMEPLAY_ROTATION_DEFAULT_AXIS_STEPS := 0
 const GAMEPLAY_ROTATION_DEFAULT_STEP_DEGREES := 18.0
 const GAMEPLAY_LIGHTING_SWEEP_X_DEGREES := 46.0
@@ -72,6 +77,8 @@ var _bake_queue_build_elapsed_ms := 0.0
 
 
 func _ready() -> void:
+	_load_mineral_templates()
+	_load_bake_environments()
 	_load_visuals()
 	_generate_cuts()
 	_initialize_bake_backends()
@@ -101,6 +108,16 @@ func get_visual_for_tier(tier: int) -> GemVisualResource:
 				_tier_to_visual[tier] = _visuals[id]
 				return _visuals[id]
 	return null
+
+
+## Returns a mineral template by mineral_id, or null.
+func get_mineral_template(mineral_id: StringName) -> Resource:
+	return _mineral_templates.get(mineral_id, null)
+
+
+## Returns a bake environment by environment_id, or null.
+func get_bake_environment(environment_id: StringName) -> Resource:
+	return _bake_environments.get(environment_id, null)
 
 
 func get_visual_ids() -> Array[StringName]:
@@ -1286,6 +1303,48 @@ func has_visuals() -> bool:
 # ---- Internal ----
 
 
+func _load_mineral_templates() -> void:
+	var dir := DirAccess.open(MINERAL_DATA_PATH)
+	if dir == null:
+		push_warning("GemVisualRegistry: Could not open %s — no mineral templates loaded" % MINERAL_DATA_PATH)
+		return
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while file_name != "":
+		if file_name.ends_with(".tres"):
+			var path := MINERAL_DATA_PATH + file_name
+			var resource = load(path)
+			if resource != null:
+				var mid: StringName = resource.get("mineral_id")
+				if mid != &"":
+					_mineral_templates[mid] = resource
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	if not _mineral_templates.is_empty():
+		print("GemVisualRegistry: Loaded %d mineral templates" % _mineral_templates.size())
+
+
+func _load_bake_environments() -> void:
+	var dir := DirAccess.open(ENVIRONMENT_DATA_PATH)
+	if dir == null:
+		push_warning("GemVisualRegistry: Could not open %s — no bake environments loaded" % ENVIRONMENT_DATA_PATH)
+		return
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while file_name != "":
+		if file_name.ends_with(".tres"):
+			var path := ENVIRONMENT_DATA_PATH + file_name
+			var resource = load(path)
+			if resource != null:
+				var eid: StringName = resource.get("environment_id")
+				if eid != &"":
+					_bake_environments[eid] = resource
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	if not _bake_environments.is_empty():
+		print("GemVisualRegistry: Loaded %d bake environments" % _bake_environments.size())
+
+
 func _load_visuals() -> void:
 	var dir := DirAccess.open(VISUAL_DATA_PATH)
 	if dir == null:
@@ -1516,12 +1575,13 @@ func _build_gameplay_bake_requests(
 ) -> Array[Dictionary]:
 	var view_scale := _compute_trace_view_scale(visual, cut_model)
 	var variant_settings := _resolve_variant_settings(variant_options)
+	var adaptive_spp := GemTracedBakeContractScript.compute_adaptive_samples(visual)
 	var requests: Array[Dictionary] = []
 	requests.append_array(_collect_lighting_bake_requests(
-		tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale
+		tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, adaptive_spp
 	))
 	requests.append_array(_collect_rotation_bake_requests(
-		tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale
+		tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, adaptive_spp
 	))
 	var showroom_n := int(variant_settings.get("showroom_direction_count", 0))
 	if showroom_n > 0:
@@ -1540,6 +1600,7 @@ func _collect_lighting_bake_requests(
 	target_size: Vector2i,
 	variant_settings: Dictionary,
 	view_scale: float,
+	adaptive_spp: int = 0,
 ) -> Array[Dictionary]:
 	var requests: Array[Dictionary] = []
 	var lighting_grid: Vector2i = variant_settings.get(
@@ -1577,6 +1638,8 @@ func _collect_lighting_bake_requests(
 					"light_dir": _compute_variant_light_dir(lighting_bin, variant_settings),
 					"view_scale": view_scale,
 				}
+				if adaptive_spp > 0:
+					request["samples_per_pixel"] = adaptive_spp
 				if not rig_config.is_empty():
 					var perturbed := _build_perturbed_environment_profile(
 						visual, lighting_bin, lighting_grid, rig_config
@@ -1596,6 +1659,7 @@ func _collect_rotation_bake_requests(
 	target_size: Vector2i,
 	variant_settings: Dictionary,
 	view_scale: float,
+	adaptive_spp: int = 0,
 ) -> Array[Dictionary]:
 	var requests: Array[Dictionary] = []
 	var rotation_views := _build_rotation_view_suite(variant_settings)
@@ -1641,6 +1705,7 @@ func _collect_rotation_bake_requests(
 			"light_dir": _compute_variant_light_dir(_get_default_lighting_bin_for_settings(variant_settings), variant_settings),
 			"view_scale": view_scale,
 			"uniform_projection": true,
+			"samples_per_pixel": adaptive_spp if adaptive_spp > 0 else GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL,
 		})
 	return requests
 
@@ -1956,9 +2021,14 @@ func _build_perturbed_environment_profile(
 	lighting_grid: Vector2i,
 	rig_config: Dictionary,
 ) -> Dictionary:
-	var base_profile := GemEnvironmentPresets.resolve_preset(
-		visual.optics_environment_preset if visual != null else 0
-	)
+	var base_profile := {}
+	if visual != null and visual.bake_environment != null and visual.bake_environment.has_method("to_trace_dict"):
+		base_profile = visual.bake_environment.to_trace_dict()
+	else:
+		# Use default gameplay studio environment
+		var default_env := load("res://data/environments/gameplay_studio.tres")
+		if default_env != null and default_env.has_method("to_trace_dict"):
+			base_profile = default_env.to_trace_dict()
 	if rig_config.is_empty():
 		return base_profile
 
@@ -2137,7 +2207,9 @@ func _build_visual_geometry_key(visual: GemVisualResource) -> String:
 		return ""
 	# Resolve pavilion from IOR so the geometry signature incorporates
 	# IOR-derived pavilion parameters (different IOR → different key).
-	var ior := visual.optics_ior if visual else GemPavilionSolverScript.DEFAULT_IOR
+	var ior := GemPavilionSolverScript.DEFAULT_IOR
+	if visual.mineral_template != null and visual.mineral_template.has_method("get_reference_ior"):
+		ior = visual.mineral_template.get_reference_ior()
 	var pavilion_params := GemPavilionSolverScript.resolve(spec, ior)
 	var resolved_spec = spec.duplicate_spec()
 	resolved_spec.apply_pavilion_resolution(pavilion_params)
@@ -2154,7 +2226,9 @@ func _ensure_visual_geometry_cached(visual: GemVisualResource) -> String:
 	if spec == null:
 		return ""
 	# Resolve pavilion parameters from gem IOR.
-	var ior := visual.optics_ior if visual else GemPavilionSolverScript.DEFAULT_IOR
+	var ior := GemPavilionSolverScript.DEFAULT_IOR
+	if visual.mineral_template != null and visual.mineral_template.has_method("get_reference_ior"):
+		ior = visual.mineral_template.get_reference_ior()
 	var pavilion_params := GemPavilionSolverScript.resolve(spec, ior)
 	# Apply resolved dimensions to spec for signature + model metadata.
 	var resolved_spec = spec.duplicate_spec()

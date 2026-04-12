@@ -664,22 +664,19 @@ func _enrich_request_list(base_requests: Array, sample_count: int, options: Dict
 		var visual: GemVisualResource = enriched_request.get("visual", null)
 		if visual == null:
 			continue
-		# Resolve environment preset into data dict so the kernel doesn't need compiled presets
+		# Resolve environment from visual's bake_environment resource
 		if not enriched_request.has("environment_profile"):
-			enriched_request["environment_profile"] = GemEnvironmentPresets.resolve_preset(
-				visual.optics_environment_preset
-			)
+			if visual.bake_environment != null and visual.bake_environment.has_method("to_trace_dict"):
+				enriched_request["environment_profile"] = visual.bake_environment.to_trace_dict()
+			else:
+				var default_env := load("res://data/environments/gameplay_studio.tres")
+				if default_env != null and default_env.has_method("to_trace_dict"):
+					enriched_request["environment_profile"] = default_env.to_trace_dict()
 		# Pass through request-level overrides from options
 		if options.has("zone_surface_scales") and not enriched_request.has("zone_surface_scales"):
 			enriched_request["zone_surface_scales"] = options.get("zone_surface_scales")
 		if options.has("output_grade") and not enriched_request.has("output_grade"):
 			enriched_request["output_grade"] = options.get("output_grade")
-		if options.has("spectral_wavelengths") and not enriched_request.has("spectral_wavelengths"):
-			enriched_request["spectral_wavelengths"] = options.get("spectral_wavelengths")
-		if options.has("high_fire_dispersion_threshold") and not enriched_request.has("high_fire_dispersion_threshold"):
-			enriched_request["high_fire_dispersion_threshold"] = options.get("high_fire_dispersion_threshold")
-		if options.has("high_fire_sparkle_threshold") and not enriched_request.has("high_fire_sparkle_threshold"):
-			enriched_request["high_fire_sparkle_threshold"] = options.get("high_fire_sparkle_threshold")
 		var mesh_cache_key := _resolve_request_mesh_cache_key(visual, enriched_request)
 		var mesh_resource = mesh_cache.get(mesh_cache_key, null)
 		var mesh_build_elapsed_ms := 0.0
@@ -695,13 +692,8 @@ func _enrich_request_list(base_requests: Array, sample_count: int, options: Dict
 			enriched_request["thread_count"] = int(options.get("thread_count", 1))
 		if options.has("trace_profile"):
 			enriched_request["trace_profile"] = bool(options.get("trace_profile", false))
-		if options.has("max_trace_bounces"):
-			enriched_request["max_trace_bounces"] = GemTracedBakeContractScript.resolve_max_trace_bounces(
-				options.get(
-					"max_trace_bounces",
-					GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES
-				)
-			)
+		if options.has("samples_per_pixel"):
+			enriched_request["samples_per_pixel"] = int(options.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL))
 		if options.has("skip_stylize"):
 			enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
 		# Image format and quality.
@@ -985,11 +977,10 @@ func _finalize_batch_result(
 	profiling: Dictionary = {},
 	batch_options: Dictionary = {},
 ) -> Dictionary:
-	var manifest_max_trace_bounces := _resolve_batch_max_trace_bounces(filtered_requests)
 	var merged_entries := _merge_manifest_entries(
 		_join_path(output_root, DEFAULT_MANIFEST_NAME),
 		entries,
-		{"max_trace_bounces": manifest_max_trace_bounces}
+		{}
 	)
 	var merged_tile_counts := _count_entries_by_tile(merged_entries)
 	var base_variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(variant_settings)
@@ -1007,7 +998,6 @@ func _finalize_batch_result(
 		"cell_size": cell_size,
 		"draw_size": draw_size,
 		"sample_count": sample_count,
-		"max_trace_bounces": manifest_max_trace_bounces,
 		"image_format": String(variant_settings.get(
 			"image_format",
 			GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT
@@ -1143,15 +1133,3 @@ func _count_entries_by_tile(entries: Array) -> Dictionary:
 			continue
 		counts[tile_id] = int(counts.get(tile_id, 0)) + 1
 	return counts
-
-
-func _resolve_batch_max_trace_bounces(filtered_requests: Array) -> int:
-	if filtered_requests.is_empty():
-		return GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES
-	var first_request: Dictionary = filtered_requests[0]
-	return GemTracedBakeContractScript.resolve_max_trace_bounces(
-		first_request.get(
-			"max_trace_bounces",
-			GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES
-		)
-	)

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"garnet_pyrope_almandine"
+mineral_name = "Garnet — Pyrope-Almandine series"
+sellmeier_b = Vector3(1.0856, 0.5765, 0)
+sellmeier_c = Vector3(0.00712, 0.02154, 0)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+absorption_spectrum = PackedFloat32Array(0.63168, 0.7396, 0.85009, 0.95989, 1.0659, 1.1656, 1.25755, 1.34178, 1.42005, 1.49598, 1.57483, 1.66314, 1.76802, 1.89625, 2.05333, 2.24249, 2.46392, 2.71421, 2.98627, 3.26979, 3.55212, 3.8197, 4.05977, 4.26224, 4.42136, 4.53697, 4.61493, 4.66662, 4.70739, 4.75396, 4.82125, 4.91899, 5.04895, 5.20321, 5.3642, 5.50664, 5.6011, 5.61882, 5.5366, 5.341, 5.03087, 4.61773, 4.12399, 3.57945, 3.0169, 2.46761, 1.95779, 1.50619, 1.12333, 0.81201, 0.56883, 0.38613, 0.25396, 0.16183, 0.0999, 0.05975, 0.03462, 0.01943, 0.01056, 0.00556, 0.00284, 0.0014, 0.00067, 0.00031, 0.00014, 0.00006, 0.00003, 0.00001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.0
+default_surface_roughness = 0.008
+display_color = Color(0.82, 0.25, 0.42, 1)

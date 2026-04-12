@@ -106,14 +106,15 @@ func _validate_identity(manifest: Dictionary, profile: Dictionary) -> void:
 				GemTracedBakeContractScript.BAKED_LOOK_VERSION,
 			]
 		)
-	var prof_b := GemTracedBakeContractScript.resolve_max_trace_bounces(
-		profile.get("max_trace_bounces", GemTracedBakeContractScript.DEFAULT_MAX_TRACE_BOUNCES)
+	var prof_spp := clampi(
+		int(profile.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)),
+		16, 512
 	)
-	if int(manifest.get("max_trace_bounces", 0)) != prof_b:
+	if int(manifest.get("samples_per_pixel", 0)) != prof_spp:
 		_add_error(
-			"max_trace_bounces mismatch (manifest=%d profile=%d)" % [
-				int(manifest.get("max_trace_bounces", 0)),
-				prof_b,
+			"samples_per_pixel mismatch (manifest=%d profile=%d)" % [
+				int(manifest.get("samples_per_pixel", 0)),
+				prof_spp,
 			]
 		)
 	if profile.has("vram_compress"):
@@ -225,6 +226,15 @@ func _validate_tiles(manifest: Dictionary, profile: Dictionary, registry: Node) 
 		var key := String(tid)
 		if int(tile_counts.get(key, 0)) < 1:
 			_add_error("tile_counts missing or zero for expected gem: %s" % key)
+
+	# Validate mineral template references on baked gems
+	for tid in expected_ids:
+		var visual: Resource = registry.get_visual(StringName(String(tid)))
+		if visual == null:
+			continue
+		var tmpl = visual.get("mineral_template")
+		if tmpl == null:
+			_add_error("gem '%s' has null mineral_template (required for traced bake)" % String(tid))
 
 
 func _validate_entries(manifest: Dictionary, output_root: String) -> void:

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"tigers_eye"
+mineral_name = "Tiger's Eye (SiO2 + crocidolite)"
+sellmeier_b = Vector3(0.6962, 0.4079, 0.8975)
+sellmeier_c = Vector3(0.00468, 0.01351, 97.934)
+scattering_coefficient = 15.0
+scattering_anisotropy = 0.5
+absorption_spectrum = PackedFloat32Array(7.46654, 7.75502, 7.90124, 7.92628, 7.86271, 7.74798, 7.61773, 7.50031, 7.41371, 7.3649, 7.35139, 7.36398, 7.38998, 7.416, 7.4301, 7.42294, 7.38825, 7.32268, 7.22538, 7.09741, 6.94121, 6.76008, 6.55779, 6.33831, 6.10553, 5.86312, 5.61444, 5.36243, 5.10961, 4.85803, 4.60933, 4.36477, 4.12524, 3.89137, 3.66356, 3.44203, 3.22691, 3.01828, 2.81615, 2.6206, 2.43169, 2.24955, 2.07432, 1.90619, 1.74537, 1.59208, 1.44653, 1.30892, 1.17941, 1.0581, 0.94505, 0.84024, 0.74361, 0.655, 0.5742, 0.50095, 0.43492, 0.37574, 0.32302, 0.27631, 0.23519, 0.19918, 0.16784, 0.14072, 0.11738, 0.09742, 0.08045, 0.0661, 0.05403, 0.04394, 0.03555, 0.02862, 0.02293, 0.01827, 0.01448, 0.01142, 0.00897, 0.007, 0.00544, 0.0042, 0.00323)
+fluorescence_quantum_yield = 0.0
+birefringence_delta_n = 0.009
+default_surface_roughness = 0.04
+display_color = Color(0.65, 0.45, 0.15, 1)

@@ -52,11 +52,19 @@ func _run() -> void:
 	}
 	if bool(args.get("trace_profile", false)):
 		options["trace_profile"] = true
-	var max_trace_bounces := int(args.get("max_trace_bounces", 0))
-	if max_trace_bounces > 0:
-		options["max_trace_bounces"] = GemTracedBakeContractScript.resolve_max_trace_bounces(
-			max_trace_bounces
-		)
+	var samples_per_pixel := int(args.get("samples_per_pixel", 0))
+	if samples_per_pixel > 0:
+		options["samples_per_pixel"] = clampi(samples_per_pixel, 16, 512)
+	var environment_path := String(args.get("environment", "")).strip_edges()
+	if not environment_path.is_empty():
+		var env_resource = load(environment_path)
+		if env_resource != null and env_resource.has_method("to_trace_dict"):
+			options["environment_override"] = env_resource
+		else:
+			push_warning("Offline bake: could not load environment from %s" % environment_path)
+	var exposure_override := float(args.get("exposure", 0.0))
+	if exposure_override > 0.0:
+		options["exposure_override"] = exposure_override
 	var thread_count := int(args.get("threads", 0))
 	if thread_count > 0:
 		options["thread_count"] = thread_count
@@ -155,7 +163,7 @@ func _run() -> void:
 		"cell_size": Vector2i(size, size),
 		"draw_size": Vector2i(draw_size, draw_size),
 		"sample_count": sample_count,
-		"max_trace_bounces": int(options.get("max_trace_bounces", 0)),
+		"samples_per_pixel": int(options.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)),
 		"thread_count": int(options.get("thread_count", 0)),
 		"variant_worker_count": int(options.get("variant_worker_count", 0)),
 		"output_root": String(options["output_root"]),
@@ -171,13 +179,13 @@ func _run() -> void:
 	})
 	print("Starting offline traced bake")
 	print("Gems: %s" % _tile_ids_to_text(tile_ids))
-	print("Cell size: %dx%d  Draw size: %dx%d  Samples: %d  Max bounces: %s  Threads: %s  Variant workers: %s  Output: %s" % [
+	print("Cell size: %dx%d  Draw size: %dx%d  Samples: %d  SPP: %s  Threads: %s  Variant workers: %s  Output: %s" % [
 		size,
 		size,
 		draw_size,
 		draw_size,
 		sample_count,
-		str(options.get("max_trace_bounces", "default")),
+		str(options.get("samples_per_pixel", "default")),
 		str(options.get("thread_count", "auto")),
 		str(options.get("variant_worker_count", "auto")),
 		String(options["output_root"]),

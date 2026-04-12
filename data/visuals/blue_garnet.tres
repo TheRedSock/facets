@@ -2,26 +2,18 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/pendeloque.tres" id="1_aomwr"]
+[ext_resource type="Resource" path="res://data/minerals/garnet_pyrope_spessartine.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"blue_garnet"
 cut_spec = ExtResource("1_aomwr")
 cut_id = &"pendeloque"
-base_color = Color(0.09, 0.18, 0.54, 1)
-shininess = 96.0
-specular_intensity = 0.5
-depth_tint = Color(0.08, 0.06, 0.18, 0.46)
-saturation_boost = 0.22
-contrast = 0.58
-rim_intensity = 0.12
-rim_color = Color(0.78, 0.86, 0.98, 1)
-translucency = 0.04
-translucency_color = Color(0.56, 0.24, 0.48, 1)
-secondary_specular = 0.24
-secondary_light_angle = 108.0
-sparkle_intensity = 0.28
-sparkle_threshold = 0.82
+display_color = Color(0.09, 0.18, 0.54, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 gradient_color = Color(0.5, 0.14, 0.38, 1)
 gradient_strength = 0.2
 gradient_angle_degrees = 32.0
@@ -29,22 +21,7 @@ phenomenon_color = Color(0.68, 0.16, 0.42, 1)
 phenomenon_strength = 0.62
 phenomenon_angle_degrees = 38.0
 phenomenon_sharpness = 1.1
-brilliance_contrast = 0.38
-extinction = 0.42
-optics_ior = 1.78
-optics_dispersion = 0.027
-optics_absorption_color = Color(0.14, 0.12, 0.3, 1)
-optics_absorption_strength = 1.90
-optics_surface_roughness = 0.03
-optics_scattering_strength = 0.01
-optics_scattering_color = Color(0.48, 0.2, 0.4, 1)
-optics_environment_preset = 4
 optics_environment_rotation_degrees = 6.0
-optics_environment_energy = 0.66
-optics_light_energy = 1.46
-optics_ground_albedo = 0.12
-optics_ground_tint = Color(0.80, 0.78, 0.88, 1)
-optics_light_temperature_kelvin = 5200
 stylize_mix = 0.74
 stylize_facet_edge_gain = 0.68
 stylize_plane_contrast = 0.52

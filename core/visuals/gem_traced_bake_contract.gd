@@ -4,7 +4,7 @@ extends RefCounted
 const DEFAULT_OUTPUT_ROOT := "user://traced_bakes"
 const DEFAULT_MANIFEST_NAME := "gameplay_manifest.json"
 const GENERATED_OUTPUT_ROOT := "res://generated/traced_bakes"
-const BAKED_LOOK_VERSION := 5
+const BAKED_LOOK_VERSION := 6
 
 ## Image output format constants.
 const IMAGE_FORMAT_PNG := &"png"
@@ -39,8 +39,7 @@ const DEFAULT_ROTATION_STEP_DEGREES := 18.0
 const DEFAULT_SHOWROOM_DIRECTION_COUNT := 0
 const DEFAULT_SHOWROOM_ROLL_STEPS := 6
 const GAMEPLAY_VARIANT_TYPE_SHOWROOM := &"showroom"
-const DEFAULT_MAX_TRACE_BOUNCES := 12
-const MAX_TRACE_BOUNCES_LIMIT := 24
+const DEFAULT_SAMPLES_PER_PIXEL := 64
 const SUPPORTED_ROTATION_AXES := [&"pitch", &"yaw", &"roll"]
 
 
@@ -161,10 +160,8 @@ static func normalize_image_format(raw_value) -> StringName:
 	return DEFAULT_IMAGE_FORMAT
 
 
-## Compute WebP quality for a given visual, factoring in optical complexity.
-## Gems with high dispersion, sparkle or specular intensity get higher quality
-## to preserve fine spectral detail that compresses poorly.  Returns a float
-## in [MIN_WEBP_QUALITY, MAX_WEBP_QUALITY].
+## Compute WebP quality for a given visual.
+## Gems with high dispersion need higher quality to preserve fine spectral detail.
 ## If the visual has a non-negative bake_quality_override it takes precedence.
 static func compute_adaptive_webp_quality(visual: Resource, base_quality: float = DEFAULT_WEBP_QUALITY) -> float:
 	if visual == null:
@@ -174,16 +171,56 @@ static func compute_adaptive_webp_quality(visual: Resource, base_quality: float 
 	if override_quality >= 0.0:
 		return clampf(override_quality, MIN_WEBP_QUALITY, MAX_WEBP_QUALITY)
 	var quality := base_quality
-	# Dispersion (Diamond-like prismatic fire) compresses poorly.
-	if _get_visual_float(visual, &"hue_dispersion") > 0.1:
-		quality += 0.04
-	# High specular intensity produces bright highlights that need precision.
-	if _get_visual_float(visual, &"specular_intensity") > 0.7:
-		quality += 0.02
-	# Sparkle creates sharp high-contrast details.
-	if _get_visual_float(visual, &"sparkle_intensity") > 0.3:
-		quality += 0.02
+	# High-dispersion minerals (computed from Sellmeier spread) compress poorly.
+	var template: Resource = visual.get(&"mineral_template")
+	if template != null:
+		var ior_spread := _compute_dispersion_spread(template)
+		if ior_spread > 0.03:
+			quality += 0.06
+		elif ior_spread > 0.015:
+			quality += 0.03
 	return clampf(quality, MIN_WEBP_QUALITY, MAX_WEBP_QUALITY)
+
+
+## Compute adaptive samples_per_pixel for a visual based on dispersion and scattering.
+static func compute_adaptive_samples(visual: Resource) -> int:
+	if visual == null:
+		return DEFAULT_SAMPLES_PER_PIXEL
+	var base := DEFAULT_SAMPLES_PER_PIXEL
+	var template: Resource = visual.get(&"mineral_template")
+	if template == null:
+		return base
+	var dispersion_spread := _compute_dispersion_spread(template)
+	if dispersion_spread > 0.03:
+		base = int(base * 2.5)
+	elif dispersion_spread > 0.015:
+		base = int(base * 1.5)
+	var sigma_s: float = float(template.get(&"scattering_coefficient"))
+	var override_s := _get_visual_float(visual, &"scattering_coefficient_override", -1.0)
+	if override_s >= 0.0:
+		sigma_s = override_s
+	if sigma_s > 5.0:
+		base = int(base * 1.3)
+	return clampi(base, 32, 512)
+
+
+static func _compute_dispersion_spread(template: Resource) -> float:
+	if template == null:
+		return 0.0
+	var b: Vector3 = template.get(&"sellmeier_b")
+	var c: Vector3 = template.get(&"sellmeier_c")
+	if b == null or c == null:
+		return 0.0
+	var ior_blue := _sellmeier_ior_at(b, c, 380.0)
+	var ior_red := _sellmeier_ior_at(b, c, 780.0)
+	return ior_blue - ior_red
+
+
+static func _sellmeier_ior_at(b: Vector3, c: Vector3, lambda_nm: float) -> float:
+	var l := lambda_nm * 0.001
+	var l2 := l * l
+	var n2 := 1.0 + b.x * l2 / (l2 - c.x) + b.y * l2 / (l2 - c.y) + b.z * l2 / (l2 - c.z)
+	return sqrt(max(n2, 1.0))
 
 
 ## File extension (without dot) for the given image format.
@@ -230,9 +267,7 @@ static func build_manifest_entry(
 		"target_size": cell_size,
 		"draw_size": draw_size,
 		"sample_count": sample_count,
-		"max_trace_bounces": resolve_max_trace_bounces(
-			request.get("max_trace_bounces", DEFAULT_MAX_TRACE_BOUNCES)
-		),
+		"samples_per_pixel": int(request.get("samples_per_pixel", DEFAULT_SAMPLES_PER_PIXEL)),
 		"stylize_version": BAKED_LOOK_VERSION,
 		"image_format": String(request.get("image_format", DEFAULT_IMAGE_FORMAT)),
 		"image_quality": float(request.get("image_quality", DEFAULT_WEBP_QUALITY)),
@@ -296,16 +331,7 @@ static func manifest_matches_current(manifest: Dictionary, expected: Dictionary 
 		return false
 	if int(manifest.get("stylize_version", 0)) != BAKED_LOOK_VERSION:
 		return false
-	var expected_max_trace_bounces := resolve_max_trace_bounces(
-		expected.get(
-			"max_trace_bounces",
-			manifest.get("max_trace_bounces", DEFAULT_MAX_TRACE_BOUNCES)
-		)
-	)
-	var manifest_max_trace_bounces := resolve_max_trace_bounces(
-		manifest.get("max_trace_bounces", expected_max_trace_bounces)
-	)
-	return manifest_max_trace_bounces == expected_max_trace_bounces
+	return true
 
 
 static func entry_matches_request(entry: Dictionary, request: Dictionary) -> bool:
@@ -323,14 +349,6 @@ static func entry_matches_request(entry: Dictionary, request: Dictionary) -> boo
 	)
 	var entry_target_size := normalize_size(entry.get("target_size", requested_target_size), requested_target_size)
 	if requested_target_size != Vector2i.ZERO and entry_target_size != requested_target_size:
-		return false
-	var requested_max_trace_bounces := resolve_max_trace_bounces(
-		request.get("max_trace_bounces", DEFAULT_MAX_TRACE_BOUNCES)
-	)
-	var entry_max_trace_bounces := resolve_max_trace_bounces(
-		entry.get("max_trace_bounces", requested_max_trace_bounces)
-	)
-	if entry_max_trace_bounces != requested_max_trace_bounces:
 		return false
 	return true
 
@@ -357,10 +375,6 @@ static func normalize_size(raw_value, fallback: Vector2i = Vector2i.ZERO) -> Vec
 		if values.has("x") and values.has("y"):
 			return Vector2i(int(values.get("x", fallback.x)), int(values.get("y", fallback.y)))
 	return fallback
-
-
-static func resolve_max_trace_bounces(raw_value) -> int:
-	return clampi(int(raw_value), 1, MAX_TRACE_BOUNCES_LIMIT)
 
 
 static func get_lighting_grid_presets() -> Dictionary:

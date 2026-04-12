@@ -81,7 +81,6 @@ plans/          Design docs (reference only, not code)
 ### Deprecated
 
 - `autoloads/perf_monitor.gd` — not autoloaded, unused
-- `core/visuals/gem_optics_tracer.gd` — DEPRECATED. GDScript tracer retained as reference only. Native `GemTraceKernel` is mandatory.
 - `core/visuals/gem_material_sampler.gd` — used by procedural 2D renderer; native has C++ port
 - No runtime loading screen in current flow
 
@@ -292,7 +291,7 @@ C++ GDExtension (`native/`) using Embree for BVH traversal. The sole tracer impl
 
 **API:** `trace_to_image(mesh_resource, visual, request) -> Image`, `get_last_trace_profile() -> Dictionary`.
 
-**Required:** The native extension must be compiled. The GDScript fallback (`gem_optics_tracer.gd`) is deprecated and no longer used by the bake pipeline.
+**Required:** The native extension must be compiled. The GDScript tracer (`gem_optics_tracer.gd`) has been removed; the native kernel is the sole implementation.
 
 **Build:** Requires MSVC 2022, Python 3.x, SCons.
 ```bash

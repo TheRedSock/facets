@@ -621,12 +621,12 @@ func test_effect_resolution() -> void:
 func test_gradient_strength_without_texture() -> void:
 	var cut = GemCutGenerators.generate_from_spec_id(&"cushion")
 	var base_visual := GemVisualResource.new()
-	base_visual.base_color = Color(0.32, 0.6, 0.82, 1)
+	base_visual.display_color = Color(0.32, 0.6, 0.82, 1)
 	base_visual.gradient_color = Color(0.9, 0.2, 0.35, 1)
 	base_visual.gradient_strength = 0.0
 
 	var gradient_visual := GemVisualResource.new()
-	gradient_visual.base_color = base_visual.base_color
+	gradient_visual.display_color = base_visual.display_color
 	gradient_visual.gradient_color = base_visual.gradient_color
 	gradient_visual.gradient_strength = 0.7
 

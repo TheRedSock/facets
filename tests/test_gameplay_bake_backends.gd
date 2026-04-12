@@ -132,6 +132,14 @@ func _run_manifest_reload_case() -> void:
 	assert_eq(settings.get("lighting_runtime_grid_size"), Vector2i(1, 1), "Reloading the traced manifest should update the virtual runtime lighting grid")
 	assert_eq(settings.get("rotation_bin_count"), 8, "Reloading the traced manifest should update the active rotation suite")
 
+	# Manifest content checks: verify new fields are present
+	var manifest: Dictionary = registry.get_offline_traced_manifest()
+	if not manifest.is_empty():
+		assert_true(
+			manifest.has("samples_per_pixel"),
+			"Traced manifest should contain samples_per_pixel field"
+		)
+
 
 func _wait_for_cache(registry: Node, preference: StringName, tile_scope = []) -> void:
 	var frame_count := 0

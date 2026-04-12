@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mineral_id = &"diamond"
+mineral_name = "Diamond (C)"
+sellmeier_b = Vector3(4.3356, 0.3306, 0)
+sellmeier_c = Vector3(0.0106, 0.0175, 0)
+scattering_coefficient = 0.0
+scattering_anisotropy = 0.0
+absorption_spectrum = PackedFloat32Array(0.07351, 0.08873, 0.10574, 0.12354, 0.14019, 0.15296, 0.15903, 0.15639, 0.14466, 0.12536, 0.10148, 0.0766, 0.05386, 0.03526, 0.02149, 0.0122, 0.00646, 0.0032, 0.00148, 0.00065, 0.00027, 0.00011, 0.00004, 0.00002, 0.00001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+fluorescence_quantum_yield = 0.05
+fluorescence_excitation_center_nm = 365.0
+fluorescence_excitation_width_nm = 20.0
+fluorescence_emission_center_nm = 440.0
+fluorescence_emission_width_nm = 25.0
+birefringence_delta_n = 0.0
+default_surface_roughness = 0.005
+display_color = Color(0.97, 0.97, 0.98, 1)

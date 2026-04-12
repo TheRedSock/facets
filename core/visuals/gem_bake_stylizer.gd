@@ -186,8 +186,7 @@ static func _build_guides(
 			interior_strength *= clampf(
 				0.35
 				+ (1.0 - center_luma) * 0.75
-				+ center_chroma * 0.4
-				+ visual.extinction * 0.3,
+				+ center_chroma * 0.4,
 				0.0,
 				1.0
 			)
@@ -403,12 +402,8 @@ static func _apply_highlight_snap(color: Vector3, amount: float) -> Vector3:
 
 
 static func _build_ink_color(visual: GemVisualResource, color: Vector3) -> Vector3:
-	var base_rgb := Vector3(visual.base_color.r, visual.base_color.g, visual.base_color.b)
-	var depth_rgb := Vector3(visual.depth_tint.r, visual.depth_tint.g, visual.depth_tint.b)
-	var ink_rgb := base_rgb
-	if visual.depth_tint.a > 0.01:
-		ink_rgb = ink_rgb.lerp(depth_rgb, clampf(visual.depth_tint.a * 0.45, 0.0, 0.45))
-	ink_rgb = _adjust_saturation(ink_rgb, -0.12)
+	var base_rgb := Vector3(visual.display_color.r, visual.display_color.g, visual.display_color.b)
+	var ink_rgb := _adjust_saturation(base_rgb, -0.12)
 	var ink_luma := clampf(_luma(color) * 0.34 + 0.07, 0.07, 0.28)
 	return _set_luma(ink_rgb, ink_luma)
 

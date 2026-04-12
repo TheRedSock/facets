@@ -1,8 +1,9 @@
 class_name GemRenderer
 extends RefCounted
 
-## Pure-math lighting calculations for faceted gem rendering.
+## Procedural 2D fallback renderer — simplified Blinn-Phong lighting for faceted gems.
 ## No scene-tree dependency — can run headlessly.
+## Physical accuracy comes from the traced path; this is a lightweight fallback.
 ##
 ## Performance contract: facet normals in GemProjectedCutResource are pre-normalized at
 ## cut generation time.  This renderer skips redundant normalization calls.
@@ -10,6 +11,9 @@ extends RefCounted
 const DEFAULT_LIGHT_DIR := Vector3(-0.4, -0.5, 0.75)
 const DEFAULT_VIEW_DIR := Vector3(0.0, 0.0, 1.0)
 const AMBIENT := 0.15
+const FALLBACK_SHININESS := 32.0
+const FALLBACK_SPECULAR := 0.4
+const FALLBACK_CONTRAST := 0.3
 const GemMaterialSamplerScript = preload("res://core/visuals/gem_material_sampler.gd")
 
 
@@ -21,10 +25,10 @@ const GemMaterialSamplerScript = preload("res://core/visuals/gem_material_sample
 static func compute_facet_color(
 	normal: Vector3,
 	base_color: Color,
-	shininess: float = 32.0,
-	specular_intensity: float = 0.4,
+	shininess: float = FALLBACK_SHININESS,
+	specular_intensity: float = FALLBACK_SPECULAR,
 	light_dir: Vector3 = DEFAULT_LIGHT_DIR,
-	contrast: float = 0.3,
+	contrast: float = FALLBACK_CONTRAST,
 ) -> Color:
 	var l := light_dir.normalized()
 	var n := normal.normalized()
@@ -51,20 +55,16 @@ static func compute_facet_color(
 
 
 ## Computes colours for every facet in a cut, respecting the visual's
-## material properties and optional modifier overrides.
+## display_color and optional modifier overrides.
 ##
-## All effects are computed in a single per-facet pass to eliminate the overhead
-## of multiple array iterations.  Pre-computed cut constants (centroids, jitter,
-## zone weights) are used when available, with inline fallbacks for cuts that
-## were not finalized through the standard pipeline.
+## Simplified Blinn-Phong fallback — physical accuracy comes from the traced path.
 ##
 ## Pipeline order (per facet):
 ##   1. Modifier adjustments (darken/brighten/desaturate)
-##   2. Depth tint, colour zoning, phenomenon cue
-##   3. Inlined Blinn-Phong primary lighting
-##   4. Translucency, rim lighting, secondary specular
-##   5. Hue dispersion, sparkle boost
-##   6. Per-facet jitter, saturation boost, zone brilliance, transparency
+##   2. Colour zoning (gradient), phenomenon cue
+##   3. Material surface/volume patterns, reactive effects
+##   4. Inlined Blinn-Phong lighting
+##   5. Per-facet jitter
 static func compute_all_facet_colors(
 	cut,
 	visual: GemVisualResource,
@@ -75,7 +75,7 @@ static func compute_all_facet_colors(
 	var colors = PackedColorArray()
 	colors.resize(count)
 
-	var base := visual.base_color
+	var base := visual.display_color
 	var texture_overlay_mode := texture_uses_overlay_mode(visual)
 	if visual.use_texture and not texture_overlay_mode:
 		base = Color.WHITE
@@ -93,13 +93,12 @@ static func compute_all_facet_colors(
 
 	var l := light_dir.normalized()
 	var half_vec := (l + DEFAULT_VIEW_DIR).normalized()
-	var contrast := visual.contrast
-	var shininess := visual.shininess
-	var specular_intensity := visual.specular_intensity
+	var contrast := FALLBACK_CONTRAST
+	var shininess := FALLBACK_SHININESS
+	var specular_intensity := FALLBACK_SPECULAR
 	var one_minus_ambient := 1.0 - AMBIENT
 
 	# Feature flags (avoid per-facet branching on disabled features).
-	var has_depth_tint := visual.depth_tint.a > 0.01
 	var has_gradient := (
 		visual.gradient_strength > 0.001
 		and visual.gradient_color.a > 0.001
@@ -108,14 +107,6 @@ static func compute_all_facet_colors(
 		visual.phenomenon_strength > 0.001
 		and visual.phenomenon_color.a > 0.001
 	)
-	var has_translucency := visual.translucency > 0.001
-	var has_rim := visual.rim_intensity > 0.001
-	var has_secondary := visual.secondary_specular > 0.001
-	var has_dispersion := visual.hue_dispersion > 0.001
-	var has_sparkle := visual.sparkle_intensity > 0.001
-	var has_saturation := not is_zero_approx(visual.saturation_boost)
-	var has_brilliance := visual.brilliance_contrast > 0.001
-	var has_transparency := visual.transparency > 0.001
 	var has_material_surface := (
 		visual.surface_pattern_mix > 0.001
 		and visual.surface_pattern_type != GemVisualResource.MATERIAL_PATTERN_NONE
@@ -132,30 +123,14 @@ static func compute_all_facet_colors(
 	# Pre-computed cut data availability flags.
 	var has_centroids = cut.facet_centroids.size() == count
 	var has_precomputed_jitter = cut.facet_jitter.size() == count
-	var has_zone_weights = cut.zone_brilliance_weights.size() == count
-	has_brilliance = has_brilliance and (has_zone_weights or cut.facet_zones.size() == count)
 	var needs_centroid := has_gradient or has_material_surface or has_material_volume or has_material_reactive
 
-	# Secondary light direction: primary light rotated around Z by the offset angle.
-	var secondary_half := Vector3.ZERO
 	var gradient_axis := Vector2.RIGHT
 	var phenomenon_axis := Vector2.RIGHT
 	if has_gradient:
 		gradient_axis = Vector2.RIGHT.rotated(deg_to_rad(visual.gradient_angle_degrees)).normalized()
 	if has_phenomenon:
 		phenomenon_axis = Vector2.RIGHT.rotated(deg_to_rad(visual.phenomenon_angle_degrees)).normalized()
-	if has_secondary:
-		var angle_rad := deg_to_rad(visual.secondary_light_angle)
-		var cos_a := cos(angle_rad)
-		var sin_a := sin(angle_rad)
-		var secondary_l := Vector3(
-			l.x * cos_a - l.y * sin_a,
-			l.x * sin_a + l.y * cos_a,
-			l.z).normalized()
-		secondary_half = (secondary_l + DEFAULT_VIEW_DIR).normalized()
-
-	# Transparency pre-compute.
-	var alpha_mult := 1.0 - visual.transparency if has_transparency else 1.0
 
 	# ---- Single per-facet pass ----
 
@@ -169,11 +144,6 @@ static func compute_all_facet_colors(
 				centroid = cut.facet_centroids[i]
 			else:
 				centroid = _compute_facet_centroid(cut, i)
-
-		# Depth-tint: mix in the tint colour for facets facing away from the viewer.
-		if has_depth_tint:
-			var facing := clampf(n.z, 0.0, 1.0)
-			facet_base = base.lerp(visual.depth_tint, (1.0 - facing) * visual.depth_tint.a)
 
 		# Color zoning: linear or radial blend toward gradient_color.
 		if has_gradient:
@@ -219,7 +189,7 @@ static func compute_all_facet_colors(
 				clampf(volume_mix, 0.0, 1.0)
 			)
 
-		# ---- Inlined Blinn-Phong lighting (Fix #2) ----
+		# ---- Inlined Blinn-Phong lighting ----
 		var ndotl = n.dot(l)
 		var half_lambert = ndotl * 0.5 + 0.5
 		var standard_lambert = maxf(ndotl, 0.0)
@@ -233,57 +203,11 @@ static func compute_all_facet_colors(
 		var cb := clampf(facet_base.b * shade + spec_contrib, 0.0, 1.0)
 		var ca := facet_base.a
 
-		# Translucency: fills in shadow areas with transmitted light.
-		if has_translucency:
-			var shadow := 1.0 - clampf(ndotl * 0.5 + 0.5, 0.0, 1.0)
-			var transmitted := visual.translucency * shadow * 2.0
-			cr = clampf(cr + visual.translucency_color.r * transmitted, 0.0, 1.0)
-			cg = clampf(cg + visual.translucency_color.g * transmitted, 0.0, 1.0)
-			cb = clampf(cb + visual.translucency_color.b * transmitted, 0.0, 1.0)
-
-		# Rim lighting: Fresnel-based edge glow on tilted facets.
-		if has_rim:
-			var edge_factor := 1.0 - clampf((n.z - 0.5) * 2.0, 0.0, 1.0)
-			var rim_factor := pow(edge_factor, visual.rim_power) * visual.rim_intensity
-			cr = clampf(cr + visual.rim_color.r * rim_factor, 0.0, 1.0)
-			cg = clampf(cg + visual.rim_color.g * rim_factor, 0.0, 1.0)
-			cb = clampf(cb + visual.rim_color.b * rim_factor, 0.0, 1.0)
-
-		# Secondary specular: second Blinn-Phong highlight from a rotated light angle.
-		if has_secondary:
-			var spec2 := pow(maxf(n.dot(secondary_half), 0.0), shininess) * visual.secondary_specular
-			cr = clampf(cr + spec2, 0.0, 1.0)
-			cg = clampf(cg + spec2, 0.0, 1.0)
-			cb = clampf(cb + spec2, 0.0, 1.0)
-
 		if has_material_reactive:
 			var reactive_color: Color = GemMaterialSamplerScript.sample_reactive_color(visual, object_position, n, l)
 			cr = clampf(cr + reactive_color.r, 0.0, 1.0)
 			cg = clampf(cg + reactive_color.g, 0.0, 1.0)
 			cb = clampf(cb + reactive_color.b, 0.0, 1.0)
-
-		# Hue dispersion: prismatic hue shift per facet based on normal angle.
-		# Requires RGB→HSV→RGB round-trip, only when enabled.
-		if has_dispersion:
-			var angle := atan2(n.y, n.x)
-			var hue_shift := (angle / TAU) * visual.hue_dispersion
-			var c := Color(cr, cg, cb, ca)
-			c.h = fmod(c.h + hue_shift + 1.0, 1.0)
-			c.s = clampf(c.s + visual.hue_dispersion * 0.5, 0.0, 1.0)
-			cr = c.r
-			cg = c.g
-			cb = c.b
-
-		# Sparkle boost: dramatic brightness on facets exceeding specular threshold.
-		if has_sparkle:
-			var alignment := maxf(n.dot(half_vec), 0.0)
-			if alignment > visual.sparkle_threshold:
-				var range_above := 1.0 - visual.sparkle_threshold
-				var sparkle := (alignment - visual.sparkle_threshold) / maxf(range_above, 0.001)
-				var boost := sparkle * visual.sparkle_intensity
-				cr = clampf(cr + boost, 0.0, 1.0)
-				cg = clampf(cg + boost, 0.0, 1.0)
-				cb = clampf(cb + boost, 0.0, 1.0)
 
 		# Per-facet jitter: deterministic brightness variation from pre-computed values.
 		var jitter := 0.0
@@ -302,41 +226,6 @@ static func compute_all_facet_colors(
 		cr = clampf(cr + jitter, 0.0, 1.0)
 		cg = clampf(cg + jitter, 0.0, 1.0)
 		cb = clampf(cb + jitter, 0.0, 1.0)
-
-		# Saturation boost: requires RGB→HSV→RGB round-trip, only when enabled.
-		if has_saturation:
-			var c := Color(cr, cg, cb, ca)
-			c.s = clampf(c.s + visual.saturation_boost, 0.0, 1.0)
-			cr = c.r
-			cg = c.g
-			cb = c.b
-
-		# Zone brilliance: brighten table/star, darken girdle using pre-computed weights.
-		if has_brilliance:
-			var weight := 0.0
-			if has_zone_weights:
-				weight = cut.zone_brilliance_weights[i]
-			else:
-				# Fallback: resolve from zone string.
-				var zone: String = cut.facet_zones[i]
-				match zone:
-					"table":
-						weight = 0.5
-					"star":
-						weight = 0.25
-					"girdle":
-						weight = -0.4
-					"step":
-						weight = -0.2
-			var mult := 1.0 + weight * visual.brilliance_contrast
-			if not is_equal_approx(mult, 1.0):
-				cr = clampf(cr * mult, 0.0, 1.0)
-				cg = clampf(cg * mult, 0.0, 1.0)
-				cb = clampf(cb * mult, 0.0, 1.0)
-
-		# Transparency: reduce alpha.
-		if has_transparency:
-			ca = clampf(ca * alpha_mult, 0.0, 1.0)
 
 		colors[i] = Color(cr, cg, cb, ca)
 
@@ -523,8 +412,7 @@ static func texture_uses_overlay_mode(visual: GemVisualResource) -> bool:
 
 
 ## Computes semi-transparent overlay colours for pavilion extinction fragments.
-## Each fragment gets a dark colour whose alpha scales with the visual's
-## extinction intensity and the fragment normal's light-return score.
+## Simplified fallback: uses darkened display_color as the extinction tint.
 ## Fragments that would reflect light poorly appear darker (more opaque).
 static func compute_pavilion_colors(
 	cut,
@@ -533,16 +421,14 @@ static func compute_pavilion_colors(
 ) -> PackedColorArray:
 	var colors = PackedColorArray()
 	var count = int(cut.pavilion_count())
-	if count == 0 or visual.extinction < 0.001:
+	if count == 0:
 		return colors
 	colors.resize(count)
 
 	var l = light_dir.normalized()
 
-	# Base extinction colour: use depth_tint if available, otherwise darkened base.
-	var ext_color = visual.base_color.darkened(0.7)
-	if visual.depth_tint.a > 0.01:
-		ext_color = visual.depth_tint.darkened(0.4)
+	# Extinction colour: darkened display_color.
+	var ext_color = visual.display_color.darkened(0.7)
 	ext_color.a = 1.0
 
 	for i in count:
@@ -552,7 +438,7 @@ static func compute_pavilion_colors(
 		var light_return := clampf(n.dot(l), 0.0, 1.0)
 		# Poor light return → stronger extinction (more opaque overlay).
 		var darkness := (1.0 - light_return)
-		var alpha := visual.extinction * darkness * 0.7
+		var alpha := darkness * 0.35
 		colors[i] = Color(ext_color.r, ext_color.g, ext_color.b, clampf(alpha, 0.0, 0.85))
 
 	return colors

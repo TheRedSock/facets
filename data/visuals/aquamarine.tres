@@ -2,45 +2,22 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/kite_brilliant.tres" id="1_m7x0k"]
+[ext_resource type="Resource" path="res://data/minerals/beryl.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"aquamarine"
 cut_spec = ExtResource("1_m7x0k")
 cut_id = &"kite_brilliant"
-base_color = Color(0.38, 0.78, 0.96, 1)
-shininess = 34.0
-specular_intensity = 0.50
-transparency = 0.02
-depth_tint = Color(0.1, 0.38, 0.56, 0.22)
-saturation_boost = 0.16
-contrast = 0.34
-rim_intensity = 0.1
-rim_color = Color(0.78, 0.94, 1, 1)
-rim_power = 1.8
-translucency = 0.08
-translucency_color = Color(0.82, 0.96, 1, 1)
-secondary_specular = 0.12
+display_color = Color(0.38, 0.78, 0.96, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+absorption_spectrum_override = PackedFloat32Array(0.40043, 0.37895, 0.32103, 0.24357, 0.16569, 0.10135, 0.0562, 0.02894, 0.0148, 0.00872, 0.00695, 0.00728, 0.00864, 0.01063, 0.01316, 0.01624, 0.01997, 0.02444, 0.02978, 0.03614, 0.04365, 0.05249, 0.06284, 0.0749, 0.08888, 0.105, 0.1235, 0.1446, 0.16856, 0.19563, 0.22603, 0.25999, 0.29774, 0.33945, 0.38529, 0.43538, 0.4898, 0.54858, 0.61168, 0.67902, 0.75044, 0.82568, 0.90445, 0.98633, 1.07085, 1.15747, 1.24554, 1.33437, 1.42319, 1.5112, 1.59753, 1.6813, 1.76162, 1.83759, 1.90834, 1.97303, 2.03086, 2.08111, 2.12315, 2.15644, 2.18053, 2.19512, 2.2, 2.19512, 2.18053, 2.15644, 2.12315, 2.08111, 2.03086, 1.97303, 1.90834, 1.83759, 1.76162, 1.6813, 1.59753, 1.5112, 1.42319, 1.33437, 1.24554, 1.15747, 1.07085)
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 gradient_color = Color(0.24, 0.7, 0.92, 1)
 gradient_strength = 0.12
-brilliance_contrast = 0.34
-extinction = 0.14
-optics_ior = 1.58
-optics_dispersion = 0.014
-optics_absorption_color = Color(0.62, 0.88, 0.98, 1)
-optics_absorption_strength = 1.1
-optics_surface_roughness = 0.04
-optics_scattering_strength = 0.025
-optics_scattering_color = Color(0.82, 0.96, 1, 1)
-optics_birefringence_strength = 0.006
-optics_optic_axis = Vector3(0, 1, 0.14)
-optics_environment_preset = 0
 optics_environment_rotation_degrees = 12.0
-optics_environment_energy = 0.60
-optics_light_energy = 1.22
-optics_ground_albedo = 0.25
-optics_ground_tint = Color(0.82, 0.88, 0.94, 1)
-optics_light_temperature_kelvin = 6200
 stylize_mix = 0.64
 stylize_facet_edge_gain = 0.58
 stylize_plane_contrast = 0.4

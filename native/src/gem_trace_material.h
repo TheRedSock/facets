@@ -1,6 +1,6 @@
+// gem_trace_material.h — Procedural material sampling (patterns, reactive effects).
+// Updated for new GemTraceProps interface.
 #pragma once
-// Ported procedural material sampling from GemMaterialSampler.gd.
-// All functions are stateless free functions.
 
 #include "gem_trace_types.h"
 
@@ -8,10 +8,8 @@ namespace gem { namespace material {
 
 // --- Public API (called by tracer) ---
 
-double transmission_factor(const VisualProps& v);
-
 SurfaceMaterialSample apply_surface_material(
-    const VisualProps& v,
+    const GemTraceProps& props,
     godot::Color base_color,
     godot::Vector2 uv,
     godot::Vector3 object_position,
@@ -19,15 +17,19 @@ SurfaceMaterialSample apply_surface_material(
     godot::Image* texture_image);
 
 VolumeMaterialSample sample_volume_material(
-    const VisualProps& v,
+    const GemTraceProps& props,
     godot::Vector3 object_position);
 
 godot::Color sample_reactive_color(
-    const VisualProps& v,
+    const GemTraceProps& props,
     godot::Vector3 object_position,
     godot::Vector3 normal,
     godot::Vector3 light_dir,
     godot::Vector3 view_dir);
+
+// Transmission factor for material mode.
+// Returns 0.0 for opaque, 1.0 for transparent, configurable for translucent.
+double transmission_factor(const GemTraceProps& props);
 
 // --- Noise primitives ---
 

@@ -2,46 +2,22 @@
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/lozenge.tres" id="1_xxx8n"]
+[ext_resource type="Resource" path="res://data/minerals/corundum.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"sapphire"
 cut_spec = ExtResource("1_xxx8n")
 cut_id = &"lozenge"
-base_color = Color(0.05, 0.12, 0.70, 1)
-shininess = 80.0
-specular_intensity = 0.48
-depth_tint = Color(0.008, 0.015, 0.10, 0.55)
-saturation_boost = 0.24
-contrast = 0.78
-rim_intensity = 0.10
-rim_color = Color(0.82, 0.9, 1, 1)
-secondary_specular = 0.18
-secondary_light_angle = 110.0
-sparkle_intensity = 0.14
-sparkle_threshold = 0.82
+display_color = Color(0.05, 0.12, 0.70, 1)
+mineral_template = ExtResource("2")
+absorption_strength_scale = 1.0
+absorption_spectrum_override = PackedFloat32Array(2.87245, 3.10647, 3.21898, 3.20862, 3.09416, 2.90973, 2.69652, 2.49361, 2.33071, 2.22423, 2.17742, 2.18328, 2.22901, 2.30046, 2.3855, 2.47601, 2.56849, 2.66376, 2.76594, 2.88128, 3.01691, 3.1797, 3.37532, 3.60747, 3.87749, 4.184, 4.523, 4.88802, 5.27049, 5.66025, 6.04615, 6.4166, 6.76028, 7.06664, 7.32651, 7.53245, 7.67921, 7.76385, 7.78595, 7.74753, 7.65298, 7.50876, 7.32307, 7.10545, 6.86624, 6.61612, 6.36555, 6.1243, 5.90102, 5.70284, 5.53514, 5.40135, 5.3029, 5.23924, 5.20797, 5.20507, 5.22517, 5.26187, 5.30811, 5.35654, 5.39986, 5.43117, 5.44428, 5.43391, 5.39591, 5.32737, 5.22666, 5.09348, 4.92873, 4.73445, 4.51362, 4.27002, 4.00802, 3.73234, 3.44786, 3.15945, 2.87174, 2.58903, 2.31513, 2.0533, 1.80617)
+surface_roughness_override = -1.0
+scattering_coefficient_override = -1.0
 gradient_color = Color(0.04, 0.08, 0.58, 1)
 gradient_strength = 0.12
-brilliance_contrast = 0.50
-extinction = 0.65
-optics_ior = 1.76
-optics_dispersion = 0.014
-optics_absorption_color = Color(0.003, 0.012, 0.88, 1)
-optics_absorption_strength = 8.50
-optics_surface_roughness = 0.022
-optics_scattering_strength = 0.0
-optics_scattering_color = Color(0.10, 0.18, 0.80, 1)
-optics_birefringence_strength = 0.008
-optics_optic_axis = Vector3(0, 1, 0.22)
-optics_environment_preset = 4
 optics_environment_rotation_degrees = 14.0
-optics_environment_energy = 0.70
-optics_light_energy = 2.20
-optics_ground_albedo = 0.0
-optics_ground_tint = Color(0.78, 0.80, 0.88, 1)
-optics_light_temperature_kelvin = 6500
-optics_interface_highlight_scale = 1.60
-optics_blocker_strength_multiplier = 1.30
 stylize_mix = 0.86
 stylize_facet_edge_gain = 0.82
 stylize_plane_contrast = 0.72
