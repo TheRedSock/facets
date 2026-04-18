@@ -321,6 +321,8 @@ godot --headless --path . --script res://tools/validate_production_bake.gd -- --
 
 Runtime searches `user://` first, then `res://generated/`. To rebake: delete `user://traced_bakes/` manifest.
 
+**Gem appearance retuning policy:** Before editing per-gem spectra / phenomenon / gradients in `data/visuals/*.tres`, run an environment A/B (`neutral_warm_reference.tres` vs `gameplay_studio.tres`) with identical bake flags and `skip_stylize`, and review `tests/test_pavilion_proportions.gd` output — shallow crowns and cool-biased lighting can dominate “too cold” reads; isolate those first.
+
 ### Asset Optimization
 
 - **GPU compression:** BC7/BPTC on load (constants in `GemTracedBakeContract`). ASTC on mobile, S3TC fallback. ~4x VRAM savings.
@@ -351,7 +353,10 @@ weights: Array[int] = [4, 3, 2, 1]     # INTEGER only
 godot --headless --script tests/test_smoke.gd                # Core smoke tests
 godot --headless --script tests/test_gem_cuts.gd              # Cut regression
 godot --headless --script tests/test_native_trace_kernel.gd   # Native tracer
+godot --headless --script tests/test_trace_physics.gd         # Native spectral/uplift physics harness
+godot --headless --script tests/test_pavilion_proportions.gd  # Crown vs pavilion share (solver audit)
 godot --headless --script tests/test_rng_cross_platform.gd    # Cross-platform RNG
+godot --headless --script tests/test_gem_designer_contracts.gd # Designer JSON + preview enrich parity
 ```
 
 ---

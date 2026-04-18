@@ -4,59 +4,59 @@
 
 [resource]
 script = ExtResource("1")
-environment_id = &"gameplay_studio"
-environment_name = "Gameplay Studio (5400K, balanced)"
-sky_low = Color(0.11, 0.12, 0.16, 1)
-sky_top = Color(0.26, 0.30, 0.39, 1)
-horizon = Color(0.52, 0.46, 0.38, 1)
-ground_dark = Color(0.02, 0.018, 0.018, 1)
-ground_lift = Color(0.08, 0.068, 0.062, 1)
+environment_id = &"neutral_warm_reference"
+environment_name = "Neutral/Warm Reference (~4300–4800K, low blue bias)"
+sky_low = Color(0.14, 0.13, 0.12, 1)
+sky_top = Color(0.22, 0.24, 0.30, 1)
+horizon = Color(0.58, 0.48, 0.38, 1)
+ground_dark = Color(0.022, 0.018, 0.016, 1)
+ground_lift = Color(0.10, 0.082, 0.068, 1)
 light_cards = [{
 	"dir": Vector3(0.08, 0.38, 0.92),
-	"color": Color(1.0, 0.99, 0.97, 1),
+	"color": Color(1.0, 0.95, 0.86, 1),
 	"sharp_power": 820.0,
 	"broad_power": 12.0,
 	"sharp_strength": 2.30,
 	"broad_strength": 1.20,
-	"temperature_kelvin": 5400.0,
-	"edge_color": Color(0.92, 0.95, 1.0, 1),
+	"temperature_kelvin": 4500.0,
+	"edge_color": Color(1.0, 0.94, 0.86, 1),
 	"gradient_power": 0.7
 }, {
 	"dir": Vector3(0.72, 0.12, 0.68),
-	"color": Color(1.0, 0.94, 0.88, 1),
+	"color": Color(1.0, 0.92, 0.84, 1),
 	"sharp_power": 92.0,
 	"broad_power": 8.0,
 	"sharp_strength": 0.32,
 	"broad_strength": 0.34,
-	"temperature_kelvin": 6000.0,
-	"edge_color": Color(0.94, 0.96, 1.0, 1),
+	"temperature_kelvin": 4800.0,
+	"edge_color": Color(0.98, 0.94, 0.88, 1),
 	"gradient_power": 0.8
 }, {
 	"dir": Vector3(-0.72, 0.14, 0.64),
-	"color": Color(0.92, 0.97, 1.0, 1),
+	"color": Color(0.98, 0.96, 0.92, 1),
 	"sharp_power": 92.0,
 	"broad_power": 8.0,
 	"sharp_strength": 0.30,
 	"broad_strength": 0.32,
-	"temperature_kelvin": 6000.0,
-	"edge_color": Color(0.88, 0.94, 1.0, 1),
+	"temperature_kelvin": 4300.0,
+	"edge_color": Color(0.96, 0.93, 0.88, 1),
 	"gradient_power": 0.8
 }, {
 	"dir": Vector3(-0.06, -0.54, 0.84),
-	"color": Color(1.0, 0.92, 0.82, 1),
+	"color": Color(1.0, 0.88, 0.76, 1),
 	"sharp_power": 24.0,
 	"broad_power": 6.0,
-	"sharp_strength": 0.04,
-	"broad_strength": 0.06,
-	"temperature_kelvin": 4800.0,
-	"edge_color": Color(1.0, 0.92, 0.82, 1),
+	"sharp_strength": 0.12,
+	"broad_strength": 0.14,
+	"temperature_kelvin": 4000.0,
+	"edge_color": Color(1.0, 0.90, 0.78, 1),
 	"gradient_power": 1.0
 }]
 blocker_dir = Vector3(-0.10, -0.18, 0.98)
 blocker_power = 8.0
 blocker_strength = 0.10
 ground_albedo = 0.12
-ground_tint = Color(0.90, 0.86, 0.80, 1)
+ground_tint = Color(0.94, 0.88, 0.80, 1)
 ground_distance = 0.8
 exposure = 1.0
 light_energy = 2.4

@@ -388,6 +388,121 @@ static func _deep_merge_dict(base: Dictionary, overrides: Dictionary) -> Diction
 	return merged
 
 
+## Minimal override dict such that `_deep_merge_dict(base, result)` matches `current` for designer save.
+static func compute_contract_overrides(base_contract: Dictionary, current_contract: Dictionary) -> Dictionary:
+	var diff = _diff_contract_values(base_contract, current_contract)
+	return diff if typeof(diff) == TYPE_DICTIONARY else {}
+
+
+## Returns null when values are equivalent (no override needed).
+static func _diff_contract_values(base_val, current_val) -> Variant:
+	if typeof(base_val) != typeof(current_val):
+		return _duplicate_variant(current_val)
+	match typeof(current_val):
+		TYPE_DICTIONARY:
+			var base_d: Dictionary = base_val
+			var cur_d: Dictionary = current_val
+			var out := {}
+			for k in cur_d.keys():
+				var cv = cur_d[k]
+				if not base_d.has(k):
+					out[k] = _duplicate_variant(cv)
+					continue
+				var bv = base_d[k]
+				var sub = _diff_contract_values(bv, cv)
+				if sub != null:
+					out[k] = sub
+			return out if not out.is_empty() else null
+		TYPE_ARRAY:
+			var ba: Array = base_val
+			var ca: Array = current_val
+			if _contract_arrays_equal(ba, ca):
+				return null
+			return _duplicate_variant(ca)
+		_:
+			if _contract_leaf_equal(base_val, current_val):
+				return null
+			return _duplicate_variant(current_val)
+
+
+static func _contract_arrays_equal(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return false
+	for i in a.size():
+		var av = a[i]
+		var bv = b[i]
+		if typeof(av) == TYPE_DICTIONARY and typeof(bv) == TYPE_DICTIONARY:
+			if not _contract_dicts_equal(av, bv):
+				return false
+		elif typeof(av) == TYPE_ARRAY and typeof(bv) == TYPE_ARRAY:
+			if not _contract_arrays_equal(av, bv):
+				return false
+		elif not _contract_leaf_equal(av, bv):
+			return false
+	return true
+
+
+static func _contract_dicts_equal(a: Dictionary, b: Dictionary) -> bool:
+	if a.size() != b.size():
+		return false
+	for k in a.keys():
+		if not b.has(k):
+			return false
+		if typeof(a[k]) == TYPE_DICTIONARY and typeof(b[k]) == TYPE_DICTIONARY:
+			if not _contract_dicts_equal(a[k], b[k]):
+				return false
+		elif typeof(a[k]) == TYPE_ARRAY and typeof(b[k]) == TYPE_ARRAY:
+			if not _contract_arrays_equal(a[k], b[k]):
+				return false
+		elif not _contract_leaf_equal(a[k], b[k]):
+			return false
+	return true
+
+
+static func _contract_leaf_equal(a, b) -> bool:
+	if typeof(a) != typeof(b):
+		return false
+	match typeof(a):
+		TYPE_FLOAT:
+			return is_equal_approx(float(a), float(b))
+		TYPE_VECTOR2:
+			var va := a as Vector2
+			var vb := b as Vector2
+			return va.is_equal_approx(vb)
+		TYPE_VECTOR3:
+			var v3a := a as Vector3
+			var v3b := b as Vector3
+			return v3a.is_equal_approx(v3b)
+		TYPE_COLOR:
+			var ca := a as Color
+			var cb := b as Color
+			return ca.is_equal_approx(cb)
+		TYPE_STRING, TYPE_STRING_NAME:
+			return String(a) == String(b)
+		TYPE_BOOL, TYPE_INT:
+			return a == b
+		TYPE_PACKED_FLOAT32_ARRAY:
+			var pa: PackedFloat32Array = a
+			var pb: PackedFloat32Array = b
+			if pa.size() != pb.size():
+				return false
+			for i in pa.size():
+				if not is_equal_approx(pa[i], pb[i]):
+					return false
+			return true
+		TYPE_PACKED_VECTOR2_ARRAY:
+			var p2a: PackedVector2Array = a
+			var p2b: PackedVector2Array = b
+			if p2a.size() != p2b.size():
+				return false
+			for i in p2a.size():
+				if not p2a[i].is_equal_approx(p2b[i]):
+					return false
+			return true
+		_:
+			return a == b
+
+
 static func _duplicate_variant(value):
 	match typeof(value):
 		TYPE_DICTIONARY:

@@ -16,6 +16,7 @@ surface_roughness_override = -1.0
 scattering_coefficient_override = -1.0
 optics_trace_view_scale = 1.06
 optics_environment_rotation_degrees = 20.0
+enable_dispersion = true
 stylize_mix = 0.76
 stylize_facet_edge_gain = 0.82
 stylize_plane_contrast = 0.44

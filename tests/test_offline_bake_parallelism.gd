@@ -17,6 +17,7 @@ func _run() -> void:
 	test_explicit_variant_workers_share_cpu_budget()
 	test_trace_thread_heuristic_avoids_overthreading_small_images()
 	test_trace_thread_heuristic_scales_for_larger_images()
+	test_environment_override_wins_over_default_environment()
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
 	quit(1 if _fail_count > 0 else 0)
 
@@ -57,6 +58,36 @@ func test_trace_thread_heuristic_scales_for_larger_images() -> void:
 		7
 	)
 	assert_true(thread_count > 1 and thread_count <= 8, "Larger traced bakes should use multiple threads within the requested budget")
+
+
+func test_environment_override_wins_over_default_environment() -> void:
+	var job = OfflineGemBakeJobScript.new()
+	var warm_env = load("res://data/environments/neutral_warm_reference.tres")
+	var visual: GemVisualResource = load("res://data/visuals/ruby.tres")
+	assert_true(warm_env != null and warm_env.has_method("to_trace_dict"), "Warm reference environment should load")
+	assert_true(visual != null, "Ruby visual should load for environment override test")
+	if warm_env == null or visual == null:
+		return
+
+	var requests: Array = job._enrich_request_list(
+		[{
+			"visual": visual,
+			"tile_id": &"ruby",
+			"variant_key": "ruby@rot_01",
+		}],
+		1,
+		{"environment_override": warm_env}
+	)
+	assert_true(requests.size() == 1, "Environment override test should enrich one request")
+	if requests.is_empty():
+		return
+
+	var profile: Dictionary = requests[0].get("environment_profile", {})
+	assert_eq(
+		profile.get("sky_low"),
+		warm_env.to_trace_dict().get("sky_low"),
+		"Environment override should replace the default gameplay environment"
+	)
 
 
 func assert_true(condition: bool, message: String) -> void:

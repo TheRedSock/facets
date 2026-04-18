@@ -418,16 +418,12 @@ static func _mix_palette(
 static func _resolve_secondary_color(visual: GemVisualResource, base_color: Color) -> Color:
 	if visual.material_secondary_color.a > 0.001:
 		return visual.material_secondary_color
-	if visual.gradient_color.a > 0.001:
-		return visual.gradient_color
 	return base_color.darkened(0.18)
 
 
 static func _resolve_tertiary_color(visual: GemVisualResource, base_color: Color) -> Color:
 	if visual.material_tertiary_color.a > 0.001:
 		return visual.material_tertiary_color
-	if visual.phenomenon_color.a > 0.001:
-		return visual.phenomenon_color
 	return base_color.lightened(0.12)
 
 

@@ -23,6 +23,8 @@ assets/debug_bakes/
 
 # Production bake output (build artifacts; add res://generated/ to export includes)
 generated/traced_bakes/
+# Local orthogonal / raw QA bakes (regenerate; large PNG/WebP trees)
+generated/traced_bakes_orthogonal_qa/
 
 # Native GDExtension build artifacts
 native/lib/

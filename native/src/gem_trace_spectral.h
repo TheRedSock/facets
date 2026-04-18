@@ -26,6 +26,9 @@ double birefringent_ior(const GemTraceProps& props, double lambda_nm,
 double evaluate_absorption(const GemTraceProps& props, double lambda_nm,
                            Vector3 ray_dir = Vector3(0, 0, 1));
 
+// Interpolate an 81-sample curve (380–780 nm, 5 nm steps) at λ. No pleochroism / scaling.
+double sample_curve_at_lambda(const std::vector<float>& samples, double lambda_nm);
+
 // XYZ to linear sRGB (may produce out-of-gamut values; clamp after accumulation).
 Vector3 xyz_to_linear_srgb(Vector3 xyz);
 

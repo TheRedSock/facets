@@ -55,6 +55,8 @@ func _run() -> void:
 	var samples_per_pixel := int(args.get("samples_per_pixel", 0))
 	if samples_per_pixel > 0:
 		options["samples_per_pixel"] = clampi(samples_per_pixel, 16, 512)
+	if args.has("seed"):
+		options["seed"] = int(args.get("seed", 42))
 	var environment_path := String(args.get("environment", "")).strip_edges()
 	if not environment_path.is_empty():
 		var env_resource = load(environment_path)
@@ -131,6 +133,15 @@ func _run() -> void:
 		options["showroom_direction_count"] = maxi(int(args.get("showroom_directions", 0)), 0)
 	if args.has("showroom_roll_steps"):
 		options["showroom_roll_steps"] = clampi(int(args.get("showroom_roll_steps", 6)), 1, 64)
+	# --showroom_axis_steps=N emits N evenly-spaced frames per axis (pitch + yaw)
+	# tagged as showroom variants so gif_rotations.py can consume them directly.
+	# --showroom_axes=yaw (or "pitch,yaw") restricts to a subset of axes.
+	var showroom_axis_steps := maxi(int(args.get("showroom_axis_steps", 0)), 0)
+	if showroom_axis_steps > 0:
+		options["showroom_axis_steps"] = clampi(showroom_axis_steps, 1, 360)
+	var showroom_axes_raw := String(args.get("showroom_axes", "")).strip_edges()
+	if not showroom_axes_raw.is_empty():
+		options["showroom_axes"] = showroom_axes_raw.replace(";", ",").split(",", false)
 	# Lighting rig: --lighting_rig=<json> passes per-bin light perturbation config.
 	var rig_json := String(args.get("lighting_rig", "")).strip_edges()
 	if not rig_json.is_empty():
@@ -164,6 +175,7 @@ func _run() -> void:
 		"draw_size": Vector2i(draw_size, draw_size),
 		"sample_count": sample_count,
 		"samples_per_pixel": int(options.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)),
+		"seed": int(options.get("seed", -1)),
 		"thread_count": int(options.get("thread_count", 0)),
 		"variant_worker_count": int(options.get("variant_worker_count", 0)),
 		"output_root": String(options["output_root"]),
@@ -178,6 +190,8 @@ func _run() -> void:
 		"progress": 0.0,
 	})
 	print("Starting offline traced bake")
+	if options.has("seed"):
+		print("Trace seed: %d" % int(options["seed"]))
 	print("Gems: %s" % _tile_ids_to_text(tile_ids))
 	print("Cell size: %dx%d  Draw size: %dx%d  Samples: %d  SPP: %s  Threads: %s  Variant workers: %s  Output: %s" % [
 		size,

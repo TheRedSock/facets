@@ -97,15 +97,29 @@ static func compute_all_facet_colors(
 	var shininess := FALLBACK_SHININESS
 	var specular_intensity := FALLBACK_SPECULAR
 	var one_minus_ambient := 1.0 - AMBIENT
+	var transparent_mode := visual.material_mode == GemVisualResource.MATERIAL_MODE_FACETED_TRANSPARENT
+
+	var grad_zone_ok := (
+		visual.gradient_zone_spectrum.size() == 81
+		and _zone_spectrum_has_signal(visual.gradient_zone_spectrum)
+	)
+	var phen_zone_ok := (
+		visual.phenomenon_zone_spectrum.size() == 81
+		and _zone_spectrum_has_signal(visual.phenomenon_zone_spectrum)
+	)
 
 	# Feature flags (avoid per-facet branching on disabled features).
 	var has_gradient := (
+		transparent_mode
+		and
 		visual.gradient_strength > 0.001
-		and visual.gradient_color.a > 0.001
+		and (grad_zone_ok or visual.gradient_color.a > 0.001)
 	)
 	var has_phenomenon := (
+		transparent_mode
+		and
 		visual.phenomenon_strength > 0.001
-		and visual.phenomenon_color.a > 0.001
+		and (phen_zone_ok or visual.phenomenon_color.a > 0.001)
 	)
 	var has_material_surface := (
 		visual.surface_pattern_mix > 0.001
@@ -132,6 +146,13 @@ static func compute_all_facet_colors(
 	if has_phenomenon:
 		phenomenon_axis = Vector2.RIGHT.rotated(deg_to_rad(visual.phenomenon_angle_degrees)).normalized()
 
+	var gradient_target := visual.gradient_color
+	if grad_zone_ok:
+		gradient_target = GemVisualResource.zone_spectrum_to_display_color(visual.gradient_zone_spectrum)
+	var phenomenon_target := visual.phenomenon_color
+	if phen_zone_ok:
+		phenomenon_target = GemVisualResource.zone_spectrum_to_display_color(visual.phenomenon_zone_spectrum)
+
 	# ---- Single per-facet pass ----
 
 	for i in count:
@@ -149,18 +170,18 @@ static func compute_all_facet_colors(
 		if has_gradient:
 			var t := _compute_gradient_mix(centroid, visual, gradient_axis) * visual.gradient_strength
 			facet_base = Color(
-				lerpf(facet_base.r, visual.gradient_color.r, t),
-				lerpf(facet_base.g, visual.gradient_color.g, t),
-				lerpf(facet_base.b, visual.gradient_color.b, t),
+				lerpf(facet_base.r, gradient_target.r, t),
+				lerpf(facet_base.g, gradient_target.g, t),
+				lerpf(facet_base.b, gradient_target.b, t),
 				facet_base.a)
 
 		if has_phenomenon:
 			var phenomenon_t := _compute_phenomenon_mix(n, phenomenon_axis, visual.phenomenon_sharpness)
 			var phenomenon_blend := phenomenon_t * visual.phenomenon_strength
 			facet_base = Color(
-				lerpf(facet_base.r, visual.phenomenon_color.r, phenomenon_blend),
-				lerpf(facet_base.g, visual.phenomenon_color.g, phenomenon_blend),
-				lerpf(facet_base.b, visual.phenomenon_color.b, phenomenon_blend),
+				lerpf(facet_base.r, phenomenon_target.r, phenomenon_blend),
+				lerpf(facet_base.g, phenomenon_target.g, phenomenon_blend),
+				lerpf(facet_base.b, phenomenon_target.b, phenomenon_blend),
 				facet_base.a)
 
 		var object_position := Vector3(
@@ -277,6 +298,13 @@ static func _compute_phenomenon_mix(
 		return 0.5
 	var axis_alignment := planar.normalized().dot(phenomenon_axis)
 	return pow(clampf(axis_alignment * 0.5 + 0.5, 0.0, 1.0), sharpness)
+
+
+static func _zone_spectrum_has_signal(spectrum: PackedFloat32Array) -> bool:
+	for i in spectrum.size():
+		if spectrum[i] > 1e-6:
+			return true
+	return false
 
 
 ## Builds UVs so the texture reads as one continuous surface across all facets.

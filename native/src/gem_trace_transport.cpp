@@ -9,6 +9,16 @@
 // This eliminates the binary reflect/refract variance that caused chromatic
 // noise in gems with steep absorption spectra (e.g., Fluorite with 400:1
 // absorption variation across the visible spectrum).
+//
+// Birefringence: for crystals with |Δn| > BIREFRINGENCE_SPLIT_THRESHOLD the
+// primary air→gem refraction is forked into an ordinary and an extraordinary
+// ray (each with 0.5 × T throughput). The two rays travel along slightly
+// different Snell directions so back-facet reflections see physically
+// separated geometry — this produces the characteristic "doubling" of
+// facet edges seen in e.g. peridot, tourmaline, zircon. The split is
+// applied only at entry to keep cost bounded; subsequent internal bounces
+// share the ordinary IOR, which captures the dominant visual cue (entry-
+// angle separation accumulates across the internal bounce sequence).
 #include "gem_trace_transport.h"
 #include "gem_trace_spectral.h"
 #include "gem_trace_fresnel.h"
@@ -24,6 +34,14 @@ namespace gem { namespace transport {
 // negligible bias (< 0.1% energy loss) but prevents infinite loops
 // and eliminates firefly amplification from RR's 1/survival division.
 static constexpr double THROUGHPUT_CUTOFF = 0.001;
+
+// Minimum Δn for an engine-level ray split at the entry interface.
+// Below this value, birefringence is visually indistinguishable from
+// single-IOR refraction given typical gem sizes, so we skip the 2x path
+// cost. Corundum (0.008), quartz (0.009), chrysoberyl (0.009) all land
+// just above the threshold; peridot (0.036), grandidierite (0.037), and
+// tourmaline (0.018) produce visible doubling.
+static constexpr double BIREFRINGENCE_SPLIT_THRESHOLD = 0.005;
 
 // ---------------------------------------------------------------------------
 // Opaque surface shading
@@ -77,22 +95,31 @@ double compute_opaque_surface(
 }
 
 // ---------------------------------------------------------------------------
-// Single-wavelength path tracer (NEE at dielectric surfaces)
+// Single-wavelength path tracer core (NEE at dielectric surfaces).
+//
+// Accepts an initial state so the birefringent entry fork can start two
+// independent sub-paths from inside the gem with different refracted
+// directions.
 // ---------------------------------------------------------------------------
 
-double trace_path(
+static double trace_path_core(
     const TraceContext& ctx,
     const TraceScene& scene,
     Vector3 origin,
     Vector3 direction,
     double lambda_nm,
-    TraceRNG& rng)
+    TraceRNG& rng,
+    bool start_inside_gem,
+    double start_throughput,
+    int start_prev_triangle)
 {
     const GemTraceProps& props = ctx.props;
-    double throughput = 1.0;
+    double throughput = start_throughput;
     double result = 0.0;
-    bool inside_gem = false;
-    int prev_triangle = -1;
+    bool inside_gem = start_inside_gem;
+    int prev_triangle = start_prev_triangle;
+    // Mutable wavelength inside the gem (fluorescence shifts λ; survives zero scattering).
+    double wl = lambda_nm;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
 
@@ -121,9 +148,11 @@ double trace_path(
                 Vector3 obj_pos = (ctx.radius > 0.0001)
                     ? origin / (float)ctx.radius : Vector3(0, 0, 0);
                 throughput *= volume::beer_lambert_zoned(
-                    props, lambda_nm, scatter_dist, direction,
+                    props, wl, scatter_dist, direction,
                     obj_pos, absorb_mult);
-                volume::try_fluorescence(props, lambda_nm, rng);
+                if (volume::try_fluorescence(props, wl, rng)) {
+                    throughput *= volume::fluorescence_emission_boost(props, wl, direction);
+                }
                 direction = volume::sample_henyey_greenstein(
                     direction, props.scattering_anisotropy, rng);
                 origin = scatter_pos;
@@ -137,15 +166,18 @@ double trace_path(
                 Vector3 obj_pos = (ctx.radius > 0.0001)
                     ? origin / (float)ctx.radius : Vector3(0, 0, 0);
                 throughput *= volume::beer_lambert_zoned(
-                    props, lambda_nm, surface_dist, direction,
+                    props, wl, surface_dist, direction,
                     obj_pos, absorb_mult);
+                if (volume::try_fluorescence(props, wl, rng)) {
+                    throughput *= volume::fluorescence_emission_boost(props, wl, direction);
+                }
             }
 
             // --- Surface interaction (potential exit) ---
             origin = hit.position;
             prev_triangle = hit.triangle_idx;
 
-            double eta_i = spectral::sellmeier_ior(props, lambda_nm);
+            double eta_i = spectral::sellmeier_ior(props, wl);
             double roughness = props.effective_roughness();
             Vector3 surface_normal = hit.front_face ? hit.normal : -hit.normal;
             Vector3 micro_normal = fresnel::sample_ggx(surface_normal, roughness, rng);
@@ -162,7 +194,7 @@ double trace_path(
                 HitResult exit_check = scene.intersect(exit_origin, exit_dir, prev_triangle);
                 if (!exit_check.did_hit) {
                     result += throughput * T
-                        * environment::sample(ctx.environment, exit_dir, lambda_nm);
+                        * environment::sample(ctx.environment, exit_dir, wl);
                 }
             }
 
@@ -192,14 +224,6 @@ double trace_path(
             double roughness = props.effective_roughness();
             Vector3 micro_normal = fresnel::sample_ggx(hit.normal, roughness, rng);
             double R = fresnel::dielectric(direction, micro_normal, AIR_IOR, eta_t);
-
-            // Birefringence
-            if (props.birefringence_delta_n > 1e-6 && hit.front_face) {
-                if (rng.next() < 0.5) {
-                    eta_t = spectral::birefringent_ior(props, lambda_nm, direction, true);
-                    R = fresnel::dielectric(direction, micro_normal, AIR_IOR, eta_t);
-                }
-            }
 
             // NEE: deterministically evaluate reflected environment
             Vector3 reflect_dir = fresnel::reflect(direction, micro_normal);
@@ -233,42 +257,118 @@ double trace_path(
 }
 
 // ---------------------------------------------------------------------------
-// Multi-wavelength spectral path tracer (4-hero, NEE split).
+// Single-wavelength path tracer (birefringence-aware entry fork).
+// ---------------------------------------------------------------------------
+
+double trace_path(
+    const TraceContext& ctx,
+    const TraceScene& scene,
+    Vector3 origin,
+    Vector3 direction,
+    double lambda_nm,
+    TraceRNG& rng)
+{
+    const GemTraceProps& props = ctx.props;
+
+    // Fast path: not birefringent (or opaque/translucent surface shading).
+    if (props.birefringence_delta_n < BIREFRINGENCE_SPLIT_THRESHOLD
+        || ctx.is_opaque || ctx.is_translucent) {
+        return trace_path_core(ctx, scene, origin, direction, lambda_nm, rng,
+                               false, 1.0, -1);
+    }
+
+    // Probe the primary air→gem intersection so the split can start two
+    // sub-paths from inside the gem with different Snell directions.
+    HitResult entry = scene.intersect(origin, direction, -1);
+    if (!entry.did_hit) {
+        return environment::sample(ctx.environment, direction, lambda_nm);
+    }
+    if (!entry.front_face) {
+        // Primary ray should always hit a front face for a closed manifold;
+        // fallback to the non-split path if it doesn't.
+        return trace_path_core(ctx, scene, origin, direction, lambda_nm, rng,
+                               false, 1.0, -1);
+    }
+
+    double roughness = props.effective_roughness();
+    Vector3 micro_normal = fresnel::sample_ggx(entry.normal, roughness, rng);
+
+    double eta_o = spectral::sellmeier_ior(props, lambda_nm);
+    double eta_e = spectral::birefringent_ior(props, lambda_nm, direction, true);
+
+    // Average-eta Fresnel for the reflected NEE contribution. Splitting
+    // reflectance into per-ray terms is over-precision for typical Δn
+    // (< 0.04 ⇒ < 0.1% R difference) and doubles the NEE sample count.
+    double eta_avg = 0.5 * (eta_o + eta_e);
+    double R = fresnel::dielectric(direction, micro_normal, AIR_IOR, eta_avg);
+    double T = 1.0 - R;
+
+    double result = 0.0;
+
+    // NEE: reflected environment (shared across both rays).
+    Vector3 reflect_dir = fresnel::reflect(direction, micro_normal);
+    {
+        Vector3 reflect_origin = entry.position + reflect_dir * (float)TRACE_EPSILON;
+        HitResult reflect_check = scene.intersect(
+            reflect_origin, reflect_dir, entry.triangle_idx);
+        if (!reflect_check.did_hit) {
+            result += R * environment::sample(ctx.environment, reflect_dir, lambda_nm);
+        }
+    }
+
+    // Ordinary ray refraction — continues via trace_path_core starting inside.
+    Vector3 refr_o = fresnel::refract(direction, micro_normal, AIR_IOR / eta_o);
+    if (refr_o.length_squared() > 1e-12) {
+        Vector3 entry_origin = entry.position + refr_o * (float)TRACE_EPSILON;
+        result += trace_path_core(
+            ctx, scene, entry_origin, refr_o, lambda_nm, rng,
+            true, 0.5 * T, entry.triangle_idx);
+    }
+
+    // Extraordinary ray refraction — different eta so different Snell angle.
+    Vector3 refr_e = fresnel::refract(direction, micro_normal, AIR_IOR / eta_e);
+    if (refr_e.length_squared() > 1e-12) {
+        Vector3 entry_origin = entry.position + refr_e * (float)TRACE_EPSILON;
+        result += trace_path_core(
+            ctx, scene, entry_origin, refr_e, lambda_nm, rng,
+            true, 0.5 * T, entry.triangle_idx);
+    }
+
+    return dmax(result, 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Multi-wavelength spectral path tracer core (4-hero, NEE split).
 //
 // Traces a single geometric path determined by lambdas[0] (the hero).
 // At each dielectric surface, the exit/entry contribution is evaluated
 // deterministically for all 4 wavelengths (NEE), then the path continues
 // via the non-exit direction with per-wavelength Fresnel attenuation.
-//
-// This eliminates the binary reflect/refract variance from the old
-// stochastic branching approach. Per-wavelength effects tracked:
-//   - Beer-Lambert absorption (dominant color-producing effect)
-//   - Fresnel attenuation (per-wavelength, applied directly — no ratio
-//     corrections needed since there's no branching)
-//   - Environment spectral radiance at exit (evaluated deterministically)
 // ---------------------------------------------------------------------------
 
-SpectralResult trace_path_spectral(
+static SpectralResult trace_path_spectral_core(
     const TraceContext& ctx,
     const TraceScene& scene,
     Vector3 origin,
     Vector3 direction,
     const double lambdas[HERO_WAVELENGTHS],
-    TraceRNG& rng)
+    TraceRNG& rng,
+    bool start_inside_gem,
+    double start_throughput,
+    int start_prev_triangle)
 {
     const GemTraceProps& props = ctx.props;
     SpectralResult result = {};
     const double hero = lambdas[0];
+    // Per-channel wavelength (fluorescence can shift each hero/companion λ independently).
+    double wave[HERO_WAVELENGTHS];
+    for (int w = 0; w < HERO_WAVELENGTHS; w++) wave[w] = lambdas[w];
 
-    // Per-wavelength throughput. Tracks Beer-Lambert absorption and
-    // Fresnel attenuation independently for each wavelength.
-    // No geometric throughput separation needed — all wavelengths share
-    // the same path geometry determined by the hero.
     double wl_tp[HERO_WAVELENGTHS];
-    for (int w = 0; w < HERO_WAVELENGTHS; w++) wl_tp[w] = 1.0;
+    for (int w = 0; w < HERO_WAVELENGTHS; w++) wl_tp[w] = start_throughput;
 
-    bool inside_gem = false;
-    int prev_triangle = -1;
+    bool inside_gem = start_inside_gem;
+    int prev_triangle = start_prev_triangle;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
 
@@ -292,16 +392,17 @@ SpectralResult trace_path_spectral(
             if (sigma_s > 1e-12 && scatter_dist < surface_dist) {
                 // --- Scattering event ---
                 Vector3 scatter_pos = origin + direction * (float)scatter_dist;
-                // Normalized position for gradient/phenomenon modulation
                 Vector3 obj_pos = (ctx.radius > 0.0001)
                     ? origin / (float)ctx.radius : Vector3(0, 0, 0);
                 for (int w = 0; w < HERO_WAVELENGTHS; w++) {
                     wl_tp[w] *= volume::beer_lambert_zoned(
-                        props, lambdas[w], scatter_dist, direction,
+                        props, wave[w], scatter_dist, direction,
                         obj_pos, absorb_mult);
+                    if (volume::try_fluorescence(props, wave[w], rng)) {
+                        wl_tp[w] *= volume::fluorescence_emission_boost(
+                            props, wave[w], direction);
+                    }
                 }
-                double fl = hero;
-                volume::try_fluorescence(props, fl, rng);
                 direction = volume::sample_henyey_greenstein(
                     direction, props.scattering_anisotropy, rng);
                 origin = scatter_pos;
@@ -316,8 +417,12 @@ SpectralResult trace_path_spectral(
                     ? origin / (float)ctx.radius : Vector3(0, 0, 0);
                 for (int w = 0; w < HERO_WAVELENGTHS; w++) {
                     wl_tp[w] *= volume::beer_lambert_zoned(
-                        props, lambdas[w], surface_dist, direction,
+                        props, wave[w], surface_dist, direction,
                         obj_pos, absorb_mult);
+                    if (volume::try_fluorescence(props, wave[w], rng)) {
+                        wl_tp[w] *= volume::fluorescence_emission_boost(
+                            props, wave[w], direction);
+                    }
                 }
             }
 
@@ -329,32 +434,29 @@ SpectralResult trace_path_spectral(
             Vector3 surface_normal = hit.front_face ? hit.normal : -hit.normal;
             Vector3 micro_normal = fresnel::sample_ggx(surface_normal, roughness, rng);
 
-            // Compute hero exit direction for TIR check and NEE shadow ray
-            double eta_hero = spectral::sellmeier_ior(props, hero);
-            Vector3 exit_dir = fresnel::refract(
-                direction, micro_normal, eta_hero / AIR_IOR);
-            bool is_tir = (exit_dir.length_squared() < 1e-12);
-
-            // Compute per-wavelength Fresnel reflectance
+            // Compute per-wavelength Fresnel reflectance (inside gem → air).
             double R_w[HERO_WAVELENGTHS];
             for (int w = 0; w < HERO_WAVELENGTHS; w++) {
-                double eta_w = spectral::sellmeier_ior(props, lambdas[w]);
+                double eta_w = spectral::sellmeier_ior(props, wave[w]);
                 R_w[w] = fresnel::dielectric(direction, micro_normal, eta_w, AIR_IOR);
             }
 
-            // NEE: deterministically evaluate exit contribution
-            if (!is_tir) {
-                Vector3 exit_origin = hit.position + exit_dir * (float)TRACE_EPSILON;
+            // NEE: per-wavelength exit direction (dispersion) and TIR.
+            for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+                double eta_w = spectral::sellmeier_ior(props, wave[w]);
+                Vector3 exit_dir_w = fresnel::refract(
+                    direction, micro_normal, eta_w / AIR_IOR);
+                if (exit_dir_w.length_squared() < 1e-12) {
+                    continue; // TIR for this wavelength — no exit radiance
+                }
+                Vector3 exit_origin = hit.position + exit_dir_w * (float)TRACE_EPSILON;
                 HitResult exit_check = scene.intersect(
-                    exit_origin, exit_dir, prev_triangle);
+                    exit_origin, exit_dir_w, prev_triangle);
                 if (!exit_check.did_hit) {
-                    // Unoccluded exit — sample environment for all wavelengths
-                    for (int w = 0; w < HERO_WAVELENGTHS; w++) {
-                        double T_w = 1.0 - R_w[w];
-                        double env = environment::sample(
-                            ctx.environment, exit_dir, lambdas[w]);
-                        result.intensities[w] += wl_tp[w] * T_w * env;
-                    }
+                    double T_w = 1.0 - R_w[w];
+                    double env = environment::sample(
+                        ctx.environment, exit_dir_w, wave[w]);
+                    result.intensities[w] += wl_tp[w] * T_w * env;
                 }
             }
 
@@ -396,18 +498,10 @@ SpectralResult trace_path_spectral(
             // Hero IOR for geometry decisions (refraction direction)
             double eta_hero_t = spectral::sellmeier_ior(props, hero);
 
-            // Birefringence (hero only — affects path geometry)
-            if (props.birefringence_delta_n > 1e-6 && hit.front_face) {
-                if (rng.next() < 0.5) {
-                    eta_hero_t = spectral::birefringent_ior(
-                        props, hero, direction, true);
-                }
-            }
-
             // Compute per-wavelength Fresnel reflectance
             double R_w[HERO_WAVELENGTHS];
             for (int w = 0; w < HERO_WAVELENGTHS; w++) {
-                double eta_w = spectral::sellmeier_ior(props, lambdas[w]);
+                double eta_w = spectral::sellmeier_ior(props, wave[w]);
                 R_w[w] = fresnel::dielectric(direction, micro_normal, AIR_IOR, eta_w);
             }
 
@@ -421,7 +515,7 @@ SpectralResult trace_path_spectral(
                 if (!reflect_check.did_hit) {
                     for (int w = 0; w < HERO_WAVELENGTHS; w++) {
                         double env = environment::sample(
-                            ctx.environment, reflect_dir, lambdas[w]);
+                            ctx.environment, reflect_dir, wave[w]);
                         result.intensities[w] += wl_tp[w] * R_w[w] * env;
                     }
                 }
@@ -443,9 +537,6 @@ SpectralResult trace_path_spectral(
         }
 
         // Throughput cutoff (replaces Russian roulette — no amplification).
-        // Terminates paths when max per-wavelength throughput drops below
-        // 0.1%, losing negligible energy. No 1/survival division means
-        // throughput is always bounded and monotonically decreasing.
         if (bounce >= RR_START_BOUNCE) {
             double max_tp = 0.0;
             for (int w = 0; w < HERO_WAVELENGTHS; w++)
@@ -453,6 +544,122 @@ SpectralResult trace_path_spectral(
             if (max_tp < THROUGHPUT_CUTOFF) break;
         }
     }
+
+    for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+        result.intensities[w] = dmax(result.intensities[w], 0.0);
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-wavelength spectral path tracer (birefringence-aware entry fork).
+//
+// The 4 hero wavelengths share a common geometric path, so the fork splits
+// the path into two geometric branches — one using the ordinary IOR for
+// refraction, one using the extraordinary IOR at the hero wavelength.
+// Each branch carries all 4 wavelengths and runs the shared-geometry
+// inside-gem loop from trace_path_spectral_core with 0.5×T initial
+// throughput per wavelength.
+// ---------------------------------------------------------------------------
+
+SpectralResult trace_path_spectral(
+    const TraceContext& ctx,
+    const TraceScene& scene,
+    Vector3 origin,
+    Vector3 direction,
+    const double lambdas[HERO_WAVELENGTHS],
+    TraceRNG& rng)
+{
+    const GemTraceProps& props = ctx.props;
+
+    // Fast path — no birefringence split required.
+    if (props.birefringence_delta_n < BIREFRINGENCE_SPLIT_THRESHOLD
+        || ctx.is_opaque || ctx.is_translucent) {
+        return trace_path_spectral_core(
+            ctx, scene, origin, direction, lambdas, rng,
+            false, 1.0, -1);
+    }
+
+    const double hero = lambdas[0];
+
+    // Probe the primary air→gem intersection so the split can start two
+    // sub-paths from inside the gem with different Snell directions.
+    HitResult entry = scene.intersect(origin, direction, -1);
+    if (!entry.did_hit) {
+        SpectralResult miss = {};
+        for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+            miss.intensities[w] =
+                environment::sample(ctx.environment, direction, lambdas[w]);
+        }
+        return miss;
+    }
+    if (!entry.front_face) {
+        return trace_path_spectral_core(
+            ctx, scene, origin, direction, lambdas, rng,
+            false, 1.0, -1);
+    }
+
+    double roughness = props.effective_roughness();
+    Vector3 micro_normal = fresnel::sample_ggx(entry.normal, roughness, rng);
+
+    double eta_o_hero = spectral::sellmeier_ior(props, hero);
+    double eta_e_hero = spectral::birefringent_ior(props, hero, direction, true);
+
+    // Per-wavelength Fresnel reflectance using ordinary IOR — the ordinary
+    // and extraordinary rays differ by ≲0.1% reflectance in gem-grade
+    // materials, and resolving the pair per-λ would double the NEE work.
+    double R_w[HERO_WAVELENGTHS];
+    for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+        double eta_w = spectral::sellmeier_ior(props, lambdas[w]);
+        R_w[w] = fresnel::dielectric(direction, micro_normal, AIR_IOR, eta_w);
+    }
+
+    SpectralResult result = {};
+
+    // NEE: reflected environment (shared across both rays).
+    Vector3 reflect_dir = fresnel::reflect(direction, micro_normal);
+    {
+        Vector3 reflect_origin = entry.position
+            + reflect_dir * (float)TRACE_EPSILON;
+        HitResult reflect_check = scene.intersect(
+            reflect_origin, reflect_dir, entry.triangle_idx);
+        if (!reflect_check.did_hit) {
+            for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+                double env = environment::sample(
+                    ctx.environment, reflect_dir, lambdas[w]);
+                result.intensities[w] += R_w[w] * env;
+            }
+        }
+    }
+
+    // Use the average Fresnel as the overall T factor so the two refracted
+    // branches share the same per-λ throughput (eta_o/eta_e's Fresnel
+    // difference is negligible at grazing angles away from TIR).
+    double T_w[HERO_WAVELENGTHS];
+    for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+        T_w[w] = 1.0 - R_w[w];
+    }
+
+    // Both sub-paths run the shared-geometry core starting from inside the
+    // gem, with 0.5 × T per-λ initial throughput.
+
+    auto run_branch = [&](double eta_t) {
+        Vector3 refr = fresnel::refract(direction, micro_normal, AIR_IOR / eta_t);
+        if (refr.length_squared() < 1e-12) return;
+        Vector3 entry_origin = entry.position + refr * (float)TRACE_EPSILON;
+        // Dispatch the core with uniform starting throughput per-λ (0.5*T
+        // blended at hero-λ — chromatic T is applied at the end by scaling
+        // each channel's contribution).
+        SpectralResult br = trace_path_spectral_core(
+            ctx, scene, entry_origin, refr, lambdas, rng,
+            true, 0.5, entry.triangle_idx);
+        for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+            result.intensities[w] += T_w[w] * br.intensities[w];
+        }
+    };
+
+    run_branch(eta_o_hero);
+    run_branch(eta_e_hero);
 
     for (int w = 0; w < HERO_WAVELENGTHS; w++) {
         result.intensities[w] = dmax(result.intensities[w], 0.0);

@@ -918,6 +918,8 @@ func build_explicit_bake_requests(
 
 
 ## Single crown (top-down) traced frame for live designer preview.
+## [param variant_options] merged into normalized variant settings (same pipeline as gameplay bakes).
+## [param samples_per_pixel] if <= 0, uses [method GemTracedBakeContract.compute_adaptive_samples].
 func build_designer_preview_crown_request(
 	tile_id: StringName,
 	visual: GemVisualResource,
@@ -925,15 +927,17 @@ func build_designer_preview_crown_request(
 	cut,
 	draw_size: Vector2i,
 	target_size: Vector2i,
+	variant_options: Dictionary = {},
+	samples_per_pixel: int = -1,
 ) -> Dictionary:
 	if visual == null or cut_model == null or cut == null:
 		return {}
 	if target_size == Vector2i.ZERO:
 		target_size = draw_size
 	var view_scale := _compute_trace_view_scale(visual, cut_model)
-	var variant_settings := _resolve_variant_settings({
-		"lighting_grid_size": GemTracedBakeContractScript.DEFAULT_LIGHTING_GRID_SIZE,
-	})
+	var merged_opts := {"lighting_grid_size": GemTracedBakeContractScript.DEFAULT_LIGHTING_GRID_SIZE}
+	merged_opts.merge(variant_options, true)
+	var variant_settings := _resolve_variant_settings(merged_opts)
 	var lighting_bin := _get_default_lighting_bin_for_settings(variant_settings)
 	var lighting_uv := _lighting_bin_to_centered(lighting_bin, variant_settings)
 	var cut_key := get_visual_cut_key(visual)
@@ -978,6 +982,11 @@ func build_designer_preview_crown_request(
 		"lighting_uv": lighting_uv,
 		"lighting_bin": lighting_bin,
 		"view_scale": view_scale,
+		"uniform_projection": true,
+		"samples_per_pixel": (
+			samples_per_pixel if samples_per_pixel > 0
+			else GemTracedBakeContractScript.compute_adaptive_samples(visual)
+		),
 	}
 
 
@@ -1588,6 +1597,11 @@ func _build_gameplay_bake_requests(
 		requests.append_array(_collect_showroom_bake_requests(
 			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, {}, showroom_n
 		))
+	var showroom_axis_steps := int(variant_settings.get("showroom_axis_steps", 0))
+	if showroom_axis_steps > 0:
+		requests.append_array(_collect_showroom_axis_requests(
+			tile_id, visual, cut_model, cut, draw_size, target_size, variant_settings, view_scale, showroom_axis_steps
+		))
 	return requests
 
 
@@ -1727,10 +1741,23 @@ func _collect_showroom_axis_requests(
 	var default_light := _get_default_lighting_bin_for_settings(variant_settings)
 	var light_dir := _compute_variant_light_dir(default_light, variant_settings)
 	# Two axes: pitch (X) and yaw (Y). Each gets axis_steps evenly spaced frames.
+	# `showroom_axes` (PackedStringArray) optionally restricts to a subset
+	# (e.g. ["yaw"] when only the yaw rotation GIF is needed).
+	var axes_filter: Array = []
+	var raw_filter = variant_settings.get("showroom_axes", [])
+	if raw_filter is PackedStringArray or raw_filter is Array:
+		for ax in raw_filter:
+			axes_filter.append(StringName(String(ax).strip_edges().to_lower()))
 	var axes: Array[Dictionary] = [
 		{"axis": Vector3.RIGHT, "frame_type": "pitch", "label_prefix": "pitch"},
 		{"axis": Vector3.UP, "frame_type": "yaw", "label_prefix": "yaw"},
 	]
+	if not axes_filter.is_empty():
+		var filtered: Array[Dictionary] = []
+		for ax_def in axes:
+			if axes_filter.has(StringName(ax_def["frame_type"])):
+				filtered.append(ax_def)
+		axes = filtered
 	for ax_def in axes:
 		var axis: Vector3 = ax_def["axis"]
 		var frame_type: String = ax_def["frame_type"]

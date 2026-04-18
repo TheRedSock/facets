@@ -19,13 +19,11 @@ static double apply_contrast(double value, double contrast) {
 
 static Color resolve_secondary_color(const GemTraceProps& v, Color base) {
     if (v.material_secondary_color.a > 0.001) return v.material_secondary_color;
-    if (v.gradient_color.a > 0.001) return v.gradient_color;
     return base.darkened(0.18);
 }
 
 static Color resolve_tertiary_color(const GemTraceProps& v, Color base) {
     if (v.material_tertiary_color.a > 0.001) return v.material_tertiary_color;
-    if (v.phenomenon_color.a > 0.001) return v.phenomenon_color;
     return base.lightened(0.12);
 }
 

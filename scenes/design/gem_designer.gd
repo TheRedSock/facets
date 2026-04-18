@@ -8,20 +8,30 @@ const GAMEPLAY_BLEND_SHADER := preload("res://scenes/tile/gameplay_sprite_blend.
 const PREVIEW_SIZE := Vector2i(256, 256)
 const DEBOUNCE_SEC := 1.0
 
-const GemDesignSessionScript = preload("res://scenes/design/gem_design_session.gd")
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 const GemViewSphereSamplingScript = preload("res://core/visuals/gem_view_sphere_sampling.gd")
 const GemCutModelModifierScript = preload("res://resources/visuals/gem_cut_model_modifier.gd")
+const SpectrumCurveEditorScript = preload("res://scenes/design/spectrum_curve_editor.gd")
+const CutProfileCanvasScript = preload("res://scenes/design/cut_profile_canvas.gd")
+const ProductionBakeProfileScript = preload("res://tools/production_bake_profile.gd")
 
-var _session: GemDesignSessionScript
+const GAMEPLAY_BAKE_PROFILE_PATH := "res://config/bake_profiles/gameplay.json"
+const CUT_SPECS_DIR := "res://data/visuals/cut_specs"
+
+var _session: GemDesignSession
 
 var _gem_dropdown: OptionButton
 var _preview_tex: TextureRect
 var _preview_timer: Timer
 var _preview_gen := 0
+## Generation of the trace currently running in `_preview_thread` (-1 = none). Used to chain
+## a new bake when edits supersede during an in-flight trace (native trace cannot be cancelled).
+var _preview_inflight_gen: int = -1
 var _preview_thread: Thread
+var _preview_activity_label: Label
+var _preview_activity_bar: ProgressBar
 var _preview_stylize_checkbox: CheckBox
 
 var _visual_scroll: VBoxContainer
@@ -49,6 +59,35 @@ var _showroom_stylize_checkbox: CheckBox
 var _preview_bounces_spin: SpinBox
 var _preview_samples_spin: SpinBox
 var _showroom_bounces_spin: SpinBox
+## Shared trace controls (preview + showroom + debounced trace enrichment).
+var _trace_spp_spin: SpinBox
+var _trace_samples_spin: SpinBox
+var _trace_stylize_checkbox: CheckBox
+var _trace_match_gameplay_checkbox: CheckBox
+var _trace_adaptive_spp_checkbox: CheckBox
+var _trace_production_profile_checkbox: CheckBox
+var _spectrum_editor: Control
+var _spectrum_y_max_spin: SpinBox
+var _gauss_center_spin: SpinBox
+var _gauss_sigma_spin: SpinBox
+var _gauss_strength_spin: SpinBox
+var _absorption_edit_mode: OptionButton
+var _mineral_path_edit: LineEdit
+var _cut_spec_dropdown: OptionButton
+var _cut_restore_btn: Button
+var _cut_use_btn: Button
+var _cut_edit_status: Label
+var _cut_ring_option: OptionButton
+var _cut_profile_canvas: Control
+var _cut_height_spin: SpinBox
+var _cut_rose_spin: SpinBox
+var _cut_symm_check: CheckBox
+var _cut_sector_label: Label
+var _updating_cut_metrics: bool = false
+var _save_mineral_btn: Button
+var _restore_mineral_btn: Button
+var _spectrum_source_label: Label
+var _visual_tab_root: VBoxContainer
 var _status: Label
 
 var _orientation := Quaternion.IDENTITY
@@ -87,9 +126,11 @@ const _DEPENDENCY_RULES := {
 	&"gradient_mode": { "requires": { &"gradient_strength": "> 0" }, "reason": "Requires gradient strength > 0" },
 	&"gradient_angle_degrees": { "requires": { &"gradient_strength": "> 0" }, "reason": "Requires gradient strength > 0" },
 	&"gradient_color": { "requires": { &"gradient_strength": "> 0" }, "reason": "Requires gradient strength > 0" },
+	&"gradient_zone_spectrum": { "requires": { &"gradient_strength": "> 0" }, "reason": "Requires gradient strength > 0" },
 	&"phenomenon_angle_degrees": { "requires": { &"phenomenon_strength": "> 0" }, "reason": "Requires phenomenon strength > 0" },
 	&"phenomenon_sharpness": { "requires": { &"phenomenon_strength": "> 0" }, "reason": "Requires phenomenon strength > 0" },
 	&"phenomenon_color": { "requires": { &"phenomenon_strength": "> 0" }, "reason": "Requires phenomenon strength > 0" },
+	&"phenomenon_zone_spectrum": { "requires": { &"phenomenon_strength": "> 0" }, "reason": "Requires phenomenon strength > 0" },
 	&"surface_pattern_mix": { "requires": { &"surface_pattern_type": "!= 0" }, "reason": "Requires surface pattern type != None" },
 	&"surface_pattern_scale": { "requires": { &"surface_pattern_type": "!= 0", &"surface_pattern_mix": "> 0" }, "reason": "Requires surface pattern active" },
 	&"surface_pattern_rotation_degrees": { "requires": { &"surface_pattern_type": "!= 0", &"surface_pattern_mix": "> 0" }, "reason": "Requires surface pattern active" },
@@ -150,9 +191,37 @@ const _GROUP_PREFIX_MAP := {
 	"Edge Rendering": "edge_",
 }
 
+## Dim when material_mode is faceted transparent (pattern / opaque controls).
+const _MATERIAL_MODE_PATTERN_ONLY_PROPS: Array[StringName] = [
+	&"material_secondary_color", &"material_tertiary_color", &"use_texture", &"color_texture",
+	&"texture_blend", &"texture_zoom", &"texture_offset", &"texture_facet_warp",
+	&"surface_pattern_type", &"surface_pattern_mix", &"surface_pattern_scale",
+	&"surface_pattern_rotation_degrees", &"surface_pattern_density", &"surface_pattern_contrast",
+	&"surface_pattern_warp_strength", &"surface_pattern_warp_scale",
+	&"surface_pattern_specular_variation", &"surface_pattern_roughness_variation",
+	&"volume_pattern_type", &"volume_pattern_mix", &"volume_pattern_scale", &"volume_pattern_axis",
+	&"volume_pattern_density", &"volume_pattern_contrast", &"volume_pattern_warp_strength",
+	&"volume_pattern_warp_scale", &"volume_absorption_variation", &"volume_scattering_variation",
+	&"reactive_effect_type", &"reactive_strength", &"reactive_color", &"reactive_secondary_color",
+	&"reactive_sharpness", &"reactive_density", &"reactive_scale", &"reactive_axis",
+]
+
+## Dim when NOT faceted transparent (zoning / angle phenomenon — tracer uses spectra or legacy RGB).
+const _MATERIAL_MODE_FACETED_TRANSPARENT_ONLY_PROPS: Array[StringName] = [
+	&"gradient_color", &"gradient_zone_spectrum", &"gradient_strength", &"gradient_mode", &"gradient_angle_degrees",
+	&"phenomenon_color", &"phenomenon_zone_spectrum", &"phenomenon_strength", &"phenomenon_angle_degrees",
+	&"phenomenon_sharpness",
+]
+
+const SPECTRUM_TARGET_MINERAL_ABSORPTION := 0
+const SPECTRUM_TARGET_GEM_ABSORPTION_OVERRIDE := 1
+const SPECTRUM_TARGET_GRADIENT_ZONE := 2
+const SPECTRUM_TARGET_PHENOMENON_ZONE := 3
+
 
 func _ready() -> void:
-	_session = GemDesignSessionScript.new()
+	_session = GemDesignSession.new()
+	_session.geometry_changed.connect(_on_session_geometry_changed)
 	_build_ui()
 	_fill_gem_dropdown()
 	if _gem_dropdown.item_count > 0:
@@ -213,6 +282,8 @@ func _build_ui() -> void:
 	save_btn.pressed.connect(_on_save_file_pressed)
 	left.add_child(save_btn)
 
+	left.add_child(_labeled("Trace settings (preview + showroom)", _make_shared_trace_settings_group()))
+
 	left.add_child(_make_separator())
 
 	var mod_title := Label.new()
@@ -249,12 +320,20 @@ func _build_ui() -> void:
 	tabs.size_flags_horizontal = SIZE_EXPAND_FILL
 	center.add_child(tabs)
 
+	_visual_tab_root = VBoxContainer.new()
+	_visual_tab_root.size_flags_vertical = SIZE_EXPAND_FILL
+	_visual_tab_root.size_flags_horizontal = SIZE_EXPAND_FILL
+	_visual_tab_root.add_theme_constant_override("separation", 8)
+	tabs.add_child(_visual_tab_root)
+	tabs.set_tab_title(_visual_tab_root.get_index(), "Visual")
+
+	_build_mineral_and_spectrum_block(_visual_tab_root)
+
 	var visual_panel := ScrollContainer.new()
 	visual_panel.size_flags_vertical = SIZE_EXPAND_FILL
 	visual_panel.size_flags_horizontal = SIZE_EXPAND_FILL
 	visual_panel.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	tabs.add_child(visual_panel)
-	tabs.set_tab_title(visual_panel.get_index(), "Visual")
+	_visual_tab_root.add_child(visual_panel)
 
 	_visual_scroll = VBoxContainer.new()
 	_visual_scroll.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -298,7 +377,9 @@ func _build_ui() -> void:
 	var cut_panel := VBoxContainer.new()
 	cut_panel.size_flags_vertical = SIZE_EXPAND_FILL
 	tabs.add_child(cut_panel)
-	tabs.set_tab_title(cut_panel.get_index(), "Cut (JSON)")
+	tabs.set_tab_title(cut_panel.get_index(), "Cut")
+
+	_build_cut_tab_header(cut_panel)
 
 	_cut_edit = TextEdit.new()
 	_cut_edit.size_flags_vertical = SIZE_EXPAND_FILL
@@ -347,14 +428,13 @@ func _build_ui() -> void:
 	_on_orbit_checkbox_toggled(false)
 	_update_showroom_info_labels()
 	analysis_panel.add_child(_labeled("Bake draw size (px)", _make_analysis_draw_spinbox()))
-	analysis_panel.add_child(_labeled("Samples", _make_analysis_sample_spinbox()))
-	analysis_panel.add_child(_labeled("Samples per pixel", _make_showroom_bounces_spinbox()))
+	var trace_hint := Label.new()
+	trace_hint.text = "SPP, MSAA, and stylization use Trace settings in the left column."
+	trace_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	trace_hint.add_theme_font_size_override("font_size", 11)
+	trace_hint.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
+	analysis_panel.add_child(trace_hint)
 	analysis_panel.add_child(_labeled("Output folder", _analysis_output_line()))
-
-	_showroom_stylize_checkbox = CheckBox.new()
-	_showroom_stylize_checkbox.text = "Apply stylization"
-	_showroom_stylize_checkbox.button_pressed = false
-	analysis_panel.add_child(_showroom_stylize_checkbox)
 
 	_bake_btn = Button.new()
 	_bake_btn.text = "Run Showroom Bake"
@@ -761,26 +841,6 @@ func _make_analysis_draw_spinbox() -> SpinBox:
 	return _analysis_draw_spin
 
 
-func _make_analysis_sample_spinbox() -> SpinBox:
-	_analysis_sample_spin = SpinBox.new()
-	_analysis_sample_spin.min_value = 1.0
-	_analysis_sample_spin.max_value = 5.0
-	_analysis_sample_spin.step = 1.0
-	_analysis_sample_spin.value = 1.0
-	_analysis_sample_spin.size_flags_horizontal = SIZE_EXPAND_FILL
-	return _analysis_sample_spin
-
-
-func _make_showroom_bounces_spinbox() -> SpinBox:
-	_showroom_bounces_spin = SpinBox.new()
-	_showroom_bounces_spin.min_value = 16.0
-	_showroom_bounces_spin.max_value = 512.0
-	_showroom_bounces_spin.step = 1.0
-	_showroom_bounces_spin.value = float(GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)
-	_showroom_bounces_spin.size_flags_horizontal = SIZE_EXPAND_FILL
-	return _showroom_bounces_spin
-
-
 func _analysis_output_line() -> LineEdit:
 	_analysis_output = LineEdit.new()
 	_analysis_output.text = "user://gem_designer_analysis"
@@ -794,48 +854,139 @@ func _update_analysis_debug_visibility() -> void:
 		_analysis_debug_label.visible = debug_visible
 
 
+func _make_shared_trace_settings_group() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	var row1 := HBoxContainer.new()
+	row1.add_theme_constant_override("separation", 8)
+	var spp_l := Label.new()
+	spp_l.text = "SPP"
+	spp_l.add_theme_font_size_override("font_size", 12)
+	spp_l.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
+	row1.add_child(spp_l)
+	_trace_spp_spin = SpinBox.new()
+	_trace_spp_spin.min_value = 16.0
+	_trace_spp_spin.max_value = 512.0
+	_trace_spp_spin.step = 1.0
+	_trace_spp_spin.value = float(GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)
+	_trace_spp_spin.custom_minimum_size = Vector2(72, 0)
+	_trace_spp_spin.value_changed.connect(func(_v: float) -> void:
+		_sync_trace_spin_aliases()
+		_schedule_preview()
+	)
+	row1.add_child(_trace_spp_spin)
+	var samp_l := Label.new()
+	samp_l.text = "MSAA samples"
+	samp_l.add_theme_font_size_override("font_size", 12)
+	samp_l.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
+	row1.add_child(samp_l)
+	_trace_samples_spin = SpinBox.new()
+	_trace_samples_spin.min_value = 1.0
+	_trace_samples_spin.max_value = 5.0
+	_trace_samples_spin.step = 1.0
+	_trace_samples_spin.value = 1.0
+	_trace_samples_spin.custom_minimum_size = Vector2(56, 0)
+	_trace_samples_spin.value_changed.connect(func(_v: float) -> void:
+		_sync_trace_spin_aliases()
+		_schedule_preview()
+	)
+	row1.add_child(_trace_samples_spin)
+	box.add_child(row1)
+	_trace_stylize_checkbox = CheckBox.new()
+	_trace_stylize_checkbox.text = "Apply stylization"
+	_trace_stylize_checkbox.button_pressed = false
+	_trace_stylize_checkbox.toggled.connect(func(_on: bool) -> void:
+		_sync_trace_spin_aliases()
+		_schedule_preview()
+	)
+	box.add_child(_trace_stylize_checkbox)
+	_trace_match_gameplay_checkbox = CheckBox.new()
+	_trace_match_gameplay_checkbox.text = "Match gameplay variant settings"
+	_trace_match_gameplay_checkbox.button_pressed = false
+	_trace_match_gameplay_checkbox.toggled.connect(func(_on: bool) -> void: _schedule_preview())
+	box.add_child(_trace_match_gameplay_checkbox)
+	_trace_adaptive_spp_checkbox = CheckBox.new()
+	_trace_adaptive_spp_checkbox.text = "Adaptive SPP (material-aware)"
+	_trace_adaptive_spp_checkbox.button_pressed = false
+	_trace_adaptive_spp_checkbox.toggled.connect(func(_on: bool) -> void:
+		_update_adaptive_spp_enabled()
+		_schedule_preview()
+	)
+	box.add_child(_trace_adaptive_spp_checkbox)
+	_trace_production_profile_checkbox = CheckBox.new()
+	_trace_production_profile_checkbox.text = "Load gameplay.json trace defaults once"
+	_trace_production_profile_checkbox.button_pressed = false
+	_trace_production_profile_checkbox.toggled.connect(_on_trace_production_profile_toggled)
+	box.add_child(_trace_production_profile_checkbox)
+	_preview_bounces_spin = _trace_spp_spin
+	_preview_samples_spin = _trace_samples_spin
+	_preview_stylize_checkbox = _trace_stylize_checkbox
+	_showroom_bounces_spin = _trace_spp_spin
+	_analysis_sample_spin = _trace_samples_spin
+	_showroom_stylize_checkbox = _trace_stylize_checkbox
+	_update_adaptive_spp_enabled()
+	return box
+
+
+func _sync_trace_spin_aliases() -> void:
+	pass
+
+
+func _update_adaptive_spp_enabled() -> void:
+	if _trace_spp_spin == null:
+		return
+	var use_adaptive := _trace_adaptive_spp_checkbox != null and _trace_adaptive_spp_checkbox.button_pressed
+	_trace_spp_spin.editable = not use_adaptive
+
+
 func _make_preview_panel() -> Control:
 	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
 	_preview_tex = TextureRect.new()
 	_preview_tex.custom_minimum_size = Vector2(256, 256)
 	_preview_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	box.add_child(_preview_tex)
-	_preview_stylize_checkbox = CheckBox.new()
-	_preview_stylize_checkbox.text = "Apply stylization"
-	_preview_stylize_checkbox.button_pressed = false
-	_preview_stylize_checkbox.toggled.connect(func(_on: bool) -> void: _schedule_preview())
-	box.add_child(_preview_stylize_checkbox)
-	var settings_row := HBoxContainer.new()
-	settings_row.add_theme_constant_override("separation", 8)
-	var spp_label := Label.new()
-	spp_label.text = "SPP"
-	spp_label.add_theme_font_size_override("font_size", 12)
-	spp_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
-	settings_row.add_child(spp_label)
-	_preview_bounces_spin = SpinBox.new()
-	_preview_bounces_spin.min_value = 16.0
-	_preview_bounces_spin.max_value = 512.0
-	_preview_bounces_spin.step = 1.0
-	_preview_bounces_spin.value = float(GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL)
-	_preview_bounces_spin.custom_minimum_size = Vector2(70, 0)
-	_preview_bounces_spin.value_changed.connect(func(_v: float) -> void: _schedule_preview())
-	settings_row.add_child(_preview_bounces_spin)
-	var samples_label := Label.new()
-	samples_label.text = "Samples"
-	samples_label.add_theme_font_size_override("font_size", 12)
-	samples_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.72))
-	settings_row.add_child(samples_label)
-	_preview_samples_spin = SpinBox.new()
-	_preview_samples_spin.min_value = 1.0
-	_preview_samples_spin.max_value = 5.0
-	_preview_samples_spin.step = 1.0
-	_preview_samples_spin.value = 1.0
-	_preview_samples_spin.custom_minimum_size = Vector2(60, 0)
-	_preview_samples_spin.value_changed.connect(func(_v: float) -> void: _schedule_preview())
-	settings_row.add_child(_preview_samples_spin)
-	box.add_child(settings_row)
+
+	var activity := VBoxContainer.new()
+	activity.add_theme_constant_override("separation", 4)
+	_preview_activity_label = Label.new()
+	_preview_activity_label.text = ""
+	_preview_activity_label.add_theme_font_size_override("font_size", 12)
+	_preview_activity_label.add_theme_color_override("font_color", Color(0.72, 0.78, 0.92))
+	_preview_activity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	activity.add_child(_preview_activity_label)
+
+	_preview_activity_bar = ProgressBar.new()
+	_preview_activity_bar.custom_minimum_size = Vector2(0, 8)
+	_preview_activity_bar.size_flags_horizontal = SIZE_EXPAND_FILL
+	_preview_activity_bar.show_percentage = false
+	_preview_activity_bar.visible = false
+	_preview_activity_bar.indeterminate = true
+	_preview_activity_bar.min_value = 0.0
+	_preview_activity_bar.max_value = 1.0
+	activity.add_child(_preview_activity_bar)
+	box.add_child(activity)
+
+	var hint := Label.new()
+	hint.text = "Uses Trace settings above."
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65))
+	box.add_child(hint)
 	return box
+
+
+func _set_preview_activity(message: String, show_loading_bar: bool) -> void:
+	if _preview_activity_label != null:
+		_preview_activity_label.text = message
+		if not message.is_empty() and message.begins_with("Preview updated"):
+			_preview_activity_label.add_theme_color_override("font_color", Color(0.62, 0.88, 0.72))
+		elif not message.is_empty():
+			_preview_activity_label.add_theme_color_override("font_color", Color(0.72, 0.78, 0.92))
+	if _preview_activity_bar != null:
+		_preview_activity_bar.visible = show_loading_bar and not message.is_empty()
+	if _preview_tex != null:
+		_preview_tex.modulate = Color(0.72, 0.74, 0.78, 1.0) if show_loading_bar else Color.WHITE
 
 
 func _labeled(text: String, ctrl: Control) -> VBoxContainer:
@@ -853,6 +1004,773 @@ func _make_separator() -> Control:
 	var h := HSeparator.new()
 	h.custom_minimum_size = Vector2(0, 8)
 	return h
+
+
+func _on_session_geometry_changed() -> void:
+	_refresh_cut_ring_selector()
+
+
+func _build_mineral_and_spectrum_block(parent: VBoxContainer) -> void:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	var title := Label.new()
+	title.text = "Physical source & spectrum"
+	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_color_override("font_color", Color(0.72, 0.78, 0.9))
+	box.add_child(title)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	_mineral_path_edit = LineEdit.new()
+	_mineral_path_edit.placeholder_text = "Mineral template .tres"
+	_mineral_path_edit.size_flags_horizontal = SIZE_EXPAND_FILL
+	_mineral_path_edit.text_changed.connect(func(_t: String) -> void: pass)
+	var pick_min := Button.new()
+	pick_min.text = "Pick…"
+	pick_min.pressed.connect(_on_pick_mineral_template)
+	row.add_child(_mineral_path_edit)
+	row.add_child(pick_min)
+	box.add_child(_labeled("Mineral template", row))
+
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 8)
+	_restore_mineral_btn = Button.new()
+	_restore_mineral_btn.text = "Restore mineral from file"
+	_restore_mineral_btn.pressed.connect(_on_restore_mineral_template)
+	_save_mineral_btn = Button.new()
+	_save_mineral_btn.text = "Save mineral as…"
+	_save_mineral_btn.pressed.connect(_on_save_mineral_template_pressed)
+	btn_row.add_child(_restore_mineral_btn)
+	btn_row.add_child(_save_mineral_btn)
+	box.add_child(btn_row)
+
+	var env_row := HBoxContainer.new()
+	env_row.add_theme_constant_override("separation", 6)
+	var env_edit := LineEdit.new()
+	env_edit.placeholder_text = "Bake environment .tres"
+	env_edit.size_flags_horizontal = SIZE_EXPAND_FILL
+	env_edit.name = "_bake_env_path_edit"
+	var env_btn := Button.new()
+	env_btn.text = "Pick…"
+	env_btn.pressed.connect(_on_pick_bake_environment.bind(env_edit))
+	env_row.add_child(env_edit)
+	env_row.add_child(env_btn)
+	box.add_child(_labeled("Bake environment", env_row))
+
+	var tex_row := HBoxContainer.new()
+	tex_row.add_theme_constant_override("separation", 6)
+	var tex_edit := LineEdit.new()
+	tex_edit.placeholder_text = "Color texture (optional)"
+	tex_edit.size_flags_horizontal = SIZE_EXPAND_FILL
+	tex_edit.name = "_color_tex_path_edit"
+	var tex_btn := Button.new()
+	tex_btn.text = "Pick…"
+	tex_btn.pressed.connect(_on_pick_color_texture.bind(tex_edit))
+	tex_row.add_child(tex_edit)
+	tex_row.add_child(tex_btn)
+	tex_row.name = "_designer_color_texture_row"
+	box.add_child(_labeled("Color texture", tex_row))
+
+	_absorption_edit_mode = OptionButton.new()
+	_absorption_edit_mode.add_item("Edit mineral absorption spectrum", SPECTRUM_TARGET_MINERAL_ABSORPTION)
+	_absorption_edit_mode.add_item("Edit per-gem absorption override", SPECTRUM_TARGET_GEM_ABSORPTION_OVERRIDE)
+	_absorption_edit_mode.add_item("Edit gradient zone absorption", SPECTRUM_TARGET_GRADIENT_ZONE)
+	_absorption_edit_mode.add_item("Edit phenomenon zone absorption", SPECTRUM_TARGET_PHENOMENON_ZONE)
+	_absorption_edit_mode.name = "_designer_spectrum_target_mode"
+	_absorption_edit_mode.item_selected.connect(_on_absorption_edit_mode_changed)
+	box.add_child(_labeled("Spectrum edit target", _absorption_edit_mode))
+
+	_spectrum_source_label = Label.new()
+	_spectrum_source_label.add_theme_font_size_override("font_size", 11)
+	_spectrum_source_label.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
+	_spectrum_source_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_spectrum_source_label)
+
+	_spectrum_editor = SpectrumCurveEditorScript.new()
+	_spectrum_editor.name = "_designer_spectrum_editor"
+	_spectrum_editor.samples_changed.connect(_on_spectrum_samples_changed)
+	box.add_child(_spectrum_editor)
+
+	var y_row := HBoxContainer.new()
+	y_row.add_theme_constant_override("separation", 8)
+	y_row.name = "_designer_spectrum_y_row"
+	var y_lbl := Label.new()
+	y_lbl.text = "Plot Y max (0 = auto)"
+	y_lbl.custom_minimum_size = Vector2(140, 0)
+	_spectrum_y_max_spin = SpinBox.new()
+	_spectrum_y_max_spin.min_value = 0.0
+	_spectrum_y_max_spin.max_value = 500.0
+	_spectrum_y_max_spin.step = 0.5
+	_spectrum_y_max_spin.value = 0.0
+	_spectrum_y_max_spin.size_flags_horizontal = SIZE_EXPAND_FILL
+	_spectrum_y_max_spin.value_changed.connect(func(v: float) -> void:
+		if _spectrum_editor:
+			_spectrum_editor.set_y_axis_max(v)
+	)
+	y_row.add_child(y_lbl)
+	y_row.add_child(_spectrum_y_max_spin)
+	box.add_child(y_row)
+
+	var g_row := HBoxContainer.new()
+	g_row.add_theme_constant_override("separation", 6)
+	g_row.name = "_designer_spectrum_gaussian_row"
+	var g_lbl := Label.new()
+	g_lbl.text = "Gaussian λ σ strength"
+	g_lbl.custom_minimum_size = Vector2(120, 0)
+	_gauss_center_spin = SpinBox.new()
+	_gauss_center_spin.min_value = 380.0
+	_gauss_center_spin.max_value = 780.0
+	_gauss_center_spin.value = 550.0
+	_gauss_center_spin.prefix = "nm"
+	_gauss_sigma_spin = SpinBox.new()
+	_gauss_sigma_spin.min_value = 5.0
+	_gauss_sigma_spin.max_value = 200.0
+	_gauss_sigma_spin.value = 40.0
+	_gauss_sigma_spin.prefix = "σ"
+	_gauss_strength_spin = SpinBox.new()
+	_gauss_strength_spin.min_value = 0.0
+	_gauss_strength_spin.max_value = 50.0
+	_gauss_strength_spin.step = 0.05
+	_gauss_strength_spin.value = 1.0
+	var gauss_btn := Button.new()
+	gauss_btn.text = "Add band"
+	gauss_btn.pressed.connect(_on_add_gaussian_band_to_spectrum)
+	g_row.add_child(g_lbl)
+	g_row.add_child(_gauss_center_spin)
+	g_row.add_child(_gauss_sigma_spin)
+	g_row.add_child(_gauss_strength_spin)
+	g_row.add_child(gauss_btn)
+	box.add_child(g_row)
+
+	parent.add_child(box)
+	# Path edits stored by name — resolved in refresh.
+	set_meta("_bake_env_edit", env_edit)
+	set_meta("_color_tex_edit", tex_edit)
+
+
+func _on_pick_mineral_template() -> void:
+	var dlg := FileDialog.new()
+	dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	dlg.access = FileDialog.ACCESS_RESOURCES
+	dlg.filters = PackedStringArray(["*.tres ; GemMineralTemplate"])
+	dlg.file_selected.connect(func(p: String) -> void:
+		var res = load(p)
+		if res is GemMineralTemplate:
+			_session.working_visual.mineral_template = (res as GemMineralTemplate).duplicate(true)
+			_session.mineral_template_source_path = p
+			_refresh_mineral_paths_and_spectrum()
+			_rebuild_visual_inspector()
+			_schedule_preview()
+		dlg.queue_free()
+	)
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered_ratio(0.5)
+
+
+func _on_restore_mineral_template() -> void:
+	if _session.mineral_template_source_path.is_empty():
+		_status.text = "No mineral template path on disk"
+		return
+	var disk = load(_session.mineral_template_source_path)
+	if disk is GemMineralTemplate:
+		_session.working_visual.mineral_template = (disk as GemMineralTemplate).duplicate(true)
+		_refresh_mineral_paths_and_spectrum()
+		_rebuild_visual_inspector()
+		_schedule_preview()
+		_status.text = "Restored mineral from %s" % _session.mineral_template_source_path
+
+
+func _on_save_mineral_template_pressed() -> void:
+	var dlg := FileDialog.new()
+	dlg.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	dlg.access = FileDialog.ACCESS_RESOURCES
+	dlg.filters = PackedStringArray(["*.tres ; GemMineralTemplate"])
+	dlg.file_selected.connect(func(p: String) -> void:
+		var err := _session.save_mineral_template_to_path(p)
+		_status.text = "Save mineral %s" % ("ok" if err == OK else str(err))
+		_refresh_mineral_paths_and_spectrum()
+		dlg.queue_free()
+	)
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered_ratio(0.5)
+
+
+func _on_pick_bake_environment(env_edit: LineEdit) -> void:
+	var dlg := FileDialog.new()
+	dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	dlg.access = FileDialog.ACCESS_RESOURCES
+	dlg.filters = PackedStringArray(["*.tres"])
+	dlg.file_selected.connect(func(p: String) -> void:
+		var res = load(p)
+		if res != null:
+			_session.working_visual.bake_environment = res
+			env_edit.text = p
+			_session.mark_visual_dirty()
+			_schedule_preview()
+		dlg.queue_free()
+	)
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered_ratio(0.5)
+
+
+func _on_pick_color_texture(tex_edit: LineEdit) -> void:
+	var dlg := FileDialog.new()
+	dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	dlg.access = FileDialog.ACCESS_RESOURCES
+	dlg.filters = PackedStringArray(["*.png, *.webp, *.jpg ; Images"])
+	dlg.file_selected.connect(func(p: String) -> void:
+		var tex: Texture2D = load(p) as Texture2D
+		if tex != null:
+			_session.working_visual.color_texture = tex
+			tex_edit.text = p
+			_session.mark_visual_dirty()
+			_schedule_preview()
+		dlg.queue_free()
+	)
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered_ratio(0.5)
+
+
+func _refresh_mineral_paths_and_spectrum() -> void:
+	if _mineral_path_edit and _session.working_visual:
+		_mineral_path_edit.text = _session.mineral_template_source_path
+		var env_edit: LineEdit = get_meta("_bake_env_edit", null) as LineEdit
+		if env_edit and _session.working_visual.bake_environment != null:
+			var bp: String = _session.working_visual.bake_environment.resource_path
+			env_edit.text = bp
+		var tex_edit: LineEdit = get_meta("_color_tex_edit", null) as LineEdit
+		if tex_edit and _session.working_visual.color_texture != null:
+			tex_edit.text = _session.working_visual.color_texture.resource_path
+	_refresh_spectrum_editor_from_session()
+	_refresh_spectrum_source_readout()
+
+
+func _current_spectrum_target_id() -> int:
+	if _absorption_edit_mode == null or _absorption_edit_mode.selected < 0:
+		return SPECTRUM_TARGET_MINERAL_ABSORPTION
+	return _absorption_edit_mode.get_item_id(_absorption_edit_mode.selected)
+
+
+func _set_spectrum_target_id(target_id: int) -> void:
+	if _absorption_edit_mode == null:
+		return
+	for i in _absorption_edit_mode.item_count:
+		if _absorption_edit_mode.get_item_id(i) == target_id:
+			_absorption_edit_mode.select(i)
+			return
+
+
+func _get_active_body_absorption_source() -> String:
+	if _session.working_visual == null:
+		return "none"
+	if _session.working_visual.absorption_spectrum_override.size() == 81:
+		return "per-gem absorption override"
+	var mt: GemMineralTemplate = _session.working_visual.mineral_template as GemMineralTemplate
+	if mt != null and mt.absorption_spectrum.size() == 81:
+		return "mineral template absorption"
+	return "no authored body absorption"
+
+
+func _get_active_body_absorption_samples() -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	if _session.working_visual == null:
+		return out
+	if _session.working_visual.absorption_spectrum_override.size() == 81:
+		return _session.working_visual.absorption_spectrum_override
+	var mt: GemMineralTemplate = _session.working_visual.mineral_template as GemMineralTemplate
+	if mt != null:
+		return mt.absorption_spectrum
+	return out
+
+
+func _spectrum_target_requires_faceted(target_id: int) -> bool:
+	return target_id in [SPECTRUM_TARGET_GRADIENT_ZONE, SPECTRUM_TARGET_PHENOMENON_ZONE]
+
+
+func _refresh_spectrum_source_readout() -> void:
+	if _spectrum_source_label == null or _session.working_visual == null:
+		return
+	var edit_target := "mineral absorption"
+	match _current_spectrum_target_id():
+		SPECTRUM_TARGET_GEM_ABSORPTION_OVERRIDE:
+			edit_target = "per-gem absorption override"
+		SPECTRUM_TARGET_GRADIENT_ZONE:
+			edit_target = "gradient zone absorption"
+		SPECTRUM_TARGET_PHENOMENON_ZONE:
+			edit_target = "phenomenon zone absorption"
+	_spectrum_source_label.text = "Editing: %s. Tracer body source: %s." % [
+		edit_target,
+		_get_active_body_absorption_source(),
+	]
+
+
+func _on_absorption_edit_mode_changed(_idx: int) -> void:
+	_refresh_spectrum_editor_from_session()
+	_refresh_spectrum_source_readout()
+
+
+func _refresh_spectrum_editor_from_session() -> void:
+	if _spectrum_editor == null or _session.working_visual == null:
+		return
+	var s := PackedFloat32Array()
+	var overlay := PackedFloat32Array()
+	match _current_spectrum_target_id():
+		SPECTRUM_TARGET_GEM_ABSORPTION_OVERRIDE:
+			s = _session.working_visual.absorption_spectrum_override
+			var mt_override: GemMineralTemplate = _session.working_visual.mineral_template as GemMineralTemplate
+			if mt_override != null:
+				overlay = mt_override.absorption_spectrum
+		SPECTRUM_TARGET_GRADIENT_ZONE:
+			s = _session.working_visual.gradient_zone_spectrum
+			overlay = _get_active_body_absorption_samples()
+		SPECTRUM_TARGET_PHENOMENON_ZONE:
+			s = _session.working_visual.phenomenon_zone_spectrum
+			overlay = _get_active_body_absorption_samples()
+		_:
+			var mt: GemMineralTemplate = _session.working_visual.mineral_template as GemMineralTemplate
+			if mt != null:
+				s = mt.absorption_spectrum
+				if mt.pleochroism_absorption_spectrum.size() == 81:
+					overlay = mt.pleochroism_absorption_spectrum
+	_spectrum_editor.set_samples(s)
+	_spectrum_editor.set_overlay_samples(overlay)
+
+
+func _on_add_gaussian_band_to_spectrum() -> void:
+	if _spectrum_editor == null:
+		return
+	_spectrum_editor.add_gaussian_band(
+		_gauss_center_spin.value,
+		_gauss_sigma_spin.value,
+		_gauss_strength_spin.value,
+	)
+
+
+func _on_spectrum_samples_changed(new_samples: PackedFloat32Array) -> void:
+	if _session.working_visual == null:
+		return
+	match _current_spectrum_target_id():
+		SPECTRUM_TARGET_GEM_ABSORPTION_OVERRIDE:
+			_session.working_visual.absorption_spectrum_override = new_samples.duplicate()
+		SPECTRUM_TARGET_GRADIENT_ZONE:
+			_session.working_visual.gradient_zone_spectrum = new_samples.duplicate()
+		SPECTRUM_TARGET_PHENOMENON_ZONE:
+			_session.working_visual.phenomenon_zone_spectrum = new_samples.duplicate()
+		_:
+			if _session.working_visual.mineral_template is GemMineralTemplate:
+				(_session.working_visual.mineral_template as GemMineralTemplate).absorption_spectrum = new_samples.duplicate()
+	_session.mark_visual_dirty()
+	_refresh_spectrum_source_readout()
+	_schedule_preview()
+
+
+func _build_cut_tab_header(cut_panel: VBoxContainer) -> void:
+	var header := VBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	var row1 := HBoxContainer.new()
+	row1.add_theme_constant_override("separation", 6)
+	_cut_spec_dropdown = OptionButton.new()
+	_cut_spec_dropdown.size_flags_horizontal = SIZE_EXPAND_FILL
+	_cut_spec_dropdown.item_selected.connect(_on_cut_template_item_selected)
+	row1.add_child(_cut_spec_dropdown)
+	_cut_use_btn = Button.new()
+	_cut_use_btn.text = "Use selected as base"
+	_cut_use_btn.pressed.connect(_on_use_selected_cut_template)
+	_cut_restore_btn = Button.new()
+	_cut_restore_btn.text = "Restore to base template"
+	_cut_restore_btn.pressed.connect(_on_restore_cut_to_template)
+	row1.add_child(_cut_use_btn)
+	row1.add_child(_cut_restore_btn)
+	header.add_child(_labeled("Cut template", row1))
+	_cut_edit_status = Label.new()
+	_cut_edit_status.add_theme_font_size_override("font_size", 11)
+	_cut_edit_status.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
+	header.add_child(_cut_edit_status)
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 8)
+	_cut_ring_option = OptionButton.new()
+	_cut_ring_option.custom_minimum_size = Vector2(140, 0)
+	_cut_ring_option.item_selected.connect(_on_cut_ring_selected)
+	row2.add_child(_labeled("Ring", _cut_ring_option))
+	var add_ring_btn := Button.new()
+	add_ring_btn.text = "Add"
+	add_ring_btn.pressed.connect(_on_add_cut_ring_pressed)
+	row2.add_child(add_ring_btn)
+	var dup_ring_btn := Button.new()
+	dup_ring_btn.text = "Duplicate"
+	dup_ring_btn.pressed.connect(_on_duplicate_cut_ring_pressed)
+	row2.add_child(dup_ring_btn)
+	var remove_ring_btn := Button.new()
+	remove_ring_btn.text = "Remove"
+	remove_ring_btn.pressed.connect(_on_remove_cut_ring_pressed)
+	row2.add_child(remove_ring_btn)
+	header.add_child(row2)
+
+	var row_h := HBoxContainer.new()
+	row_h.add_theme_constant_override("separation", 8)
+	var hl := Label.new()
+	hl.text = "height_ratio"
+	hl.custom_minimum_size = Vector2(88, 0)
+	_cut_height_spin = SpinBox.new()
+	_cut_height_spin.min_value = 0.0
+	_cut_height_spin.max_value = 1.0
+	_cut_height_spin.step = 0.001
+	_cut_height_spin.size_flags_horizontal = SIZE_EXPAND_FILL
+	_cut_height_spin.value_changed.connect(_on_cut_ring_metrics_spin_changed)
+	var rl := Label.new()
+	rl.text = "rose_h"
+	rl.custom_minimum_size = Vector2(48, 0)
+	_cut_rose_spin = SpinBox.new()
+	_cut_rose_spin.min_value = 0.0
+	_cut_rose_spin.max_value = 2.0
+	_cut_rose_spin.step = 0.001
+	_cut_rose_spin.size_flags_horizontal = SIZE_EXPAND_FILL
+	_cut_rose_spin.value_changed.connect(_on_cut_ring_metrics_spin_changed)
+	row_h.add_child(hl)
+	row_h.add_child(_cut_height_spin)
+	row_h.add_child(rl)
+	row_h.add_child(_cut_rose_spin)
+	header.add_child(row_h)
+
+	var row_sym := HBoxContainer.new()
+	row_sym.add_theme_constant_override("separation", 8)
+	_cut_symm_check = CheckBox.new()
+	_cut_symm_check.text = "Propagate dragged vertex across symmetry sectors"
+	_cut_symm_check.tooltip_text = "When point count matches sector symmetry, dragging one vertex updates the corresponding point in each sector."
+	_cut_symm_check.toggled.connect(_on_cut_symmetry_toggled)
+	_cut_sector_label = Label.new()
+	_cut_sector_label.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
+	row_sym.add_child(_cut_symm_check)
+	row_sym.add_child(_cut_sector_label)
+	header.add_child(row_sym)
+
+	_cut_profile_canvas = CutProfileCanvasScript.new()
+	_cut_profile_canvas.polygon_committed.connect(_on_cut_polygon_committed)
+	header.add_child(_cut_profile_canvas)
+	cut_panel.add_child(header)
+	_refresh_cut_template_dropdown()
+
+
+func _collect_tres_paths(dir_path: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var da := DirAccess.open(dir_path)
+	if da == null:
+		return out
+	da.list_dir_begin()
+	var fn := da.get_next()
+	while fn != "":
+		if not da.current_is_dir() and fn.ends_with(".tres"):
+			out.append("%s/%s" % [String(dir_path).trim_suffix("/"), fn])
+		fn = da.get_next()
+	da.list_dir_end()
+	out.sort()
+	return out
+
+
+func _refresh_cut_template_dropdown() -> void:
+	if _cut_spec_dropdown == null:
+		return
+	_cut_spec_dropdown.clear()
+	var paths := _collect_tres_paths(CUT_SPECS_DIR)
+	for p in paths:
+		_cut_spec_dropdown.add_item(p.get_file())
+		_cut_spec_dropdown.set_item_metadata(_cut_spec_dropdown.item_count - 1, p)
+	# Select current base if present
+	if _session.base_cut_template_path:
+		for i in _cut_spec_dropdown.item_count:
+			if _cut_spec_dropdown.get_item_metadata(i) == _session.base_cut_template_path:
+				_cut_spec_dropdown.select(i)
+				break
+	_update_cut_status_label()
+	_refresh_cut_ring_selector()
+
+
+func _on_cut_template_item_selected(_idx: int) -> void:
+	pass
+
+
+func _on_use_selected_cut_template() -> void:
+	if _cut_spec_dropdown == null or _cut_spec_dropdown.selected < 0:
+		return
+	var path: String = _cut_spec_dropdown.get_item_metadata(_cut_spec_dropdown.selected)
+	if _session.apply_cut_template_path(path):
+		_refresh_cut_json_text()
+		_schedule_preview()
+		_status.text = "Cut base: %s" % path
+
+
+func _on_restore_cut_to_template() -> void:
+	_session.restore_cut_to_baseline()
+	_refresh_cut_json_text()
+	_refresh_cut_ring_selector()
+	_schedule_preview()
+	_status.text = "Cut restored to base template"
+
+
+func _update_cut_status_label() -> void:
+	if _cut_edit_status == null:
+		return
+	if _session.base_cut_template_path.is_empty():
+		_cut_edit_status.text = "Embedded / non-template cut (saves as full cut_spec)."
+	elif _session.has_cut_local_edits():
+		_cut_edit_status.text = "Local edits vs %s (save writes cut_overrides)." % _session.base_cut_template_path.get_file()
+	else:
+		_cut_edit_status.text = "Matches base template %s" % _session.base_cut_template_path.get_file()
+
+
+func _refresh_cut_ring_selector(select_ring_i: int = 0) -> void:
+	if _cut_ring_option == null or _session.working_cut_spec == null:
+		return
+	_cut_ring_option.clear()
+	var contract: Dictionary = _session.working_cut_spec.build_contract_dict()
+	var rings = contract.get("rings", [])
+	if typeof(rings) != TYPE_ARRAY:
+		return
+	var i := 0
+	for r in rings:
+		_cut_ring_option.add_item("Ring %d" % i)
+		_cut_ring_option.set_item_metadata(_cut_ring_option.item_count - 1, i)
+		i += 1
+	if _cut_ring_option.item_count > 0:
+		_cut_ring_option.select(clampi(select_ring_i, 0, _cut_ring_option.item_count - 1))
+	_on_cut_ring_selected(_cut_ring_option.selected if _cut_ring_option.item_count > 0 else -1)
+
+
+func _selected_cut_ring_index() -> int:
+	if _cut_ring_option == null or _cut_ring_option.selected < 0:
+		return -1
+	return int(_cut_ring_option.get_item_metadata(_cut_ring_option.selected))
+
+
+func _scale_ring_points(points: PackedVector2Array, factor: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var center := Vector2(0.5, 0.5)
+	for p in points:
+		out.append(center + (p - center) * factor)
+	return out
+
+
+func _build_new_ring_from_reference(ref_ring: Dictionary, default_name: String, scale_factor: float) -> Dictionary:
+	var ring := ref_ring.duplicate(true)
+	ring["name"] = default_name
+	var pts: PackedVector2Array = ring.get("points", PackedVector2Array()) as PackedVector2Array
+	if pts.size() > 0:
+		ring["points"] = _scale_ring_points(pts, scale_factor)
+	ring["height_ratio"] = clampf(float(ring.get("height_ratio", 0.0)), 0.0, 1.0)
+	ring["rose_height_ratio"] = maxf(float(ring.get("rose_height_ratio", 0.0)), 0.0)
+	return ring
+
+
+func _apply_cut_rings_contract(contract: Dictionary, select_ring_i: int) -> void:
+	_session.working_cut_spec.apply_full_contract(contract)
+	_session.sync_cut_to_visual()
+	_session.mark_geometry_dirty()
+	_update_cut_status_label()
+	_refresh_cut_json_text()
+	_refresh_cut_ring_selector(select_ring_i)
+	_schedule_preview()
+
+
+func _on_add_cut_ring_pressed() -> void:
+	if _session.working_cut_spec == null:
+		return
+	var contract: Dictionary = _session.working_cut_spec.build_contract_dict()
+	var rings_raw = contract.get("rings", [])
+	if typeof(rings_raw) != TYPE_ARRAY:
+		return
+	var rings: Array = rings_raw.duplicate(true)
+	var ref_i := maxi(_selected_cut_ring_index(), 0)
+	var ref_ring: Dictionary = rings[ref_i] if not rings.is_empty() else {
+		"name": "ring_00",
+		"points": PackedVector2Array([Vector2(0.3, 0.3), Vector2(0.7, 0.3), Vector2(0.7, 0.7), Vector2(0.3, 0.7)]),
+		"height_ratio": 0.0,
+		"rose_height_ratio": 0.0,
+		"zone": "custom",
+	}
+	var insert_i := ref_i + 1
+	rings.insert(insert_i, _build_new_ring_from_reference(ref_ring, "ring_%02d" % insert_i, 0.92))
+	contract["rings"] = rings
+	_apply_cut_rings_contract(contract, insert_i)
+
+
+func _on_duplicate_cut_ring_pressed() -> void:
+	if _session.working_cut_spec == null:
+		return
+	var ring_i := _selected_cut_ring_index()
+	if ring_i < 0:
+		return
+	var contract: Dictionary = _session.working_cut_spec.build_contract_dict()
+	var rings_raw = contract.get("rings", [])
+	if typeof(rings_raw) != TYPE_ARRAY:
+		return
+	var rings: Array = rings_raw.duplicate(true)
+	var ring: Dictionary = (rings[ring_i] as Dictionary).duplicate(true)
+	ring["name"] = "%s_copy" % String(ring.get("name", "ring_%02d" % ring_i))
+	rings.insert(ring_i + 1, ring)
+	contract["rings"] = rings
+	_apply_cut_rings_contract(contract, ring_i + 1)
+
+
+func _on_remove_cut_ring_pressed() -> void:
+	if _session.working_cut_spec == null:
+		return
+	var ring_i := _selected_cut_ring_index()
+	if ring_i < 0:
+		return
+	var contract: Dictionary = _session.working_cut_spec.build_contract_dict()
+	var rings_raw = contract.get("rings", [])
+	if typeof(rings_raw) != TYPE_ARRAY:
+		return
+	var rings: Array = rings_raw.duplicate(true)
+	if rings.size() <= 1:
+		_status.text = "Cannot remove the last ring"
+		return
+	rings.remove_at(ring_i)
+	contract["rings"] = rings
+	_apply_cut_rings_contract(contract, maxi(0, ring_i - 1))
+
+
+func _on_cut_symmetry_toggled(on: bool) -> void:
+	if _cut_profile_canvas:
+		_cut_profile_canvas.symmetry_rotation_enabled = on
+		_cut_profile_canvas.queue_redraw()
+
+
+func _on_cut_ring_metrics_spin_changed() -> void:
+	if _updating_cut_metrics:
+		return
+	_commit_ring_metrics_from_ui()
+
+
+func _commit_ring_metrics_from_ui() -> void:
+	if _session.working_cut_spec == null or _cut_ring_option == null:
+		return
+	if _cut_ring_option.selected < 0:
+		return
+	var ring_i: int = int(_cut_ring_option.get_item_metadata(_cut_ring_option.selected))
+	var contract: Dictionary = _session.working_cut_spec.build_contract_dict()
+	var rings_raw = contract.get("rings", [])
+	if typeof(rings_raw) != TYPE_ARRAY:
+		return
+	var rings: Array = rings_raw.duplicate(true)
+	if ring_i < 0 or ring_i >= rings.size():
+		return
+	var ring: Dictionary = (rings[ring_i] as Dictionary).duplicate(true)
+	ring["height_ratio"] = _cut_height_spin.value
+	ring["rose_height_ratio"] = _cut_rose_spin.value
+	rings[ring_i] = ring
+	contract["rings"] = rings
+	_session.working_cut_spec.apply_full_contract(contract)
+	_session.sync_cut_to_visual()
+	_session.mark_geometry_dirty()
+	_update_cut_status_label()
+	_refresh_cut_json_text()
+	_schedule_preview()
+
+
+func _refresh_cut_ring_ghosts() -> void:
+	if _cut_profile_canvas == null or _session.working_cut_spec == null or _cut_ring_option == null:
+		return
+	if _cut_ring_option.selected < 0:
+		return
+	var sel_i: int = int(_cut_ring_option.get_item_metadata(_cut_ring_option.selected))
+	var contract: Dictionary = _session.working_cut_spec.build_contract_dict()
+	var rings = contract.get("rings", [])
+	if typeof(rings) != TYPE_ARRAY:
+		return
+	var ghosts: Array = []
+	for i in rings.size():
+		if i == sel_i:
+			continue
+		var r: Dictionary = rings[i]
+		var pts: PackedVector2Array = r.get("points", PackedVector2Array()) as PackedVector2Array
+		if pts.size() > 1:
+			ghosts.append(pts)
+	_cut_profile_canvas.set_ghost_polygons(ghosts)
+
+
+func _on_cut_ring_selected(_idx: int) -> void:
+	if _cut_ring_option == null or _session.working_cut_spec == null:
+		return
+	if _cut_ring_option.selected < 0:
+		return
+	var ring_i: int = int(_cut_ring_option.get_item_metadata(_cut_ring_option.selected))
+	var contract: Dictionary = _session.working_cut_spec.build_contract_dict()
+	var rings = contract.get("rings", [])
+	if ring_i < 0 or ring_i >= rings.size():
+		return
+	var ring: Dictionary = rings[ring_i]
+	var pts: PackedVector2Array = ring.get("points", PackedVector2Array()) as PackedVector2Array
+	_updating_cut_metrics = true
+	_cut_height_spin.value = float(ring.get("height_ratio", 0.0))
+	_cut_rose_spin.value = float(ring.get("rose_height_ratio", 0.0))
+	_updating_cut_metrics = false
+	var sym: Dictionary = contract.get("symmetry", {})
+	var sc := int(sym.get("sector_count", 0))
+	_cut_sector_label.text = "sector_count=%d" % sc if sc > 0 else "sector_count=—"
+	if _cut_profile_canvas:
+		_cut_profile_canvas.sector_count = sc
+		_cut_profile_canvas.sector_rotation_radians = float(sym.get("rotation", 0.0))
+	if _cut_profile_canvas:
+		_cut_profile_canvas.set_polygon(pts)
+	_refresh_cut_ring_ghosts()
+
+
+func _on_cut_polygon_committed(pts: PackedVector2Array) -> void:
+	if _session.working_cut_spec == null or _cut_ring_option == null:
+		return
+	if _cut_ring_option.selected < 0:
+		return
+	var ring_i: int = int(_cut_ring_option.get_item_metadata(_cut_ring_option.selected))
+	var contract: Dictionary = _session.working_cut_spec.build_contract_dict()
+	var rings_raw = contract.get("rings", [])
+	if typeof(rings_raw) != TYPE_ARRAY:
+		return
+	var rings: Array = rings_raw.duplicate(true)
+	if ring_i < 0 or ring_i >= rings.size():
+		return
+	var ring: Dictionary = (rings[ring_i] as Dictionary).duplicate(true)
+	ring["points"] = pts
+	rings[ring_i] = ring
+	contract["rings"] = rings
+	_apply_cut_rings_contract(contract, ring_i)
+
+
+func _build_trace_variant_options() -> Dictionary:
+	if _trace_match_gameplay_checkbox == null or not _trace_match_gameplay_checkbox.button_pressed:
+		return {}
+	var prof: Dictionary = ProductionBakeProfileScript.load_profile_file(GAMEPLAY_BAKE_PROFILE_PATH)
+	if prof.is_empty():
+		return {}
+	var bake_opts: Dictionary = ProductionBakeProfileScript.profile_to_bake_options(
+		prof, GAMEPLAY_BAKE_PROFILE_PATH
+	)
+	return GemTracedBakeContractScript.build_manifest_variant_settings(bake_opts)
+
+
+func _on_trace_production_profile_toggled(pressed: bool) -> void:
+	if not pressed:
+		return
+	var prof: Dictionary = ProductionBakeProfileScript.load_profile_file(GAMEPLAY_BAKE_PROFILE_PATH)
+	if prof.is_empty():
+		_status.text = "Could not load gameplay bake profile"
+		return
+	var opts: Dictionary = ProductionBakeProfileScript.profile_to_bake_options(
+		prof, GAMEPLAY_BAKE_PROFILE_PATH
+	)
+	if _trace_spp_spin:
+		_trace_spp_spin.value = float(opts.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL))
+	if _trace_samples_spin:
+		_trace_samples_spin.value = float(opts.get("sample_count", 1))
+	if _trace_stylize_checkbox:
+		_trace_stylize_checkbox.button_pressed = not bool(opts.get("skip_stylize", false))
+	if _trace_production_profile_checkbox:
+		_trace_production_profile_checkbox.button_pressed = false
+	_schedule_preview()
 
 
 func _fill_gem_dropdown() -> void:
@@ -930,6 +1848,8 @@ func _on_add_modifier_pressed() -> void:
 
 func _refresh_all() -> void:
 	_session.compile_geometry(true)
+	_refresh_mineral_paths_and_spectrum()
+	_refresh_cut_template_dropdown()
 	_rebuild_visual_inspector()
 	_refresh_cut_json_text()
 	_refresh_visual_json_text()
@@ -947,11 +1867,9 @@ func _reset_showroom_viewer() -> void:
 
 
 func _refresh_cut_json_text() -> void:
-	if _session.working_cut_spec == null:
-		_cut_edit.text = "{}"
-		return
-	var d := _session.working_cut_spec.build_json_safe_contract_dict()
+	var d: Dictionary = _session.build_cut_json_export_dict()
 	_cut_edit.text = JSON.stringify(d, "\t")
+	_update_cut_status_label()
 
 
 func _on_apply_cut_json() -> void:
@@ -959,9 +1877,14 @@ func _on_apply_cut_json() -> void:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		_status.text = "Cut JSON: expected object"
 		return
-	_session.apply_contract_dict_to_cut(parsed)
+	var data: Dictionary = parsed
+	if data.has("cut_json_schema_version"):
+		_session.apply_cut_json_export_dict(data)
+	else:
+		_session.apply_contract_dict_to_cut(data)
 	_refresh_cut_json_text()
 	_rebuild_visual_inspector()
+	_refresh_cut_ring_selector()
 	_schedule_preview()
 	_status.text = "Cut applied"
 
@@ -979,6 +1902,7 @@ func _on_apply_visual_json() -> void:
 		_status.text = "Visual JSON: expected object"
 		return
 	_session.apply_visual_json_dict(parsed)
+	_refresh_mineral_paths_and_spectrum()
 	_rebuild_visual_inspector()
 	_refresh_visual_json_text()
 	_schedule_preview()
@@ -1094,7 +2018,16 @@ func _make_section_header(group_name: String, is_subgroup: bool) -> Dictionary:
 
 func _make_property_row(n: String, prop: Dictionary, val, vis: GemVisualResource, group_name: String) -> Control:
 	var t: int = prop.type
-	if t == TYPE_OBJECT or t == TYPE_ARRAY or t == TYPE_DICTIONARY:
+	if n in [
+		&"mineral_template",
+		&"bake_environment",
+		&"color_texture",
+		&"absorption_spectrum_override",
+		&"gradient_zone_spectrum",
+		&"phenomenon_zone_spectrum",
+	]:
+		return null
+	if t == TYPE_ARRAY or t == TYPE_DICTIONARY:
 		return null
 
 	# Sentinel float/color properties removed (environment presets no longer exist).
@@ -1204,6 +2137,27 @@ func _make_property_row(n: String, prop: Dictionary, val, vis: GemVisualResource
 		h.add_child(gv3)
 		return h
 
+	if t == TYPE_OBJECT:
+		var le := LineEdit.new()
+		if val is Resource:
+			le.text = (val as Resource).resource_path if (val as Resource).resource_path else "<embedded resource>"
+		else:
+			le.text = "<null>"
+		le.editable = false
+		le.size_flags_horizontal = SIZE_EXPAND_FILL
+		h.add_child(le)
+		return h
+
+	if t == TYPE_PACKED_FLOAT32_ARRAY:
+		var arr: PackedFloat32Array = val
+		var lbl := Label.new()
+		lbl.text = "%d floats (use Visual JSON for bulk edit)" % arr.size()
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbl.add_theme_color_override("font_color", Color(0.65, 0.68, 0.75))
+		lbl.size_flags_horizontal = SIZE_EXPAND_FILL
+		h.add_child(lbl)
+		return h
+
 	return null
 
 
@@ -1293,23 +2247,99 @@ func _update_dependency_states() -> void:
 	var vis: GemVisualResource = _session.working_visual
 	for prop_name in _prop_row_controls:
 		var row: Control = _prop_row_controls[prop_name]
-		if prop_name not in _DEPENDENCY_RULES:
+		var sn := StringName(prop_name)
+		var dep_active := true
+		if sn in _DEPENDENCY_RULES:
+			var rule: Dictionary = _DEPENDENCY_RULES[sn]
+			var requires: Dictionary = rule.requires
+			for req_prop in requires:
+				if not _evaluate_prop_condition(vis, req_prop, requires[req_prop]):
+					dep_active = false
+					break
+		var material_dim := _material_mode_dims_prop(vis, sn)
+		if dep_active and not material_dim:
 			row.modulate.a = 1.0
 			row.tooltip_text = ""
-			continue
-		var rule: Dictionary = _DEPENDENCY_RULES[prop_name]
-		var requires: Dictionary = rule.requires
-		var active := true
-		for req_prop in requires:
-			if not _evaluate_prop_condition(vis, req_prop, requires[req_prop]):
-				active = false
-				break
-		if active:
-			row.modulate.a = 1.0
-			row.tooltip_text = ""
+			_apply_row_interactive(row, true)
 		else:
 			row.modulate.a = 0.4
-			row.tooltip_text = rule.reason
+			if not dep_active and sn in _DEPENDENCY_RULES:
+				row.tooltip_text = _DEPENDENCY_RULES[sn].reason
+			elif material_dim:
+				if sn in _MATERIAL_MODE_PATTERN_ONLY_PROPS:
+					row.tooltip_text = "Patterned materials: texture and field controls. Disabled for faceted transparent."
+				elif sn in _MATERIAL_MODE_FACETED_TRANSPARENT_ONLY_PROPS:
+					row.tooltip_text = "Faceted transparent only (use gradient / phenomenon spectra or legacy RGB)."
+				else:
+					row.tooltip_text = "Not used for current material mode"
+			else:
+				row.tooltip_text = ""
+			_apply_row_interactive(row, false)
+
+	_update_physical_source_panel_state()
+
+
+func _apply_row_interactive(row: Control, interactive: bool) -> void:
+	if row == null:
+		return
+	_propagate_interactive(row, interactive)
+
+
+func _propagate_interactive(n: Node, interactive: bool) -> void:
+	if n is BaseButton:
+		(n as BaseButton).disabled = not interactive
+	elif n is SpinBox:
+		(n as SpinBox).editable = interactive
+	elif n is Slider:
+		(n as Slider).editable = interactive
+	elif n is LineEdit:
+		(n as LineEdit).editable = interactive
+	elif n is TextEdit:
+		(n as TextEdit).editable = interactive
+	elif n is ColorPickerButton:
+		(n as ColorPickerButton).disabled = not interactive
+	for c in n.get_children():
+		_propagate_interactive(c, interactive)
+
+
+func _update_physical_source_panel_state() -> void:
+	if _session.working_visual == null:
+		return
+	var ft := _session.working_visual.material_mode == GemVisualResource.MATERIAL_MODE_FACETED_TRANSPARENT
+	if _absorption_edit_mode != null:
+		for i in _absorption_edit_mode.item_count:
+			var target_id := _absorption_edit_mode.get_item_id(i)
+			_absorption_edit_mode.set_item_disabled(i, _spectrum_target_requires_faceted(target_id) and not ft)
+		if _spectrum_target_requires_faceted(_current_spectrum_target_id()) and not ft:
+			_set_spectrum_target_id(SPECTRUM_TARGET_MINERAL_ABSORPTION)
+			_refresh_spectrum_editor_from_session()
+			_refresh_spectrum_source_readout()
+	var tex_row = find_child("_designer_color_texture_row", true, false)
+	if tex_row is Control:
+		var tr := tex_row as Control
+		tr.modulate.a = 0.45 if ft else 1.0
+		tr.tooltip_text = "Faceted transparent gems use traced spectra; color texture applies to patterned materials." if ft else ""
+		_apply_row_interactive(tr, not ft)
+	var target_row = find_child("_designer_spectrum_target_mode", true, false)
+	if target_row is Control:
+		(target_row as Control).tooltip_text = "Gradient and phenomenon zone spectra are faceted-transparent authoring targets."
+	var spectrum_ui_active := ft or not _spectrum_target_requires_faceted(_current_spectrum_target_id())
+	for node_name in ["_designer_spectrum_editor", "_designer_spectrum_y_row", "_designer_spectrum_gaussian_row"]:
+		var n = find_child(node_name, true, false)
+		if n is Control:
+			var c := n as Control
+			c.modulate.a = 1.0 if spectrum_ui_active else 0.45
+			c.tooltip_text = "" if spectrum_ui_active else "Gradient and phenomenon zone spectra are disabled outside faceted transparent mode."
+			_apply_row_interactive(c, spectrum_ui_active)
+
+
+func _material_mode_dims_prop(vis: GemVisualResource, prop_name: StringName) -> bool:
+	var mode: int = vis.material_mode
+	if prop_name in _MATERIAL_MODE_PATTERN_ONLY_PROPS:
+		return mode == GemVisualResource.MATERIAL_MODE_FACETED_TRANSPARENT
+	if prop_name in _MATERIAL_MODE_FACETED_TRANSPARENT_ONLY_PROPS:
+		return mode != GemVisualResource.MATERIAL_MODE_FACETED_TRANSPARENT
+	return false
 
 
 static func _parse_range_hint(prop: Dictionary) -> Dictionary:
@@ -1402,67 +2432,116 @@ func _schedule_preview() -> void:
 	_preview_gen += 1
 	_preview_timer.stop()
 	_preview_timer.start()
+	_set_preview_activity("Preview · queued (~%.1fs debounce)…" % DEBOUNCE_SEC, true)
+	if _status != null:
+		_status.text = "Preview · waiting for debounce…"
 
 
 func _on_preview_timer_timeout() -> void:
-	_start_preview_trace(_preview_gen)
+	_set_preview_activity("Preview · ray tracing…", true)
+	if _status != null:
+		_status.text = "Preview · baking…"
+	_attempt_preview_trace()
 
 
-func _start_preview_trace(gen: int) -> void:
+## Starts a debounced preview trace for the current `_preview_gen`, or no-ops if a trace is
+## already running (a new bake is chained in `_process` when the worker finishes if gen moved on).
+func _attempt_preview_trace() -> void:
 	if _preview_thread != null and _preview_thread.is_started():
+		_set_preview_activity("Preview · finishing previous trace, then updating…", true)
+		if _status != null:
+			_status.text = "Preview · queued behind in-flight trace…"
 		return
+	var gen := _preview_gen
 	_session.compile_geometry(false)
 	var model = _session.get_cached_model()
 	var cut = _session.get_cached_projected_cut()
 	var vis_snap: GemVisualResource = _session.working_visual.duplicate(true)
 	if model == null or cut == null or vis_snap == null:
-		_status.text = "Preview: invalid geometry"
+		_set_preview_activity("Preview · invalid geometry", false)
+		if _status != null:
+			_status.text = "Preview: invalid geometry"
+		_preview_stop_process_if_no_worker()
 		return
 	var mesh = GemMeshGeneratorsScript.generate_from_model(model)
 	if mesh == null:
-		_status.text = "Preview: mesh failed"
+		_set_preview_activity("Preview · mesh build failed", false)
+		if _status != null:
+			_status.text = "Preview: mesh failed"
+		_preview_stop_process_if_no_worker()
 		return
-	var req := GemVisualRegistry.build_designer_preview_crown_request(
+	## Edits during compile/mesh build: skip this start; deferred retry picks up latest gen.
+	if gen != _preview_gen:
+		_preview_stop_process_if_no_worker()
+		call_deferred("_attempt_preview_trace")
+		return
+	var variant_opts := _build_trace_variant_options()
+	var use_adaptive := _trace_adaptive_spp_checkbox != null and _trace_adaptive_spp_checkbox.button_pressed
+	var spp_arg := -1 if use_adaptive else clampi(int(_trace_spp_spin.value), 16, 512)
+	var base_req := GemVisualRegistry.build_designer_preview_crown_request(
 		SESSION_TILE_ID,
 		vis_snap,
 		model,
 		cut,
 		PREVIEW_SIZE,
-		PREVIEW_SIZE
+		PREVIEW_SIZE,
+		variant_opts,
+		spp_arg
 	)
-	req["mesh_includes_cut_rotation"] = true
-	var preview_spp := GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL
-	if _preview_bounces_spin != null:
-		preview_spp = clampi(int(_preview_bounces_spin.value), 16, 512)
-	var preview_samples := 1
-	if _preview_samples_spin != null:
-		preview_samples = int(_preview_samples_spin.value)
+	base_req["mesh_includes_cut_rotation"] = true
+	var enrich_opts := {
+		"skip_stylize": not (_trace_stylize_checkbox != null and _trace_stylize_checkbox.button_pressed),
+	}
+	if not use_adaptive:
+		enrich_opts["samples_per_pixel"] = clampi(int(_trace_spp_spin.value), 16, 512)
+	var sample_count := clampi(int(_trace_samples_spin.value), 1, OfflineGemBakeJobScript.max_supported_sample_count())
+	var bake_job := OfflineGemBakeJobScript.new()
+	var req := bake_job.build_designer_enriched_request(
+		base_req,
+		vis_snap,
+		mesh,
+		sample_count,
+		enrich_opts
+	)
 	var pack := {
 		"gen": gen,
 		"mesh": mesh,
 		"visual": vis_snap,
 		"request": req,
 		"weak_self": weakref(self),
-		"skip_stylize": not (_preview_stylize_checkbox != null and _preview_stylize_checkbox.button_pressed),
-		"samples_per_pixel": preview_spp,
-		"sample_count": preview_samples,
 	}
 	_preview_thread = Thread.new()
 	var err := _preview_thread.start(Callable(self, "_preview_thread_body").bind(pack))
 	if err != OK:
 		_preview_thread = null
-		_status.text = "Preview thread start failed"
+		_preview_inflight_gen = -1
+		_set_preview_activity("Preview · thread start failed", false)
+		if _status != null:
+			_status.text = "Preview thread start failed"
+		set_process(false)
 		return
+	_preview_inflight_gen = gen
 	set_process(true)
+
+
+func _preview_stop_process_if_no_worker() -> void:
+	if _preview_thread == null or not _preview_thread.is_started():
+		set_process(false)
 
 
 func _process(_delta: float) -> void:
 	if _preview_thread == null or not _preview_thread.is_started():
 		return
 	if not _preview_thread.is_alive():
+		var finished_gen := _preview_inflight_gen
 		_preview_thread.wait_to_finish()
 		_preview_thread = null
-		set_process(false)
+		_preview_inflight_gen = -1
+		var need_fresh_trace := finished_gen >= 0 and _preview_gen != finished_gen
+		if need_fresh_trace:
+			_attempt_preview_trace()
+		if _preview_thread == null or not _preview_thread.is_started():
+			set_process(false)
 
 
 func _preview_thread_body(pack: Dictionary) -> void:
@@ -1474,10 +2553,6 @@ func _preview_thread_body(pack: Dictionary) -> void:
 	if mesh == null or visual == null or w == null:
 		return
 	var tracer = OfflineGemBakeJobScript.create_tracer()
-	req["mesh_resource"] = mesh
-	req["sample_count"] = int(pack.get("sample_count", 1))
-	req["samples_per_pixel"] = int(pack.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL))
-	req["skip_stylize"] = bool(pack.get("skip_stylize", true))
 	var img: Image = tracer.trace_to_image(mesh, visual, req)
 	var node = w.get_ref()
 	if node != null:
@@ -1494,11 +2569,15 @@ func _on_preview_image_ready(gen: int, img: Image) -> void:
 	if gen != _preview_gen:
 		return
 	if img == null:
-		_status.text = "Preview trace failed"
+		_set_preview_activity("Preview · trace failed", false)
+		if _status != null:
+			_status.text = "Preview trace failed"
 		return
 	var tex := ImageTexture.create_from_image(img)
 	_preview_tex.texture = tex
-	_status.text = "Preview updated"
+	_set_preview_activity("Preview updated", false)
+	if _status != null:
+		_status.text = "Preview updated"
 
 
 func _get_showroom_output_root() -> String:
@@ -1595,6 +2674,8 @@ func _on_run_showroom_bake() -> void:
 		"showroom_direction_count": dir_n,
 		"showroom_roll_steps": roll_n,
 	}
+	if _trace_match_gameplay_checkbox != null and _trace_match_gameplay_checkbox.button_pressed:
+		opts["variant_settings"] = _build_trace_variant_options()
 	var raw: Array = GemVisualRegistry.build_explicit_bake_requests(
 		SESSION_TILE_ID,
 		vis_snap,

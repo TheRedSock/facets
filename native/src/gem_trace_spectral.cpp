@@ -9,24 +9,30 @@ namespace gem { namespace spectral {
 // Source: CIE 15:2004, Table T.1
 // ---------------------------------------------------------------------------
 
+// Canonical CIE 1931 2-degree x̄ observer (CIE 15:2004 Table T.1).
+// NOTE: The previous table in this file had a corrupted long-wavelength
+// lobe (peak shifted to 580 nm instead of 600 nm, values at 620-700 nm
+// collapsed by ~3x).  That bug caused the tracer to see almost no red
+// response above 620 nm, which is why red gems (ruby, rhodolite, painite,
+// etc.) integrated to olive-green regardless of the authored spectra.
 static const double CIE_X[81] = {
     0.001368, 0.002236, 0.004243, 0.007650, 0.014310,  // 380-400
     0.023190, 0.043510, 0.077630, 0.134380, 0.214770,  // 405-425
     0.283900, 0.328500, 0.348280, 0.348060, 0.336200,  // 430-450
-    0.318700, 0.290800, 0.233700, 0.175560, 0.123200,  // 455-475
-    0.078250, 0.042160, 0.020300, 0.008750, 0.002100,  // 480-500
-    0.003900, 0.021000, 0.050000, 0.090100, 0.138200,  // 505-525
-    0.208020, 0.284900, 0.368180, 0.460200, 0.567690,  // 530-550
-    0.676000, 0.793200, 0.904000, 1.007300, 1.084000,  // 555-575
-    1.152500, 1.148600, 1.089100, 0.999110, 0.884930,  // 580-600
-    0.771610, 0.658340, 0.527960, 0.398090, 0.283490,  // 605-625
-    0.196550, 0.132180, 0.088120, 0.057860, 0.037840,  // 630-650
-    0.024160, 0.015340, 0.009690, 0.005850, 0.003710,  // 655-675
-    0.002120, 0.001390, 0.000890, 0.000580, 0.000370,  // 680-700
-    0.000210, 0.000150, 0.000100, 0.000070, 0.000050,  // 705-725
-    0.000030, 0.000020, 0.000010, 0.000010, 0.000000,  // 730-750
-    0.000000, 0.000000, 0.000000, 0.000000, 0.000000,  // 755-775
-    0.000000                                             // 780
+    0.318700, 0.290800, 0.251100, 0.195360, 0.142100,  // 455-475
+    0.095640, 0.057950, 0.032010, 0.014700, 0.004900,  // 480-500
+    0.002400, 0.009300, 0.029100, 0.063270, 0.109600,  // 505-525
+    0.165500, 0.225750, 0.290400, 0.359700, 0.433450,  // 530-550
+    0.512050, 0.594500, 0.678400, 0.762100, 0.842500,  // 555-575
+    0.916300, 0.978600, 1.026300, 1.056700, 1.062200,  // 580-600
+    1.045600, 1.002600, 0.938400, 0.854400, 0.751400,  // 605-625
+    0.642400, 0.541900, 0.447900, 0.360800, 0.283500,  // 630-650
+    0.218700, 0.164900, 0.121200, 0.087400, 0.063600,  // 655-675
+    0.046770, 0.032900, 0.022700, 0.015840, 0.011359,  // 680-700
+    0.008111, 0.005790, 0.004109, 0.002899, 0.002049,  // 705-725
+    0.001440, 0.001000, 0.000690, 0.000476, 0.000332,  // 730-750
+    0.000235, 0.000166, 0.000117, 0.000083, 0.000059,  // 755-775
+    0.000042                                             // 780
 };
 
 static const double CIE_Y[81] = {
@@ -162,6 +168,22 @@ double evaluate_absorption(const GemTraceProps& props, double lambda_nm, Vector3
     return dmax(alpha * props.absorption_strength_scale, 0.0);
 }
 
+double sample_curve_at_lambda(const std::vector<float>& samples, double lambda_nm) {
+    if (samples.size() != 81) {
+        return 0.0;
+    }
+    double t = (lambda_nm - LAMBDA_MIN) / SPECTRUM_STEP;
+    if (t <= 0.0) {
+        return (double)samples[0];
+    }
+    if (t >= 80.0) {
+        return (double)samples[80];
+    }
+    int i = (int)t;
+    double frac = t - (double)i;
+    return (double)samples[i] + ((double)samples[i + 1] - (double)samples[i]) * frac;
+}
+
 // ---------------------------------------------------------------------------
 // XYZ to linear sRGB (IEC 61966-2-1 matrix)
 // ---------------------------------------------------------------------------
@@ -192,7 +214,11 @@ Vector3 linear_to_srgb(Vector3 linear) {
 // ---------------------------------------------------------------------------
 // Spectral uplifting (simplified V1: smooth Gaussian basis functions)
 // For each RGB channel, define a smooth spectral basis centered at:
-//   R: 610nm, G: 540nm, B: 460nm, each with ~40nm width.
+//   R: 640nm, G: 540nm, B: 460nm, each with ~40nm width.
+// The R basis was moved from 610nm to 640nm so authored "red" colors
+// (gradient_color, phenomenon_color, light card color) uplift into the deep
+// red band where real red chromophores sit, instead of the orange-red band.
+// This de-muddies ruby/rhodolite/painite and stops topaz from oversaturating.
 // ---------------------------------------------------------------------------
 
 static double gaussian_basis(double lambda_nm, double center, double width) {
@@ -201,6 +227,11 @@ static double gaussian_basis(double lambda_nm, double center, double width) {
 }
 
 double spectral_uplift(Color srgb, double lambda_nm) {
+    // Gaussian bases centered near the CIE x̄ / ȳ / z̄ peaks so an
+    // equal-energy (1,1,1) input roughly reconstructs a flat spectrum.
+    // Note: the R-basis was temporarily moved to 640 nm while debugging
+    // a CIE_X table bug; now that the observer data is correct, 610 nm
+    // (just redward of the x̄ peak at 600 nm) gives cleaner uplifts.
     double r_basis = gaussian_basis(lambda_nm, 610.0, 40.0);
     double g_basis = gaussian_basis(lambda_nm, 540.0, 42.0);
     double b_basis = gaussian_basis(lambda_nm, 460.0, 38.0);

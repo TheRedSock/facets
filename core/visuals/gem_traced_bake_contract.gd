@@ -118,6 +118,24 @@ static func normalize_variant_settings(raw_value: Dictionary = {}) -> Dictionary
 		1,
 		64
 	)
+	var showroom_axis_steps := clampi(
+		int(raw_value.get("showroom_axis_steps", 0)),
+		0,
+		360
+	)
+	var raw_showroom_axes = raw_value.get("showroom_axes", [])
+	if raw_showroom_axes is String:
+		raw_showroom_axes = String(raw_showroom_axes).replace(";", ",").split(",", false)
+	var normalized_showroom_axes: Array[StringName] = []
+	var seen_showroom_axes: Dictionary = {}
+	for raw_axis in raw_showroom_axes:
+		var sa := StringName(String(raw_axis).strip_edges().to_lower())
+		if sa == &"" or seen_showroom_axes.has(sa):
+			continue
+		if not [&"pitch", &"yaw"].has(sa):
+			continue
+		seen_showroom_axes[sa] = true
+		normalized_showroom_axes.append(sa)
 	var result := {
 		"lighting_grid_preset": detect_lighting_grid_preset(lighting_grid),
 		"lighting_grid_size": lighting_grid,
@@ -128,6 +146,8 @@ static func normalize_variant_settings(raw_value: Dictionary = {}) -> Dictionary
 		"rotation_axes": PackedStringArray(normalized_axes),
 		"showroom_direction_count": showroom_dir_count,
 		"showroom_roll_steps": showroom_roll_steps,
+		"showroom_axis_steps": showroom_axis_steps,
+		"showroom_axes": PackedStringArray(normalized_showroom_axes),
 		"lighting_atlas_layers": maxi(
 			0,
 			int(raw_value.get("lighting_atlas_layers", maxi(0, lighting_grid.x * lighting_grid.y)))

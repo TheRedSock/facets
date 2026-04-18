@@ -147,13 +147,23 @@ static func resolve(spec, ior: float = DEFAULT_IOR) -> Dictionary:
 			if c + p > 0.0:
 				crown_fraction = c / (c + p)
 
-		# Target total depth from width ratio.
+		# Start from the authored width-based total depth target.
 		var diameter := effective_radius * 2.0
 		var target_total_depth := diameter * total_depth_ratio
 
-		# Crown height = fraction of non-girdle depth, or what remains after pavilion.
+		# Angle-first priority means the pavilion angle can force a deeper stone than the
+		# width-ratio target. Expand total depth as needed so the requested crown:pavilion
+		# split still has room to exist instead of collapsing the crown toward the floor.
+		if crown_fraction < 1.0:
+			var min_total_for_split := girdle_thickness + pavilion_depth / (1.0 - crown_fraction)
+			target_total_depth = maxf(target_total_depth, min_total_for_split)
+
+		# Crown height is the requested fraction of the non-girdle depth, capped by the
+		# slack left after the pavilion consumes its angle-derived depth.
+		var non_girdle_depth := maxf(target_total_depth - girdle_thickness, 0.0)
+		var target_crown_height := non_girdle_depth * crown_fraction
 		var available_for_crown := target_total_depth - pavilion_depth - girdle_thickness
-		crown_height = available_for_crown * crown_fraction / (1.0 - crown_fraction) if crown_fraction < 1.0 else available_for_crown
+		crown_height = minf(target_crown_height, available_for_crown) if crown_fraction < 1.0 else available_for_crown
 
 		# With angle-first, crown absorbs the slack. But if pavilion is very deep
 		# (low IOR), crown gets compressed. Apply clamps.

@@ -43,10 +43,22 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 ## Reference to the mineral template for crystal physics (Sellmeier, absorption, etc.).
 ## All gems of the same mineral species share one template.
 @export var mineral_template: Resource = null
+## Optic axis for pleochroism (extraordinary-ray direction in model space). Used by the
+## native tracer when the mineral has a `pleochroism_absorption_spectrum`. Must be
+## non-zero when overriding; `Vector3.ZERO` keeps the tracer default axis.
+@export var optic_axis: Vector3 = Vector3.ZERO
 ## Per-gem absorption spectrum override. If non-empty (81 floats at 5nm intervals),
 ## REPLACES the template's absorption_spectrum. Use this for different chromophores
 ## in the same crystal (e.g., ruby vs sapphire are both corundum, different Cr/Fe/Ti).
 @export var absorption_spectrum_override: PackedFloat32Array = PackedFloat32Array()
+## Per-gem pleochroism spectrum override. Spectrum (81 floats) sampled when the ray
+## propagates ALONG the `optic_axis` direction. The main `absorption_spectrum(_override)`
+## is sampled when the ray propagates PERPENDICULAR to the axis. The tracer blends
+## the two with cos²(angle) so viewing down the c-axis of a dichroic gem (e.g. ruby
+## viewed along c = orange-red, perpendicular = purple-red) reads its second pleochroic
+## colour. Leave empty to disable pleochroism on this visual (falls back to the
+## mineral template's `pleochroism_absorption_spectrum` if it has one).
+@export var pleochroism_absorption_spectrum_override: PackedFloat32Array = PackedFloat32Array()
 ## Multiplier on the active absorption spectrum. 1.0 = use as-is.
 ## >1.0 = deeper color, <1.0 = lighter color. Scales the extinction coefficient.
 @export_range(0.01, 10.0) var absorption_strength_scale: float = 1.0
@@ -62,18 +74,35 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export var display_color: Color = Color.WHITE
 
 @export_subgroup("Gradient")
+## Optional 81-sample target absorption curve for the gradient zone (380–780 nm, 5 nm steps),
+## in the same authoring space as absorption spectra. When non-empty, the native tracer
+## blends body absorption toward this curve in the gradient region instead of uplifting
+## `gradient_color`. Empty = legacy RGB uplift path.
+@export var gradient_zone_spectrum: PackedFloat32Array = PackedFloat32Array()
 ## Blends the display colour toward this colour using the selected zoning mode,
 ## simulating natural colour zoning (e.g. amethyst purple-to-white or
-## tourmaline-style edge/core separation).
+## tourmaline-style edge/core separation). Active only for faceted transparent gems;
+## patterned materials should use their explicit material palette/pattern controls.
+## Ignored by the tracer when `gradient_zone_spectrum` has 81 samples (procedural fallback still uses it if spectrum empty).
 @export var gradient_color: Color = Color.TRANSPARENT
 @export_range(0.0, 1.0) var gradient_strength: float = 0.0
 @export_enum("Linear", "Radial", "Radial Inverse") var gradient_mode: int = GRADIENT_MODE_LINEAR
 @export_range(-180.0, 180.0) var gradient_angle_degrees: float = 90.0
+## Object-space XY offset (in radius-normalized units) applied before evaluating
+## RADIAL / RADIAL_INVERSE modes. Use when the cut's geometric origin sits off
+## the visual center of mass (trillion, pear, marquise) so the radial zone wraps
+## the visible silhouette instead of a distant geometric point.
+@export var gradient_center: Vector2 = Vector2.ZERO
 
 @export_subgroup("Phenomenon")
+## Optional 81-sample target absorption curve for angle-dependent phenomenon response.
+## When non-empty, the tracer blends toward this curve instead of RGB uplift from
+## `phenomenon_color`.
+@export var phenomenon_zone_spectrum: PackedFloat32Array = PackedFloat32Array()
 ## Static dual-tone cue for color-change stones (e.g. alexandrite, blue garnet).
 ## The secondary colour is blended per facet based on facet orientation rather
-## than using prismatic dispersion intended for diamond-like fire.
+## than using prismatic dispersion intended for diamond-like fire. Active only for
+## faceted transparent gems; patterned materials should use reactive/material fields.
 @export var phenomenon_color: Color = Color.TRANSPARENT
 @export_range(0.0, 1.0) var phenomenon_strength: float = 0.0
 @export_range(-180.0, 180.0) var phenomenon_angle_degrees: float = 0.0
@@ -91,6 +120,7 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_group("Detailing")
 ## Broad material family used by the traced and procedural paths.
 @export_enum("Faceted Transparent", "Patterned Opaque", "Patterned Translucent") var material_mode: int = MATERIAL_MODE_FACETED_TRANSPARENT
+## Explicit palette controls for patterned material modes.
 @export var material_secondary_color: Color = Color.TRANSPARENT
 @export var material_tertiary_color: Color = Color.TRANSPARENT
 ## If true, sample from color_texture instead of flat display_color.
@@ -156,6 +186,13 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 ## Rotates the entire environment (sky + cards + blocker) around the vertical axis.
 @export_range(-180.0, 180.0) var optics_environment_rotation_degrees: float = 0.0
 
+@export_subgroup("Dispersion")
+## When true, the tracer runs one independent path per hero wavelength, so each
+## wavelength refracts along its own Snell direction at every surface. Produces
+## physically-correct prismatic "fire" for high-dispersion gems (diamond, zircon,
+## sphene). Cost: ~4x slower trace; leave off for low-dispersion gems.
+@export var enable_dispersion: bool = false
+
 # ==== Stylization ====
 
 @export_group("Stylization")
@@ -210,12 +247,31 @@ func get_cut_spec_id() -> StringName:
 	return &""
 
 
+## Approximate sRGB from an 81-sample curve for procedural 2D fallback only.
+static func zone_spectrum_to_display_color(spectrum: PackedFloat32Array) -> Color:
+	if spectrum.size() != 81:
+		return Color.WHITE
+	var peak := 0.0001
+	for i in 81:
+		peak = maxf(peak, spectrum[i])
+	if peak < 1e-8:
+		return Color.WHITE
+	# Rough band proxies: ~650 nm, ~530 nm, ~460 nm (indices 54, 30, 16).
+	var r := clampf(spectrum[54] / peak, 0.0, 1.0)
+	var g := clampf(spectrum[30] / peak, 0.0, 1.0)
+	var b := clampf(spectrum[16] / peak, 0.0, 1.0)
+	return Color(r, g, b)
+
+
+const VISUAL_JSON_SCHEMA_VERSION := 1
+
+## Geometry + resource refs excluded from the generic property loop (handled explicitly).
 const _VISUAL_JSON_SKIP := [&"cut_spec", &"cut_overrides", &"cut_id", &"color_texture", &"mineral_template", &"bake_environment"]
 
 
 ## Serialize all visual (non-geometry) properties to a JSON-safe dictionary.
 func build_visual_json_dict() -> Dictionary:
-	var result := {}
+	var result := {"visual_json_schema_version": VISUAL_JSON_SCHEMA_VERSION}
 	for prop in get_property_list():
 		if not (prop.usage & PROPERTY_USAGE_EDITOR):
 			continue
@@ -225,22 +281,48 @@ func build_visual_json_dict() -> Dictionary:
 		if n in _VISUAL_JSON_SKIP:
 			continue
 		result[String(n)] = _to_json_safe_value(get(n))
+	if mineral_template != null and mineral_template.resource_path:
+		result["mineral_template_path"] = mineral_template.resource_path
+	if bake_environment != null and bake_environment.resource_path:
+		result["bake_environment_path"] = bake_environment.resource_path
+	if color_texture != null and color_texture.resource_path:
+		result["color_texture_path"] = color_texture.resource_path
 	return result
 
 
 ## Apply a JSON-parsed dictionary of visual properties.
 func apply_visual_json_dict(data: Dictionary) -> void:
+	var ver := int(data.get("visual_json_schema_version", 1))
+	if ver > VISUAL_JSON_SCHEMA_VERSION:
+		push_warning("GemVisualResource: visual JSON schema %d newer than supported %d" % [ver, VISUAL_JSON_SCHEMA_VERSION])
+
+	var mpath := String(data.get("mineral_template_path", ""))
+	if not mpath.is_empty() and ResourceLoader.exists(mpath):
+		mineral_template = load(mpath)
+	var epath := String(data.get("bake_environment_path", ""))
+	if not epath.is_empty() and ResourceLoader.exists(epath):
+		bake_environment = load(epath)
+	var tpath := String(data.get("color_texture_path", ""))
+	if not tpath.is_empty() and ResourceLoader.exists(tpath):
+		color_texture = load(tpath)
+
 	var prop_types := {}
 	for prop in get_property_list():
 		if prop.usage & PROPERTY_USAGE_EDITOR:
 			prop_types[StringName(prop.name)] = prop.type
 	for key in data.keys():
+		var sk := String(key)
+		if sk == "visual_json_schema_version" or sk.ends_with("_path"):
+			continue
 		var sn := StringName(key)
 		if sn in _VISUAL_JSON_SKIP:
 			continue
 		if not prop_types.has(sn):
 			continue
-		set(sn, _from_json_value(data[key], prop_types[sn]))
+		var t: int = int(prop_types[sn])
+		if t == TYPE_OBJECT:
+			continue
+		set(sn, _from_json_value(data[key], t))
 
 
 static func _to_json_safe_value(value) -> Variant:

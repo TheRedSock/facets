@@ -32,6 +32,25 @@ static func create_tracer():
 	return null
 
 
+## Enrich one trace request like batch bakes (environment, mesh, samples, stylize, etc.).
+## Used by the gem designer preview so it matches showroom/offline normalization.
+func build_designer_enriched_request(
+	base_request: Dictionary,
+	visual: GemVisualResource,
+	mesh_resource: GemMeshResource,
+	sample_count: int,
+	options: Dictionary,
+) -> Dictionary:
+	var req := base_request.duplicate(true)
+	req["visual"] = visual
+	req["mesh_resource"] = mesh_resource
+	var arr: Array = [req]
+	var enriched := _enrich_request_list(arr, sample_count, options)
+	if enriched.is_empty():
+		return req
+	return enriched[0]
+
+
 ## Maximum MSAA sample count supported by the trace kernel (5-point quincunx pattern).
 static func max_supported_sample_count() -> int:
 	return 5
@@ -664,8 +683,12 @@ func _enrich_request_list(base_requests: Array, sample_count: int, options: Dict
 		var visual: GemVisualResource = enriched_request.get("visual", null)
 		if visual == null:
 			continue
-		# Resolve environment from visual's bake_environment resource
-		if not enriched_request.has("environment_profile"):
+		# Resolve environment with CLI/profile override first, then visual, then default.
+		if options.has("environment_override"):
+			var env_override = options.get("environment_override")
+			if env_override != null and env_override.has_method("to_trace_dict"):
+				enriched_request["environment_profile"] = env_override.to_trace_dict()
+		elif not enriched_request.has("environment_profile"):
 			if visual.bake_environment != null and visual.bake_environment.has_method("to_trace_dict"):
 				enriched_request["environment_profile"] = visual.bake_environment.to_trace_dict()
 			else:
@@ -694,6 +717,8 @@ func _enrich_request_list(base_requests: Array, sample_count: int, options: Dict
 			enriched_request["trace_profile"] = bool(options.get("trace_profile", false))
 		if options.has("samples_per_pixel"):
 			enriched_request["samples_per_pixel"] = int(options.get("samples_per_pixel", GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL))
+		if options.has("seed"):
+			enriched_request["seed"] = int(options.get("seed", 42))
 		if options.has("skip_stylize"):
 			enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
 		# Image format and quality.

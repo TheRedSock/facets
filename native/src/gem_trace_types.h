@@ -162,6 +162,25 @@ struct GemTraceProps {
     double phenomenon_angle_degrees = 0.0;
     double phenomenon_sharpness = 1.0;
 
+    // Gradient center offset (in normalized object space, radius-units).
+    // Used by RADIAL / RADIAL_INVERSE modes so non-centroidal cuts (trillion, pear,
+    // marquise) can re-center the radial zone. (0, 0) = geometric origin.
+    Vector2 gradient_center = Vector2(0, 0);
+
+    // Optional 81-sample target absorption curves (380–780 nm). When non-empty, the
+    // tracer blends the body absorption toward these zone curves instead of using
+    // RGB uplift from gradient_color / phenomenon_color.
+    std::vector<float> gradient_zone_spectrum;
+    std::vector<float> phenomenon_zone_spectrum;
+
+    // Per-wavelength geometry splitting.
+    // When true, trace_row_band runs 4 independent single-wavelength paths
+    // (one per hero λ) through the gem instead of sharing one path. Costs
+    // ~4x trace time but produces physically-correct dispersion — each λ
+    // refracts along its own Snell direction at every surface, so high-
+    // dispersion gems (diamond, zircon) exhibit real "fire".
+    bool enable_dispersion = false;
+
     // Surface pattern fields (all retained from current)
     int surface_pattern_type = MATERIAL_PATTERN_NONE;
     double surface_pattern_mix = 0.0;

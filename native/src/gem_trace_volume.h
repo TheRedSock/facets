@@ -23,18 +23,17 @@ double beer_lambert_zoned(const GemTraceProps& props, double lambda_nm,
                           double distance, Vector3 ray_dir,
                           Vector3 obj_pos, double absorption_mult = 1.0);
 
-// Compute gradient-based per-wavelength absorption multiplier.
-// Returns a factor in [0.1, 3.0] that modulates absorption to shift body
-// color toward gradient_color in the gradient zone.
+// Compute gradient-zoned absorption alpha for the current wavelength.
+// Uses gradient_zone_spectrum as a target absorption curve when present; otherwise
+// falls back to the legacy RGB-uplift heuristic from gradient_color.
 double gradient_absorption_mod(const GemTraceProps& props,
-                               Vector3 obj_pos, double lambda_nm);
+                               Vector3 obj_pos, double lambda_nm, double base_alpha);
 
-// Compute phenomenon-based per-wavelength absorption multiplier.
-// Returns a factor in [0.1, 3.0] that modulates absorption based on
-// the ray direction relative to the phenomenon axis, producing
-// angle-dependent color shift (e.g., alexandrite green→purple).
+// Compute phenomenon-zoned absorption alpha for the current wavelength.
+// Uses phenomenon_zone_spectrum as a target absorption curve when present; otherwise
+// falls back to the legacy RGB-uplift heuristic from phenomenon_color.
 double phenomenon_absorption_mod(const GemTraceProps& props,
-                                 Vector3 ray_dir, double lambda_nm);
+                                 Vector3 ray_dir, double lambda_nm, double base_alpha);
 
 // Sample scattering event distance from exponential distribution.
 // Returns distance to next scatter event. If > surface_distance, no scatter occurs.
@@ -46,5 +45,15 @@ Vector3 sample_henyey_greenstein(Vector3 incident_dir, double g, TraceRNG& rng);
 // Test for fluorescence wavelength shift.
 // Returns true if fluorescence occurred (wavelength_nm is modified).
 bool try_fluorescence(const GemTraceProps& props, double& wavelength_nm, TraceRNG& rng);
+
+// Throughput multiplier to keep a just-emitted fluorescence photon physically
+// visible when the authored absorption at the emission wavelength is high
+// enough that it would otherwise be re-absorbed before escaping. Returns 1.0
+// (no boost) when the authored alpha_emission already gives >= 50% survival
+// over a typical remaining escape path. Call ONCE per successful fluorescence
+// shift, immediately after `try_fluorescence` returns true.
+double fluorescence_emission_boost(const GemTraceProps& props,
+                                   double emitted_wavelength_nm,
+                                   Vector3 ray_dir);
 
 }} // namespace gem::volume

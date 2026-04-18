@@ -47,14 +47,15 @@ double sample_cards(const EnvironmentSetup& env, Vector3 dir, double lambda_nm,
 
         // Cap effective power for stochastic sampling convergence.
         // The card power controls the angular extent of the light source
-        // in the environment map. High powers create narrow cones that
-        // require many samples to converge — a cos^30 lobe has ~15° half-
-        // width and creates 14:1 brightness variance within typical exit
-        // direction spreads. cos^8 broadens to ~45° half-width, reducing
-        // variance to ~2:1 within the same spread.
-        // Specular highlight sharpness comes from the GGX microfacet on
-        // the gem surface, not from the card's angular power.
-        power = dmin(power, 8.0);
+        // in the environment map. Higher powers narrow the cone, producing
+        // tighter "jeweler's strobe" highlights at the cost of noise on
+        // smooth facets. cos^40 (~12° half-width) approximates a small
+        // distant studio strobe and is what drives the bright pinpoint
+        // sparkles in cut-stone reference photography. The previous cap
+        // of cos^8 (~45° half-width) effectively softboxed every gem and
+        // forced the highlight to spread as a wide diffuse smear.
+        // Bump SPP to 96+ if highlight speckle becomes objectionable.
+        power = dmin(power, 40.0);
 
         // Gradient card: lerp from edge_color to center color
         double grad_t = std::pow(clampd(alignment, 0.0, 1.0), card.gradient_power);

@@ -71,3 +71,78 @@ func get_reference_ior() -> float:
 		+ sellmeier_b.y * l2 / (l2 - sellmeier_c.y) \
 		+ sellmeier_b.z * l2 / (l2 - sellmeier_c.z)
 	return sqrt(max(n2, 1.0))
+
+
+const MINERAL_JSON_SCHEMA_VERSION := 1
+
+
+func build_mineral_json_dict() -> Dictionary:
+	var result := {"mineral_json_schema_version": MINERAL_JSON_SCHEMA_VERSION}
+	for prop in get_property_list():
+		if not (prop.usage & PROPERTY_USAGE_EDITOR):
+			continue
+		var n: StringName = prop.name
+		if n.begins_with(&"resource_") or n == &"script":
+			continue
+		result[String(n)] = _mineral_to_json_safe(get(n))
+	return result
+
+
+func apply_mineral_json_dict(data: Dictionary) -> void:
+	var ver := int(data.get("mineral_json_schema_version", 1))
+	if ver > MINERAL_JSON_SCHEMA_VERSION:
+		push_warning("GemMineralTemplate: JSON schema %d newer than supported %d" % [ver, MINERAL_JSON_SCHEMA_VERSION])
+	var prop_types := {}
+	for prop in get_property_list():
+		if prop.usage & PROPERTY_USAGE_EDITOR:
+			prop_types[StringName(prop.name)] = prop.type
+	for key in data.keys():
+		if String(key) == "mineral_json_schema_version":
+			continue
+		var sn := StringName(key)
+		if not prop_types.has(sn):
+			continue
+		set(sn, _mineral_from_json_value(data[key], prop_types[sn]))
+
+
+static func _mineral_to_json_safe(value) -> Variant:
+	match typeof(value):
+		TYPE_COLOR:
+			return [value.r, value.g, value.b, value.a]
+		TYPE_VECTOR3:
+			return [value.x, value.y, value.z]
+		TYPE_STRING_NAME:
+			return String(value)
+		TYPE_PACKED_FLOAT32_ARRAY:
+			return Array(value)
+		_:
+			return value
+
+
+static func _mineral_from_json_value(value, target_type: int) -> Variant:
+	match target_type:
+		TYPE_COLOR:
+			if typeof(value) == TYPE_ARRAY and value.size() >= 4:
+				return Color(float(value[0]), float(value[1]), float(value[2]), float(value[3]))
+			if typeof(value) == TYPE_ARRAY and value.size() >= 3:
+				return Color(float(value[0]), float(value[1]), float(value[2]), 1.0)
+		TYPE_VECTOR3:
+			if typeof(value) == TYPE_ARRAY and value.size() >= 3:
+				return Vector3(float(value[0]), float(value[1]), float(value[2]))
+		TYPE_STRING_NAME:
+			return StringName(String(value))
+		TYPE_FLOAT:
+			return float(value)
+		TYPE_INT:
+			return int(value)
+		TYPE_BOOL:
+			return bool(value)
+		TYPE_STRING:
+			return String(value)
+		TYPE_PACKED_FLOAT32_ARRAY:
+			if typeof(value) == TYPE_ARRAY:
+				var arr := PackedFloat32Array()
+				for v in value:
+					arr.append(float(v))
+				return arr
+	return value

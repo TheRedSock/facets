@@ -40,6 +40,20 @@ func _run() -> void:
 	var rotation_step_degrees := float(args.get("rotation_step_degrees", 0.0))
 	if rotation_step_degrees > 0.0:
 		rotation_variant_options["rotation_step_degrees"] = rotation_step_degrees
+	# Showroom yaw/pitch sweep support (matches run_offline_gem_bake flags).
+	var showroom_axis_steps := maxi(int(args.get("showroom_axis_steps", 0)), 0)
+	if showroom_axis_steps > 0:
+		rotation_variant_options["showroom_axis_steps"] = clampi(showroom_axis_steps, 1, 360)
+	var showroom_axes_raw := String(args.get("showroom_axes", "")).strip_edges()
+	if not showroom_axes_raw.is_empty():
+		rotation_variant_options["showroom_axes"] = showroom_axes_raw.replace(";", ",").split(",", false)
+	# If the user is rebuilding a showroom-only manifest, skip lighting+rotation
+	# suite requests so we don't try to register entries that were never baked.
+	if bool(args.get("skip_lighting", false)):
+		rotation_variant_options["lighting_grid_size"] = Vector2i.ZERO
+	if bool(args.get("skip_rotations", false)):
+		rotation_variant_options["rotation_axis_steps"] = 0
+		rotation_variant_options["rotation_base_view_count"] = 0
 	var entries: Array[Dictionary] = []
 	var tile_counts: Dictionary = {}
 	var all_requests: Array = []

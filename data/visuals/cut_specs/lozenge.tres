@@ -23,21 +23,21 @@ rings = Array[Dictionary]([{
 "rose_height_ratio": 0.0,
 "zone": "girdle"
 }, {
-"height_ratio": 0.26,
+"height_ratio": 0.30,
 "name": "ring_01",
-"points": PackedVector2Array(0.5, 0.132, 0.709, 0.5, 0.5, 0.868, 0.291, 0.5),
-"rose_height_ratio": 0.26,
+"points": PackedVector2Array(0.5, 0.120, 0.715, 0.5, 0.5, 0.880, 0.285, 0.5),
+"rose_height_ratio": 0.30,
 "zone": "step"
 }, {
-"height_ratio": 0.56,
+"height_ratio": 0.62,
 "name": "ring_02",
-"points": PackedVector2Array(0.5, 0.210, 0.670, 0.5, 0.5, 0.790, 0.330, 0.5),
-"rose_height_ratio": 0.56,
+"points": PackedVector2Array(0.5, 0.200, 0.670, 0.5, 0.5, 0.800, 0.330, 0.5),
+"rose_height_ratio": 0.62,
 "zone": "step"
 }, {
 "height_ratio": 1.0,
 "name": "ring_03",
-"points": PackedVector2Array(0.5, 0.285, 0.62, 0.5, 0.5, 0.715, 0.38, 0.5),
+"points": PackedVector2Array(0.5, 0.295, 0.605, 0.5, 0.5, 0.705, 0.395, 0.5),
 "rose_height_ratio": 1.0,
 "zone": "table"
 }])
@@ -48,7 +48,7 @@ crown = {
 "center_point": Vector2(0.5, 0.5),
 "edge_trim": 0.2,
 "fans": Array[Dictionary]([]),
-"height": 0.10,
+"height": 0.17,
 "inner_star_facets": Array[PackedVector2Array]([]),
 "inner_star_height_ratio": 0.78,
 "outer_shoulder_height_ratio": 0.0,

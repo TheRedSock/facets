@@ -145,4 +145,6 @@ static func profile_to_bake_options(profile: Dictionary, profile_res_path: Strin
 	var default_env := String(profile.get("default_environment", "")).strip_edges()
 	if not default_env.is_empty():
 		opts["default_environment"] = default_env
+	if profile.has("seed"):
+		opts["seed"] = int(profile.get("seed", 42))
 	return opts
