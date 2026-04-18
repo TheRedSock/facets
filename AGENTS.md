@@ -321,7 +321,7 @@ godot --headless --path . --script res://tools/validate_production_bake.gd -- --
 
 Runtime searches `user://` first, then `res://generated/`. To rebake: delete `user://traced_bakes/` manifest.
 
-**Gem appearance retuning policy:** Before editing per-gem spectra / phenomenon / gradients in `data/visuals/*.tres`, run an environment A/B (`neutral_warm_reference.tres` vs `gameplay_studio.tres`) with identical bake flags and `skip_stylize`, and review `tests/test_pavilion_proportions.gd` output — shallow crowns and cool-biased lighting can dominate “too cold” reads; isolate those first.
+**Gem appearance retuning policy:** Before editing per-gem spectra / phenomenon / gradients in `data/visuals/*.tres`, run an environment A/B (`neutral_warm_reference_v2.tres` vs `gameplay_studio_v2.tres`) with identical bake flags and `skip_stylize`, and review `tests/test_pavilion_proportions.gd` output — shallow crowns and cool-biased lighting can dominate “too cold” reads; isolate those first.
 
 ### Asset Optimization
 

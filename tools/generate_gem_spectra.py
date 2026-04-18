@@ -644,12 +644,140 @@ def blue_garnet_phenomenon_alpha(lam: float) -> float:
     return max(0.20, baseline + teal_block + maroon_window + magenta_window + a_uv)
 
 
+def blue_garnet_body_overshoot_alpha(lam: float) -> float:
+    """T8 overshoot: darker ground, teal + maroon windows more separable at α_scale≈2.2."""
+    baseline = 5.35
+    teal_window = -4.95 * gauss(lam, 478.0, 26.0)
+    maroon_window = -2.45 * gauss(lam, 668.0, 20.0)
+    a_uv = 4.2 * math.exp(-(lam - 380.0) / 17.0) if lam < 420.0 else 0.0
+    return max(0.22, baseline + teal_window + maroon_window + a_uv)
+
+
+def blue_garnet_phenomenon_overshoot_alpha(lam: float) -> float:
+    """Phenomenon zone for overshoot: stronger burgundy vs teal flash under glare."""
+    baseline = 5.35
+    teal_block = 3.2 * gauss(lam, 480.0, 26.0)
+    maroon_window = -4.2 * gauss(lam, 655.0, 30.0)
+    magenta_window = -2.1 * gauss(lam, 715.0, 42.0)
+    a_uv = 4.2 * math.exp(-(lam - 380.0) / 17.0) if lam < 420.0 else 0.0
+    return max(0.22, baseline + teal_block + maroon_window + magenta_window + a_uv)
+
+
+def blue_garnet_body_tuned_alpha(lam: float) -> float:
+    """2026-04 retune: the T8 overshoot pushed pendeloque pavilions into near-black
+    because the long chord × scale 2.2 × baseline 5.35 saturated transmission.
+    This tuned recipe keeps the teal + maroon windows but lowers the baseline so
+    the stone reads as a saturated dark teal (not black) with visible burgundy
+    accents — matching references. Pair with absorption_strength_scale ≈ 1.25.
+    """
+    baseline = 3.8
+    teal_window = -3.5 * gauss(lam, 480.0, 28.0)
+    maroon_window = -1.7 * gauss(lam, 670.0, 22.0)
+    a_uv = 3.4 * math.exp(-(lam - 380.0) / 18.0) if lam < 420.0 else 0.0
+    return max(0.25, baseline + teal_window + maroon_window + a_uv)
+
+
+def blue_garnet_phenomenon_tuned_alpha(lam: float) -> float:
+    """Tuned phenomenon zone paired with blue_garnet_body_tuned — burgundy/magenta
+    flash is present but doesn't swallow the body teal.  Narrower, less aggressive
+    negatives than the overshoot recipe.
+    """
+    baseline = 3.8
+    teal_block = 1.8 * gauss(lam, 480.0, 26.0)
+    maroon_window = -3.0 * gauss(lam, 658.0, 28.0)
+    magenta_window = -1.5 * gauss(lam, 718.0, 42.0)
+    a_uv = 3.4 * math.exp(-(lam - 380.0) / 18.0) if lam < 420.0 else 0.0
+    return max(0.25, baseline + teal_block + maroon_window + magenta_window + a_uv)
+
+
+def painite_cherry_red_from_strong() -> List[float]:
+    """Deepen blue/green (indices 0–40 ×1.3), open red window (50–70 ×0.75)."""
+    base = sample_curve(painite_strong_alpha)
+    out: List[float] = []
+    for i, v in enumerate(base):
+        if i <= 40:
+            out.append(min(12.0, v * 1.3))
+        elif 50 <= i <= 70:
+            out.append(max(0.12, v * 0.75))
+        else:
+            out.append(v)
+    return out
+
+
+def tourmaline_body_raise_blue_violet(base: List[float]) -> List[float]:
+    """Indices 0–15 ×1.6 — kill purple flesh, steer pink body."""
+    out = list(base)
+    for i in range(min(16, len(out))):
+        out[i] = min(12.0, out[i] * 1.6)
+    return out
+
+
+def tourmaline_zone_raise_cyan_band(base: List[float]) -> List[float]:
+    """Indices 10–22 ×1.5 — deepen cyan absorption in watermelon rim."""
+    out = list(base)
+    for i in range(10, min(23, len(out))):
+        out[i] = min(12.0, out[i] * 1.5)
+    return out
+
+
+# Synced from data/visuals/alexandrite.tres — blend uses these exact samples.
+_ALEXANDRITE_ORDINARY_OVERRIDE: List[float] = [
+    2.35187, 2.08236, 1.90482, 1.80459, 1.76931, 1.78803, 1.85068, 1.94755,
+    2.06903, 2.20547, 2.16174, 2.33689, 2.49087, 2.61670, 2.70808, 2.75990,
+    2.76871, 2.73315, 2.65443, 2.53668, 2.38714, 2.21616, 2.03676, 1.86386,
+    1.71313, 1.59959, 1.53627, 1.53299, 1.59565, 1.72593, 1.92154, 2.17668,
+    2.48268, 2.82864, 3.20191, 3.58854, 3.97371, 4.34222, 4.67922, 4.97096,
+    5.20578, 5.37494, 5.47342, 5.50030, 5.45894, 5.35662, 5.20384, 5.01343,
+    4.79927, 4.57514, 4.35354, 4.14471, 3.95601, 3.79152, 3.65210, 3.53567,
+    3.43778, 3.35236, 3.27253, 3.19136, 3.10262, 3.00133, 2.88408, 2.74927,
+    2.59706, 2.42920, 2.24874, 2.05964, 1.86639, 1.67361, 1.48569, 1.30650,
+    1.13923, 0.98624, 0.84902, 0.72829, 0.62400, 0.53554, 0.46181, 0.40141,
+    0.35277,
+]
+_ALEXANDRITE_PLEO_OVERRIDE_PRE_SOFTEN: List[float] = [
+    0.87188, 0.79417, 0.73234, 0.68562, 0.65381, 0.63727, 0.63695, 0.65437,
+    0.51959, 0.60353, 0.70794, 0.83490, 0.98522, 1.15799, 1.35015, 1.55646,
+    1.76994, 1.98264, 2.18677, 2.37581, 2.54547, 2.69406, 2.82235, 2.93296,
+    3.02930, 3.11453, 3.19073, 3.25832, 3.31595, 3.36067, 3.38841, 3.39450,
+    3.37437, 3.32409, 3.24092, 3.12380, 2.97354, 2.79303, 2.58705, 2.36199,
+    2.12536, 1.88514, 1.64914, 1.42437, 1.21658, 1.02992, 0.86684, 0.72818,
+    0.61334, 0.52064, 0.44767, 0.39161, 0.34955, 0.31870, 0.29658, 0.28105,
+    0.27037, 0.26316, 0.25838, 0.25527, 0.25327, 0.25201, 0.25122, 0.25073,
+    0.25044, 0.25026, 0.25015, 0.25009, 0.25005, 0.25003, 0.25002, 0.25001,
+    0.25001, 0.25000, 0.25000, 0.25000, 0.25000, 0.25000, 0.25000, 0.25000,
+    0.25000, 0.25000,
+]
+
+
+def alexandrite_pleochroism_softened() -> List[float]:
+    """0.7 * pleo + 0.3 * ordinary — reduces harsh magenta dead zones."""
+    o = _ALEXANDRITE_ORDINARY_OVERRIDE
+    p = _ALEXANDRITE_PLEO_OVERRIDE_PRE_SOFTEN
+    return [0.7 * p[i] + 0.3 * o[i] for i in range(SAMPLES)]
+
+
 # ---------------------------------------------------------------------------
 # Emit PackedFloat32Array strings, plus sanity-check color readout.
 # ---------------------------------------------------------------------------
 
 def sample_curve(fn: Callable[[float], float]) -> List[float]:
     return [max(0.0, fn(w)) for w in WAVELENGTHS]
+
+
+def _lerp_alpha(samples: List[float]) -> Callable[[float], float]:
+    """Piecewise-linear α(λ) from 81 samples (matches WAVELENGTHS grid)."""
+
+    def f(lam: float) -> float:
+        t = (lam - LAMBDA_MIN) / STEP
+        i = int(math.floor(t))
+        fr = t - i
+        if i >= SAMPLES - 1:
+            return samples[-1]
+        if i < 0:
+            return samples[0]
+        return samples[i] * (1.0 - fr) + samples[i + 1] * fr
+
+    return f
 
 
 def format_packed(values: List[float]) -> str:
@@ -732,9 +860,26 @@ def main() -> None:
                  "2026-04 retune: near-black body with teal + maroon windows"),
         Spectrum("blue_garnet_phenomenon", blue_garnet_phenomenon_alpha, (0.22, 0.04, 0.12),
                  "2026-04 retune: burgundy phenomenon zone"),
+        Spectrum("painite_cherry_red", _lerp_alpha(painite_cherry_red_from_strong()), (0.42, 0.10, 0.06),
+                 "2026-04: cherry-red; deepen blue/green, open red window vs painite_strong"),
+        Spectrum("tourmaline_watermelon_body", _lerp_alpha(tourmaline_body_raise_blue_violet(sample_curve(tourmaline_rubellite_soft_alpha))), (0.90, 0.38, 0.56),
+                 "2026-04: body indices 0-15 ×1.6 — less purple flesh"),
+        Spectrum("tourmaline_watermelon_zone", _lerp_alpha(tourmaline_zone_raise_cyan_band(sample_curve(tourmaline_verdelite_soft_alpha))), (0.12, 0.72, 0.38),
+                 "2026-04: zone indices 10-22 ×1.5 — less turquoise rim"),
+        Spectrum("blue_garnet_body_overshoot", blue_garnet_body_overshoot_alpha, (0.04, 0.10, 0.22),
+                 "2026-04: T8 overshoot body (use with absorption_strength_scale≈2.2)"),
+        Spectrum("blue_garnet_phenomenon_overshoot", blue_garnet_phenomenon_overshoot_alpha, (0.22, 0.04, 0.12),
+                 "2026-04: T8 overshoot phenomenon zone"),
+        Spectrum("blue_garnet_body_tuned", blue_garnet_body_tuned_alpha, (0.06, 0.14, 0.24),
+                 "2026-04 retune: saturated dark teal body (use with absorption_strength_scale≈1.25)"),
+        Spectrum("blue_garnet_phenomenon_tuned", blue_garnet_phenomenon_tuned_alpha, (0.26, 0.06, 0.14),
+                 "2026-04 retune: burgundy/magenta phenomenon zone paired with body_tuned"),
     ]
     for s in spectra:
         report(s)
+
+    print("\n### alexandrite_pleochroism_softened (0.7*pleo + 0.3*ordinary; paste into alexandrite.tres)")
+    print(format_packed(alexandrite_pleochroism_softened()))
 
 
 if __name__ == "__main__":

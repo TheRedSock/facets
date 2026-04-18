@@ -19,7 +19,9 @@ mono_crash.*.json
 plans
 
 # Debug
-assets/debug_bakes/
+assets/debug_*/
+tools/__pycache__/
+tools/generated_spectra.txt
 
 # Production bake output (build artifacts; add res://generated/ to export includes)
 generated/traced_bakes/

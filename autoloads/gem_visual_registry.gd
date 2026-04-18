@@ -1932,10 +1932,19 @@ func _resolve_variant_settings(options: Dictionary = {}) -> Dictionary:
 
 
 func _build_rotation_axis_sweep(axis: StringName, axis_steps: int, step_degrees: float) -> Array[Dictionary]:
-	# Build views sorted by angle ascending: all negative angles first (most
-	# negative to least), then all positive angles (least to most).  This
-	# produces a monotonic sequence that plays smoothly as a sequential strip
-	# instead of alternating negative/positive on every other frame.
+	var span := 2.0 * float(axis_steps) * step_degrees
+	# When 2 * axis_steps * step covers a full 360°, the legacy neg-then-pos sweep
+	# skipped 0° and placed both -180° and +180° (duplicate yaw) as first/last bins.
+	# Sample k * 360 / N for k in [0, N) so 0° appears once and angles are unique mod 360.
+	if is_equal_approx(span, 360.0):
+		var n := maxi(1, axis_steps * 2)
+		var views_fc: Array[Dictionary] = []
+		for k in range(n):
+			var angle := 360.0 * float(k) / float(n)
+			views_fc.append(_make_rotation_axis_view_uniform(axis, angle, k))
+		return views_fc
+	# Legacy: monotonic negative then positive lobes (partial turn).  Produces a
+	# smooth strip for arcs that do not wrap a full circle.
 	var views: Array[Dictionary] = []
 	for step_index in range(axis_steps, 0, -1):
 		var angle := step_degrees * float(step_index)
@@ -1944,6 +1953,26 @@ func _build_rotation_axis_sweep(axis: StringName, axis_steps: int, step_degrees:
 		var angle := step_degrees * float(step_index)
 		views.append(_make_rotation_axis_view(axis, angle, step_index, 1))
 	return views
+
+
+func _make_rotation_axis_view_uniform(axis: StringName, angle_degrees: float, index: int) -> Dictionary:
+	var pitch := 0.0
+	var yaw := 0.0
+	var roll := 0.0
+	match axis:
+		&"pitch":
+			pitch = angle_degrees
+		&"yaw":
+			yaw = angle_degrees
+		&"roll":
+			roll = angle_degrees
+	return _make_rotation_view(
+		"%s_%02d" % [String(axis), index],
+		pitch,
+		yaw,
+		roll,
+		axis
+	)
 
 
 func _make_rotation_axis_view(
@@ -2052,8 +2081,8 @@ func _build_perturbed_environment_profile(
 	if visual != null and visual.bake_environment != null and visual.bake_environment.has_method("to_trace_dict"):
 		base_profile = visual.bake_environment.to_trace_dict()
 	else:
-		# Use default gameplay studio environment
-		var default_env := load("res://data/environments/gameplay_studio.tres")
+		# Use default gameplay studio environment (v2 rig)
+		var default_env := load("res://data/environments/gameplay_studio_v2.tres")
 		if default_env != null and default_env.has_method("to_trace_dict"):
 			base_profile = default_env.to_trace_dict()
 	if rig_config.is_empty():

@@ -55,7 +55,7 @@ The tier-shape mapping follows a deliberate complexity curve:
 | `princess_square` | `square` | `textbook` | Sharp square brilliant / princess family. |
 | `asscher_step` | `square` | `textbook` | Square emerald-family step cut. |
 | `radiant_square` | `square` | `textbook` | Square radiant with clipped corners. |
-| `octagon_step` | `square` | `modified_standard` | Step-cut octagon that reads as a clipped-corner square. |
+| `octagon_step` | `rectangle` | `modified_standard` | Elongated step-cut octagon (e.g. alexandrite); reads as a clipped-corner rectangle. |
 | `radiant_octagon` | `square` | `modified_standard` | Radiant-style octagon that reads as a clipped-corner square. |
 | `trillion` | `triangle` | `textbook` | Curved-side trillion / trilliant family. |
 | `straight_trillion` | `triangle` | `modified_standard` | Straight-sided trillion variant. |

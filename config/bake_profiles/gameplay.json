@@ -14,5 +14,5 @@
 	"atlas_output": true,
 	"gems": "all",
 	"output_root": "res://generated/traced_bakes",
-	"default_environment": "gameplay_studio"
+	"default_environment": "gameplay_studio_v2"
 }

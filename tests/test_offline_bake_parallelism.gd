@@ -76,7 +76,8 @@ func test_environment_override_wins_over_default_environment() -> void:
 			"variant_key": "ruby@rot_01",
 		}],
 		1,
-		{"environment_override": warm_env}
+		{"environment_override": warm_env},
+		null
 	)
 	assert_true(requests.size() == 1, "Environment override test should enrich one request")
 	if requests.is_empty():

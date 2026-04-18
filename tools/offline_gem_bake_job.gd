@@ -45,7 +45,7 @@ func build_designer_enriched_request(
 	req["visual"] = visual
 	req["mesh_resource"] = mesh_resource
 	var arr: Array = [req]
-	var enriched := _enrich_request_list(arr, sample_count, options)
+	var enriched := _enrich_request_list(arr, sample_count, options, null)
 	if enriched.is_empty():
 		return req
 	return enriched[0]
@@ -230,7 +230,7 @@ func run_explicit_request_batch(
 		max_supported_sample_count()
 	)
 	var variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(options)
-	var filtered_requests := _enrich_request_list(source_requests, sample_count, options)
+	var filtered_requests := _enrich_request_list(source_requests, sample_count, options, null)
 	var entries: Array[Dictionary] = []
 	var per_tile_counts: Dictionary = {}
 	var profiling := _make_batch_profile(0.0)
@@ -349,7 +349,7 @@ func run_explicit_request_batch_async(
 		max_supported_sample_count()
 	)
 	var variant_settings := GemTracedBakeContractScript.build_manifest_variant_settings(options)
-	var filtered_requests := _enrich_request_list(source_requests, sample_count, options)
+	var filtered_requests := _enrich_request_list(source_requests, sample_count, options, null)
 	var entries: Array[Dictionary] = []
 	var per_tile_counts: Dictionary = {}
 	var profiling := _make_batch_profile(0.0)
@@ -670,10 +670,15 @@ func _build_filtered_requests(
 			if not _request_matches_filters(request, options):
 				continue
 			base_requests.append(request)
-	return _enrich_request_list(base_requests, sample_count, options)
+	return _enrich_request_list(base_requests, sample_count, options, registry)
 
 
-func _enrich_request_list(base_requests: Array, sample_count: int, options: Dictionary) -> Array:
+func _enrich_request_list(
+	base_requests: Array,
+	sample_count: int,
+	options: Dictionary,
+	registry: Node,
+) -> Array:
 	var filtered_requests: Array[Dictionary] = []
 	var mesh_cache: Dictionary = {}
 	for request in base_requests:
@@ -692,7 +697,12 @@ func _enrich_request_list(base_requests: Array, sample_count: int, options: Dict
 			if visual.bake_environment != null and visual.bake_environment.has_method("to_trace_dict"):
 				enriched_request["environment_profile"] = visual.bake_environment.to_trace_dict()
 			else:
-				var default_env := load("res://data/environments/gameplay_studio.tres")
+				var default_env: Resource = null
+				var de := String(options.get("default_environment", "")).strip_edges()
+				if not de.is_empty() and registry != null and registry.has_method(&"get_bake_environment"):
+					default_env = registry.get_bake_environment(StringName(de))
+				if default_env == null:
+					default_env = load("res://data/environments/gameplay_studio_v2.tres")
 				if default_env != null and default_env.has_method("to_trace_dict"):
 					enriched_request["environment_profile"] = default_env.to_trace_dict()
 		# Pass through request-level overrides from options
