@@ -2080,6 +2080,9 @@ func _build_perturbed_environment_profile(
 	var base_profile := {}
 	if visual != null and visual.bake_environment != null and visual.bake_environment.has_method("to_trace_dict"):
 		base_profile = visual.bake_environment.to_trace_dict()
+	elif visual != null and visual.mineral_template != null and visual.mineral_template.get("bake_environment") != null \
+			and visual.mineral_template.bake_environment.has_method("to_trace_dict"):
+		base_profile = visual.mineral_template.bake_environment.to_trace_dict()
 	else:
 		# Use default gameplay studio environment (v2 rig)
 		var default_env := load("res://data/environments/gameplay_studio_v2.tres")

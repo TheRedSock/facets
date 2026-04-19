@@ -78,4 +78,47 @@ Vector3 sample_ggx(Vector3 geometric_normal, double roughness, TraceRNG& rng) {
     return micro.normalized();
 }
 
+// ---------------------------------------------------------------------------
+// Anisotropic GGX microfacet normal sampling (Heitz 2014)
+// ---------------------------------------------------------------------------
+
+Vector3 sample_ggx_aniso(Vector3 geometric_normal, Vector3 tangent, double alpha_x, double alpha_y, TraceRNG& rng) {
+    // Clamp alpha to avoid degenerate cases
+    alpha_x = dmax(alpha_x, 0.001);
+    alpha_y = dmax(alpha_y, 0.001);
+
+    // If nearly isotropic, fall back to isotropic sampling
+    if (std::abs(alpha_x - alpha_y) < 0.0001) {
+        return sample_ggx(geometric_normal, alpha_x, rng);
+    }
+
+    double u1 = rng.next();
+    double u2 = rng.next();
+
+    // Anisotropic GGX importance sampling (Heitz 2014)
+    // Sample azimuthal angle with anisotropic stretching
+    double phi = std::atan2(alpha_y * std::sin(TWO_PI * u2), alpha_x * std::cos(TWO_PI * u2));
+    double cos_phi = std::cos(phi);
+    double sin_phi = std::sin(phi);
+
+    // Effective alpha in the sampled direction
+    double alpha_eff_sq = 1.0 / (cos_phi * cos_phi / (alpha_x * alpha_x) + sin_phi * sin_phi / (alpha_y * alpha_y));
+
+    // Sample polar angle (same as isotropic GGX but with effective alpha)
+    double cos_theta_sq = (1.0 - u1) / (1.0 + (alpha_eff_sq - 1.0) * u1);
+    double cos_theta = std::sqrt(dmax(cos_theta_sq, 0.0));
+    double sin_theta = std::sqrt(dmax(1.0 - cos_theta_sq, 0.0));
+
+    // Build tangent frame
+    Vector3 n = geometric_normal.normalized();
+    Vector3 t = tangent.normalized();
+    Vector3 b = n.cross(t).normalized();
+    t = b.cross(n).normalized();  // Re-orthogonalize
+
+    // Construct microfacet normal in world space
+    Vector3 m = (t * (cos_phi * sin_theta) + b * (sin_phi * sin_theta) + n * cos_theta).normalized();
+
+    return m;
+}
+
 }} // namespace gem::fresnel

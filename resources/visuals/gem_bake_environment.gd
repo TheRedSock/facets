@@ -39,6 +39,13 @@ class_name GemBakeEnvironment extends Resource
 ## Environment energy multiplier
 @export_range(0.0, 4.0) var environment_energy: float = 1.0
 
+## Per-environment card power cap override.
+## Controls the maximum angular sharpness of light card highlights.
+## Higher values = tighter point-source highlights (more fire/sparkle, more noise).
+## -1.0 = use kernel default (40.0, ~12° half-width).
+## Dispersion environments may set 200-400 for visible prismatic splitting.
+@export_range(-1.0, 5000.0) var card_power_cap: float = -1.0
+
 
 ## Build a Dictionary suitable for passing as "environment_profile" in a trace request.
 func to_trace_dict() -> Dictionary:
@@ -57,6 +64,7 @@ func to_trace_dict() -> Dictionary:
 		"exposure": exposure,
 		"light_energy": light_energy,
 		"environment_energy": environment_energy,
+		"card_power_cap": card_power_cap,
 		"cards": light_cards,
 	}
 	return result

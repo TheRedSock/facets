@@ -19,6 +19,10 @@ extends Resource
 @export var patches: Array = []
 @export var constraints: Dictionary = {}
 @export var orthographic_metadata: Dictionary = {}
+## Default facet edge rounding for this cut shape (0 = sharp, 1 = maximum smoothing).
+## Controls how much the polished bevel at zone transitions is smoothed.
+## Per-gem overrides via GemVisualResource.facet_edge_rounding_override.
+@export_range(0.0, 1.0) var facet_edge_rounding: float = 0.0
 
 
 func duplicate_spec():

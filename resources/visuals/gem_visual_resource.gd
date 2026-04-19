@@ -36,6 +36,8 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 ## Rotates the cut in degrees before lighting and fit normalization.
 ## This keeps cut families axis-aligned while allowing per-gem orientation.
 @export_range(-180.0, 180.0) var rotation_degrees: float = 0.0
+## Facet edge rounding override (-1 = use cut spec default, 0+ = explicit value).
+@export_range(-1.0, 1.0) var facet_edge_rounding_override: float = -1.0
 
 # ==== Physical Source ====
 
@@ -66,6 +68,10 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_range(-1.0, 1.0) var surface_roughness_override: float = -1.0
 ## Per-gem scattering coefficient override. -1 = use mineral template default.
 @export_range(-1.0, 50.0) var scattering_coefficient_override: float = -1.0
+## Per-gem fluorescence quantum yield override. -1 = use mineral template default.
+@export_range(-1.0, 1.0) var fluorescence_quantum_yield_override: float = -1.0
+## Per-gem surface anisotropy override. -1 = use mineral template default.
+@export_range(-1.0, 1.0) var surface_roughness_anisotropy_override: float = -1.0
 
 # ==== Color ====
 
@@ -155,6 +161,10 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_range(0.1, 8.0) var volume_pattern_warp_scale: float = 1.0
 @export_range(-1.0, 1.0) var volume_absorption_variation: float = 0.0
 @export_range(-1.0, 1.0) var volume_scattering_variation: float = 0.0
+
+@export_subgroup("Inclusions")
+## Discrete inclusion geometry profile. null = no inclusions.
+@export var inclusion_profile: Resource = null
 
 @export_subgroup("Angle Reactive")
 @export_enum("None", "Chatoyancy", "Opalescence", "Iridescence") var reactive_effect_type: int = MATERIAL_REACTIVE_NONE
@@ -247,6 +257,15 @@ func get_cut_spec_id() -> StringName:
 	return &""
 
 
+## Resolve effective edge rounding: per-gem override → cut spec default → 0.
+func get_effective_edge_rounding() -> float:
+	if facet_edge_rounding_override >= 0.0:
+		return facet_edge_rounding_override
+	if cut_spec != null and &"facet_edge_rounding" in cut_spec:
+		return cut_spec.facet_edge_rounding
+	return 0.0
+
+
 ## Approximate sRGB from an 81-sample curve for procedural 2D fallback only.
 static func zone_spectrum_to_display_color(spectrum: PackedFloat32Array) -> Color:
 	if spectrum.size() != 81:
@@ -266,7 +285,7 @@ static func zone_spectrum_to_display_color(spectrum: PackedFloat32Array) -> Colo
 const VISUAL_JSON_SCHEMA_VERSION := 1
 
 ## Geometry + resource refs excluded from the generic property loop (handled explicitly).
-const _VISUAL_JSON_SKIP := [&"cut_spec", &"cut_overrides", &"cut_id", &"color_texture", &"mineral_template", &"bake_environment"]
+const _VISUAL_JSON_SKIP := [&"cut_spec", &"cut_overrides", &"cut_id", &"color_texture", &"mineral_template", &"bake_environment", &"inclusion_profile"]
 
 
 ## Serialize all visual (non-geometry) properties to a JSON-safe dictionary.

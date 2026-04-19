@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="GemVisualResource" format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/lozenge.tres" id="1_xxx8n"]
 [ext_resource type="Resource" path="res://data/minerals/corundum.tres" id="2"]
+[ext_resource type="Resource" path="res://data/environments/gem_booth.tres" id="3"]
 
 [resource]
 script = ExtResource("1")
@@ -17,8 +18,12 @@ absorption_spectrum_override = PackedFloat32Array(4.01620, 3.97700, 3.95591, 3.9
 pleochroism_absorption_spectrum_override = PackedFloat32Array(6.56051, 6.40525, 6.29090, 6.18709, 6.07139, 5.92972, 5.75619, 5.55238, 5.32587, 5.08851, 4.53061, 4.37479, 4.23780, 4.13188, 4.06548, 4.04312, 4.06574, 4.13128, 4.23553, 4.37285, 4.53697, 4.72151, 4.92044, 5.12829, 5.34028, 5.55235, 5.76110, 5.96372, 6.15790, 6.34175, 6.51374, 6.67267, 6.81759, 6.94782, 7.06291, 7.16265, 7.24701, 7.31619, 7.37056, 7.41065, 7.43714, 7.45083, 7.45260, 7.44340, 7.42422, 7.39604, 7.35983, 7.31649, 7.26686, 7.21169, 7.15161, 7.08712, 7.01862, 6.94635, 6.87043, 6.79087, 6.70757, 6.62032, 6.52885, 6.43283, 6.33191, 6.22572, 6.11390, 5.99614, 5.87219, 5.74185, 5.60504, 5.46176, 5.31214, 5.15641, 4.99491, 4.82813, 4.65662, 4.48105, 4.30218, 4.12082, 3.93787, 3.75423, 3.57084, 3.38864, 3.20854)
 surface_roughness_override = -1.0
 scattering_coefficient_override = -1.0
+fluorescence_quantum_yield_override = 0.05
 gradient_color = Color(0.04, 0.08, 0.58, 1)
 gradient_strength = 0.12
+volume_pattern_type = 1
+volume_pattern_mix = 0.10
+volume_pattern_axis = Vector3(0, 1, 0)
 optics_environment_rotation_degrees = 32.0
 stylize_mix = 0.86
 stylize_facet_edge_gain = 0.82
@@ -30,3 +35,4 @@ stylize_microdetail_suppression = 0.34
 stylize_internal_color_shift_gain = 0.28
 stylize_tone_steps = 5
 stylize_edge_ink_strength = 0.18
+bake_environment = ExtResource("3")

@@ -44,7 +44,8 @@ Vector3 sample_henyey_greenstein(Vector3 incident_dir, double g, TraceRNG& rng);
 
 // Test for fluorescence wavelength shift.
 // Returns true if fluorescence occurred (wavelength_nm is modified).
-bool try_fluorescence(const GemTraceProps& props, double& wavelength_nm, TraceRNG& rng);
+bool try_fluorescence(const GemTraceProps& props, double& wavelength_nm, TraceRNG& rng,
+                      double yield_cap = 1e30);
 
 // Throughput multiplier to keep a just-emitted fluorescence photon physically
 // visible when the authored absorption at the emission wavelength is high

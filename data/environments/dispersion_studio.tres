@@ -5,24 +5,24 @@
 [resource]
 script = ExtResource("1")
 environment_id = &"dispersion_studio"
-environment_name = "Dispersion Studio (6500K, sharp point keys)"
-sky_low = Color(0.018, 0.02, 0.028, 1)
-sky_top = Color(0.035, 0.042, 0.056, 1)
-horizon = Color(0.06, 0.06, 0.07, 1)
-ground_dark = Color(0.006, 0.006, 0.008, 1)
-ground_lift = Color(0.01, 0.01, 0.012, 1)
+environment_name = "Dispersion Studio (6500K, sharp point keys, v2 rig)"
+sky_low = Color(0.07, 0.08, 0.11, 1)
+sky_top = Color(0.17, 0.20, 0.25, 1)
+horizon = Color(0.37, 0.32, 0.27, 1)
+ground_dark = Color(0.014, 0.013, 0.013, 1)
+ground_lift = Color(0.056, 0.048, 0.044, 1)
 light_cards = [{
-	"dir": Vector3(0.12, 0.52, 0.85),
+	"dir": Vector3(0.14, 0.78, 0.61),
 	"color": Color(1.0, 1.0, 1.0, 1),
 	"sharp_power": 2800.0,
 	"broad_power": 6.0,
 	"sharp_strength": 4.20,
-	"broad_strength": 0.35,
+	"broad_strength": 1.0,
 	"temperature_kelvin": 6500.0,
 	"edge_color": Color(0.94, 0.97, 1.0, 1),
 	"gradient_power": 0.6
 }, {
-	"dir": Vector3(-0.78, 0.18, 0.60),
+	"dir": Vector3(-0.78, 0.24, 0.58),
 	"color": Color(0.96, 0.99, 1.0, 1),
 	"sharp_power": 1600.0,
 	"broad_power": 5.0,
@@ -42,7 +42,7 @@ light_cards = [{
 	"edge_color": Color(1.0, 0.97, 0.92, 1),
 	"gradient_power": 0.75
 }, {
-	"dir": Vector3(-0.04, -0.48, 0.88),
+	"dir": Vector3(-0.04, -0.54, 0.84),
 	"color": Color(1.0, 0.95, 0.86, 1),
 	"sharp_power": 40.0,
 	"broad_power": 4.0,
@@ -52,12 +52,13 @@ light_cards = [{
 	"edge_color": Color(1.0, 0.92, 0.82, 1),
 	"gradient_power": 1.0
 }]
-blocker_dir = Vector3(0.06, -0.22, 0.98)
-blocker_power = 4.0
-blocker_strength = 0.04
-ground_albedo = 0.05
+blocker_dir = Vector3(-0.10, -0.18, 0.98)
+blocker_power = 6.0
+blocker_strength = 0.06
+ground_albedo = 0.10
 ground_tint = Color(0.7, 0.72, 0.78, 1)
 ground_distance = 1.2
 exposure = 1.0
 light_energy = 3.0
-environment_energy = 0.45
+environment_energy = 0.85
+card_power_cap = 400.0

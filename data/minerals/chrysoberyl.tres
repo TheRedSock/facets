@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+[ext_resource type="Resource" path="res://data/environments/warm_incandescent_studio.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
@@ -14,4 +15,7 @@ absorption_spectrum = PackedFloat32Array(3.62352, 3.94887, 4.23686, 4.47571, 4.6
 fluorescence_quantum_yield = 0.0
 birefringence_delta_n = 0.009
 default_surface_roughness = 0.008
+surface_roughness_anisotropy = 0.10
+anisotropy_axis = Vector3(0, 1, 0)
 display_color = Color(0.55, 0.72, 0.42, 1)
+bake_environment = ExtResource("2")

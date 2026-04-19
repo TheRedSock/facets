@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="GemVisualResource" format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/pear_brilliant.tres" id="1_5ao3n"]

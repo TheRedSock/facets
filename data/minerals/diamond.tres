@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemMineralTemplate" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_mineral_template.gd" id="1"]
+[ext_resource type="Resource" path="res://data/environments/dispersion_studio.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
@@ -19,3 +20,4 @@ fluorescence_emission_width_nm = 25.0
 birefringence_delta_n = 0.0
 default_surface_roughness = 0.005
 display_color = Color(0.97, 0.97, 0.98, 1)
+bake_environment = ExtResource("2")

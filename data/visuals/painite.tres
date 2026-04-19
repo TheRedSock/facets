@@ -1,23 +1,26 @@
-[gd_resource type="Resource" script_class="GemVisualResource" format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/navette.tres" id="1_qakh2"]
 [ext_resource type="Resource" path="res://data/minerals/painite.tres" id="2"]
+[ext_resource type="Resource" path="res://data/environments/deep_color.tres" id="3"]
 
 [resource]
 script = ExtResource("1")
 visual_id = &"painite"
 cut_spec = ExtResource("1_qakh2")
 cut_id = &"navette"
-display_color = Color(0.42, 0.10, 0.06, 1)
+display_color = Color(0.38, 0.12, 0.05, 1)
 mineral_template = ExtResource("2")
 optic_axis = Vector3(0.22, 0.88, 0.42)
 absorption_strength_scale = 1.0
-absorption_spectrum_override = PackedFloat32Array(11.00028, 9.89884, 9.26099, 8.96648, 8.92306, 9.05862, 9.31578, 9.64835, 10.01890, 10.39742, 10.50336, 10.90223, 11.23746, 11.50706, 11.71213, 11.85654, 11.94625, 11.98863, 11.99157, 11.96278, 11.90904, 11.83579, 11.74683, 11.64421, 11.52843, 11.39868, 11.25321, 11.08978, 10.90606, 10.70000, 10.47013, 10.21577, 9.93712, 9.63531, 9.31232, 8.97089, 8.61437, 8.24655, 7.87149, 7.49333, 7.11618, 5.18765, 4.90787, 4.63713, 4.37757, 4.13095, 3.89868, 3.68176, 3.48084, 3.40874, 2.51472, 2.48493, 2.46681, 2.45985, 2.46344, 2.47686, 2.49938, 2.53019, 2.56851, 2.61356, 2.66459, 2.72088, 2.78176, 2.84662, 2.91487, 2.98603, 3.05964, 3.13530, 3.21267, 3.29145, 3.37138, 4.60301, 4.71185, 4.82150, 4.93179, 5.04260, 5.15380, 5.26532, 5.37708, 5.48902, 5.60111)
+absorption_spectrum_override = PackedFloat32Array(8.46175, 7.61449, 7.12384, 6.89729, 6.86390, 6.96817, 7.16599, 7.42181, 7.70685, 7.99802, 8.07951, 8.38633, 8.64420, 8.85158, 9.00933, 9.12042, 9.18943, 9.22202, 9.22429, 9.20214, 9.16080, 9.10446, 9.03602, 8.95709, 8.86803, 8.76822, 8.65632, 8.53060, 8.38928, 8.23077, 8.05395, 7.85828, 7.64394, 7.41178, 7.16332, 6.90069, 6.62644, 6.34350, 6.05499, 5.76410, 5.47399, 5.18765, 4.90787, 4.63713, 4.37757, 4.13095, 3.89868, 3.68176, 3.48084, 3.40874, 3.35296, 3.31324, 3.28908, 3.27980, 3.28459, 3.30249, 3.33250, 3.37358, 3.42468, 3.48475, 3.55279, 3.62785, 3.70902, 3.79549, 3.88650, 3.98138, 4.07952, 4.18040, 4.28356, 4.38860, 4.49518, 4.60301, 4.71185, 4.82150, 4.93179, 5.04260, 5.15380, 5.26532, 5.37708, 5.48902, 5.60111)
 surface_roughness_override = -1.0
 scattering_coefficient_override = -1.0
 gradient_color = Color(0.52, 0.14, 0.08, 1)
 gradient_strength = 0.18
+volume_pattern_type = 3
+volume_pattern_mix = 0.12
 optics_environment_rotation_degrees = 4.0
 stylize_mix = 0.72
 stylize_facet_edge_gain = 0.68
@@ -30,3 +33,4 @@ stylize_internal_color_shift_gain = 0.12
 stylize_tone_steps = 4
 stylize_edge_ink_strength = 0.2
 stylize_highlight_snap = 0.34
+bake_environment = ExtResource("3")

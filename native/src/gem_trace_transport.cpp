@@ -43,6 +43,12 @@ static constexpr double THROUGHPUT_CUTOFF = 0.001;
 // tourmaline (0.018) produce visible doubling.
 static constexpr double BIREFRINGENCE_SPLIT_THRESHOLD = 0.005;
 
+// StringName for inclusion zone comparison (initialized on first use).
+static const StringName& inclusion_zone_name() {
+    static StringName name("inclusion");
+    return name;
+}
+
 // ---------------------------------------------------------------------------
 // Opaque surface shading
 // ---------------------------------------------------------------------------
@@ -61,7 +67,22 @@ double compute_opaque_surface(
     double roughness = props.effective_roughness();
 
     // GGX microfacet for specular reflection
-    Vector3 micro_normal = fresnel::sample_ggx(normal, roughness, rng);
+    Vector3 micro_normal;
+    double aniso = props.effective_anisotropy();
+    if (aniso > 0.001) {
+        double alpha = roughness * roughness;
+        double alpha_x = alpha * (1.0 + aniso);
+        double alpha_y = alpha * (1.0 - aniso);
+        Vector3 t = (props.anisotropy_axis - normal * normal.dot(props.anisotropy_axis));
+        if (t.length_squared() < 0.001) {
+            Vector3 up = (std::abs((double)normal.y) < 0.99) ? Vector3(0, 1, 0) : Vector3(1, 0, 0);
+            t = normal.cross(up);
+        }
+        t = t.normalized();
+        micro_normal = fresnel::sample_ggx_aniso(normal, t, alpha_x, alpha_y, rng);
+    } else {
+        micro_normal = fresnel::sample_ggx(normal, roughness, rng);
+    }
     double R = fresnel::dielectric(incident_dir, micro_normal, AIR_IOR,
         spectral::sellmeier_ior(props, lambda_nm));
 
@@ -125,7 +146,8 @@ static double trace_path_core(
 
         if (inside_gem) {
             // ----- Volumetric transport (inside gem) -----
-            double sigma_s = props.effective_scattering();
+            double sigma_s = ctx.variance_budget.gate_scattering(
+                props.effective_scattering());
 
             // Volume pattern modulation
             double scatter_mult = 1.0;
@@ -150,7 +172,7 @@ static double trace_path_core(
                 throughput *= volume::beer_lambert_zoned(
                     props, wl, scatter_dist, direction,
                     obj_pos, absorb_mult);
-                if (volume::try_fluorescence(props, wl, rng)) {
+                if (volume::try_fluorescence(props, wl, rng, ctx.variance_budget.fluorescence_yield_cap)) {
                     throughput *= volume::fluorescence_emission_boost(props, wl, direction);
                 }
                 direction = volume::sample_henyey_greenstein(
@@ -168,7 +190,7 @@ static double trace_path_core(
                 throughput *= volume::beer_lambert_zoned(
                     props, wl, surface_dist, direction,
                     obj_pos, absorb_mult);
-                if (volume::try_fluorescence(props, wl, rng)) {
+                if (volume::try_fluorescence(props, wl, rng, ctx.variance_budget.fluorescence_yield_cap)) {
                     throughput *= volume::fluorescence_emission_boost(props, wl, direction);
                 }
             }
@@ -177,10 +199,65 @@ static double trace_path_core(
             origin = hit.position;
             prev_triangle = hit.triangle_idx;
 
+            // Check for inclusion boundary (gem ↔ inclusion interface)
+            if (props.has_inclusions && hit.zone == inclusion_zone_name()) {
+                // Inclusion surfaces act as internal Fresnel boundaries.
+                // Compute Fresnel at gem/inclusion interface.
+                double eta_gem = spectral::sellmeier_ior(props, wl);
+                double eta_incl = props.inclusion_ior;
+                double eta_ratio = hit.front_face
+                    ? (eta_gem / eta_incl)    // entering inclusion
+                    : (eta_incl / eta_gem);   // exiting inclusion
+                Vector3 incl_normal = hit.front_face ? hit.normal : -hit.normal;
+                double R_incl = fresnel::dielectric(direction, incl_normal, 1.0, 1.0 / eta_ratio);
+
+                // Apply inclusion absorption over effective path proportional to size
+                double eff_incl_scatter = ctx.variance_budget.gate_inclusion_scatter(
+                    props.inclusion_scatter);
+                double incl_path = props.inclusion_typical_size;
+                throughput *= std::exp(-props.inclusion_absorption * incl_path);
+
+                // Scatter: with probability proportional to scatter_strength,
+                // randomize the ray direction; otherwise refract through.
+                if (rng.next() < eff_incl_scatter * 0.3) {
+                    // Scattered reflection off inclusion surface
+                    direction = fresnel::reflect(direction, incl_normal);
+                    throughput *= R_incl;
+                } else {
+                    // Refract through the inclusion boundary
+                    Vector3 refr = fresnel::refract(direction, incl_normal, eta_ratio);
+                    if (refr.length_squared() < 1e-12) {
+                        // TIR at inclusion — reflect
+                        direction = fresnel::reflect(direction, incl_normal);
+                    } else {
+                        direction = refr;
+                        throughput *= (1.0 - R_incl);
+                    }
+                }
+                origin = hit.position + direction * (float)TRACE_EPSILON;
+                // Stay inside gem — skip the normal exit logic
+                continue;
+            }
+
             double eta_i = spectral::sellmeier_ior(props, wl);
             double roughness = props.effective_roughness();
             Vector3 surface_normal = hit.front_face ? hit.normal : -hit.normal;
-            Vector3 micro_normal = fresnel::sample_ggx(surface_normal, roughness, rng);
+            Vector3 micro_normal;
+            double aniso = ctx.props.effective_anisotropy();
+            if (aniso > 0.001) {
+                double alpha = roughness * roughness;
+                double alpha_x = alpha * (1.0 + aniso);
+                double alpha_y = alpha * (1.0 - aniso);
+                Vector3 t = (ctx.props.anisotropy_axis - surface_normal * surface_normal.dot(ctx.props.anisotropy_axis));
+                if (t.length_squared() < 0.001) {
+                    Vector3 up = (std::abs((double)surface_normal.y) < 0.99) ? Vector3(0, 1, 0) : Vector3(1, 0, 0);
+                    t = surface_normal.cross(up);
+                }
+                t = t.normalized();
+                micro_normal = fresnel::sample_ggx_aniso(surface_normal, t, alpha_x, alpha_y, rng);
+            } else {
+                micro_normal = fresnel::sample_ggx(surface_normal, roughness, rng);
+            }
             double R = fresnel::dielectric(direction, micro_normal, eta_i, AIR_IOR);
 
             // Attempt refraction (exit direction)
@@ -189,12 +266,19 @@ static double trace_path_core(
 
             // NEE: deterministically evaluate exit contribution
             if (!is_tir) {
-                double T = 1.0 - R;
-                Vector3 exit_origin = hit.position + exit_dir * (float)TRACE_EPSILON;
-                HitResult exit_check = scene.intersect(exit_origin, exit_dir, prev_triangle);
-                if (!exit_check.did_hit) {
-                    result += throughput * T
-                        * environment::sample(ctx.environment, exit_dir, wl);
+                // Validate exit direction against geometric normal: if the smoothed
+                // shading normal produced an exit ray that goes back into the gem per
+                // the actual flat surface, suppress this NEE contribution to prevent
+                // light leaking at facet edges from edge rounding.
+                // geometric_normal is always outward-facing (oriented by add_facet).
+                if (exit_dir.dot(hit.geometric_normal) > 0.0) {
+                    double T = 1.0 - R;
+                    Vector3 exit_origin = hit.position + exit_dir * (float)TRACE_EPSILON;
+                    HitResult exit_check = scene.intersect(exit_origin, exit_dir, prev_triangle);
+                    if (!exit_check.did_hit) {
+                        result += throughput * T
+                            * environment::sample(ctx.environment, exit_dir, wl);
+                    }
                 }
             }
 
@@ -222,7 +306,22 @@ static double trace_path_core(
 
             double eta_t = spectral::sellmeier_ior(props, lambda_nm);
             double roughness = props.effective_roughness();
-            Vector3 micro_normal = fresnel::sample_ggx(hit.normal, roughness, rng);
+            Vector3 micro_normal;
+            double aniso = ctx.props.effective_anisotropy();
+            if (aniso > 0.001) {
+                double alpha = roughness * roughness;
+                double alpha_x = alpha * (1.0 + aniso);
+                double alpha_y = alpha * (1.0 - aniso);
+                Vector3 t = (ctx.props.anisotropy_axis - hit.normal * hit.normal.dot(ctx.props.anisotropy_axis));
+                if (t.length_squared() < 0.001) {
+                    Vector3 up = (std::abs((double)hit.normal.y) < 0.99) ? Vector3(0, 1, 0) : Vector3(1, 0, 0);
+                    t = hit.normal.cross(up);
+                }
+                t = t.normalized();
+                micro_normal = fresnel::sample_ggx_aniso(hit.normal, t, alpha_x, alpha_y, rng);
+            } else {
+                micro_normal = fresnel::sample_ggx(hit.normal, roughness, rng);
+            }
             double R = fresnel::dielectric(direction, micro_normal, AIR_IOR, eta_t);
 
             // NEE: deterministically evaluate reflected environment
@@ -291,7 +390,18 @@ double trace_path(
     }
 
     double roughness = props.effective_roughness();
-    Vector3 micro_normal = fresnel::sample_ggx(entry.normal, roughness, rng);
+    Vector3 micro_normal;
+    double aniso = props.effective_anisotropy();
+    if (aniso > 0.001) {
+        double alpha = roughness * roughness;
+        double alpha_x = alpha * (1.0 + aniso);
+        double alpha_y = alpha * (1.0 - aniso);
+        Vector3 t = (props.anisotropy_axis - entry.normal * entry.normal.dot(props.anisotropy_axis)).normalized();
+        if (t.length_squared() < 0.001) t = Vector3(1, 0, 0);
+        micro_normal = fresnel::sample_ggx_aniso(entry.normal, t, alpha_x, alpha_y, rng);
+    } else {
+        micro_normal = fresnel::sample_ggx(entry.normal, roughness, rng);
+    }
 
     double eta_o = spectral::sellmeier_ior(props, lambda_nm);
     double eta_e = spectral::birefringent_ior(props, lambda_nm, direction, true);
@@ -374,7 +484,8 @@ static SpectralResult trace_path_spectral_core(
 
         if (inside_gem) {
             // ----- Volumetric transport (inside gem) -----
-            double sigma_s = props.effective_scattering();
+            double sigma_s = ctx.variance_budget.gate_scattering(
+                props.effective_scattering());
             double scatter_mult = 1.0;
             double absorb_mult = 1.0;
             if (ctx.has_volume_patterns && ctx.radius > 0.0001) {
@@ -398,7 +509,7 @@ static SpectralResult trace_path_spectral_core(
                     wl_tp[w] *= volume::beer_lambert_zoned(
                         props, wave[w], scatter_dist, direction,
                         obj_pos, absorb_mult);
-                    if (volume::try_fluorescence(props, wave[w], rng)) {
+                    if (volume::try_fluorescence(props, wave[w], rng, ctx.variance_budget.fluorescence_yield_cap)) {
                         wl_tp[w] *= volume::fluorescence_emission_boost(
                             props, wave[w], direction);
                     }
@@ -419,7 +530,7 @@ static SpectralResult trace_path_spectral_core(
                     wl_tp[w] *= volume::beer_lambert_zoned(
                         props, wave[w], surface_dist, direction,
                         obj_pos, absorb_mult);
-                    if (volume::try_fluorescence(props, wave[w], rng)) {
+                    if (volume::try_fluorescence(props, wave[w], rng, ctx.variance_budget.fluorescence_yield_cap)) {
                         wl_tp[w] *= volume::fluorescence_emission_boost(
                             props, wave[w], direction);
                     }
@@ -430,9 +541,81 @@ static SpectralResult trace_path_spectral_core(
             origin = hit.position;
             prev_triangle = hit.triangle_idx;
 
+            // Check for inclusion boundary (gem ↔ inclusion interface)
+            if (props.has_inclusions && hit.zone == inclusion_zone_name()) {
+                Vector3 incl_normal = hit.front_face ? hit.normal : -hit.normal;
+                double eff_incl_scatter = ctx.variance_budget.gate_inclusion_scatter(
+                    props.inclusion_scatter);
+                double incl_path = props.inclusion_typical_size;
+                for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+                    wl_tp[w] *= std::exp(-props.inclusion_absorption * incl_path);
+                }
+                if (rng.next() < eff_incl_scatter * 0.3) {
+                    // Scattered reflection off inclusion
+                    double eta_hero = spectral::sellmeier_ior(props, hero);
+                    double eta_ratio_h = hit.front_face
+                        ? (eta_hero / props.inclusion_ior)
+                        : (props.inclusion_ior / eta_hero);
+                    double R_incl = fresnel::dielectric(direction, incl_normal, 1.0, 1.0 / eta_ratio_h);
+                    // Save incident direction BEFORE reflecting — per-wavelength
+                    // Fresnel must use the original incident angle, not the
+                    // already-reflected direction.
+                    Vector3 incident_save = direction;
+                    direction = fresnel::reflect(direction, incl_normal);
+                    for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+                        double eta_w = spectral::sellmeier_ior(props, wave[w]);
+                        double eta_ratio_w = hit.front_face
+                            ? (eta_w / props.inclusion_ior)
+                            : (props.inclusion_ior / eta_w);
+                        double R_w_incl = fresnel::dielectric(incident_save, incl_normal, 1.0, 1.0 / eta_ratio_w);
+                        wl_tp[w] *= R_w_incl;
+                    }
+                } else {
+                    // Refract through inclusion boundary
+                    double eta_hero = spectral::sellmeier_ior(props, hero);
+                    double eta_ratio_h = hit.front_face
+                        ? (eta_hero / props.inclusion_ior)
+                        : (props.inclusion_ior / eta_hero);
+                    Vector3 refr = fresnel::refract(direction, incl_normal, eta_ratio_h);
+                    if (refr.length_squared() < 1e-12) {
+                        direction = fresnel::reflect(direction, incl_normal);
+                    } else {
+                        // Save incident direction BEFORE refracting — per-wavelength
+                        // Fresnel must use the original incident angle.
+                        Vector3 incident_save = direction;
+                        direction = refr;
+                        for (int w = 0; w < HERO_WAVELENGTHS; w++) {
+                            double eta_w = spectral::sellmeier_ior(props, wave[w]);
+                            double eta_ratio_w = hit.front_face
+                                ? (eta_w / props.inclusion_ior)
+                                : (props.inclusion_ior / eta_w);
+                            double R_w_incl = fresnel::dielectric(incident_save, incl_normal, 1.0, 1.0 / eta_ratio_w);
+                            wl_tp[w] *= (1.0 - R_w_incl);
+                        }
+                    }
+                }
+                origin = hit.position + direction * (float)TRACE_EPSILON;
+                continue;
+            }
+
             double roughness = props.effective_roughness();
             Vector3 surface_normal = hit.front_face ? hit.normal : -hit.normal;
-            Vector3 micro_normal = fresnel::sample_ggx(surface_normal, roughness, rng);
+            Vector3 micro_normal;
+            double aniso = ctx.props.effective_anisotropy();
+            if (aniso > 0.001) {
+                double alpha = roughness * roughness;
+                double alpha_x = alpha * (1.0 + aniso);
+                double alpha_y = alpha * (1.0 - aniso);
+                Vector3 t = (ctx.props.anisotropy_axis - surface_normal * surface_normal.dot(ctx.props.anisotropy_axis));
+                if (t.length_squared() < 0.001) {
+                    Vector3 up = (std::abs((double)surface_normal.y) < 0.99) ? Vector3(0, 1, 0) : Vector3(1, 0, 0);
+                    t = surface_normal.cross(up);
+                }
+                t = t.normalized();
+                micro_normal = fresnel::sample_ggx_aniso(surface_normal, t, alpha_x, alpha_y, rng);
+            } else {
+                micro_normal = fresnel::sample_ggx(surface_normal, roughness, rng);
+            }
 
             // Compute per-wavelength Fresnel reflectance (inside gem → air).
             double R_w[HERO_WAVELENGTHS];
@@ -442,12 +625,18 @@ static SpectralResult trace_path_spectral_core(
             }
 
             // NEE: per-wavelength exit direction (dispersion) and TIR.
+            // Validate against geometric normal to prevent light leaking from
+            // edge rounding (same as single-wavelength path).
+            // geometric_normal is always outward-facing (oriented by add_facet).
             for (int w = 0; w < HERO_WAVELENGTHS; w++) {
                 double eta_w = spectral::sellmeier_ior(props, wave[w]);
                 Vector3 exit_dir_w = fresnel::refract(
                     direction, micro_normal, eta_w / AIR_IOR);
                 if (exit_dir_w.length_squared() < 1e-12) {
                     continue; // TIR for this wavelength — no exit radiance
+                }
+                if (exit_dir_w.dot(hit.geometric_normal) <= 0.0) {
+                    continue; // exit direction goes back into gem per geometric surface
                 }
                 Vector3 exit_origin = hit.position + exit_dir_w * (float)TRACE_EPSILON;
                 HitResult exit_check = scene.intersect(
@@ -493,7 +682,18 @@ static SpectralResult trace_path_spectral_core(
             origin = hit.position;
 
             double roughness = props.effective_roughness();
-            Vector3 micro_normal = fresnel::sample_ggx(hit.normal, roughness, rng);
+            Vector3 micro_normal;
+            double aniso = ctx.props.effective_anisotropy();
+            if (aniso > 0.001) {
+                double alpha = roughness * roughness;
+                double alpha_x = alpha * (1.0 + aniso);
+                double alpha_y = alpha * (1.0 - aniso);
+                Vector3 t = (ctx.props.anisotropy_axis - hit.normal * hit.normal.dot(ctx.props.anisotropy_axis)).normalized();
+                if (t.length_squared() < 0.001) t = Vector3(1, 0, 0);
+                micro_normal = fresnel::sample_ggx_aniso(hit.normal, t, alpha_x, alpha_y, rng);
+            } else {
+                micro_normal = fresnel::sample_ggx(hit.normal, roughness, rng);
+            }
 
             // Hero IOR for geometry decisions (refraction direction)
             double eta_hero_t = spectral::sellmeier_ior(props, hero);
@@ -600,7 +800,18 @@ SpectralResult trace_path_spectral(
     }
 
     double roughness = props.effective_roughness();
-    Vector3 micro_normal = fresnel::sample_ggx(entry.normal, roughness, rng);
+    Vector3 micro_normal;
+    double aniso = props.effective_anisotropy();
+    if (aniso > 0.001) {
+        double alpha = roughness * roughness;
+        double alpha_x = alpha * (1.0 + aniso);
+        double alpha_y = alpha * (1.0 - aniso);
+        Vector3 t = (props.anisotropy_axis - entry.normal * entry.normal.dot(props.anisotropy_axis)).normalized();
+        if (t.length_squared() < 0.001) t = Vector3(1, 0, 0);
+        micro_normal = fresnel::sample_ggx_aniso(entry.normal, t, alpha_x, alpha_y, rng);
+    } else {
+        micro_normal = fresnel::sample_ggx(entry.normal, roughness, rng);
+    }
 
     double eta_o_hero = spectral::sellmeier_ior(props, hero);
     double eta_e_hero = spectral::birefringent_ior(props, hero, direction, true);

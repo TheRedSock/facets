@@ -5,14 +5,14 @@
 [resource]
 script = ExtResource("1")
 environment_id = &"neutral_sky"
-environment_name = "Neutral Sky (5500K daylight)"
+environment_name = "Neutral Sky (5500K daylight, v2 rig)"
 sky_low = Color(0.16, 0.19, 0.26, 1)
 sky_top = Color(0.36, 0.42, 0.54, 1)
 horizon = Color(0.68, 0.54, 0.36, 1)
 ground_dark = Color(0.02, 0.016, 0.013, 1)
 ground_lift = Color(0.1, 0.078, 0.052, 1)
 light_cards = [{
-	"dir": Vector3(0.0, 0.24, 0.97),
+	"dir": Vector3(0.04, 0.76, 0.65),
 	"color": Color(1.0, 0.96, 0.88, 1),
 	"sharp_power": 900.0,
 	"broad_power": 90.0,
@@ -42,9 +42,9 @@ light_cards = [{
 	"edge_color": Color(0.93, 0.96, 1.0, 1),
 	"gradient_power": 0.8
 }]
-blocker_dir = Vector3(-0.18, -0.30, 0.94)
-blocker_power = 10.0
-blocker_strength = 0.19
+blocker_dir = Vector3(-0.10, -0.18, 0.98)
+blocker_power = 8.0
+blocker_strength = 0.16
 ground_albedo = 0.15
 ground_tint = Color(0.92, 0.87, 0.80, 1)
 ground_distance = 0.8

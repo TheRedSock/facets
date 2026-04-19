@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="GemInclusionProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_inclusion_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+inclusion_type = &"fingerprints"
+density = 0.45
+size_range = Vector2(0.04, 0.10)
+orientation_axis = Vector3(0, 1, 0)
+orientation_spread = 0.8
+material_ior = 1.33
+material_absorption = 1.5
+scatter_strength = 0.5
+count_range = Vector2i(5, 12)
+seed_offset = 0

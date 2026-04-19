@@ -14,4 +14,6 @@ absorption_spectrum = PackedFloat32Array(2.31557, 2.46222, 2.52686, 2.54747, 2.5
 fluorescence_quantum_yield = 0.0
 birefringence_delta_n = 0.036
 default_surface_roughness = 0.01
+surface_roughness_anisotropy = 0.12
+anisotropy_axis = Vector3(0, 1, 0)
 display_color = Color(0.55, 0.78, 0.22, 1)

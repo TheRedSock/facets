@@ -18,7 +18,7 @@ func facet_count() -> int:
 	return facet_vertices.size()
 
 
-func add_facet(vertices: PackedVector3Array, zone: String = "") -> void:
+func add_facet(vertices: PackedVector3Array, zone: String = "", orient_center = null) -> void:
 	if vertices.size() < 3:
 		return
 	var oriented := PackedVector3Array(vertices)
@@ -26,7 +26,11 @@ func add_facet(vertices: PackedVector3Array, zone: String = "") -> void:
 	if normal.is_zero_approx():
 		return
 	var centroid := _compute_centroid(oriented)
-	if normal.dot(centroid) < 0.0:
+	# Orient normal outward from the reference center. For gem facets this is the
+	# origin (default). For inclusion facets, pass the inclusion center so normals
+	# point outward from the inclusion, not from the gem center.
+	var orient_dir: Vector3 = centroid - orient_center if orient_center != null else centroid
+	if normal.dot(orient_dir) < 0.0:
 		oriented = _reverse_vertices(oriented)
 		normal = -normal
 	facet_vertices.append(oriented)
@@ -116,6 +120,142 @@ func build_trace_data() -> Dictionary:
 	}
 	_trace_data_cache["default"] = trace_data
 	return trace_data
+
+
+## Maximum dihedral angle (radians) between facet normals for edge rounding to apply.
+const EDGE_ROUNDING_MAX_ANGLE := 0.50  # ~28 degrees — covers crown/girdle and pavilion/girdle junctions
+
+## Zone-pair allow-list: smoothing only fires across these zone boundaries.
+## Keeps intentional intra-zone facet junctions (pavilion-pavilion, bezel-bezel) sharp
+## while softening polished gem edges at zone transitions.
+const EDGE_ROUNDING_ZONE_PAIRS := {
+	&"bezel,girdle": true, &"girdle,bezel": true,
+	&"girdle,girdle_band": true, &"girdle_band,girdle": true,
+	&"girdle_band,pavilion": true, &"pavilion,girdle_band": true,
+	&"table,star": true, &"star,table": true,
+	&"star,bezel": true, &"bezel,star": true,
+	&"culet,pavilion": true, &"pavilion,culet": true,
+}
+
+
+func build_trace_data_with_rounding(edge_rounding: float) -> Dictionary:
+	if edge_rounding <= 0.0:
+		return build_trace_data()
+
+	var cache_key := "rounding_" + str(edge_rounding)
+	if _trace_data_cache.has(cache_key):
+		return _trace_data_cache[cache_key]
+
+	var base := build_trace_data()
+	var tri_a: Array = base["triangle_vertices_a"]
+	var tri_b: Array = base["triangle_vertices_b"]
+	var tri_c: Array = base["triangle_vertices_c"]
+	var tri_normals: Array = base["triangle_normals"]
+	var tri_facet_idx: PackedInt32Array = base["triangle_facet_indices"]
+	var tri_count := tri_a.size()
+
+	if tri_count == 0:
+		_trace_data_cache[cache_key] = base
+		return base
+
+	# --- Build vertex-to-facet lookup ---
+	# Key: snapped vertex position string -> Array of facet indices that share that vertex
+	# Inclusion-zone facets are excluded — their edges should remain sharp
+	# (they represent crystalline internal structures, not polished surfaces).
+	var vert_to_facets: Dictionary = {}
+	for facet_index in facet_vertices.size():
+		if facet_index < facet_zones.size() and facet_zones[facet_index] == "inclusion":
+			continue
+		var verts := facet_vertices[facet_index]
+		for v in verts:
+			var key := _snap_vertex_key(v)
+			if not vert_to_facets.has(key):
+				vert_to_facets[key] = []
+			var facet_list: Array = vert_to_facets[key]
+			# Avoid duplicates (a facet can share a vertex position more than once in degenerate cases)
+			if facet_list.find(facet_index) == -1:
+				facet_list.append(facet_index)
+
+	# --- Precompute smoothed normal per (facet, vertex_key) pair ---
+	# For each facet's vertex, blend its face normal with neighbor facets sharing that vertex.
+	var smoothed_cache: Dictionary = {}  # "facet_idx,vertex_key" -> Vector3
+
+	for facet_index in facet_vertices.size():
+		if facet_index < facet_zones.size() and facet_zones[facet_index] == "inclusion":
+			continue
+		var face_normal: Vector3 = facet_normals[facet_index]
+		var source_zone: String = facet_zones[facet_index] if facet_index < facet_zones.size() else ""
+		var verts := facet_vertices[facet_index]
+		for v in verts:
+			var vkey := _snap_vertex_key(v)
+			var cache_entry_key := str(facet_index) + "," + vkey
+			if smoothed_cache.has(cache_entry_key):
+				continue
+
+			# Start with the face's own normal (weight 1.0)
+			var blended := face_normal
+			var sharing_facets: Array = vert_to_facets.get(vkey, [])
+			for neighbor_idx in sharing_facets:
+				if neighbor_idx == facet_index:
+					continue
+				var neighbor_zone: String = facet_zones[neighbor_idx] if neighbor_idx < facet_zones.size() else ""
+				# Only smooth across allowed zone-pair boundaries.
+				# If either zone is empty (legacy geometry), skip — no rounding.
+				if source_zone.is_empty() or neighbor_zone.is_empty():
+					continue
+				if source_zone == neighbor_zone:
+					continue  # same-zone edges stay sharp
+				var zone_pair_key := StringName(source_zone + "," + neighbor_zone)
+				if not EDGE_ROUNDING_ZONE_PAIRS.has(zone_pair_key):
+					continue
+				var neighbor_normal: Vector3 = facet_normals[neighbor_idx]
+				var cos_angle := face_normal.dot(neighbor_normal)
+				# Clamp for numerical safety
+				cos_angle = clampf(cos_angle, -1.0, 1.0)
+				var dihedral := acos(cos_angle)
+				if dihedral < EDGE_ROUNDING_MAX_ANGLE:
+					var weight := edge_rounding * (1.0 - dihedral / EDGE_ROUNDING_MAX_ANGLE)
+					blended += neighbor_normal * weight
+
+			smoothed_cache[cache_entry_key] = blended.normalized()
+
+	# --- Pack per-vertex normals for each triangle ---
+	var vertex_normals_a: Array[Vector3] = []
+	var vertex_normals_b: Array[Vector3] = []
+	var vertex_normals_c: Array[Vector3] = []
+	vertex_normals_a.resize(tri_count)
+	vertex_normals_b.resize(tri_count)
+	vertex_normals_c.resize(tri_count)
+
+	for tri_idx in tri_count:
+		var facet_index: int = tri_facet_idx[tri_idx]
+		var a: Vector3 = tri_a[tri_idx]
+		var b: Vector3 = tri_b[tri_idx]
+		var c: Vector3 = tri_c[tri_idx]
+
+		var key_a := str(facet_index) + "," + _snap_vertex_key(a)
+		var key_b := str(facet_index) + "," + _snap_vertex_key(b)
+		var key_c := str(facet_index) + "," + _snap_vertex_key(c)
+
+		var fallback: Vector3 = tri_normals[tri_idx]
+		vertex_normals_a[tri_idx] = smoothed_cache.get(key_a, fallback)
+		vertex_normals_b[tri_idx] = smoothed_cache.get(key_b, fallback)
+		vertex_normals_c[tri_idx] = smoothed_cache.get(key_c, fallback)
+
+	# --- Build result dict (shallow copy of base + vertex normal arrays) ---
+	var result := {}
+	for key in base:
+		result[key] = base[key]
+	result["triangle_vertex_normals_a"] = vertex_normals_a
+	result["triangle_vertex_normals_b"] = vertex_normals_b
+	result["triangle_vertex_normals_c"] = vertex_normals_c
+
+	_trace_data_cache[cache_key] = result
+	return result
+
+
+static func _snap_vertex_key(v: Vector3) -> String:
+	return "%s,%s,%s" % [snappedf(v.x, 0.0001), snappedf(v.y, 0.0001), snappedf(v.z, 0.0001)]
 
 
 func trace_triangle_count() -> int:

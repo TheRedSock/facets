@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """
-Generate animated GIF(s) from showroom axis rotation bakes.
+Generate animated GIF(s) from rotation bakes.
 
 Reads the gameplay_manifest.json from a bake output directory, filters for
-showroom axis rotation entries (pitch and/or yaw), validates size and step
-consistency per gem, and assembles frames into looping animated GIFs.
+rotation entries (pitch and/or yaw), validates size and step consistency per
+gem, and assembles frames into looping animated GIFs.
+
+Supports two manifest formats:
+- Showroom bakes (variant_type="showroom", showroom_frame_type=axis)
+- CLI rotation bakes (variant_type="rotation", rotation_axis=axis),
+  e.g. from run_offline_gem_bake.gd with --rotation_axes=yaw
 
 Only entries recorded in the manifest are used.  If a bake directory contains
 images from multiple bake runs at different resolutions or step counts, the
@@ -168,26 +173,60 @@ def resolve_texture_path(entry_texture_path: str, input_dir: Path, output_root: 
     return None
 
 
+def detect_available_axes(manifest: dict) -> list[str]:
+    """Scan manifest entries to find which rotation axes are present.
+
+    Returns a sorted list of axis names (e.g. ["pitch"], ["yaw"], or
+    ["pitch", "yaw"]).
+    """
+    axes: set[str] = set()
+    for entry in manifest.get("entries", []):
+        variant_type = entry.get("variant_type")
+        if variant_type == "showroom":
+            ft = entry.get("showroom_frame_type")
+            if ft in VALID_AXES:
+                axes.add(ft)
+        elif variant_type == "rotation":
+            ra = entry.get("rotation_axis")
+            if ra in VALID_AXES:
+                axes.add(ra)
+    return sorted(axes)
+
+
 def collect_axis_entries(
     manifest: dict,
     axis: str,
     gem_filter: set[str] | None,
     include_all: bool,
 ) -> dict[str, list[dict]]:
-    """Collect showroom axis entries from manifest, grouped by tile_id.
+    """Collect rotation entries from manifest, grouped by tile_id.
+
+    Supports two manifest formats:
+    - Showroom bakes: variant_type="showroom", showroom_frame_type=axis
+    - CLI rotation bakes: variant_type="rotation", rotation_axis=axis
 
     Returns {tile_id: [entries sorted by frame index]}.
-    Only entries with matching showroom_frame_type and consistent size/step
-    count are included.
+    Only entries with matching axis and consistent size/step count are included.
     """
     entries = manifest.get("entries", [])
     groups: dict[str, list[dict]] = {}
 
     for entry in entries:
-        # Must be a showroom variant with matching frame type.
-        if entry.get("variant_type") != "showroom":
-            continue
-        if entry.get("showroom_frame_type") != axis:
+        variant_type = entry.get("variant_type")
+
+        # Match showroom bakes (showroom_frame_type == axis).
+        is_showroom = (
+            variant_type == "showroom"
+            and entry.get("showroom_frame_type") == axis
+        )
+
+        # Match CLI rotation bakes (rotation_axis == axis).
+        is_rotation = (
+            variant_type == "rotation"
+            and entry.get("rotation_axis") == axis
+        )
+
+        if not is_showroom and not is_rotation:
             continue
 
         tile_id = entry.get("tile_id", "")
@@ -208,25 +247,41 @@ def collect_axis_entries(
 
 
 def _parse_frame_index_from_variant_key(variant_key: str, axis: str) -> int | None:
-    """Extract the 3-digit frame index from a showroom axis variant key.
+    """Extract the frame index from a rotation variant key.
 
-    Expected format: {tile_id}@showroom_{axis}_{NNN}
+    Supported formats:
+    - Showroom: {tile_id}@showroom_{axis}_{NNN}
+    - CLI rotation: {tile_id}@rot_{NN}
     """
+    # Try showroom format first.
     pattern = f"@showroom_{axis}_"
     idx = variant_key.find(pattern)
-    if idx < 0:
-        return None
-    suffix = variant_key[idx + len(pattern):]
-    # Take leading digits.
-    digits = ""
-    for ch in suffix:
-        if ch.isdigit():
-            digits += ch
-        else:
-            break
-    if not digits:
-        return None
-    return int(digits)
+    if idx >= 0:
+        suffix = variant_key[idx + len(pattern):]
+        digits = ""
+        for ch in suffix:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if digits:
+            return int(digits)
+
+    # Try CLI rotation format: @rot_{NN}
+    rot_pattern = "@rot_"
+    idx = variant_key.find(rot_pattern)
+    if idx >= 0:
+        suffix = variant_key[idx + len(rot_pattern):]
+        digits = ""
+        for ch in suffix:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if digits:
+            return int(digits)
+
+    return None
 
 
 def validate_and_sort_group(
@@ -269,8 +324,19 @@ def validate_and_sort_group(
     # Parse frame indices and sort.
     indexed: list[tuple[int, dict]] = []
     for e in entries:
-        vk = str(e.get("variant_key", ""))
-        frame_idx = _parse_frame_index_from_variant_key(vk, axis)
+        frame_idx = None
+
+        if e.get("variant_type") == "rotation":
+            # CLI rotation bakes: rotation_bin is the authoritative frame index.
+            rotation_bin = e.get("rotation_bin")
+            if rotation_bin is not None:
+                frame_idx = int(rotation_bin)
+
+        if frame_idx is None:
+            # Showroom bakes or fallback: parse from variant key.
+            vk = str(e.get("variant_key", ""))
+            frame_idx = _parse_frame_index_from_variant_key(vk, axis)
+
         if frame_idx is None:
             continue
         indexed.append((frame_idx, e))
@@ -430,14 +496,14 @@ def save_gif(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate animated GIFs from showroom axis rotation bakes."
+        description="Generate animated GIFs from rotation bakes."
     )
     parser.add_argument(
         "--axis", "-a",
         nargs="+",
         choices=["pitch", "yaw"],
-        default=["pitch"],
-        help="Rotation axis/axes to generate GIFs for (default: pitch).",
+        default=None,
+        help="Rotation axis/axes to generate GIFs for (default: auto-detect from manifest).",
     )
     parser.add_argument(
         "--gems", "-g",
@@ -495,8 +561,8 @@ def main():
     if manifest is None:
         print(
             f"Error: No {MANIFEST_NAME} found in {input_dir}.\n"
-            f"Run a showroom bake first (gem designer Analysis tab, or CLI with "
-            f"--showroom_axis_steps).",
+            f"Run a rotation bake first (gem designer Analysis tab, CLI with "
+            f"--showroom_axis_steps, or --rotation_axes).",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -505,15 +571,29 @@ def main():
     gem_filter = set(args.gems) if args.gems else None
     output_root = str(manifest.get("output_root", ""))
 
+    # Resolve axes: explicit flag or auto-detect from manifest.
+    if args.axis is not None:
+        axes = args.axis
+    else:
+        axes = detect_available_axes(manifest)
+        if not axes:
+            print(
+                "No rotation entries (showroom or CLI) found in manifest.\n"
+                "Specify --axis explicitly or bake with rotation options.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print(f"Auto-detected axis/axes: {', '.join(axes)}")
+
     total_gifs = 0
     total_skipped = 0
 
-    for axis in args.axis:
+    for axis in axes:
         print(f"\n=== {axis.upper()} axis ===")
 
         groups = collect_axis_entries(manifest, axis, gem_filter, args.include_all)
         if not groups:
-            print(f"  No showroom {axis} entries found in manifest.")
+            print(f"  No {axis} rotation entries found in manifest.")
             if gem_filter:
                 print(f"  (filtered to: {', '.join(sorted(gem_filter))})")
             continue

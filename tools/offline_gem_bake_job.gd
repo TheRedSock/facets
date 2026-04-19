@@ -4,6 +4,7 @@ extends RefCounted
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")
 const GemBakeStylizerScript = preload("res://core/visuals/gem_bake_stylizer.gd")
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
+const GemInclusionGeneratorScript = preload("res://core/visuals/gem_inclusion_generator.gd")
 
 const DEFAULT_OUTPUT_ROOT := GemTracedBakeContractScript.DEFAULT_OUTPUT_ROOT
 const DEFAULT_MANIFEST_NAME := GemTracedBakeContractScript.DEFAULT_MANIFEST_NAME
@@ -688,7 +689,7 @@ func _enrich_request_list(
 		var visual: GemVisualResource = enriched_request.get("visual", null)
 		if visual == null:
 			continue
-		# Resolve environment with CLI/profile override first, then visual, then default.
+		# Resolve environment with CLI/profile override first, then visual, then mineral, then default.
 		if options.has("environment_override"):
 			var env_override = options.get("environment_override")
 			if env_override != null and env_override.has_method("to_trace_dict"):
@@ -696,6 +697,9 @@ func _enrich_request_list(
 		elif not enriched_request.has("environment_profile"):
 			if visual.bake_environment != null and visual.bake_environment.has_method("to_trace_dict"):
 				enriched_request["environment_profile"] = visual.bake_environment.to_trace_dict()
+			elif visual.mineral_template != null and visual.mineral_template.get("bake_environment") != null \
+					and visual.mineral_template.bake_environment.has_method("to_trace_dict"):
+				enriched_request["environment_profile"] = visual.mineral_template.bake_environment.to_trace_dict()
 			else:
 				var default_env: Resource = null
 				var de := String(options.get("default_environment", "")).strip_edges()
@@ -731,6 +735,8 @@ func _enrich_request_list(
 			enriched_request["seed"] = int(options.get("seed", 42))
 		if options.has("skip_stylize"):
 			enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
+		if options.has("disable_edge_rounding"):
+			enriched_request["disable_edge_rounding"] = bool(options.get("disable_edge_rounding", false))
 		# Image format and quality.
 		var image_format := GemTracedBakeContractScript.normalize_image_format(
 			options.get("image_format", GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT)
@@ -750,9 +756,17 @@ func _enrich_request_list(
 
 func _build_request_mesh(visual: GemVisualResource, request: Dictionary):
 	var request_model = request.get("cut_model", null)
+	var mesh = null
 	if request_model != null:
-		return GemMeshGeneratorsScript.generate_from_model(request_model)
-	return GemMeshGeneratorsScript.generate_from_visual(visual)
+		mesh = GemMeshGeneratorsScript.generate_from_model(request_model)
+	else:
+		mesh = GemMeshGeneratorsScript.generate_from_visual(visual)
+	# generate_from_visual already handles inclusions; for the model path,
+	# apply inclusion geometry here since it bypasses generate_from_visual.
+	if mesh != null and request_model != null and visual != null and visual.inclusion_profile != null:
+		var radius: float = mesh.compute_bounding_radius()
+		GemInclusionGeneratorScript.generate_and_merge(mesh, visual.inclusion_profile, radius)
+	return mesh
 
 
 func _resolve_request_mesh_cache_key(visual: GemVisualResource, request: Dictionary) -> String:

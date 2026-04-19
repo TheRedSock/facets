@@ -15,4 +15,6 @@ pleochroism_absorption_spectrum = PackedFloat32Array(0.25672,0.34071,0.44583,0.5
 fluorescence_quantum_yield = 0.0
 birefringence_delta_n = 0.018
 default_surface_roughness = 0.01
+surface_roughness_anisotropy = 0.18
+anisotropy_axis = Vector3(0, 1, 0)
 display_color = Color(0.30, 0.72, 0.55, 1)

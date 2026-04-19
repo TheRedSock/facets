@@ -20,6 +20,8 @@ void TraceScene::build_from_trace_data(const godot::Dictionary& trace_data) {
     if (scene_) { rtcReleaseScene(scene_); scene_ = nullptr; }
     normals_.clear();
     zones_.clear();
+    vertex_normals_.clear();
+    has_vertex_normals_ = false;
     tri_count_ = 0;
     if (!device_) return;
 
@@ -74,6 +76,24 @@ void TraceScene::build_from_trace_data(const godot::Dictionary& trace_data) {
         zones_[i]   = (i < (int)z_list.size()) ? godot::StringName(z_list[i]) : godot::StringName();
     }
 
+    // Load per-vertex smoothed normals for facet edge rounding (if present)
+    if (trace_data.has("triangle_vertex_normals_a")) {
+        godot::Array vn_a = trace_data.get("triangle_vertex_normals_a", godot::Array());
+        godot::Array vn_b = trace_data.get("triangle_vertex_normals_b", godot::Array());
+        godot::Array vn_c = trace_data.get("triangle_vertex_normals_c", godot::Array());
+        if ((int)vn_a.size() == count && (int)vn_b.size() == count && (int)vn_c.size() == count) {
+            vertex_normals_.resize(count);
+            for (int i = 0; i < count; ++i) {
+                vertex_normals_[i] = {
+                    (godot::Vector3)vn_a[i],
+                    (godot::Vector3)vn_b[i],
+                    (godot::Vector3)vn_c[i]
+                };
+            }
+            has_vertex_normals_ = true;
+        }
+    }
+
     rtcCommitGeometry(geom);
     rtcAttachGeometry(scene_, geom);
     rtcReleaseGeometry(geom); // scene holds a reference
@@ -119,10 +139,26 @@ HitResult TraceScene::intersect(godot::Vector3 origin, godot::Vector3 dir,
     result.triangle_idx = prim;
     result.position     = origin + dir * result.distance;
     result.normal       = (prim < (int)normals_.size()) ? normals_[prim] : godot::Vector3(0, 1, 0);
+    result.geometric_normal = result.normal;  // preserve flat normal before smoothing
     result.zone         = (prim < (int)zones_.size()) ? zones_[prim] : godot::StringName();
 
-    // Determine front-face from ray direction vs stored face normal
-    result.front_face = (dir.dot(result.normal) < 0.0);
+    // Determine front-face from ray direction vs flat geometric normal
+    // (must use flat normal for correct inside/outside determination)
+    result.front_face = (dir.dot(result.geometric_normal) < 0.0);
+
+    // Interpolate per-vertex smoothed normals using Embree barycentrics
+    if (has_vertex_normals_ && prim < (int)vertex_normals_.size()) {
+        float u = rayhit.hit.u;
+        float v = rayhit.hit.v;
+        float w = 1.0f - u - v;
+        godot::Vector3 interp = vertex_normals_[prim][0] * w
+                              + vertex_normals_[prim][1] * u
+                              + vertex_normals_[prim][2] * v;
+        double len_sq = (double)interp.x * interp.x + (double)interp.y * interp.y + (double)interp.z * interp.z;
+        if (len_sq > 1e-12) {
+            result.normal = interp.normalized();
+        }
+    }
 
     return result;
 }

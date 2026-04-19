@@ -70,6 +70,8 @@ GemTraceProps GemTraceKernel::extract_props(Ref<Resource> visual) const {
             p.fluorescence_emission_width_nm = (double)(float)tmpl->get("fluorescence_emission_width_nm");
             p.birefringence_delta_n = (double)(float)tmpl->get("birefringence_delta_n");
             p.surface_roughness = (double)(float)tmpl->get("default_surface_roughness");
+            p.surface_anisotropy = (double)(float)tmpl->get("surface_roughness_anisotropy");
+            p.anisotropy_axis = Vector3(tmpl->get("anisotropy_axis"));
 
             Variant pleo_var = tmpl->get("pleochroism_absorption_spectrum");
             if (pleo_var.get_type() != Variant::NIL) {
@@ -116,6 +118,8 @@ GemTraceProps GemTraceKernel::extract_props(Ref<Resource> visual) const {
     p.absorption_strength_scale = (double)(float)visual->get("absorption_strength_scale");
     p.surface_roughness_override = (double)(float)visual->get("surface_roughness_override");
     p.scattering_coefficient_override = (double)(float)visual->get("scattering_coefficient_override");
+    p.fluorescence_quantum_yield_override = (double)(float)visual->get("fluorescence_quantum_yield_override");
+    p.surface_anisotropy_override = (double)(float)visual->get("surface_roughness_anisotropy_override");
 
     // Gradient
     p.gradient_color = Color(visual->get("gradient_color"));
@@ -207,6 +211,23 @@ GemTraceProps GemTraceKernel::extract_props(Ref<Resource> visual) const {
 
     p.rotation_degrees = (double)(float)visual->get("rotation_degrees");
 
+    // Inclusion properties
+    Variant incl_var = visual->get("inclusion_profile");
+    if (incl_var.get_type() != Variant::NIL) {
+        Ref<Resource> incl = incl_var;
+        if (incl.is_valid()) {
+            p.has_inclusions = true;
+            p.inclusion_ior = (double)(float)incl->get("material_ior");
+            p.inclusion_absorption = (double)(float)incl->get("material_absorption");
+            p.inclusion_scatter = (double)(float)incl->get("scatter_strength");
+            Variant sz_var = incl->get("size_range");
+            if (sz_var.get_type() == Variant::VECTOR2) {
+                Vector2 sz = sz_var;
+                p.inclusion_typical_size = (double)(sz.x + sz.y) * 0.5;
+            }
+        }
+    }
+
     // Optic axis (per-visual; cut orientation vs crystal axis)
     Variant optic_var = visual->get("optic_axis");
     if (optic_var.get_type() == Variant::VECTOR3) {
@@ -246,6 +267,7 @@ EnvironmentSetup GemTraceKernel::build_environment(
         env.exposure = (double)(float)ep.get("exposure", 1.0);
         env.light_energy = (double)(float)ep.get("light_energy", 2.4);
         env.environment_energy = (double)(float)ep.get("environment_energy", 1.0);
+        env.card_power_cap = (double)(float)ep.get("card_power_cap", -1.0);
 
         Vector3 blocker_local = Vector3(ep.get("blocker_dir", Vector3(-0.18, -0.30, 0.94)));
         env.blocker_dir = blocker_local.normalized();
@@ -417,8 +439,18 @@ TraceContext GemTraceKernel::build_context(
     // Extract properties
     ctx.props = extract_props(visual);
 
-    // Build trace data
-    Dictionary trace_data_raw = Dictionary(mesh_resource->call("build_trace_data"));
+    // Build trace data (with optional facet edge rounding resolved from cut spec + visual override).
+    // Request-level "disable_edge_rounding" flag overrides for A/B testing.
+    double edge_rounding = (double)(float)visual->call("get_effective_edge_rounding");
+    if ((bool)request.get("disable_edge_rounding", false)) {
+        edge_rounding = 0.0;
+    }
+    Dictionary trace_data_raw;
+    if (edge_rounding > 0.0) {
+        trace_data_raw = Dictionary(mesh_resource->call("build_trace_data_with_rounding", edge_rounding));
+    } else {
+        trace_data_raw = Dictionary(mesh_resource->call("build_trace_data"));
+    }
     Dictionary trace_data = trace_data_raw.duplicate(false);
     trace_data["optic_axis"] = ctx.props.optic_axis;
     request["_trace_data"] = trace_data;
@@ -468,6 +500,9 @@ TraceContext GemTraceKernel::build_context(
     ctx.samples_per_pixel = clampi(
         (int)(int64_t)request.get("samples_per_pixel", 64), 16, 512);
     ctx.base_seed = (uint64_t)(int64_t)request.get("seed", 42);
+
+    // SPP-dependent variance budget — caps high-variance features at low SPP
+    ctx.variance_budget = VarianceBudget::from_spp(ctx.samples_per_pixel);
 
     // Feature flags
     ctx.has_volume_patterns = (ctx.props.volume_pattern_mix > 0.001

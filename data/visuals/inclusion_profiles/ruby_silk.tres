@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="GemInclusionProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_inclusion_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+inclusion_type = &"needles"
+density = 0.3
+size_range = Vector2(0.015, 0.04)
+orientation_axis = Vector3(1, 0, 0)
+orientation_spread = 0.15
+material_ior = 2.6
+material_absorption = 3.0
+scatter_strength = 0.5
+count_range = Vector2i(4, 10)
+seed_offset = 0

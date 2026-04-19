@@ -43,3 +43,4 @@ orthographic_metadata = {
 "side_yaw_degrees": 0.0,
 "top_roll_degrees": 0.0
 }
+facet_edge_rounding = 0.03

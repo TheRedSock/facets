@@ -216,15 +216,17 @@ Vector3 sample_henyey_greenstein(Vector3 incident_dir, double g, TraceRNG& rng) 
 // Fluorescence wavelength shift
 // ---------------------------------------------------------------------------
 
-bool try_fluorescence(const GemTraceProps& props, double& wavelength_nm, TraceRNG& rng) {
-    if (props.fluorescence_quantum_yield <= 0.0) return false;
+bool try_fluorescence(const GemTraceProps& props, double& wavelength_nm, TraceRNG& rng,
+                      double yield_cap) {
+    double yield = dmin(props.effective_fluorescence_yield(), yield_cap);
+    if (yield <= 0.0) return false;
 
     // Gaussian excitation probability
     double delta = (wavelength_nm - props.fluorescence_excitation_center_nm)
                  / dmax(props.fluorescence_excitation_width_nm, 1.0);
     double excitation = std::exp(-0.5 * delta * delta);
 
-    if (rng.next() >= props.fluorescence_quantum_yield * excitation) return false;
+    if (rng.next() >= yield * excitation) return false;
 
     // Shift wavelength to emission band (Gaussian sample)
     wavelength_nm = props.fluorescence_emission_center_nm
@@ -236,7 +238,7 @@ bool try_fluorescence(const GemTraceProps& props, double& wavelength_nm, TraceRN
 double fluorescence_emission_boost(const GemTraceProps& props,
                                    double emitted_wavelength_nm,
                                    Vector3 ray_dir) {
-    if (props.fluorescence_quantum_yield <= 0.0) return 1.0;
+    if (props.effective_fluorescence_yield() <= 0.0) return 1.0;
     if (props.effective_absorption().empty()) return 1.0;
 
     // Nominal remaining path inside the gem after emission. Typical object-space

@@ -46,16 +46,13 @@ double sample_cards(const EnvironmentSetup& env, Vector3 dir, double lambda_nm,
         double strength = lerpd(card.sharp_strength, card.broad_strength, roughness);
 
         // Cap effective power for stochastic sampling convergence.
-        // The card power controls the angular extent of the light source
-        // in the environment map. Higher powers narrow the cone, producing
-        // tighter "jeweler's strobe" highlights at the cost of noise on
-        // smooth facets. cos^40 (~12° half-width) approximates a small
-        // distant studio strobe and is what drives the bright pinpoint
-        // sparkles in cut-stone reference photography. The previous cap
-        // of cos^8 (~45° half-width) effectively softboxed every gem and
-        // forced the highlight to spread as a wide diffuse smear.
+        // Per-environment card_power_cap allows sharp-source environments
+        // (e.g., dispersion_studio) to use higher caps for tighter highlights
+        // that reveal prismatic fire, while the default 40.0 (~12° half-width)
+        // approximates a small distant studio strobe for general use.
         // Bump SPP to 96+ if highlight speckle becomes objectionable.
-        power = dmin(power, 40.0);
+        double cap = (env.card_power_cap > 0.0) ? env.card_power_cap : 40.0;
+        power = dmin(power, cap);
 
         // Gradient card: lerp from edge_color to center color
         double grad_t = std::pow(clampd(alignment, 0.0, 1.0), card.gradient_power);

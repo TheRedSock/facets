@@ -13,4 +13,6 @@ scattering_anisotropy = 0.0
 fluorescence_quantum_yield = 0.0
 birefringence_delta_n = 0.006
 default_surface_roughness = 0.01
+surface_roughness_anisotropy = 0.04
+anisotropy_axis = Vector3(0, 1, 0)
 display_color = Color(0.75, 0.92, 0.82, 1)

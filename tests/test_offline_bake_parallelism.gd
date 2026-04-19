@@ -62,7 +62,7 @@ func test_trace_thread_heuristic_scales_for_larger_images() -> void:
 
 func test_environment_override_wins_over_default_environment() -> void:
 	var job = OfflineGemBakeJobScript.new()
-	var warm_env = load("res://data/environments/neutral_warm_reference.tres")
+	var warm_env = load("res://data/environments/neutral_warm_reference_v2.tres")
 	var visual: GemVisualResource = load("res://data/visuals/ruby.tres")
 	assert_true(warm_env != null and warm_env.has_method("to_trace_dict"), "Warm reference environment should load")
 	assert_true(visual != null, "Ruby visual should load for environment override test")

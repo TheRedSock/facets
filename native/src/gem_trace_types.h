@@ -147,6 +147,14 @@ struct GemTraceProps {
     // Per-gem roughness override (-1 = use template default)
     double surface_roughness_override = -1.0;
 
+    // Per-gem fluorescence quantum yield override (-1 = use template default)
+    double fluorescence_quantum_yield_override = -1.0;
+
+    // Surface roughness anisotropy (0 = isotropic, >0 = elongated highlights)
+    double surface_anisotropy = 0.0;
+    double surface_anisotropy_override = -1.0;
+    Vector3 anisotropy_axis = Vector3(0, 1, 0);
+
     // Display color (for procedural fallback / UI only, NOT used in transport)
     Color display_color = Color(1, 1, 1, 1);
 
@@ -227,6 +235,13 @@ struct GemTraceProps {
     // View
     double rotation_degrees = 0.0;
 
+    // Inclusion material properties
+    double inclusion_ior = 1.5;
+    double inclusion_absorption = 2.0;
+    double inclusion_scatter = 0.5;
+    double inclusion_typical_size = 0.02; // midpoint of profile size_range
+    bool has_inclusions = false;
+
     // --- Resolved effective values (computed during context build) ---
 
     const std::vector<float>& effective_absorption() const {
@@ -242,6 +257,16 @@ struct GemTraceProps {
     double effective_roughness() const {
         return (surface_roughness_override >= 0.0)
             ? surface_roughness_override : surface_roughness;
+    }
+
+    double effective_fluorescence_yield() const {
+        return (fluorescence_quantum_yield_override >= 0.0)
+            ? fluorescence_quantum_yield_override : fluorescence_quantum_yield;
+    }
+
+    double effective_anisotropy() const {
+        return (surface_anisotropy_override >= 0.0)
+            ? surface_anisotropy_override : surface_anisotropy;
     }
 };
 
@@ -302,6 +327,9 @@ struct EnvironmentSetup {
     // Light/environment energy multipliers
     double light_energy = 2.4;
     double environment_energy = 1.0;
+
+    // Per-environment card power cap. -1 = use default (40.0).
+    double card_power_cap = -1.0;
 };
 
 // ---------------------------------------------------------------------------
@@ -311,10 +339,11 @@ struct EnvironmentSetup {
 struct HitResult {
     bool did_hit = false;
     Vector3 position;
-    Vector3 normal;       // geometric normal (outward-facing)
+    Vector3 normal;            // shading normal (may be smoothed by edge rounding)
+    Vector3 geometric_normal;  // flat facet normal (always the true geometric surface)
     double distance = 0.0;
     int triangle_idx = -1;
-    bool front_face = true;
+    bool front_face = true;    // determined from geometric_normal, not shading normal
     StringName zone;
 };
 
@@ -353,6 +382,46 @@ struct CellularResult {
 // Trace context (per-image, built once before tracing begins)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// SPP-dependent variance budget
+// ---------------------------------------------------------------------------
+// Precomputed caps for high-variance features, scaled to the rendering budget.
+// At low SPP, features that inject stochastic variance (volumetric scattering,
+// fluorescence, inclusion scattering) are capped to values that converge within
+// the available sample count. At high SPP, the authored values are used as-is.
+//
+// The caps are derived from the relationship:
+//   required_SPP ≈ (feature_strength / safe_base)² × reference_SPP
+// Inverted: safe_cap = safe_base × sqrt(SPP / reference_SPP)
+
+struct VarianceBudget {
+    double scattering_cap;          // max effective scattering coefficient
+    double fluorescence_yield_cap;  // max effective fluorescence quantum yield
+    double inclusion_scatter_cap;   // max effective inclusion scatter_strength
+
+    static VarianceBudget from_spp(int spp) {
+        VarianceBudget vb;
+        double s = std::sqrt((double)(spp > 0 ? spp : 1));
+        // Scattering: 0.20 converges at 256 SPP → k = 0.20/16 = 0.0125
+        vb.scattering_cap = 0.0125 * s;
+        // Fluorescence yield: 0.10 converges at 256 SPP → k = 0.10/16 = 0.00625
+        vb.fluorescence_yield_cap = 0.00625 * s;
+        // Inclusion scatter: 0.20 converges at 256 SPP → k = 0.20/16 = 0.0125
+        vb.inclusion_scatter_cap = 0.0125 * s;
+        return vb;
+    }
+
+    inline double gate_scattering(double authored) const {
+        return authored < scattering_cap ? authored : scattering_cap;
+    }
+    inline double gate_fluorescence_yield(double authored) const {
+        return authored < fluorescence_yield_cap ? authored : fluorescence_yield_cap;
+    }
+    inline double gate_inclusion_scatter(double authored) const {
+        return authored < inclusion_scatter_cap ? authored : inclusion_scatter_cap;
+    }
+};
+
 struct TraceContext {
     GemTraceProps props;
     EnvironmentSetup environment;
@@ -386,6 +455,9 @@ struct TraceContext {
 
     // Light direction (for opaque/translucent surface lighting)
     Vector3 light_dir;
+
+    // SPP-dependent variance budget (computed from samples_per_pixel)
+    VarianceBudget variance_budget;
 };
 
 // ---------------------------------------------------------------------------

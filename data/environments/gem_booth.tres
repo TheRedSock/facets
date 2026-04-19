@@ -5,19 +5,19 @@
 [resource]
 script = ExtResource("1")
 environment_id = &"gem_booth"
-environment_name = "Gem Booth (5200K neutral, professional)"
+environment_name = "Gem Booth (5200K neutral, professional, v2 rig)"
 sky_low = Color(0.08, 0.09, 0.12, 1)
 sky_top = Color(0.21, 0.24, 0.29, 1)
 horizon = Color(0.42, 0.36, 0.28, 1)
 ground_dark = Color(0.016, 0.013, 0.013, 1)
 ground_lift = Color(0.065, 0.052, 0.039, 1)
 light_cards = [{
-	"dir": Vector3(0.00, 0.36, 0.94),
+	"dir": Vector3(0.04, 0.72, 0.69),
 	"color": Color(1.0, 0.985, 0.96, 1),
 	"sharp_power": 900.0,
 	"broad_power": 14.0,
 	"sharp_strength": 3.8,
-	"broad_strength": 2.3,
+	"broad_strength": 1.2,
 	"temperature_kelvin": 5200.0,
 	"edge_color": Color(0.94, 0.96, 1.0, 1),
 	"gradient_power": 0.7
@@ -42,9 +42,9 @@ light_cards = [{
 	"edge_color": Color(0.88, 0.92, 1.0, 1),
 	"gradient_power": 0.8
 }]
-blocker_dir = Vector3(-0.14, -0.24, 0.96)
-blocker_power = 9.0
-blocker_strength = 0.17
+blocker_dir = Vector3(-0.10, -0.18, 0.98)
+blocker_power = 8.0
+blocker_strength = 0.16
 ground_albedo = 0.20
 ground_tint = Color(0.94, 0.90, 0.84, 1)
 ground_distance = 0.8

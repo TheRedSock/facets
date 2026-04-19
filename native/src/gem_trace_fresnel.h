@@ -29,4 +29,11 @@ Vector3 reflect(Vector3 dir, Vector3 normal);
 // Returns a sampled microfacet normal in world space.
 Vector3 sample_ggx(Vector3 geometric_normal, double roughness, TraceRNG& rng);
 
+// Sample microfacet normal from anisotropic GGX (Trowbridge-Reitz) distribution.
+// geometric_normal: the flat facet normal
+// tangent: preferred tangent direction on the surface (anisotropy elongation axis)
+// alpha_x, alpha_y: directional roughness parameters
+// Returns a sampled microfacet normal in world space.
+Vector3 sample_ggx_aniso(Vector3 geometric_normal, Vector3 tangent, double alpha_x, double alpha_y, TraceRNG& rng);
+
 }} // namespace gem::fresnel

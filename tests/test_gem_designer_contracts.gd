@@ -37,7 +37,7 @@ func _test_visual_json_paths_and_override() -> Array[String]:
 		out.append("Could not load mineral for test")
 		return out
 	vis.mineral_template = mt
-	var env = load("res://data/environments/neutral_warm_reference.tres")
+	var env = load("res://data/environments/neutral_warm_reference_v2.tres")
 	if env:
 		vis.bake_environment = env
 	var ov := PackedFloat32Array()

@@ -155,6 +155,9 @@ func _run() -> void:
 	# so it doesn't pass through normalize_variant_settings.
 	if args.has("skip_stylize"):
 		options["skip_stylize"] = true
+	# Disable facet edge rounding for A/B testing: --disable_edge_rounding
+	if args.has("disable_edge_rounding") or args.has("no_edge_rounding"):
+		options["disable_edge_rounding"] = true
 	# Image format: --format=webp|png (default webp).
 	var image_format := GemTracedBakeContractScript.normalize_image_format(
 		args.get("format", GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT)

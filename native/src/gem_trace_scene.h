@@ -3,6 +3,7 @@
 
 #include "gem_trace_types.h"
 #include <embree4/rtcore.h>
+#include <array>
 #include <vector>
 
 namespace gem {
@@ -36,6 +37,10 @@ private:
     // Side-channel data that Embree doesn't store (indexed by primID)
     std::vector<godot::Vector3>    normals_;
     std::vector<godot::StringName> zones_;
+
+    // Per-vertex smoothed normals for facet edge rounding (indexed by primID)
+    bool has_vertex_normals_ = false;
+    std::vector<std::array<godot::Vector3, 3>> vertex_normals_; // [primID] = {n_a, n_b, n_c}
 };
 
 } // namespace gem

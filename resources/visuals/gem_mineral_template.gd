@@ -57,8 +57,21 @@ class_name GemMineralTemplate extends Resource
 ## 0.0 = perfect mirror polish, 0.01 = excellent polish, 0.05 = fair, 0.1+ = rough/frosted.
 @export_range(0.0, 1.0) var default_surface_roughness: float = 0.01
 
+## Surface roughness anisotropy for anisotropic GGX. 0 = isotropic, 1 = maximum elongation.
+## Affects the shape of specular highlights — non-zero creates elongated specular lobes.
+@export_range(0.0, 1.0) var surface_roughness_anisotropy: float = 0.0
+
+## Preferred direction for surface anisotropy in model space.
+## For uniaxial crystals, typically the c-axis.
+@export var anisotropy_axis: Vector3 = Vector3(0, 1, 0)
+
 ## Display color for UI / procedural fallback (NOT used in ray transport).
 @export var display_color: Color = Color.WHITE
+
+## Default bake environment for gems using this mineral template.
+## Individual GemVisualResource.bake_environment overrides this.
+## null = inherit from bake profile or global default.
+@export var bake_environment: Resource = null
 
 
 ## Compute the Sellmeier IOR at a reference wavelength (589nm sodium D-line).
