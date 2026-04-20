@@ -690,6 +690,82 @@ def blue_garnet_phenomenon_tuned_alpha(lam: float) -> float:
     return max(0.25, baseline + teal_block + maroon_window + magenta_window + a_uv)
 
 
+# ---------------------------------------------------------------------------
+# 2026-04-19 review pass — blue garnet teal/magenta rebalance, peridot green push
+# ---------------------------------------------------------------------------
+
+
+def blue_garnet_body_teal_v2_alpha(lam: float) -> float:
+    """Blue garnet body v2 — more dominant teal, less brown.
+
+    The v1 tuned recipe still reads brown because the maroon window lets too
+    much red through relative to the teal.  Changes:
+      - Widen teal window (σ 28 → 34 nm) and deepen it (−3.5 → −4.0) so more
+        blue-green light escapes.
+      - Shift teal centre slightly blueward (480 → 476 nm) for a cooler read.
+      - Narrow maroon window (σ 22 → 16 nm) and weaken it (−1.7 → −1.0) so
+        red doesn't compete with teal.
+      - Lower baseline slightly (3.8 → 3.6) so the gem stays bright enough
+        under the teal window for the teal to read clearly.
+    """
+    baseline = 3.6
+    teal_window = -4.0 * gauss(lam, 476.0, 34.0)
+    maroon_window = -1.0 * gauss(lam, 670.0, 16.0)
+    a_uv = 3.4 * math.exp(-(lam - 380.0) / 18.0) if lam < 420.0 else 0.0
+    return max(0.20, baseline + teal_window + maroon_window + a_uv)
+
+
+def blue_garnet_phenomenon_magenta_v2_alpha(lam: float) -> float:
+    """Blue garnet phenomenon v2 — purple/magenta instead of burgundy.
+
+    The v1 phenomenon read brown/burgundy because it only opened a red
+    window.  Real color-change garnet phenomenon should flash purple/magenta
+    under shifted viewing geometry.  Purple = transmit violet + red.
+
+    Changes vs v1 phenomenon_tuned:
+      - Open a violet window at 420 nm (−2.2 Gaussian) so blue-violet
+        light escapes alongside the red.
+      - Keep the red/maroon window but narrow it (σ 28 → 22 nm).
+      - Block green-yellow more aggressively (add 530 nm block) to keep
+        the hue firmly purple rather than muddy brown.
+      - The violet + red transmission = purple/magenta appearance.
+    """
+    baseline = 3.8
+    teal_block = 2.0 * gauss(lam, 480.0, 26.0)
+    green_block = 1.5 * gauss(lam, 530.0, 28.0)
+    violet_window = -2.2 * gauss(lam, 420.0, 28.0)
+    maroon_window = -2.8 * gauss(lam, 660.0, 22.0)
+    magenta_window = -1.2 * gauss(lam, 720.0, 38.0)
+    a_uv = 2.8 * math.exp(-(lam - 380.0) / 18.0) if lam < 420.0 else 0.0
+    return max(0.20, baseline + teal_block + green_block + violet_window + maroon_window + magenta_window + a_uv)
+
+
+def peridot_greener_alpha(lam: float) -> float:
+    """Peridot — tiny push toward pure green.
+
+    The current spectrum's transmission window centres at ~555 nm (yellow-green).
+    To shift the read slightly greener without changing character:
+      - Add a mild yellow absorber at 575 nm (α ≈ 0.25, σ 18 nm) to close the
+        yellow side of the window a fraction.
+      - Slightly widen the green-blue transmission by reducing absorption at
+        ~510 nm with a small negative Gaussian (−0.15).
+    These are deliberately small — the user said "a tiny smidge".
+    Based on peridot absorption_spectrum_override currently shipping.
+    """
+    # Start from the same olivine Fe2+ basis
+    a_violet = 3.58 * gauss(lam, 430.0, 55.0)
+    a_blue = 2.1 * gauss(lam, 470.0, 42.0)
+    a_main_rise = 0.35 * max(0.0, (lam - 580.0) / 60.0) if lam > 580.0 else 0.0
+    a_red = 2.15 * gauss(lam, 650.0, 90.0)
+    a_uv = 2.0 * math.exp(-(lam - 380.0) / 28.0) if lam < 430.0 else 0.0
+    # Peridot green window centred at ~530 nm
+    green_window = -0.8 * gauss(lam, 535.0, 30.0)
+    # Yellow absorber to close the warm side of the window
+    a_yellow_close = 0.30 * gauss(lam, 575.0, 18.0)
+    baseline = 0.45
+    return max(0.0, a_violet + a_blue + a_main_rise + a_red + a_uv + green_window + a_yellow_close + baseline)
+
+
 def painite_cherry_red_from_strong() -> List[float]:
     """Deepen blue/green (indices 0–40 ×1.3), open red window (50–70 ×0.75)."""
     base = sample_curve(painite_strong_alpha)
@@ -874,6 +950,12 @@ def main() -> None:
                  "2026-04 retune: saturated dark teal body (use with absorption_strength_scale≈1.25)"),
         Spectrum("blue_garnet_phenomenon_tuned", blue_garnet_phenomenon_tuned_alpha, (0.26, 0.06, 0.14),
                  "2026-04 retune: burgundy/magenta phenomenon zone paired with body_tuned"),
+        Spectrum("blue_garnet_body_teal_v2", blue_garnet_body_teal_v2_alpha, (0.08, 0.20, 0.30),
+                 "2026-04-19: dominant teal body, reduced brown; pair with absorption_strength_scale≈1.0"),
+        Spectrum("blue_garnet_phenomenon_magenta_v2", blue_garnet_phenomenon_magenta_v2_alpha, (0.30, 0.06, 0.28),
+                 "2026-04-19: purple/magenta phenomenon; open violet + red, block green"),
+        Spectrum("peridot_greener", peridot_greener_alpha, (0.44, 0.76, 0.14),
+                 "2026-04-19: tiny green push via yellow absorber at 575nm"),
     ]
     for s in spectra:
         report(s)

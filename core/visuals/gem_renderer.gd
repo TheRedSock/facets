@@ -14,7 +14,10 @@ const AMBIENT := 0.15
 const FALLBACK_SHININESS := 32.0
 const FALLBACK_SPECULAR := 0.4
 const FALLBACK_CONTRAST := 0.3
-const GemMaterialSamplerScript = preload("res://core/visuals/gem_material_sampler.gd")
+## NOTE: GemMaterialSampler (gem_material_sampler.gd) was previously preloaded here
+## for procedural gradient/phenomenon/material simulation.  That logic has been
+## removed — all color effects are now handled exclusively by the native C++ ray
+## tracer (GemTraceKernel).  This file provides only a crude flat-lit preview.
 
 
 ## Computes the flat-shaded colour for a single facet.
@@ -57,14 +60,16 @@ static func compute_facet_color(
 ## Computes colours for every facet in a cut, respecting the visual's
 ## display_color and optional modifier overrides.
 ##
-## Simplified Blinn-Phong fallback — physical accuracy comes from the traced path.
+## DEVELOPMENT PREVIEW ONLY — not used in production bakes or gameplay.
+## The native C++ ray tracer (GemTraceKernel) is the sole authority for
+## color, gradient, phenomenon, and spectral effects.  This function
+## provides a flat-lit Blinn-Phong approximation for the design workbench
+## and headless contexts where traced textures are unavailable.
 ##
 ## Pipeline order (per facet):
 ##   1. Modifier adjustments (darken/brighten/desaturate)
-##   2. Colour zoning (gradient), phenomenon cue
-##   3. Material surface/volume patterns, reactive effects
-##   4. Inlined Blinn-Phong lighting
-##   5. Per-facet jitter
+##   2. Inlined Blinn-Phong lighting
+##   3. Per-facet jitter
 static func compute_all_facet_colors(
 	cut,
 	visual: GemVisualResource,
@@ -97,61 +102,9 @@ static func compute_all_facet_colors(
 	var shininess := FALLBACK_SHININESS
 	var specular_intensity := FALLBACK_SPECULAR
 	var one_minus_ambient := 1.0 - AMBIENT
-	var transparent_mode := visual.material_mode == GemVisualResource.MATERIAL_MODE_FACETED_TRANSPARENT
 
-	var grad_zone_ok := (
-		visual.gradient_zone_spectrum.size() == 81
-		and _zone_spectrum_has_signal(visual.gradient_zone_spectrum)
-	)
-	var phen_zone_ok := (
-		visual.phenomenon_zone_spectrum.size() == 81
-		and _zone_spectrum_has_signal(visual.phenomenon_zone_spectrum)
-	)
-
-	# Feature flags (avoid per-facet branching on disabled features).
-	var has_gradient := (
-		transparent_mode
-		and
-		visual.gradient_strength > 0.001
-		and (grad_zone_ok or visual.gradient_color.a > 0.001)
-	)
-	var has_phenomenon := (
-		transparent_mode
-		and
-		visual.phenomenon_strength > 0.001
-		and (phen_zone_ok or visual.phenomenon_color.a > 0.001)
-	)
-	var has_material_surface := (
-		visual.surface_pattern_mix > 0.001
-		and visual.surface_pattern_type != GemVisualResource.MATERIAL_PATTERN_NONE
-	)
-	var has_material_volume := (
-		visual.volume_pattern_mix > 0.001
-		and visual.volume_pattern_type != GemVisualResource.MATERIAL_PATTERN_NONE
-	)
-	var has_material_reactive := (
-		visual.reactive_strength > 0.001
-		and visual.reactive_effect_type != GemVisualResource.MATERIAL_REACTIVE_NONE
-	)
-
-	# Pre-computed cut data availability flags.
-	var has_centroids = cut.facet_centroids.size() == count
 	var has_precomputed_jitter = cut.facet_jitter.size() == count
-	var needs_centroid := has_gradient or has_material_surface or has_material_volume or has_material_reactive
-
-	var gradient_axis := Vector2.RIGHT
-	var phenomenon_axis := Vector2.RIGHT
-	if has_gradient:
-		gradient_axis = Vector2.RIGHT.rotated(deg_to_rad(visual.gradient_angle_degrees)).normalized()
-	if has_phenomenon:
-		phenomenon_axis = Vector2.RIGHT.rotated(deg_to_rad(visual.phenomenon_angle_degrees)).normalized()
-
-	var gradient_target := visual.gradient_color
-	if grad_zone_ok:
-		gradient_target = GemVisualResource.zone_spectrum_to_display_color(visual.gradient_zone_spectrum)
-	var phenomenon_target := visual.phenomenon_color
-	if phen_zone_ok:
-		phenomenon_target = GemVisualResource.zone_spectrum_to_display_color(visual.phenomenon_zone_spectrum)
+	var has_centroids = cut.facet_centroids.size() == count
 
 	# ---- Single per-facet pass ----
 
@@ -159,56 +112,6 @@ static func compute_all_facet_colors(
 		# Normal is pre-normalized at cut generation time (see GemCutPrimitives.normal_for).
 		var n: Vector3 = cut.facet_normals[i]
 		var facet_base := base
-		var centroid := Vector2.ZERO
-		if needs_centroid:
-			if has_centroids:
-				centroid = cut.facet_centroids[i]
-			else:
-				centroid = _compute_facet_centroid(cut, i)
-
-		# Color zoning: linear or radial blend toward gradient_color.
-		if has_gradient:
-			var t := _compute_gradient_mix(centroid, visual, gradient_axis) * visual.gradient_strength
-			facet_base = Color(
-				lerpf(facet_base.r, gradient_target.r, t),
-				lerpf(facet_base.g, gradient_target.g, t),
-				lerpf(facet_base.b, gradient_target.b, t),
-				facet_base.a)
-
-		if has_phenomenon:
-			var phenomenon_t := _compute_phenomenon_mix(n, phenomenon_axis, visual.phenomenon_sharpness)
-			var phenomenon_blend := phenomenon_t * visual.phenomenon_strength
-			facet_base = Color(
-				lerpf(facet_base.r, phenomenon_target.r, phenomenon_blend),
-				lerpf(facet_base.g, phenomenon_target.g, phenomenon_blend),
-				lerpf(facet_base.b, phenomenon_target.b, phenomenon_blend),
-				facet_base.a)
-
-		var object_position := Vector3(
-			(centroid.x - 0.5) * 2.0,
-			(centroid.y - 0.5) * 2.0,
-			0.0
-		)
-		var local_specular_intensity := specular_intensity
-		if has_material_surface:
-			var surface_material: Dictionary = GemMaterialSamplerScript.apply_surface_material(
-				visual,
-				facet_base,
-				centroid,
-				object_position,
-				n
-			)
-			facet_base = surface_material.get("color", facet_base)
-			local_specular_intensity *= float(surface_material.get("specular_mult", 1.0))
-		if has_material_volume:
-			var volume_material: Dictionary = GemMaterialSamplerScript.sample_volume_material(visual, object_position)
-			var volume_mix := visual.volume_pattern_mix * (
-				0.42 if visual.material_mode == GemVisualResource.MATERIAL_MODE_PATTERNED_TRANSLUCENT else 0.22
-			)
-			facet_base = facet_base.lerp(
-				volume_material.get("color", facet_base),
-				clampf(volume_mix, 0.0, 1.0)
-			)
 
 		# ---- Inlined Blinn-Phong lighting ----
 		var ndotl = n.dot(l)
@@ -217,18 +120,12 @@ static func compute_all_facet_colors(
 		var diffuse := lerpf(half_lambert, standard_lambert, contrast)
 		var spec := pow(maxf(n.dot(half_vec), 0.0), shininess)
 		var shade := AMBIENT + one_minus_ambient * diffuse
-		var spec_contrib := local_specular_intensity * spec
+		var spec_contrib := specular_intensity * spec
 
 		var cr := clampf(facet_base.r * shade + spec_contrib, 0.0, 1.0)
 		var cg := clampf(facet_base.g * shade + spec_contrib, 0.0, 1.0)
 		var cb := clampf(facet_base.b * shade + spec_contrib, 0.0, 1.0)
 		var ca := facet_base.a
-
-		if has_material_reactive:
-			var reactive_color: Color = GemMaterialSamplerScript.sample_reactive_color(visual, object_position, n, l)
-			cr = clampf(cr + reactive_color.r, 0.0, 1.0)
-			cg = clampf(cg + reactive_color.g, 0.0, 1.0)
-			cb = clampf(cb + reactive_color.b, 0.0, 1.0)
 
 		# Per-facet jitter: deterministic brightness variation from pre-computed values.
 		var jitter := 0.0
@@ -263,48 +160,12 @@ static func _compute_facet_centroid(cut, facet_index: int) -> Vector2:
 
 
 ## Returns the Y coordinate of a facet's centroid in [0,1] unit space.
-## Kept as a lightweight fallback for gradient computation when centroids
-## are not pre-computed.
 static func _facet_centroid_y(cut, facet_index: int) -> float:
 	var verts: PackedVector2Array = cut.facet_vertices[facet_index]
 	var cy = 0.0
 	for v in verts:
 		cy += v.y
 	return cy / verts.size()
-
-
-static func _compute_gradient_mix(
-	centroid: Vector2,
-	visual: GemVisualResource,
-	gradient_axis: Vector2,
-) -> float:
-	var centered := centroid - Vector2(0.5, 0.5)
-	match visual.gradient_mode:
-		GemVisualResource.GRADIENT_MODE_RADIAL:
-			return clampf(centered.length() / 0.70710678, 0.0, 1.0)
-		GemVisualResource.GRADIENT_MODE_RADIAL_INVERSE:
-			return 1.0 - clampf(centered.length() / 0.70710678, 0.0, 1.0)
-		_:
-			return clampf(0.5 + centered.dot(gradient_axis), 0.0, 1.0)
-
-
-static func _compute_phenomenon_mix(
-	normal: Vector3,
-	phenomenon_axis: Vector2,
-	sharpness: float,
-) -> float:
-	var planar := Vector2(normal.x, normal.y)
-	if planar.length_squared() < 0.00001:
-		return 0.5
-	var axis_alignment := planar.normalized().dot(phenomenon_axis)
-	return pow(clampf(axis_alignment * 0.5 + 0.5, 0.0, 1.0), sharpness)
-
-
-static func _zone_spectrum_has_signal(spectrum: PackedFloat32Array) -> bool:
-	for i in spectrum.size():
-		if spectrum[i] > 1e-6:
-			return true
-	return false
 
 
 ## Builds UVs so the texture reads as one continuous surface across all facets.

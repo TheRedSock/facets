@@ -1113,10 +1113,6 @@ func ensure_gameplay_texture_cache(
 	_bake_started_usec = Time.get_ticks_usec()
 	_bake_warmup_elapsed_ms = 0.0
 	_bake_queue_build_elapsed_ms = 0.0
-	if _should_preload_procedural_runtime_assets():
-		var warmup_start_usec := Time.get_ticks_usec()
-		preload_runtime_assets([draw_size, bake_render_size])
-		_bake_warmup_elapsed_ms = (Time.get_ticks_usec() - warmup_start_usec) / 1000.0
 	var can_extend_scope := _can_extend_gameplay_texture_profile(draw_size, normalized_scope)
 	var cached_scope_before_update := _normalize_tile_scope(_gameplay_texture_profile.get("tile_scope", []))
 	var queue_scope := normalized_scope
@@ -1254,13 +1250,15 @@ func get_cached_scaled_geometry(cut, cut_key: String, draw_size: Vector2i) -> Di
 	return geometry
 
 
-## Explicit gameplay preload hook.  Keeps expensive first-use cache misses off the
-## animation path by warming colors and scaled render bundles before the board animates.
+## Explicit gameplay preload hook.  Warms scaled render bundles (geometry only)
+## for any procedural fallback display still in use (design workbench).
+## NOTE: Procedural color pre-warming has been removed — the native C++ tracer
+## is the sole authority for gem colors.  GemRenderer provides only a flat-lit
+## display_color preview.
 func preload_runtime_assets(
 	draw_sizes: Array[Vector2i] = [],
 	include_tier_aliases: bool = false,
 ) -> void:
-	_pre_warm_colors(include_tier_aliases)
 	for draw_size in draw_sizes:
 		if draw_size.x <= 0 or draw_size.y <= 0:
 			continue
@@ -2085,7 +2083,7 @@ func _build_perturbed_environment_profile(
 		base_profile = visual.mineral_template.bake_environment.to_trace_dict()
 	else:
 		# Use default gameplay studio environment (v2 rig)
-		var default_env := load("res://data/environments/gameplay_studio_v2.tres")
+		var default_env := load("res://data/environments/gameplay_studio_v2_crown.tres")
 		if default_env != null and default_env.has_method("to_trace_dict"):
 			base_profile = default_env.to_trace_dict()
 	if rig_config.is_empty():
@@ -2232,21 +2230,6 @@ func _compute_trace_view_scale(visual: GemVisualResource, cut_model) -> float:
 		return 1.08 * base_scale
 	return cut_model.orthographic_axis_fit_scale * base_scale
 
-
-## Eagerly computes and caches facet colors for all loaded gem types.
-func _pre_warm_colors(include_tier_aliases: bool = false) -> void:
-	if not _color_cache.is_empty():
-		return
-	for tile_id in _visuals:
-		var visual: GemVisualResource = _visuals[tile_id]
-		var cut = get_visual_cut(visual)
-		if cut != null:
-			get_cached_colors(tile_id, cut, visual)
-			var tier := _resolve_visual_tier(tile_id)
-			if include_tier_aliases and tier > 0:
-				get_cached_colors(StringName("_tier_%d" % tier), cut, visual)
-	if not _color_cache.is_empty():
-		print("GemVisualRegistry: Pre-warmed %d color caches" % _color_cache.size())
 
 
 func get_visual_cut_key(visual: GemVisualResource) -> String:
@@ -2488,9 +2471,6 @@ func _can_extend_gameplay_texture_profile(draw_size: Vector2i, requested_scope: 
 		and _gameplay_texture_profile.get("rotation_bin_count", -1) == current_settings.get("rotation_bin_count", -1) \
 		and _gameplay_texture_profile.get("rotation_view_signature", "") == current_settings.get("rotation_view_signature", "")
 
-
-func _should_preload_procedural_runtime_assets() -> bool:
-	return false
 
 
 func _invalidate_gameplay_texture_cache_state() -> void:

@@ -1,10 +1,10 @@
 class_name GemInclusionGenerator
 extends RefCounted
 
-## Generates discrete inclusion geometry (needles, plates, crystals, fingerprints)
-## and merges them into an existing GemMeshResource. Each facet is added with
-## zone "inclusion" so the native tracer can distinguish inclusion surfaces from
-## gem facet surfaces during transport.
+## Generates discrete inclusion geometry (needles, plates, crystals, fingerprints,
+## veils, fingerprint_veins) and merges them into an existing GemMeshResource.
+## Each facet is added with zone "inclusion" so the native tracer can distinguish
+## inclusion surfaces from gem facet surfaces during transport.
 
 
 ## Generate inclusion geometry from profile and merge into mesh.
@@ -17,11 +17,6 @@ static func generate_and_merge(mesh: Resource, profile: Resource, bounding_radiu
 		return
 	if bounding_radius <= 0.0:
 		bounding_radius = 0.5
-
-	var count := int(lerpf(float(profile.count_range.x), float(profile.count_range.y), profile.density))
-	count = maxi(count, 0)
-	if count == 0:
-		return
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_base + profile.seed_offset
@@ -44,16 +39,47 @@ static func generate_and_merge(mesh: Resource, profile: Resource, bounding_radiu
 		if safe_aabb.size.x <= 0.0 or safe_aabb.size.y <= 0.0 or safe_aabb.size.z <= 0.0:
 			return
 
-	var inclusion_type: StringName = profile.inclusion_type
+	# Multi-scale hierarchy: if scale_layers is non-empty, iterate layers.
+	# Each layer overrides size_range, count_range, density, and optionally type.
+	var layers: Array = profile.scale_layers if &"scale_layers" in profile and profile.scale_layers.size() > 0 else []
+	if layers.size() > 0:
+		for layer_idx in layers.size():
+			var layer: Dictionary = layers[layer_idx]
+			var layer_size_range: Vector2 = layer.get("size_range", profile.size_range)
+			var layer_count_range: Vector2i = layer.get("count_range", profile.count_range)
+			var layer_density: float = layer.get("density", profile.density)
+			var layer_type: StringName = StringName(layer.get("type_override", ""))
+			if layer_type == &"":
+				layer_type = profile.inclusion_type
+			var layer_count := int(lerpf(float(layer_count_range.x), float(layer_count_range.y), layer_density))
+			layer_count = maxi(layer_count, 0)
+			_generate_layer(mesh, rng, safe_aabb, layer_type, layer_size_range,
+				layer_count, profile.orientation_axis, profile.orientation_spread)
+	else:
+		# Single-scale fallback (existing behaviour)
+		var count := int(lerpf(float(profile.count_range.x), float(profile.count_range.y), profile.density))
+		count = maxi(count, 0)
+		if count == 0:
+			return
+		_generate_layer(mesh, rng, safe_aabb, profile.inclusion_type, profile.size_range,
+			count, profile.orientation_axis, profile.orientation_spread)
+
+
+## Generate one layer of inclusions into the mesh.
+static func _generate_layer(mesh: Resource, rng: RandomNumberGenerator, safe_aabb: AABB,
+		inclusion_type: StringName, size_range: Vector2, count: int,
+		orientation_axis: Vector3, orientation_spread: float) -> void:
+	if count <= 0:
+		return
 
 	for _i in count:
 		var pos := _random_point_in_aabb(rng, safe_aabb)
 
 		# Random orientation based on axis + spread
-		var orient := _random_orientation(rng, profile.orientation_axis, profile.orientation_spread)
+		var orient := _random_orientation(rng, orientation_axis, orientation_spread)
 
 		# Random size
-		var size := lerpf(profile.size_range.x, profile.size_range.y, rng.randf())
+		var size := lerpf(size_range.x, size_range.y, rng.randf())
 
 		# Fingerprints are clusters of sub-crystals, each with its own center.
 		# Handle them separately so each sub-crystal gets correct normal orientation.
@@ -67,7 +93,7 @@ static func generate_and_merge(mesh: Resource, profile: Resource, bounding_radiu
 						mesh.add_facet(verts, "inclusion", sub_center)
 			continue
 
-		# Non-fingerprint types: single inclusion with center = pos
+		# Non-cluster types: single inclusion with center = pos
 		var facets: Array[PackedVector3Array] = []
 		match inclusion_type:
 			&"needles":
@@ -76,6 +102,10 @@ static func generate_and_merge(mesh: Resource, profile: Resource, bounding_radiu
 				facets = _generate_crystal(size, orient, pos)
 			&"plates":
 				facets = _generate_plate(size, orient, pos)
+			&"veil":
+				facets = _generate_veil(size, orient, pos, rng)
+			&"fingerprint_vein":
+				facets = _generate_fingerprint_vein(size, orient, pos, rng)
 			_:
 				facets = _generate_crystal(size, orient, pos)
 
@@ -227,6 +257,96 @@ static func _generate_fingerprint_groups(size: float, basis: Basis, pos: Vector3
 		groups.append({"facets": sub_facets, "center": sub_pos})
 
 	return groups
+
+
+## Curved sheet of micro-triangles (veil): represents healed fractures,
+## fluid-film inclusions, and jardin-like veils in emerald/sapphire.
+## Generates a ~4x4 quad grid with noise displacement, triangulated into ~32 tris.
+## The sheet spans roughly size × size in the local XY plane with gentle curvature.
+static func _generate_veil(size: float, basis: Basis, pos: Vector3, rng: RandomNumberGenerator) -> Array[PackedVector3Array]:
+	var facets: Array[PackedVector3Array] = []
+	var grid_res := 4  # 4x4 = 16 vertices, 18 quads = 36 tris (approximate)
+	var half := size * 0.5
+	var thickness := size * 0.02  # very thin sheet
+
+	# Generate grid vertices with noise displacement
+	var grid: Array = []  # 2D array of Vector3
+	for iy in grid_res + 1:
+		var row: Array[Vector3] = []
+		for ix in grid_res + 1:
+			var u := float(ix) / float(grid_res) - 0.5  # -0.5 to 0.5
+			var v := float(iy) / float(grid_res) - 0.5
+			# Gentle curvature: parabolic dome + noise
+			var height := -(u * u + v * v) * size * 0.3
+			# Per-vertex noise for organic irregularity
+			height += (rng.randf() - 0.5) * size * 0.08
+			var local_pos := Vector3(u * size, v * size, height)
+			row.append(basis * local_pos + pos)
+		grid.append(row)
+
+	# Triangulate quads: each quad becomes 2 tris
+	for iy in grid_res:
+		for ix in grid_res:
+			var v00: Vector3 = grid[iy][ix]
+			var v10: Vector3 = grid[iy][ix + 1]
+			var v01: Vector3 = grid[iy + 1][ix]
+			var v11: Vector3 = grid[iy + 1][ix + 1]
+			facets.append(PackedVector3Array([v00, v10, v11]))
+			facets.append(PackedVector3Array([v00, v11, v01]))
+
+	return facets
+
+
+## Gently-curving thin capsule chain (fingerprint_vein): represents healed
+## fissures in ruby/sapphire/emerald. Generates a polyline of 4-8 cylindrical
+## segments along a jittered path, each segment a thin hexagonal prism.
+static func _generate_fingerprint_vein(size: float, basis: Basis, pos: Vector3, rng: RandomNumberGenerator) -> Array[PackedVector3Array]:
+	var facets: Array[PackedVector3Array] = []
+	var seg_count := rng.randi_range(4, 8)
+	var radius := size * 0.04  # very thin
+	var seg_length := size * 0.8 / float(seg_count)
+
+	# Build a jittered path as a sequence of points
+	var path: Array[Vector3] = []
+	var current := pos - basis * Vector3(0, 0, size * 0.4)
+	path.append(current)
+	for _seg in seg_count:
+		# Advance primarily along the local Z axis with gentle lateral drift
+		var dx := (rng.randf() - 0.5) * seg_length * 0.4
+		var dy := (rng.randf() - 0.5) * seg_length * 0.4
+		var dz := seg_length
+		current = current + basis * Vector3(dx, dy, dz)
+		path.append(current)
+
+	# Generate a thin hexagonal prism for each segment
+	for seg_idx in seg_count:
+		var p0: Vector3 = path[seg_idx]
+		var p1: Vector3 = path[seg_idx + 1]
+		var seg_dir := (p1 - p0).normalized()
+		if seg_dir.is_zero_approx():
+			continue
+
+		# Build a local frame for the segment cross-section
+		var up := Vector3.UP if absf(seg_dir.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
+		var right := seg_dir.cross(up).normalized()
+		up = right.cross(seg_dir).normalized()
+
+		# 4 vertices on each end (square cross-section, simpler than hex for thin veins)
+		var r0: Array[Vector3] = []
+		var r1: Array[Vector3] = []
+		for i in 4:
+			var angle := float(i) * TAU / 4.0 + TAU / 8.0  # rotated 45 deg for diamond shape
+			var offset := right * cos(angle) * radius + up * sin(angle) * radius
+			r0.append(p0 + offset)
+			r1.append(p1 + offset)
+
+		# Side quads
+		for i in 4:
+			var j := (i + 1) % 4
+			facets.append(PackedVector3Array([r0[i], r1[i], r1[j]]))
+			facets.append(PackedVector3Array([r0[i], r1[j], r0[j]]))
+
+	return facets
 
 
 # ---------------------------------------------------------------------------

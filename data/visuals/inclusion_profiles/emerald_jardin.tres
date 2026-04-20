@@ -14,3 +14,18 @@ material_absorption = 1.5
 scatter_strength = 0.5
 count_range = Vector2i(5, 12)
 seed_offset = 0
+scale_layers = [{
+	"size_range": Vector2(0.005, 0.015),
+	"count_range": Vector2i(15, 30),
+	"density": 0.8,
+	"type_override": &"veil"
+}, {
+	"size_range": Vector2(0.03, 0.08),
+	"count_range": Vector2i(3, 6),
+	"density": 0.5
+}, {
+	"size_range": Vector2(0.06, 0.12),
+	"count_range": Vector2i(1, 2),
+	"density": 0.3,
+	"type_override": &"fingerprint_vein"
+}]

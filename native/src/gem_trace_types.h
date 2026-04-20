@@ -79,6 +79,7 @@ static constexpr int MATERIAL_PATTERN_FIBERS = 3;
 static constexpr int MATERIAL_PATTERN_CELLS = 4;
 static constexpr int MATERIAL_PATTERN_CLOUDS = 5;
 static constexpr int MATERIAL_PATTERN_LAYERS = 6;
+static constexpr int MATERIAL_PATTERN_GROWTH_ZONING = 7;
 
 // Reactive types
 static constexpr int MATERIAL_REACTIVE_NONE = 0;
@@ -330,6 +331,13 @@ struct EnvironmentSetup {
 
     // Per-environment card power cap. -1 = use default (40.0).
     double card_power_cap = -1.0;
+
+    // Dual-illuminant: secondary illuminant temperature (K) and mix factor.
+    // When mix > 0, the kernel traces two independent spectral accumulations
+    // (primary ~D65, secondary at this temperature) per pixel and combines
+    // them at XYZ stage pre-tonemap.
+    double secondary_illuminant_temperature = 2856.0;
+    double secondary_illuminant_mix = 0.0;
 };
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,10 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/navette.tres" id="1_qakh2"]
 [ext_resource type="Resource" path="res://data/minerals/painite.tres" id="2"]
-[ext_resource type="Resource" path="res://data/environments/deep_color.tres" id="3"]
+[ext_resource type="Resource" path="res://data/environments/deep_color_crown.tres" id="3"]
+[ext_resource type="Resource" path="res://data/visuals/inclusion_profiles/painite_silk.tres" id="4"]
 
 [resource]
 script = ExtResource("1")
@@ -20,7 +21,8 @@ scattering_coefficient_override = -1.0
 gradient_color = Color(0.52, 0.14, 0.08, 1)
 gradient_strength = 0.18
 volume_pattern_type = 3
-volume_pattern_mix = 0.12
+volume_pattern_mix = 0.18
+volume_absorption_variation = 0.10
 optics_environment_rotation_degrees = 4.0
 stylize_mix = 0.72
 stylize_facet_edge_gain = 0.68
@@ -34,3 +36,4 @@ stylize_tone_steps = 4
 stylize_edge_ink_strength = 0.2
 stylize_highlight_snap = 0.34
 bake_environment = ExtResource("3")
+inclusion_profile = ExtResource("4")

@@ -268,6 +268,8 @@ EnvironmentSetup GemTraceKernel::build_environment(
         env.light_energy = (double)(float)ep.get("light_energy", 2.4);
         env.environment_energy = (double)(float)ep.get("environment_energy", 1.0);
         env.card_power_cap = (double)(float)ep.get("card_power_cap", -1.0);
+        env.secondary_illuminant_temperature = (double)(float)ep.get("secondary_illuminant_temperature", 2856.0);
+        env.secondary_illuminant_mix = clampd((double)(float)ep.get("secondary_illuminant_mix", 0.0), 0.0, 1.0);
 
         Vector3 blocker_local = Vector3(ep.get("blocker_dir", Vector3(-0.18, -0.30, 0.94)));
         env.blocker_dir = blocker_local.normalized();
@@ -625,7 +627,9 @@ void GemTraceKernel::trace_row_band(
     for (int y = row_start; y < row_end; y++) {
         for (int x = 0; x < width; x++) {
             Vector3 xyz_sum(0.0, 0.0, 0.0);
+            Vector3 xyz_sum_secondary(0.0, 0.0, 0.0);
             double hit_count = 0.0;
+            bool dual_illuminant = ctx.environment.secondary_illuminant_mix > 0.001;
 
             TraceRNG rng;
             rng.seed(ctx.base_seed, y, x);
@@ -669,6 +673,14 @@ void GemTraceKernel::trace_row_band(
                             ctx, scene, origin, ctx.view_dir, lambdas[w], rng);
                         Vector3 cie = spectral::cie_xyz(lambdas[w]);
                         xyz_sum += cie * (float)I_w;
+                        if (dual_illuminant) {
+                            // Weight by secondary illuminant SPD ratio vs D65.
+                            // Planck(λ,A)/Planck(λ,D65) boosts red, cuts blue,
+                            // activating alexandrite's Cr3+ red transmission window.
+                            double ratio = spectral::planckian_radiance(lambdas[w], ctx.environment.secondary_illuminant_temperature)
+                                         / dmax(spectral::planckian_radiance(lambdas[w], 6504.0), 1e-10);
+                            xyz_sum_secondary += cie * (float)(I_w * ratio);
+                        }
                     }
                 } else {
                     // Shared-geometry path: one geometric trace carrying 4
@@ -678,6 +690,11 @@ void GemTraceKernel::trace_row_band(
                     for (int w = 0; w < HERO_WAVELENGTHS; w++) {
                         Vector3 cie = spectral::cie_xyz(lambdas[w]);
                         xyz_sum += cie * (float)spr.intensities[w];
+                        if (dual_illuminant) {
+                            double ratio = spectral::planckian_radiance(lambdas[w], ctx.environment.secondary_illuminant_temperature)
+                                         / dmax(spectral::planckian_radiance(lambdas[w], 6504.0), 1e-10);
+                            xyz_sum_secondary += cie * (float)(spr.intensities[w] * ratio);
+                        }
                     }
                 }
             }
@@ -689,7 +706,18 @@ void GemTraceKernel::trace_row_band(
                 // Normalize the MC spectral estimate.
                 // Total spectral samples = HERO_WAVELENGTHS * hit_count.
                 double spectral_count = (double)HERO_WAVELENGTHS * hit_count;
-                Vector3 xyz = xyz_sum * (float)(LAMBDA_RANGE / (spectral_count * CIE_Y_INTEGRAL));
+                double norm = LAMBDA_RANGE / (spectral_count * CIE_Y_INTEGRAL);
+                Vector3 xyz_primary = xyz_sum * (float)norm;
+
+                // Dual-illuminant: combine primary (D65-like) and secondary (A-like) at XYZ pre-tonemap.
+                Vector3 xyz;
+                if (dual_illuminant) {
+                    Vector3 xyz_sec = xyz_sum_secondary * (float)norm;
+                    float mix = (float)ctx.environment.secondary_illuminant_mix;
+                    xyz = xyz_primary * (1.0f - mix) + xyz_sec * mix;
+                } else {
+                    xyz = xyz_primary;
+                }
 
                 // XYZ → linear sRGB
                 Vector3 linear = spectral::xyz_to_linear_srgb(xyz);

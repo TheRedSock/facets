@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="GemInclusionProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_inclusion_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+inclusion_type = &"crystals"
+density = 0.08
+size_range = Vector2(0.006, 0.018)
+orientation_axis = Vector3(0, 1, 0)
+orientation_spread = 0.9
+material_ior = 1.55
+material_absorption = 1.0
+scatter_strength = 0.2
+count_range = Vector2i(2, 5)
+seed_offset = 12

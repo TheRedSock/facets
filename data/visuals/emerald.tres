@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/emerald_step.tres" id="1_mb8n7"]
 [ext_resource type="Resource" path="res://data/minerals/beryl.tres" id="2"]
-[ext_resource type="Resource" path="res://data/environments/deep_color.tres" id="3"]
+[ext_resource type="Resource" path="res://data/environments/deep_color_crown.tres" id="3"]
 [ext_resource type="Resource" path="res://data/visuals/inclusion_profiles/emerald_jardin.tres" id="4"]
 
 [resource]
@@ -21,11 +21,12 @@ surface_roughness_override = -1.0
 scattering_coefficient_override = 0.0
 gradient_color = Color(0, 0.26, 0.18, 1)
 gradient_strength = 0.22
-volume_pattern_type = 5
-volume_pattern_mix = 0.3
-volume_absorption_variation = 0.10
-surface_pattern_type = 4
-surface_pattern_mix = 0.08
+volume_pattern_type = 7
+volume_pattern_mix = 0.15
+volume_pattern_axis = Vector3(1, 0, 0)
+volume_absorption_variation = 0.04
+surface_pattern_type = 0
+surface_pattern_mix = 0.0
 surface_pattern_contrast = 0.4
 optics_environment_rotation_degrees = -18.0
 stylize_mix = 0.68

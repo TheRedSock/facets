@@ -4,61 +4,61 @@
 
 [resource]
 script = ExtResource("1")
-environment_id = &"dispersion_studio"
-environment_name = "Dispersion Studio (6500K, sharp point keys, v2 rig)"
+environment_id = &"dispersion_studio_crown"
+environment_name = "Dispersion Studio Crown (6500K, sharp points, anti-table-glare)"
 sky_low = Color(0.07, 0.08, 0.11, 1)
 sky_top = Color(0.17, 0.20, 0.25, 1)
 horizon = Color(0.37, 0.32, 0.27, 1)
 ground_dark = Color(0.014, 0.013, 0.013, 1)
 ground_lift = Color(0.056, 0.048, 0.044, 1)
 light_cards = [{
-	"dir": Vector3(0.14, 0.78, 0.61),
+	"dir": Vector3(-0.66, 0.60, 0.16),
 	"color": Color(1.0, 1.0, 1.0, 1),
 	"sharp_power": 2800.0,
 	"broad_power": 3.0,
-	"sharp_strength": 4.80,
-	"broad_strength": 0.5,
+	"sharp_strength": 5.20,
+	"broad_strength": 0.60,
 	"temperature_kelvin": 6500.0,
 	"edge_color": Color(0.94, 0.97, 1.0, 1),
 	"gradient_power": 0.4
 }, {
-	"dir": Vector3(-0.78, 0.24, 0.58),
+	"dir": Vector3(-0.18, -0.82, 0.14),
 	"color": Color(0.96, 0.99, 1.0, 1),
 	"sharp_power": 1600.0,
 	"broad_power": 5.0,
-	"sharp_strength": 1.40,
-	"broad_strength": 0.18,
+	"sharp_strength": 1.55,
+	"broad_strength": 0.22,
 	"temperature_kelvin": 6500.0,
 	"edge_color": Color(0.90, 0.95, 1.0, 1),
 	"gradient_power": 0.7
 }, {
-	"dir": Vector3(0.62, -0.08, -0.78),
+	"dir": Vector3(0.16, 0.66, -0.72),
 	"color": Color(1.0, 0.98, 0.94, 1),
 	"sharp_power": 1400.0,
 	"broad_power": 5.0,
-	"sharp_strength": 1.20,
-	"broad_strength": 0.16,
+	"sharp_strength": 1.35,
+	"broad_strength": 0.20,
 	"temperature_kelvin": 6000.0,
 	"edge_color": Color(1.0, 0.97, 0.92, 1),
 	"gradient_power": 0.75
 }, {
-	"dir": Vector3(-0.04, -0.54, 0.84),
+	"dir": Vector3(0.72, -0.16, 0.24),
 	"color": Color(1.0, 0.95, 0.86, 1),
 	"sharp_power": 40.0,
 	"broad_power": 4.0,
-	"sharp_strength": 0.22,
-	"broad_strength": 0.10,
+	"sharp_strength": 0.26,
+	"broad_strength": 0.14,
 	"temperature_kelvin": 4800.0,
 	"edge_color": Color(1.0, 0.92, 0.82, 1),
 	"gradient_power": 1.0
 }]
-blocker_dir = Vector3(-0.10, -0.18, 0.98)
+blocker_dir = Vector3(0.18, -0.10, 0.98)
 blocker_power = 6.0
-blocker_strength = 0.06
+blocker_strength = 0.04
 ground_albedo = 0.10
 ground_tint = Color(0.7, 0.72, 0.78, 1)
 ground_distance = 1.2
 exposure = 1.0
-light_energy = 3.0
+light_energy = 3.4
 environment_energy = 0.85
-card_power_cap = 600.0
+card_power_cap = 30.0

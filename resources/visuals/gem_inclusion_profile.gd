@@ -3,19 +3,24 @@ extends Resource
 
 ## Discrete inclusion geometry profile for the gem tracer.
 ##
-## Generates actual geometric objects (needles, plates, crystals, fingerprints)
-## inside the gem mesh that cast real shadows and refraction via the native
-## ray tracer. Each inclusion type models a real-world mineralogical feature:
-##   needles   = elongated hexagonal prisms (rutile silk in ruby/sapphire)
-##   plates    = flat hexagonal discs (mica plates)
-##   crystals  = small octahedra (crystal inclusions in emerald)
-##   fingerprints = clusters of small spheroids in disc arrangements
+## Generates actual geometric objects (needles, plates, crystals, fingerprints,
+## veils, fingerprint_veins) inside the gem mesh that cast real shadows and
+## refraction via the native ray tracer. Each inclusion type models a
+## real-world mineralogical feature:
+##   needles         = elongated hexagonal prisms (rutile silk in ruby/sapphire)
+##   plates          = flat hexagonal discs (mica plates)
+##   crystals        = small octahedra (crystal inclusions in emerald)
+##   fingerprints    = clusters of small spheroids in disc arrangements
+##   veil            = curved sheet of micro-triangles (healed fractures, jardin)
+##   fingerprint_vein = gently-curving thin capsule chain (healed fissures)
 
 ## Type of inclusion geometry to generate.
 ## "needles" = elongated hexagonal prisms (rutile silk in ruby/sapphire)
 ## "plates" = flat hexagonal discs (mica plates)
 ## "crystals" = small octahedra (crystal inclusions in emerald)
 ## "fingerprints" = clusters of small spheroids in disc arrangements
+## "veil" = curved sheet of micro-triangles (healed fractures, jardin films)
+## "fingerprint_vein" = gently-curving thin capsule chain (healed fissures)
 @export var inclusion_type: StringName = &"needles"
 
 ## Density scaling (0 = none, 1 = dense). Controls count relative to gem volume.
@@ -44,3 +49,12 @@ extends Resource
 
 ## Deterministic seed offset for reproducible placement.
 @export var seed_offset: int = 0
+
+## Optional multi-scale inclusion hierarchy. Each entry is a Dictionary with:
+##   size_range: Vector2       — [min, max] size for this scale layer
+##   count_range: Vector2i     — [min, max] count for this scale layer
+##   density: float            — density scaling for this layer
+##   type_override: StringName — inclusion type for this layer (empty = use profile's inclusion_type)
+## When non-empty, generate_and_merge iterates layers instead of using the
+## single-scale fields above. When empty, falls back to existing behaviour.
+@export var scale_layers: Array = []

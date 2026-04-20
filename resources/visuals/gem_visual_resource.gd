@@ -21,6 +21,7 @@ const MATERIAL_PATTERN_FIBERS := 3
 const MATERIAL_PATTERN_CELLS := 4
 const MATERIAL_PATTERN_CLOUDS := 5
 const MATERIAL_PATTERN_LAYERS := 6
+const MATERIAL_PATTERN_GROWTH_ZONING := 7
 const MATERIAL_REACTIVE_NONE := 0
 const MATERIAL_REACTIVE_CHATTOYANCY := 1
 const MATERIAL_REACTIVE_OPALESCENCE := 2
@@ -139,7 +140,7 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_range(0.0, 1.0) var texture_facet_warp: float = 0.35
 
 @export_subgroup("Surface Field")
-@export_enum("None", "Bands", "Concentric", "Fibers", "Cells", "Clouds", "Layers") var surface_pattern_type: int = MATERIAL_PATTERN_NONE
+@export_enum("None", "Bands", "Concentric", "Fibers", "Cells", "Clouds", "Layers", "Growth Zoning") var surface_pattern_type: int = MATERIAL_PATTERN_NONE
 @export_range(0.0, 1.0) var surface_pattern_mix: float = 0.0
 @export var surface_pattern_scale: Vector2 = Vector2.ONE
 @export_range(-180.0, 180.0) var surface_pattern_rotation_degrees: float = 0.0
@@ -151,7 +152,7 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_range(-1.0, 1.0) var surface_pattern_roughness_variation: float = 0.0
 
 @export_subgroup("Volume Field")
-@export_enum("None", "Bands", "Concentric", "Fibers", "Cells", "Clouds", "Layers") var volume_pattern_type: int = MATERIAL_PATTERN_NONE
+@export_enum("None", "Bands", "Concentric", "Fibers", "Cells", "Clouds", "Layers", "Growth Zoning") var volume_pattern_type: int = MATERIAL_PATTERN_NONE
 @export_range(0.0, 1.0) var volume_pattern_mix: float = 0.0
 @export var volume_pattern_scale: Vector3 = Vector3.ONE
 @export var volume_pattern_axis: Vector3 = Vector3.UP
@@ -258,12 +259,25 @@ func get_cut_spec_id() -> StringName:
 
 
 ## Resolve effective edge rounding: per-gem override → cut spec default → 0.
+## When using the cut-spec default (no per-gem override), applies polish coupling:
+## minerals with lower surface roughness (higher polish) auto-suppress rounding.
+## Diamond (0.005) → ~17% of cut default, corundum/garnet (0.008) → ~67%, quartz/beryl (0.01+) → full.
 func get_effective_edge_rounding() -> float:
 	if facet_edge_rounding_override >= 0.0:
 		return facet_edge_rounding_override
+	var base := 0.0
 	if cut_spec != null and &"facet_edge_rounding" in cut_spec:
-		return cut_spec.facet_edge_rounding
-	return 0.0
+		base = cut_spec.facet_edge_rounding
+	if base <= 0.0:
+		return 0.0
+	# Polish coupling: remap mineral roughness [0.004, 0.01] → [0, 1].
+	# High-polish minerals (diamond 0.005, corundum 0.008) auto-suppress;
+	# medium-polish (quartz/beryl 0.01+) pass through at full strength.
+	var roughness := 0.01  # conservative default when no mineral template
+	if mineral_template != null and &"default_surface_roughness" in mineral_template:
+		roughness = mineral_template.default_surface_roughness
+	var polish_factor := clampf((roughness - 0.004) / 0.006, 0.0, 1.0)
+	return base * polish_factor
 
 
 ## Approximate sRGB from an 81-sample curve for procedural 2D fallback only.

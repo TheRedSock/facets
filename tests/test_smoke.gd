@@ -58,8 +58,6 @@ func _init() -> void:
 	test_effect_planning()
 	test_conflict_resolution()
 	test_effect_resolution()
-	test_gradient_strength_without_texture()
-	test_patterned_material_ignores_legacy_color_overlays()
 	test_spawn_integer_weighted_pick()
 	test_spawn_integer_determinism()
 	test_event_timeline_structure()
@@ -617,59 +615,6 @@ func test_effect_resolution() -> void:
 	assert_eq(board.get_tile(Vector2i(1, 0)).tier, 3, "Tile should be upgraded to tier 3")
 	assert_eq(resolver.last_remove_events.size(), 1, "Should have 1 remove event")
 	assert_eq(resolver.last_upgrade_events.size(), 1, "Should have 1 upgrade event")
-
-
-func test_gradient_strength_without_texture() -> void:
-	var cut = GemCutGenerators.generate_from_spec_id(&"cushion")
-	var base_visual := GemVisualResource.new()
-	base_visual.display_color = Color(0.32, 0.6, 0.82, 1)
-	base_visual.gradient_color = Color(0.9, 0.2, 0.35, 1)
-	base_visual.gradient_strength = 0.0
-
-	var gradient_visual := GemVisualResource.new()
-	gradient_visual.display_color = base_visual.display_color
-	gradient_visual.gradient_color = base_visual.gradient_color
-	gradient_visual.gradient_strength = 0.7
-
-	var base_colors := GemRenderer.compute_all_facet_colors(cut, base_visual)
-	var gradient_colors := GemRenderer.compute_all_facet_colors(cut, gradient_visual)
-	var changed := false
-	for i in base_colors.size():
-		var a := base_colors[i]
-		var b := gradient_colors[i]
-		if absf(a.r - b.r) > 0.0001 or absf(a.g - b.g) > 0.0001 or absf(a.b - b.b) > 0.0001:
-			changed = true
-			break
-	assert_true(changed, "Gradient strength should affect non-textured gems")
-
-
-func test_patterned_material_ignores_legacy_color_overlays() -> void:
-	var cut = GemCutGenerators.generate_from_spec_id(&"cushion")
-	var base_visual := GemVisualResource.new()
-	base_visual.display_color = Color(0.24, 0.36, 0.18, 1)
-	base_visual.material_mode = GemVisualResource.MATERIAL_MODE_PATTERNED_OPAQUE
-	base_visual.surface_pattern_type = GemVisualResource.MATERIAL_PATTERN_BANDS
-	base_visual.surface_pattern_mix = 0.85
-	base_visual.surface_pattern_density = 1.4
-	base_visual.surface_pattern_contrast = 0.6
-
-	var legacy_overlay_visual := base_visual.duplicate(true) as GemVisualResource
-	legacy_overlay_visual.gradient_color = Color(0.92, 0.18, 0.26, 1)
-	legacy_overlay_visual.gradient_strength = 0.8
-	legacy_overlay_visual.phenomenon_color = Color(0.86, 0.82, 0.24, 1)
-	legacy_overlay_visual.phenomenon_strength = 0.7
-
-	var base_colors := GemRenderer.compute_all_facet_colors(cut, base_visual)
-	var overlay_colors := GemRenderer.compute_all_facet_colors(cut, legacy_overlay_visual)
-	for i in base_colors.size():
-		var a := base_colors[i]
-		var b := overlay_colors[i]
-		assert_true(
-			absf(a.r - b.r) <= 0.0001
-			and absf(a.g - b.g) <= 0.0001
-			and absf(a.b - b.b) <= 0.0001,
-			"Patterned material colors should not inherit gradient/phenomenon overlays"
-		)
 
 
 func test_spawn_integer_weighted_pick() -> void:

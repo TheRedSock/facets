@@ -706,7 +706,7 @@ func _enrich_request_list(
 				if not de.is_empty() and registry != null and registry.has_method(&"get_bake_environment"):
 					default_env = registry.get_bake_environment(StringName(de))
 				if default_env == null:
-					default_env = load("res://data/environments/gameplay_studio_v2.tres")
+					default_env = load("res://data/environments/gameplay_studio_v2_crown.tres")
 				if default_env != null and default_env.has_method("to_trace_dict"):
 					enriched_request["environment_profile"] = default_env.to_trace_dict()
 		# Pass through request-level overrides from options

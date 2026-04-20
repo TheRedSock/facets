@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/lozenge.tres" id="1_xxx8n"]
 [ext_resource type="Resource" path="res://data/minerals/corundum.tres" id="2"]
-[ext_resource type="Resource" path="res://data/environments/gem_booth.tres" id="3"]
+[ext_resource type="Resource" path="res://data/environments/gem_booth_crown.tres" id="3"]
 
 [resource]
 script = ExtResource("1")

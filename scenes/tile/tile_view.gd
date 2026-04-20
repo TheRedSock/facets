@@ -33,7 +33,7 @@ var _use_procedural: bool = false
 
 ## Shared scaled geometry bundle from GemVisualRegistry.
 var _render_geometry: Dictionary = {}
-var use_gameplay_texture_cache := false
+var use_gameplay_texture_cache := true
 var _outline_cut = null
 var _outline_cut_key: String = ""
 var _outline_geometry: Dictionary = {}

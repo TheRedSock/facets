@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/antique_oval.tres" id="1_0sfqc"]
 [ext_resource type="Resource" path="res://data/minerals/garnet_pyrope_almandine.tres" id="2"]
-[ext_resource type="Resource" path="res://data/environments/deep_color.tres" id="3"]
+[ext_resource type="Resource" path="res://data/environments/deep_color_crown.tres" id="3"]
 
 [resource]
 script = ExtResource("1")

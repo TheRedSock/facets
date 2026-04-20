@@ -287,6 +287,20 @@ PatternSample volume_layer_sample(Vector3 coord, double density, double contrast
     return { apply_contrast(raw, contrast), accent };
 }
 
+// Growth zoning: warped bands following crystal growth geometry.
+// Uses the existing band infrastructure but warps the input coordinate with
+// low-frequency noise to produce non-linear band spacing resembling natural
+// growth layers. Returns only value (no accent variation) — absorption-only
+// by default so it never produces "CG fog" in scatter.
+PatternSample growth_zoning_sample(Vector3 coord, double density, double contrast) {
+    // 1-octave low-frequency noise to warp band spacing
+    double warp = noise3(coord * 0.6) * 0.4;
+    // Warped band coordinate along the primary axis
+    double phase = (coord.x + warp) * density * Math_TAU * 2.0;
+    double raw = 0.5 + 0.5 * sin(phase);
+    return { apply_contrast(raw, contrast), 0.5 };  // no accent variation
+}
+
 // -------------------------------------------------------------------------
 // Surface pattern dispatch
 // -------------------------------------------------------------------------
@@ -337,6 +351,7 @@ static PatternSample sample_volume_pattern(const GemTraceProps& v, Vector3 obj_p
         case MATERIAL_PATTERN_CELLS:      return cell_sample_3d(coord * density * 2.0, v.volume_pattern_contrast);
         case MATERIAL_PATTERN_CLOUDS:     return cloud_sample_3d(coord * density * 1.7, v.volume_pattern_contrast);
         case MATERIAL_PATTERN_LAYERS:     return volume_layer_sample(coord, density, v.volume_pattern_contrast);
+        case MATERIAL_PATTERN_GROWTH_ZONING: return growth_zoning_sample(coord, density, v.volume_pattern_contrast);
         default: return { 0.5, 0.5 };
     }
 }
@@ -430,11 +445,21 @@ VolumeMaterialSample sample_volume_material(const GemTraceProps& v, Vector3 obj_
     color = mix_palette(color, resolve_secondary_color(v, color),
                         resolve_tertiary_color(v, color),
                         ps.value, ps.accent, v.volume_pattern_mix);
-    return {
-        color, ps.value, ps.accent,
-        clampd(1.0 + v.volume_absorption_variation * ((ps.value - 0.5) * 2.0), 0.12, 4.0),
-        clampd(1.0 + v.volume_scattering_variation * ((ps.accent - 0.5) * 2.0), 0.12, 4.0),
-    };
+
+    double abs_mult = clampd(1.0 + v.volume_absorption_variation * ((ps.value - 0.5) * 2.0), 0.12, 4.0);
+    double scat_mult = clampd(1.0 + v.volume_scattering_variation * ((ps.accent - 0.5) * 2.0), 0.12, 4.0);
+
+    // Growth zoning: hard amplitude cap to prevent "CG fog" artefact.
+    // Max 5% absorption modulation regardless of authored variation.
+    // Scatter stays at 1.0 unless explicit scattering_variation opt-in.
+    if (v.volume_pattern_type == MATERIAL_PATTERN_GROWTH_ZONING) {
+        abs_mult = clampd(abs_mult, 0.95, 1.05);
+        if (v.volume_scattering_variation <= 0.0001) {
+            scat_mult = 1.0;
+        }
+    }
+
+    return { color, ps.value, ps.accent, abs_mult, scat_mult };
 }
 
 Color sample_reactive_color(const GemTraceProps& v, Vector3 obj_pos,

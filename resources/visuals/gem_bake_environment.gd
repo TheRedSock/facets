@@ -46,6 +46,14 @@ class_name GemBakeEnvironment extends Resource
 ## Dispersion environments may set 200-400 for visible prismatic splitting.
 @export_range(-1.0, 5000.0) var card_power_cap: float = -1.0
 
+## Dual-illuminant rendering: secondary illuminant for color-change gems.
+## When secondary_illuminant_mix > 0, the tracer runs two independent spectral
+## accumulations per pixel (primary D65-like and secondary at this temperature),
+## combining at XYZ stage pre-tonemap. Used for alexandrite, blue garnet, etc.
+## 0.0 = disabled (single-illuminant bake).
+@export_range(1000.0, 10000.0) var secondary_illuminant_temperature: float = 2856.0
+@export_range(0.0, 1.0) var secondary_illuminant_mix: float = 0.0
+
 
 ## Build a Dictionary suitable for passing as "environment_profile" in a trace request.
 func to_trace_dict() -> Dictionary:
@@ -65,6 +73,8 @@ func to_trace_dict() -> Dictionary:
 		"light_energy": light_energy,
 		"environment_energy": environment_energy,
 		"card_power_cap": card_power_cap,
+		"secondary_illuminant_temperature": secondary_illuminant_temperature,
+		"secondary_illuminant_mix": secondary_illuminant_mix,
 		"cards": light_cards,
 	}
 	return result
