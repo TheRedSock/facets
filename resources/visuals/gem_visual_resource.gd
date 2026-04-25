@@ -29,6 +29,9 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 
 @export_group("Identity")
 @export var visual_id: StringName = &""
+## Mark as true for study, prototype, or otherwise non-production gems.
+## These are excluded from batch bakes when using the "production" keyword.
+@export var experimental: bool = false
 @export var cut_spec: Resource = null
 @export var cut_overrides: Dictionary = {}
 ## Migration-only compatibility label. Active geometry resolution should use

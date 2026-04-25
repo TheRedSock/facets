@@ -20,7 +20,8 @@ double trace_path(
     Vector3 origin,
     Vector3 direction,
     double lambda_nm,
-    TraceRNG& rng);
+    TraceRNG& rng,
+    TraceStats* stats = nullptr);
 
 // Trace a single geometric path carrying HERO_WAVELENGTHS wavelengths.
 // All wavelengths share the same bounce geometry (determined by lambdas[0]).
@@ -32,7 +33,8 @@ SpectralResult trace_path_spectral(
     Vector3 origin,
     Vector3 direction,
     const double lambdas[HERO_WAVELENGTHS],
-    TraceRNG& rng);
+    TraceRNG& rng,
+    TraceStats* stats = nullptr);
 
 // Compute opaque surface shading (Lambert diffuse + GGX specular from environment).
 // Used for MATERIAL_MODE_PATTERNED_OPAQUE gems.

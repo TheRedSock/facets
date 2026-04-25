@@ -8,7 +8,7 @@ const GemInclusionGeneratorScript = preload("res://core/visuals/gem_inclusion_ge
 
 const DEFAULT_OUTPUT_ROOT := GemTracedBakeContractScript.DEFAULT_OUTPUT_ROOT
 const DEFAULT_MANIFEST_NAME := GemTracedBakeContractScript.DEFAULT_MANIFEST_NAME
-const MAX_AUTO_VARIANT_WORKERS := 4
+const MAX_AUTO_VARIANT_WORKERS := 8
 
 signal progress_updated(progress: Dictionary)
 
@@ -142,7 +142,9 @@ func run_batch(
 			))
 			pending_index += 1
 		while not active_workers.is_empty():
-			var worker: Dictionary = active_workers.pop_front()
+			var completed_idx := _poll_first_completed(active_workers)
+			var worker: Dictionary = active_workers[completed_idx]
+			active_workers.remove_at(completed_idx)
 			var traced_request: Dictionary = worker.get("request", {})
 			var trace_result: Dictionary = {}
 			var thread: Thread = worker.get("thread", null)
@@ -262,7 +264,9 @@ func run_explicit_request_batch(
 			))
 			pending_index += 1
 		while not active_workers.is_empty():
-			var worker: Dictionary = active_workers.pop_front()
+			var completed_idx := _poll_first_completed(active_workers)
+			var worker: Dictionary = active_workers[completed_idx]
+			active_workers.remove_at(completed_idx)
 			var traced_request: Dictionary = worker.get("request", {})
 			var trace_result: Dictionary = {}
 			var thread: Thread = worker.get("thread", null)
@@ -381,7 +385,9 @@ func run_explicit_request_batch_async(
 			))
 			pending_index += 1
 		while not active_workers.is_empty():
-			var worker: Dictionary = active_workers.pop_front()
+			var completed_idx := _poll_first_completed(active_workers)
+			var worker: Dictionary = active_workers[completed_idx]
+			active_workers.remove_at(completed_idx)
 			var traced_request: Dictionary = worker.get("request", {})
 			var trace_result: Dictionary = {}
 			var thread: Thread = worker.get("thread", null)
@@ -526,7 +532,9 @@ func _run_batch_internal(
 			))
 			pending_index += 1
 		while not active_workers.is_empty():
-			var worker: Dictionary = active_workers.pop_front()
+			var completed_idx := _poll_first_completed(active_workers)
+			var worker: Dictionary = active_workers[completed_idx]
+			active_workers.remove_at(completed_idx)
 			var traced_request: Dictionary = worker.get("request", {})
 			var trace_result: Dictionary = {}
 			var thread: Thread = worker.get("thread", null)
@@ -737,6 +745,8 @@ func _enrich_request_list(
 			enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
 		if options.has("disable_edge_rounding"):
 			enriched_request["disable_edge_rounding"] = bool(options.get("disable_edge_rounding", false))
+		if options.has("verbose_trace"):
+			enriched_request["verbose_trace"] = bool(options.get("verbose_trace", false))
 		# Image format and quality.
 		var image_format := GemTracedBakeContractScript.normalize_image_format(
 			options.get("image_format", GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT)
@@ -799,12 +809,8 @@ func _resolve_parallel_execution_plan(request_count: int, options: Dictionary = 
 		elif requested_trace_threads > 0:
 			@warning_ignore("integer_division")
 			variant_worker_count = maxi(int(cpu_budget / maxi(requested_trace_threads, 1)), 1)
-		elif cpu_budget >= 24 and request_count >= 6:
-			variant_worker_count = 4
-		elif cpu_budget >= 16 and request_count >= 4:
-			variant_worker_count = 3
-		elif cpu_budget >= 8 and request_count >= 2:
-			variant_worker_count = 2
+		else:
+			variant_worker_count = _compute_optimal_worker_count(cpu_budget, request_count)
 	variant_worker_count = clampi(
 		variant_worker_count,
 		1,
@@ -828,6 +834,31 @@ func _resolve_parallel_execution_plan(request_count: int, options: Dictionary = 
 		"variant_worker_count": variant_worker_count,
 		"pipeline_enabled": variant_worker_count > 1 and request_count > 1,
 	}
+
+
+## Finds the variant worker count that maximizes total CPU utilization
+## (workers * floor(budget / workers)) while keeping at least
+## MIN_AUTO_TRACE_THREADS per worker. Among ties, prefers more workers
+## to reduce head-of-line blocking.
+const MIN_AUTO_TRACE_THREADS := 3
+
+@warning_ignore("integer_division")
+static func _compute_optimal_worker_count(cpu_budget: int, request_count: int) -> int:
+	if cpu_budget < 4 or request_count < 2:
+		return 1
+	var max_candidates := mini(request_count, MAX_AUTO_VARIANT_WORKERS)
+	var best_workers := 1
+	var best_utilization := 0
+	for w in range(2, max_candidates + 1):
+		var threads_per := int(cpu_budget / w)
+		if threads_per < MIN_AUTO_TRACE_THREADS:
+			break
+		var total := w * threads_per
+		if total >= best_utilization:
+			# >= so that ties prefer more workers (better head-of-line behavior)
+			best_workers = w
+			best_utilization = total
+	return best_workers
 
 
 func _apply_parallel_execution_plan(filtered_requests: Array, plan: Dictionary) -> void:
@@ -895,6 +926,27 @@ func _trace_request_worker(traced_request: Dictionary) -> Dictionary:
 		"trace_elapsed_ms": (Time.get_ticks_usec() - trace_start_usec) / 1000.0,
 		"trace_detail_profile": profile,
 	}
+
+
+## Polls active workers and returns the index of the first one whose thread has
+## finished.  Falls back to blocking on the first worker if none are done yet
+## (avoids busy-spinning while still preferring out-of-order completion).
+func _poll_first_completed(active_workers: Array[Dictionary]) -> int:
+	# Fast path: check if any worker's thread has already finished.
+	for i in active_workers.size():
+		var thread: Thread = active_workers[i].get("thread", null)
+		if thread == null or not thread.is_alive():
+			return i
+	# No worker is done yet. Sleep briefly and poll again to avoid a tight spin
+	# while still allowing out-of-order completion instead of always waiting on
+	# the first worker (which may be the slowest).
+	while true:
+		OS.delay_msec(1)
+		for i in active_workers.size():
+			var thread: Thread = active_workers[i].get("thread", null)
+			if thread == null or not thread.is_alive():
+				return i
+	return 0  # unreachable, satisfies return type
 
 
 func _launch_trace_worker(

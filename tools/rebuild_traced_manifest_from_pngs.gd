@@ -142,6 +142,8 @@ func _resolve_tile_ids(raw_value: String, registry: Node) -> Array:
 	var normalized := raw_value.strip_edges().to_lower()
 	if normalized.is_empty() or normalized == "all":
 		return registry.get_visual_ids()
+	if normalized == "production":
+		return registry.get_production_visual_ids()
 	var tile_ids: Array = []
 	var seen: Dictionary = {}
 	for token in raw_value.split(",", false):

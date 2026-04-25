@@ -7,6 +7,7 @@
 [resource]
 script = ExtResource("1")
 visual_id = &"malachite_study"
+experimental = true
 cut_spec = ExtResource("1_dn2o6")
 cut_id = &"patterned_cushion"
 display_color = Color(0.08, 0.22, 0.15, 1)

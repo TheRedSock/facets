@@ -138,6 +138,27 @@ func get_visual_ids() -> Array[StringName]:
 	return ids
 
 
+## Returns only non-experimental visual IDs, sorted by tier then name.
+func get_production_visual_ids() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for tile_id in _visuals.keys():
+		var visual: GemVisualResource = _visuals[tile_id]
+		if visual != null and not visual.experimental:
+			ids.append(tile_id)
+	ids.sort_custom(func(a: StringName, b: StringName) -> bool:
+		var tier_a := _resolve_visual_tier(a)
+		var tier_b := _resolve_visual_tier(b)
+		if tier_a != tier_b:
+			if tier_a < 0:
+				return false
+			if tier_b < 0:
+				return true
+			return tier_a < tier_b
+		return String(a) < String(b)
+	)
+	return ids
+
+
 ## Returns the projected 2D cut for a geometry signature, or null.
 func get_cut(geometry_signature: String):
 	return _cuts.get(geometry_signature, null)

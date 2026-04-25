@@ -7,6 +7,7 @@
 [resource]
 script = ExtResource("1")
 visual_id = &"opal_study"
+experimental = true
 cut_spec = ExtResource("1_3dv2o")
 cut_id = &"opal_cushion"
 display_color = Color(0.72, 0.82, 0.88, 1)

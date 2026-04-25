@@ -10,6 +10,8 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <thread>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 
 using namespace godot;
@@ -549,12 +551,37 @@ Ref<Image> GemTraceKernel::trace_to_image(
             request.get("target_size", Vector2i(0, 0)))));
     if (target_size.x <= 0 || target_size.y <= 0) return Ref<Image>();
 
-    TraceContext ctx = build_context(mesh_resource, visual, request);
+    bool verbose = (bool)request.get("verbose_trace", false);
+    auto wall_start = std::chrono::steady_clock::now();
+    auto phase_start = wall_start;
 
+    auto elapsed_ms = [](std::chrono::steady_clock::time_point from) -> double {
+        return std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - from).count();
+    };
+
+    // Phase 1: Context build
+    TraceContext ctx = build_context(mesh_resource, visual, request);
+    double ctx_ms = elapsed_ms(phase_start);
+    if (verbose) {
+        UtilityFunctions::print(String("[trace] context_build: {0}ms  size={1}x{2}  spp={3}  dispersion={4}")
+            .format(Array::make(String::num(ctx_ms, 1),
+                target_size.x, target_size.y,
+                ctx.samples_per_pixel,
+                ctx.props.enable_dispersion ? "on" : "off")));
+    }
+
+    // Phase 2: BVH build
+    phase_start = std::chrono::steady_clock::now();
     Dictionary trace_data = Dictionary(request.get("_trace_data", Dictionary()));
     TraceScene scene;
     scene.build_from_trace_data(trace_data);
+    double bvh_ms = elapsed_ms(phase_start);
     if (!scene.is_valid()) return Ref<Image>();
+    if (verbose) {
+        UtilityFunctions::print(String("[trace] bvh_build: {0}ms")
+            .format(Array::make(String::num(bvh_ms, 1))));
+    }
 
     // Resolve thread count
     int thread_budget = clampi(
@@ -573,23 +600,103 @@ Ref<Image> GemTraceKernel::trace_to_image(
     int total_pixels = target_size.x * target_size.y;
     std::vector<Color> pixels(total_pixels, Color(0, 0, 0, 0));
 
+    if (verbose) {
+        UtilityFunctions::print(String("[trace] tracing: {0} threads  budget={1}  rows={2}  pixels={3}  work_units={4}")
+            .format(Array::make(thread_count, thread_budget,
+                target_size.y, pixel_count, work_units)));
+    }
+
+    // Phase 3: Trace
+    phase_start = std::chrono::steady_clock::now();
+    std::atomic<int> rows_completed{0};
+    int total_rows = target_size.y;
+
+    // Monitor thread: prints progress every ~2s when verbose.
+    // Uses a rolling window (last ~10s) for rate calculation to avoid
+    // aliasing when row completion time approaches the poll interval.
+    std::atomic<bool> trace_done{false};
+    std::thread monitor_thread;
+    if (verbose && thread_count > 0) {
+        auto trace_start_time = phase_start;
+        monitor_thread = std::thread([&rows_completed, &trace_done, total_rows,
+                                       pixel_count, &ctx, trace_start_time]() {
+            // Ring buffer of (timestamp, row_count) samples for rolling window.
+            static constexpr int RING_SIZE = 5;  // 5 × 2s = 10s window
+            struct Sample { std::chrono::steady_clock::time_point time; int rows; };
+            Sample ring[RING_SIZE];
+            int ring_head = 0;
+            int ring_count = 0;
+            while (!trace_done.load(std::memory_order_relaxed)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+                if (trace_done.load(std::memory_order_relaxed)) break;
+                auto now = std::chrono::steady_clock::now();
+                int done = rows_completed.load(std::memory_order_relaxed);
+                double pct = (total_rows > 0) ? (100.0 * done / total_rows) : 0.0;
+                double elapsed = std::chrono::duration<double, std::milli>(
+                    now - trace_start_time).count();
+                int pixels_per_row = pixel_count / std::max(total_rows, 1);
+                // Push current sample into ring buffer
+                int write_idx = (ring_head + ring_count) % RING_SIZE;
+                if (ring_count < RING_SIZE) {
+                    ring_count++;
+                } else {
+                    ring_head = (ring_head + 1) % RING_SIZE;
+                    write_idx = (ring_head + ring_count - 1) % RING_SIZE;
+                }
+                ring[write_idx] = {now, done};
+                // Compute rate over the full rolling window
+                const Sample& oldest = ring[ring_head];
+                int delta_rows = done - oldest.rows;
+                double delta_ms = std::chrono::duration<double, std::milli>(now - oldest.time).count();
+                double window_rows_per_sec = (delta_ms > 0.001 && delta_rows > 0)
+                    ? (delta_rows * 1000.0 / delta_ms) : 0.0;
+                double window_samples_per_sec = window_rows_per_sec * pixels_per_row * ctx.samples_per_pixel;
+                // ETA based on rolling rate
+                double eta_ms = (window_rows_per_sec > 0.001 && done < total_rows)
+                    ? ((total_rows - done) * 1000.0 / window_rows_per_sec) : 0.0;
+                UtilityFunctions::print(String("[trace]   {0}%  rows={1}/{2}  elapsed={3}s  rate={4} rows/s  {5} samples/s  eta={6}s")
+                    .format(Array::make(
+                        String::num(pct, 1), done, total_rows,
+                        String::num(elapsed / 1000.0, 1),
+                        String::num(window_rows_per_sec, 2),
+                        String::num(window_samples_per_sec, 0),
+                        String::num(eta_ms / 1000.0, 0))));
+            }
+        });
+    }
+
+    TraceStats trace_stats;
+
     if (thread_count <= 1) {
-        trace_row_band(ctx, scene, 0, target_size.y, pixels);
+        trace_row_band(ctx, scene, 0, target_size.y, pixels, &rows_completed, &trace_stats);
     } else {
-        int rows_per_thread = (target_size.y + thread_count - 1) / thread_count;
+        std::atomic<int> next_row{0};
         std::vector<std::thread> threads;
         for (int t = 0; t < thread_count; t++) {
-            int row_start = t * rows_per_thread;
-            int row_end = dmin((t + 1) * rows_per_thread, (int)target_size.y);
-            if (row_start >= target_size.y) break;
-            threads.emplace_back([this, &ctx, &scene, row_start, row_end, &pixels]() {
-                trace_row_band(ctx, scene, row_start, row_end, pixels);
+            threads.emplace_back([this, &ctx, &scene, &next_row, &pixels, &rows_completed, total_rows, &trace_stats]() {
+                trace_rows_dynamic(ctx, scene, next_row, total_rows, pixels, rows_completed, &trace_stats);
             });
         }
         for (auto& th : threads) th.join();
     }
 
-    // Encode to RGBA8
+    trace_done.store(true, std::memory_order_relaxed);
+    if (monitor_thread.joinable()) monitor_thread.join();
+
+    double trace_ms = elapsed_ms(phase_start);
+    if (verbose) {
+        double total_samples = (double)pixel_count * ctx.samples_per_pixel;
+        double samples_per_sec = (trace_ms > 0.001) ? (total_samples * 1000.0 / trace_ms) : 0.0;
+        UtilityFunctions::print(String("[trace] trace_done: {0}ms  total_samples={1}  samples/s={2}  pixels/s={3}")
+            .format(Array::make(
+                String::num(trace_ms, 1),
+                String::num(total_samples, 0),
+                String::num(samples_per_sec, 0),
+                String::num((double)pixel_count * 1000.0 / std::max(trace_ms, 0.001), 0))));
+    }
+
+    // Phase 4: Encode
+    phase_start = std::chrono::steady_clock::now();
     PackedByteArray bytes;
     bytes.resize(total_pixels * 4);
     for (int i = 0; i < total_pixels; i++) {
@@ -603,8 +710,39 @@ Ref<Image> GemTraceKernel::trace_to_image(
 
     Ref<Image> image = Image::create_from_data(
         target_size.x, target_size.y, false, Image::FORMAT_RGBA8, bytes);
+    double encode_ms = elapsed_ms(phase_start);
 
+    // Phase 5: Alpha cleanup
+    phase_start = std::chrono::steady_clock::now();
     clean_alpha_edges(image);
+    double alpha_ms = elapsed_ms(phase_start);
+
+    double total_ms = elapsed_ms(wall_start);
+    if (verbose) {
+        UtilityFunctions::print(String("[trace] encode: {0}ms  alpha_cleanup: {1}ms  total: {2}ms")
+            .format(Array::make(
+                String::num(encode_ms, 1),
+                String::num(alpha_ms, 1),
+                String::num(total_ms, 1))));
+    }
+
+    // Record to profile dict
+    last_trace_profile_["context_build_elapsed_ms"] = ctx_ms;
+    last_trace_profile_["bvh_build_elapsed_ms"] = bvh_ms;
+    last_trace_profile_["trace_elapsed_ms"] = trace_ms;
+    last_trace_profile_["encode_elapsed_ms"] = encode_ms;
+    last_trace_profile_["alpha_cleanup_elapsed_ms"] = alpha_ms;
+    last_trace_profile_["total_wall_elapsed_ms"] = total_ms;
+    last_trace_profile_["thread_count"] = thread_count;
+    last_trace_profile_["thread_budget"] = thread_budget;
+    last_trace_profile_["primary_intersect_count"] = (int64_t)trace_stats.primary_intersect_count.load();
+    last_trace_profile_["secondary_intersect_count"] = (int64_t)trace_stats.secondary_intersect_count.load();
+    last_trace_profile_["spectral_trace_count"] = (int64_t)trace_stats.spectral_trace_count.load();
+    last_trace_profile_["surface_lighting_count"] = (int64_t)trace_stats.surface_lighting_count.load();
+    last_trace_profile_["volume_sampling_count"] = (int64_t)trace_stats.volume_scatter_count.load();
+    last_trace_profile_["bounce_count"] = (int64_t)trace_stats.bounce_count.load();
+    last_trace_profile_["starvation_terminations"] = (int64_t)trace_stats.starvation_terminations.load();
+
     return image;
 }
 
@@ -617,7 +755,9 @@ void GemTraceKernel::trace_row_band(
     const TraceScene& scene,
     int row_start,
     int row_end,
-    std::vector<Color>& out_pixels) const
+    std::vector<Color>& out_pixels,
+    std::atomic<int>* rows_completed,
+    TraceStats* stats) const
 {
     int width = ctx.target_size.x;
     double inv_w = 1.0 / (double)ctx.target_size.x;
@@ -670,7 +810,7 @@ void GemTraceKernel::trace_row_band(
                     // real prismatic "fire" in high-dispersion gems.
                     for (int w = 0; w < HERO_WAVELENGTHS; w++) {
                         double I_w = transport::trace_path(
-                            ctx, scene, origin, ctx.view_dir, lambdas[w], rng);
+                            ctx, scene, origin, ctx.view_dir, lambdas[w], rng, stats);
                         Vector3 cie = spectral::cie_xyz(lambdas[w]);
                         xyz_sum += cie * (float)I_w;
                         if (dual_illuminant) {
@@ -686,7 +826,7 @@ void GemTraceKernel::trace_row_band(
                     // Shared-geometry path: one geometric trace carrying 4
                     // wavelengths for variance reduction (hero-λ geometry).
                     transport::SpectralResult spr = transport::trace_path_spectral(
-                        ctx, scene, origin, ctx.view_dir, lambdas, rng);
+                        ctx, scene, origin, ctx.view_dir, lambdas, rng, stats);
                     for (int w = 0; w < HERO_WAVELENGTHS; w++) {
                         Vector3 cie = spectral::cie_xyz(lambdas[w]);
                         xyz_sum += cie * (float)spr.intensities[w];
@@ -743,6 +883,27 @@ void GemTraceKernel::trace_row_band(
                 out_pixels[pixel_index] = Color(srgb.x, srgb.y, srgb.z, (float)alpha);
             }
         }
+        if (rows_completed) rows_completed->fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+// ===========================================================================
+// trace_rows_dynamic — work-stealing row scheduler
+// ===========================================================================
+
+void GemTraceKernel::trace_rows_dynamic(
+    const TraceContext& ctx,
+    const TraceScene& scene,
+    std::atomic<int>& next_row,
+    int total_rows,
+    std::vector<Color>& out_pixels,
+    std::atomic<int>& rows_completed,
+    TraceStats* stats) const
+{
+    while (true) {
+        int y = next_row.fetch_add(1, std::memory_order_relaxed);
+        if (y >= total_rows) break;
+        trace_row_band(ctx, scene, y, y + 1, out_pixels, &rows_completed, stats);
     }
 }
 

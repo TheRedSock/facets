@@ -9,6 +9,7 @@
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <atomic>
 
 namespace gem {
 
@@ -51,7 +52,15 @@ private:
     // --- Per-pixel tracing ---
     void trace_row_band(const TraceContext& ctx, const TraceScene& scene,
                         int row_start, int row_end,
-                        std::vector<godot::Color>& out_pixels) const;
+                        std::vector<godot::Color>& out_pixels,
+                        std::atomic<int>* rows_completed = nullptr,
+                        TraceStats* stats = nullptr) const;
+
+    void trace_rows_dynamic(const TraceContext& ctx, const TraceScene& scene,
+                            std::atomic<int>& next_row, int total_rows,
+                            std::vector<godot::Color>& out_pixels,
+                            std::atomic<int>& rows_completed,
+                            TraceStats* stats = nullptr) const;
 
     // --- Output ---
     static double apply_aces_channel(double value);

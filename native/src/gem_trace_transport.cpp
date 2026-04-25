@@ -35,6 +35,16 @@ namespace gem { namespace transport {
 // and eliminates firefly amplification from RR's 1/survival division.
 static constexpr double THROUGHPUT_CUTOFF = 0.001;
 
+// NEE starvation detection: terminate paths that have high throughput
+// but are geometrically trapped (no exit radiance for many bounces).
+// If a ray goes NEE_STARVATION_LIMIT consecutive inside-gem bounces
+// without producing any exit contribution, it is considered trapped
+// (e.g., TIR loops in high-IOR gems like diamond) and terminated.
+static constexpr int NEE_STARVATION_LIMIT = 12;
+
+// Helper to increment a TraceStats counter when stats is non-null.
+#define TRACE_STAT_INC(counter) do { if (stats) stats->counter.fetch_add(1, std::memory_order_relaxed); } while(0)
+
 // Minimum Δn for an engine-level ray split at the entry interface.
 // Below this value, birefringence is visually indistinguishable from
 // single-IOR refraction given typical gem sizes, so we skip the 2x path
@@ -132,7 +142,8 @@ static double trace_path_core(
     TraceRNG& rng,
     bool start_inside_gem,
     double start_throughput,
-    int start_prev_triangle)
+    int start_prev_triangle,
+    TraceStats* stats)
 {
     const GemTraceProps& props = ctx.props;
     double throughput = start_throughput;
@@ -141,8 +152,11 @@ static double trace_path_core(
     int prev_triangle = start_prev_triangle;
     // Mutable wavelength inside the gem (fluorescence shifts λ; survives zero scattering).
     double wl = lambda_nm;
+    // Consecutive zero-NEE bounce counter for trapped-ray detection.
+    int consecutive_zero_nee = 0;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
+        TRACE_STAT_INC(bounce_count);
 
         if (inside_gem) {
             // ----- Volumetric transport (inside gem) -----
@@ -265,6 +279,7 @@ static double trace_path_core(
             bool is_tir = (exit_dir.length_squared() < 1e-12);
 
             // NEE: deterministically evaluate exit contribution
+            double nee_this_bounce = 0.0;
             if (!is_tir) {
                 // Validate exit direction against geometric normal: if the smoothed
                 // shading normal produced an exit ray that goes back into the gem per
@@ -275,9 +290,25 @@ static double trace_path_core(
                     double T = 1.0 - R;
                     Vector3 exit_origin = hit.position + exit_dir * (float)TRACE_EPSILON;
                     HitResult exit_check = scene.intersect(exit_origin, exit_dir, prev_triangle);
+                    TRACE_STAT_INC(secondary_intersect_count);
                     if (!exit_check.did_hit) {
-                        result += throughput * T
+                        nee_this_bounce = throughput * T
                             * environment::sample(ctx.environment, exit_dir, wl);
+                        TRACE_STAT_INC(surface_lighting_count);
+                        result += nee_this_bounce;
+                    }
+                }
+            }
+
+            // Track consecutive zero-NEE bounces for trapped-ray detection
+            if (inside_gem) {
+                if (nee_this_bounce > 0.0) {
+                    consecutive_zero_nee = 0;
+                } else {
+                    consecutive_zero_nee++;
+                    if (consecutive_zero_nee >= NEE_STARVATION_LIMIT) {
+                        TRACE_STAT_INC(starvation_terminations);
+                        break;
                     }
                 }
             }
@@ -365,15 +396,17 @@ double trace_path(
     Vector3 origin,
     Vector3 direction,
     double lambda_nm,
-    TraceRNG& rng)
+    TraceRNG& rng,
+    TraceStats* stats)
 {
+    TRACE_STAT_INC(spectral_trace_count);
     const GemTraceProps& props = ctx.props;
 
     // Fast path: not birefringent (or opaque/translucent surface shading).
     if (props.birefringence_delta_n < BIREFRINGENCE_SPLIT_THRESHOLD
         || ctx.is_opaque || ctx.is_translucent) {
         return trace_path_core(ctx, scene, origin, direction, lambda_nm, rng,
-                               false, 1.0, -1);
+                               false, 1.0, -1, stats);
     }
 
     // Probe the primary air→gem intersection so the split can start two
@@ -386,7 +419,7 @@ double trace_path(
         // Primary ray should always hit a front face for a closed manifold;
         // fallback to the non-split path if it doesn't.
         return trace_path_core(ctx, scene, origin, direction, lambda_nm, rng,
-                               false, 1.0, -1);
+                               false, 1.0, -1, stats);
     }
 
     double roughness = props.effective_roughness();
@@ -432,7 +465,7 @@ double trace_path(
         Vector3 entry_origin = entry.position + refr_o * (float)TRACE_EPSILON;
         result += trace_path_core(
             ctx, scene, entry_origin, refr_o, lambda_nm, rng,
-            true, 0.5 * T, entry.triangle_idx);
+            true, 0.5 * T, entry.triangle_idx, stats);
     }
 
     // Extraordinary ray refraction — different eta so different Snell angle.
@@ -441,7 +474,7 @@ double trace_path(
         Vector3 entry_origin = entry.position + refr_e * (float)TRACE_EPSILON;
         result += trace_path_core(
             ctx, scene, entry_origin, refr_e, lambda_nm, rng,
-            true, 0.5 * T, entry.triangle_idx);
+            true, 0.5 * T, entry.triangle_idx, stats);
     }
 
     return dmax(result, 0.0);
@@ -465,7 +498,8 @@ static SpectralResult trace_path_spectral_core(
     TraceRNG& rng,
     bool start_inside_gem,
     double start_throughput,
-    int start_prev_triangle)
+    int start_prev_triangle,
+    TraceStats* stats)
 {
     const GemTraceProps& props = ctx.props;
     SpectralResult result = {};
@@ -484,6 +518,7 @@ static SpectralResult trace_path_spectral_core(
 
         if (inside_gem) {
             // ----- Volumetric transport (inside gem) -----
+            TRACE_STAT_INC(bounce_count);
             double sigma_s = ctx.variance_budget.gate_scattering(
                 props.effective_scattering());
             double scatter_mult = 1.0;
@@ -498,10 +533,12 @@ static SpectralResult trace_path_spectral_core(
 
             double scatter_dist = volume::sample_scatter_distance(sigma_s, rng);
             HitResult hit = scene.intersect(origin, direction, prev_triangle);
+            TRACE_STAT_INC(primary_intersect_count);
             double surface_dist = hit.did_hit ? hit.distance : 1e30;
 
             if (sigma_s > 1e-12 && scatter_dist < surface_dist) {
                 // --- Scattering event ---
+                TRACE_STAT_INC(volume_scatter_count);
                 Vector3 scatter_pos = origin + direction * (float)scatter_dist;
                 Vector3 obj_pos = (ctx.radius > 0.0001)
                     ? origin / (float)ctx.radius : Vector3(0, 0, 0);
@@ -641,10 +678,12 @@ static SpectralResult trace_path_spectral_core(
                 Vector3 exit_origin = hit.position + exit_dir_w * (float)TRACE_EPSILON;
                 HitResult exit_check = scene.intersect(
                     exit_origin, exit_dir_w, prev_triangle);
+                TRACE_STAT_INC(secondary_intersect_count);
                 if (!exit_check.did_hit) {
                     double T_w = 1.0 - R_w[w];
                     double env = environment::sample(
                         ctx.environment, exit_dir_w, wave[w]);
+                    TRACE_STAT_INC(surface_lighting_count);
                     result.intensities[w] += wl_tp[w] * T_w * env;
                 }
             }
@@ -768,8 +807,10 @@ SpectralResult trace_path_spectral(
     Vector3 origin,
     Vector3 direction,
     const double lambdas[HERO_WAVELENGTHS],
-    TraceRNG& rng)
+    TraceRNG& rng,
+    TraceStats* stats)
 {
+    TRACE_STAT_INC(spectral_trace_count);
     const GemTraceProps& props = ctx.props;
 
     // Fast path — no birefringence split required.
@@ -777,7 +818,7 @@ SpectralResult trace_path_spectral(
         || ctx.is_opaque || ctx.is_translucent) {
         return trace_path_spectral_core(
             ctx, scene, origin, direction, lambdas, rng,
-            false, 1.0, -1);
+            false, 1.0, -1, stats);
     }
 
     const double hero = lambdas[0];
@@ -796,7 +837,7 @@ SpectralResult trace_path_spectral(
     if (!entry.front_face) {
         return trace_path_spectral_core(
             ctx, scene, origin, direction, lambdas, rng,
-            false, 1.0, -1);
+            false, 1.0, -1, stats);
     }
 
     double roughness = props.effective_roughness();
@@ -863,7 +904,7 @@ SpectralResult trace_path_spectral(
         // each channel's contribution).
         SpectralResult br = trace_path_spectral_core(
             ctx, scene, entry_origin, refr, lambdas, rng,
-            true, 0.5, entry.triangle_idx);
+            true, 0.5, entry.triangle_idx, stats);
         for (int w = 0; w < HERO_WAVELENGTHS; w++) {
             result.intensities[w] += T_w[w] * br.intensities[w];
         }

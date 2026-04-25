@@ -158,6 +158,9 @@ func _run() -> void:
 	# Disable facet edge rounding for A/B testing: --disable_edge_rounding
 	if args.has("disable_edge_rounding") or args.has("no_edge_rounding"):
 		options["disable_edge_rounding"] = true
+	# Verbose native trace diagnostics: --verbose_trace
+	if args.has("verbose_trace"):
+		options["verbose_trace"] = true
 	# Image format: --format=webp|png (default webp).
 	var image_format := GemTracedBakeContractScript.normalize_image_format(
 		args.get("format", GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT)
@@ -284,6 +287,8 @@ func _resolve_tile_ids(raw_value: String, registry: Node) -> Array:
 	var normalized := raw_value.strip_edges().to_lower()
 	if normalized.is_empty() or normalized == "all":
 		return registry.get_visual_ids()
+	if normalized == "production":
+		return registry.get_production_visual_ids()
 	return _parse_tile_ids(raw_value)
 
 
@@ -439,23 +444,22 @@ func _tile_ids_to_text(tile_ids: Array) -> String:
 func _print_trace_detail_profile(profile: Dictionary) -> void:
 	if profile.is_empty():
 		return
-	print("Trace detail: view %.1fms  primary %.1fms  secondary %.1fms  spectral %.1fms  surface %.1fms  volume %.1fms  alpha %.1fms  encode %.1fms" % [
-		float(profile.get("trace_view_elapsed_ms", 0.0)),
-		float(profile.get("primary_intersect_elapsed_ms", 0.0)),
-		float(profile.get("secondary_intersect_elapsed_ms", 0.0)),
-		float(profile.get("spectral_trace_elapsed_ms", 0.0)),
-		float(profile.get("surface_lighting_elapsed_ms", 0.0)),
-		float(profile.get("volume_sampling_elapsed_ms", 0.0)),
-		float(profile.get("alpha_cleanup_elapsed_ms", 0.0)),
+	print("Trace detail: ctx %.1fms  bvh %.1fms  trace %.1fms  encode %.1fms  alpha %.1fms  total %.1fms" % [
+		float(profile.get("context_build_elapsed_ms", 0.0)),
+		float(profile.get("bvh_build_elapsed_ms", 0.0)),
+		float(profile.get("trace_elapsed_ms", 0.0)),
 		float(profile.get("encode_elapsed_ms", 0.0)),
+		float(profile.get("alpha_cleanup_elapsed_ms", 0.0)),
+		float(profile.get("total_wall_elapsed_ms", 0.0)),
 	])
-	print("Trace counts: primary=%d  secondary=%d  spectral=%d  surface=%d  volume=%d  reused_primary=%d  threads=%d" % [
+	print("Trace counts: paths=%d  bounces=%d  primary=%d  nee_probe=%d  env_sample=%d  scatter=%d  starvation=%d  threads=%d" % [
+		int(profile.get("spectral_trace_count", 0)),
+		int(profile.get("bounce_count", 0)),
 		int(profile.get("primary_intersect_count", 0)),
 		int(profile.get("secondary_intersect_count", 0)),
-		int(profile.get("spectral_trace_count", 0)),
 		int(profile.get("surface_lighting_count", 0)),
 		int(profile.get("volume_sampling_count", 0)),
-		int(profile.get("primary_hit_reuse_count", 0)),
+		int(profile.get("starvation_terminations", 0)),
 		int(profile.get("thread_count", 0)),
 	])
 

@@ -13,6 +13,7 @@
 #include <vector>
 #include <cmath>
 #include <string>
+#include <atomic>
 
 namespace gem {
 
@@ -30,9 +31,7 @@ using godot::Basis;
 static constexpr double AIR_IOR = 1.0;
 static constexpr double TRACE_EPSILON = 0.0005;
 static constexpr int    MAX_BOUNCES = 128;
-static constexpr double MIN_THROUGHPUT_RR = 0.05;  // Russian roulette threshold
-static constexpr double MAX_SURVIVAL_PROB = 0.95;
-static constexpr int    RR_START_BOUNCE = 5;        // Start RR after this many bounces
+static constexpr int    RR_START_BOUNCE = 5;        // Start throughput cutoff after this many bounces
 static constexpr int    HERO_WAVELENGTHS = 4;       // Wavelengths per path (multi-hero spectral)
 static constexpr double PI = 3.14159265358979323846;
 static constexpr double TWO_PI = 6.28318530717958647692;
@@ -466,6 +465,20 @@ struct TraceContext {
 
     // SPP-dependent variance budget (computed from samples_per_pixel)
     VarianceBudget variance_budget;
+};
+
+// ---------------------------------------------------------------------------
+// TraceStats — thread-safe counters aggregated across all trace threads.
+// ---------------------------------------------------------------------------
+
+struct TraceStats {
+    std::atomic<int64_t> primary_intersect_count{0};
+    std::atomic<int64_t> secondary_intersect_count{0};   // NEE exit probe intersections
+    std::atomic<int64_t> spectral_trace_count{0};         // trace_path / trace_path_spectral calls
+    std::atomic<int64_t> surface_lighting_count{0};       // environment::sample() evaluations
+    std::atomic<int64_t> volume_scatter_count{0};         // scatter events
+    std::atomic<int64_t> bounce_count{0};                 // total bounces across all paths
+    std::atomic<int64_t> starvation_terminations{0};      // paths terminated by NEE starvation
 };
 
 // ---------------------------------------------------------------------------

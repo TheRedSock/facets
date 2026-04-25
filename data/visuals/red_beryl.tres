@@ -84,6 +84,7 @@ orthographic_metadata = {
 [resource]
 script = ExtResource("2_pfaq8")
 visual_id = &"red_beryl"
+experimental = true
 cut_spec = SubResource("Resource_pcxa7")
 display_color = Color(0.8666667, 0.24705882, 0.43529412, 1)
 mineral_template = ExtResource("3")
