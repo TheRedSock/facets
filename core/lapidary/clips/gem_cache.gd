@@ -17,7 +17,7 @@ extends RefCounted
 ## and the next bake overwrites it in place. Bumping LOOK_VERSION retires every
 ## cache at once (foreign-GPU caches regenerate rather than diffing).
 
-const LOOK_VERSION := 1
+const LOOK_VERSION := 2
 const USER_ROOT := "user://gemcache"
 const GENERATED_ROOT := "res://generated/gemcache"
 

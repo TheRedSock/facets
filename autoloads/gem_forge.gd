@@ -149,13 +149,13 @@ func _process(_delta: float) -> void:
 
 ## One-time job setup (stone compile + buffer upload). Runs in its own tick.
 func _begin_job(item: Dictionary) -> Dictionary:
-	var policy := GemRung.policy(item["rung"])
+	var stone: GemStone = item["stone"]
+	var instance := LapidaryStoneCompiler.compile(stone)
+	var policy := GemRung.policy(item["rung"], GemRung.scatter_noisy(instance))
 	var tracer := _tracer_for(int(policy["res"]))
 	if tracer == null:
 		_abort_queue()
 		return {}
-	var stone: GemStone = item["stone"]
-	var instance := LapidaryStoneCompiler.compile(stone)
 	tracer.configure_stone(instance, _active_rig_lights(), policy)
 	tracer.set_seed(int(instance["seed"]))
 	tracer.set_background(_active_rig_background())

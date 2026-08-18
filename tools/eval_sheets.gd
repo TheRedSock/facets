@@ -179,7 +179,6 @@ func _sheet_rungs() -> void:
 	var preview_ms_sum := 0.0
 	for rung: int in rungs:
 		var policy: Dictionary = GemRung.policy(rung)
-		var spp := int(policy["spp"])
 		var hero_note := ""
 		if rung == GemRung.HERO:
 			var projected := preview_ms_sum * HERO_PROJECTION_FACTOR
@@ -188,7 +187,6 @@ func _sheet_rungs() -> void:
 				hero_note = " SPP128"
 				_warn("hero projection %.0f ms exceeds %.0f ms budget - hero spp reduced 512 -> %d" % [
 					projected, HERO_BUDGET_MS, HERO_REDUCED_SPP])
-			spp = _hero_spp
 		var res := int(policy["res"])
 		var tracer := GemTracer.create(res, res)
 		if tracer == null:
@@ -196,8 +194,11 @@ func _sheet_rungs() -> void:
 			continue
 		for sd: Array in stone_defs:
 			var stone: GemStone = sd[1]
-			var ms := _render(tracer, instances[sd[0]], stone.seed, _rig_gameplay,
-				policy, spp, int(policy["batch"]))
+			var inst: Dictionary = instances[sd[0]]
+			var stone_policy: Dictionary = GemRung.policy(rung, GemRung.scatter_noisy(inst))
+			var stone_spp := _hero_spp if rung == GemRung.HERO else int(stone_policy["spp"])
+			var ms := _render(tracer, inst, stone.seed, _rig_gameplay,
+				stone_policy, stone_spp, int(stone_policy["batch"]))
 			if rung == GemRung.PREVIEW:
 				preview_ms_sum += ms
 			var img := tracer.finalize_print(GemPrint.new(), false, EXPOSURE)
@@ -209,7 +210,7 @@ func _sheet_rungs() -> void:
 			}
 			rung_tile_ms["%s %s" % [sd[0].to_lower(), GemRung.rung_name(rung)]] = snappedf(ms, 0.01)
 			print("  rung %-10s %-8s %8.1f ms (%d spp @ %dpx)" % [
-				GemRung.rung_name(rung), sd[0], ms, spp, res])
+				GemRung.rung_name(rung), sd[0], ms, stone_spp, res])
 		tracer.release()
 	_timings["rung_sheet_tile_ms"] = rung_tile_ms
 	var tiles: Array = []

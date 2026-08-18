@@ -105,7 +105,7 @@ profile() -> Dictionary                            # ms, paths/s, per-feature to
 Path per sample:
 1. Camera ray (ortho for board/sprites) → hull test. Miss → transparent (alpha accumulates coverage).
 2. Entry: Fresnel R(θ,λ). Add `R × env(reflect)` (surface sparkle), refract in with weight T. Microfacet (GGX) normal perturbation from polish/wear field at the facet-local UV.
-3. Interior loop (≤ rung.max_bounces): march segment; Beer–Lambert with α(λ)·zoning; stochastic scatter event vs σ_s (HG); test analytic inclusion list — on hit, archetype-specific interaction (needle: aligned spec + scatter; veil/cloud: dense local scatter; crystal: tinted refract-scatter). At hull exit hit: **deterministic split** — add `T × env(refract_dir) × throughput`, continue with `throughput × R` along reflection; TIR continues at full weight. Kill at ε throughput.
+3. Interior loop (≤ rung.max_bounces): march segment; Beer–Lambert with α(λ)·zoning; at most one HG scatter (homogeneous σ_s *or* a cloud/fingerprint primitive), then NEE the remaining hull chord into the analytic rig — milk is σ, not bounce count. Other inclusions stay archetype-specific (needle/platelet: aligned rough-specular silk; crystal: tinted sphere reflect). At hull exit: **deterministic split** — add `T × env(refract_dir) × throughput`, continue with `throughput × R` along reflection; TIR continues at full weight. Kill at ε throughput.
 4. Accumulate XYZ via CMF weights into float32 buffer.
 
 Second dispatch (print pass): XYZ→sRGB linear→exposure→tonescale→chroma governor→optional micro-bloom→sRGB8 + AA alpha. `raw` flag bypasses print (display transform only).

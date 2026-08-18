@@ -8,8 +8,12 @@
 //
 // Deterministic Fresnel splitting: at every interior exit the transmitted
 // branch immediately evaluates the analytic environment; the reflected / TIR
-// branch continues. Stochastic parts: AA jitter, hero-lambda stratification,
-// GGX wear perturbation, volume/inclusion scatter.
+// branch continues. HG scatter (homogeneous volume or cloud primitive) is
+// the same bet: at most one event, then the remaining chord to the hull
+// evaluates the analytic rig (NEE). Needle/platelet silk is rough-specular
+// and does not consume that slot.
+// Stochastic parts: AA jitter, hero-lambda stratification, GGX wear,
+// the scatter direction, inclusion hits.
 //
 // Batch-ready: instances are laid out on a pixel grid (grid 1x1 = single
 // stone). Stones are ranges into shared plane/inclusion/absorption buffers.
@@ -393,6 +397,64 @@ float zoning_scale(Stone st, vec3 p) {
 	return 1.0 + contrast * band;
 }
 
+// Beer-Lambert over a chord. Zoning sampled at the midpoint.
+vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl) {
+	float size_mm = st.sell_b_size.w;
+	vec3 mid = pos + dir * (t * 0.5);
+	float zf = zoning_scale(st, mid) * st.wear1.w;
+	vec4 alpha;
+	if (has_eray) {
+		float ca = abs(dot(dir, st.optic_fluor.xyz));
+		float mix_e = ca * ca;
+		for (int i = 0; i < 4; i++) {
+			alpha[i] = mix(absorb_at(a_off, wl[i]), absorb_at(a_off + 81, wl[i]), mix_e);
+		}
+	} else {
+		alpha = vec4(absorb_at(a_off, wl.x), absorb_at(a_off, wl.y), absorb_at(a_off, wl.z), absorb_at(a_off, wl.w));
+	}
+	return exp(-alpha * zf * (t * size_mm));
+}
+
+// After an HG scatter (homogeneous volume or cloud primitive): remaining
+// chord to the hull, then the analytic rig. Continues only the TIR/reflect
+// branch. One HG event per path — milk is σ, not bounce count.
+void scatter_nee(Stone st, int p_off, int p_cnt, int a_off, bool has_eray,
+		vec4 wl, vec4 n_wl, float n_geom, vec4 q, float rig_yaw, vec4 role_mult, vec4 dirt_tint,
+		inout vec3 pos, inout vec3 dir, inout vec4 throughput, inout vec4 radiance,
+		inout float fluor_absorbed, inout uint rng) {
+	float t_nee;
+	int nee_plane;
+	hull_exit(p_off, p_cnt, pos, dir, t_nee, nee_plane);
+	vec4 att_n = segment_att(st, pos, dir, t_nee, a_off, has_eray, wl);
+	if (FLAG_FLUOR && st.optic_fluor.w > 0.0) {
+		vec4 pump = smoothstep(vec4(620.0), vec4(480.0), wl);
+		fluor_absorbed += dot(throughput * (vec4(1.0) - att_n), pump);
+	}
+	throughput *= att_n;
+	pos += dir * t_nee;
+	float rough = surface_roughness(st, nee_plane, pos, planes[nee_plane].n_d.xyz, pc.seed);
+	vec3 en = rounded_normal(p_off, p_cnt, pos, nee_plane, st.wear1.y);
+	en = ggx_perturb(en, rough, rng);
+	if (dot(dir, en) < 0.02) { en = planes[nee_plane].n_d.xyz; }
+	float ci = clamp(dot(dir, en), 0.0, 1.0);
+	float s2o = n_geom * n_geom * (1.0 - ci * ci);
+	if (s2o < 1.0) {
+		vec4 r_exit = vec4(
+			fresnel_diel(ci, n_wl.x), fresnel_diel(ci, n_wl.y),
+			fresnel_diel(ci, n_wl.z), fresnel_diel(ci, n_wl.w));
+		float cto = sqrt(1.0 - s2o);
+		vec3 dout = normalize(n_geom * dir - (n_geom * ci - cto) * en);
+		radiance += throughput * (vec4(1.0) - r_exit) * dirt_tint
+			* env_radiance(quat_rot(q, dout), wl, rig_yaw, role_mult);
+		throughput *= r_exit;
+	}
+	dir = normalize(reflect(dir, en));
+	if (dot(dir, planes[nee_plane].n_d.xyz) > 0.0) {
+		dir = normalize(reflect(dir, planes[nee_plane].n_d.xyz));
+	}
+	pos -= planes[nee_plane].n_d.xyz * (T_EPS * 4.0);
+}
+
 // ================================================================= main
 void main() {
 	ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
@@ -498,27 +560,17 @@ void main() {
 
 				float t_scat = INF;
 				int vol_mode = VOLUME_MODE;
-				bool vol_allowed = vol_mode == 2 || (vol_mode == 1 && scatter_events == 0);
+				// One scatter event even in VOLUME_FULL: a random walk of HG
+				// events is the quartz noise source. Milk reads from sigma, not
+				// from bounce count. VOLUME_OFF still skips scatter entirely.
+				bool vol_allowed = vol_mode != 0 && scatter_events == 0;
 				if (sigma > 0.001 && vol_allowed) {
 					t_scat = -log(max(1e-6, 1.0 - rnd(rng))) / (sigma * size_mm);
 				}
 
 				float t_ev = min(t_exit, min(t_incl, t_scat));
 
-				// Beer-Lambert over the segment (zoning sampled at midpoint).
-				vec3 mid = pos + dir * (t_ev * 0.5);
-				float zf = zoning_scale(st, mid) * st.wear1.w;
-				vec4 alpha;
-				if (has_eray) {
-					float ca = abs(dot(dir, st.optic_fluor.xyz));
-					float mix_e = ca * ca;
-					for (int i = 0; i < 4; i++) {
-						alpha[i] = mix(absorb_at(a_off, wl[i]), absorb_at(a_off + 81, wl[i]), mix_e);
-					}
-				} else {
-					alpha = vec4(absorb_at(a_off, wl.x), absorb_at(a_off, wl.y), absorb_at(a_off, wl.z), absorb_at(a_off, wl.w));
-				}
-				vec4 seg_att = exp(-alpha * zf * (t_ev * size_mm));
+				vec4 seg_att = segment_att(st, pos, dir, t_ev, a_off, has_eray, wl);
 				if (FLAG_FLUOR && st.optic_fluor.w > 0.0) {
 					vec4 pump = smoothstep(vec4(620.0), vec4(480.0), wl);
 					fluor_absorbed += dot(throughput * (vec4(1.0) - seg_att), pump);
@@ -526,10 +578,12 @@ void main() {
 				throughput *= seg_att;
 
 				if (t_scat <= t_incl && t_scat <= t_exit) {
-					// Volume scatter event.
 					pos += dir * t_scat;
 					dir = hg_sample(dir, hg_g, rng);
 					scatter_events++;
+					scatter_nee(st, p_off, p_cnt, a_off, has_eray, wl, n_wl, n_geom, q,
+						rig_yaw, role_mult, dirt_tint, pos, dir, throughput, radiance,
+						fluor_absorbed, rng);
 				} else if (t_incl < t_exit) {
 					// Inclusion interaction. Needles (rutile silk) and platelets are
 					// rough-SPECULAR reflectors off their geometry — silk reads as
@@ -550,7 +604,6 @@ void main() {
 						if (rnd(rng) < dens) {
 							dir = normalize(reflect(dir, ggx_perturb(n_cyl, 0.30, rng)));
 							throughput *= tnt;
-							scatter_events++;
 						} else {
 							pos += dir * (T_EPS * 8.0);
 						}
@@ -560,15 +613,20 @@ void main() {
 						if (rnd(rng) < dens) {
 							dir = normalize(reflect(dir, ggx_perturb(n_dsc, 0.22, rng)));
 							throughput *= tnt;
-							scatter_events++;
 						} else {
 							pos += dir * (T_EPS * 8.0);
 						}
 					} else {
-						if (rnd(rng) < dens) {
+						// Cloud / fingerprint (kernel type 2). Same one-HG+NEE
+						// contract as volume milk — a cloud random-walk is the
+						// remaining quartz grain at 160 spp.
+						if (scatter_events == 0 && rnd(rng) < dens) {
 							dir = hg_sample(dir, 0.45, rng);
 							throughput *= tnt;
 							scatter_events++;
+							scatter_nee(st, p_off, p_cnt, a_off, has_eray, wl, n_wl, n_geom, q,
+								rig_yaw, role_mult, dirt_tint, pos, dir, throughput, radiance,
+								fluor_absorbed, rng);
 						} else {
 							pos += dir * (T_EPS * 8.0);
 						}
@@ -606,12 +664,12 @@ void main() {
 		vec3 xyz = (radiance.x * cie_xyz(wl.x) + radiance.y * cie_xyz(wl.y)
 			+ radiance.z * cie_xyz(wl.z) + radiance.w * cie_xyz(wl.w)) * pc.spectral_norm;
 		if (FLAG_FLUOR && st.optic_fluor.w > 0.0 && fluor_absorbed > 0.0) {
-			// Phenomenological glow: pump-band losses re-emitted at the fluorescence
-			// line. Absorbed tally saturates so long multi-bounce paths cannot
-			// stack into a flat wash that erases facet contrast.
+			// Daylight fluorescence: pump-band losses re-emitted at the
+			// authored line. Strength on the chromophore is the yield lever;
+			// do not multiply by an extra gain (that was a matte wash on ruby).
 			float pump = min(fluor_absorbed, 1.0);
 			pump *= pump * (3.0 - 2.0 * pump); // ease-in: weak paths glow weakly
-			xyz += cie_xyz(st.wear1.z) * (pump * st.optic_fluor.w * pc.spectral_norm * 5.5);
+			xyz += cie_xyz(st.wear1.z) * (pump * st.optic_fluor.w * pc.spectral_norm);
 		}
 		total_xyz += xyz;
 	}

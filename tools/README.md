@@ -33,7 +33,9 @@ Times 1/16/64-gem batched dispatches per quality rung; prints ms/gem. The number
 
 Clears the cache, then measures time-to-first-idle and full-catalog generation through the launcher path.
 
-### `eval_sheets.gd` — Evaluation sheets
+### `noise_spp_check.gd` — SPP ladder + ruby ablation
+
+Windowed. Writes `artifacts/lookdev/noise/` (spp ladder, ruby ablation, metrics.json). Use this after kernel scatter/fluorescence changes — not a denoiser check. The SPP list is explicit so rungs' scatter-noisy spp multiplier does not confound the ladder.
 
 Composes the montages in `artifacts/eval/`: contact sheet, grade sheet, lighting sheet, rung ladder, clip filmstrips, timing table.
 

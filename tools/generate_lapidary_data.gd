@@ -333,11 +333,15 @@ func _build_chromophores() -> Dictionary:
 	# Cr3+ in corundum (o-ray): Y band ~410 nm, U band ~556 nm, window ~480 nm
 	# (slight blue leak -> purplish red), open > 620 nm, weak R-line 694 nm.
 	# e-ray: bands shift ~420 / ~552 and the U band weakens -> more orange-red.
+	# Concentration 0.55: curves were sized for a 2×size_mm path; a brilliant
+	# TIR path is ~4×size_mm, so 1.0 made pavilion return die and the stone
+	# read as opaque. Daylight fluorescence 0.05 (UV-lamp 0.5 lives on the
+	# species; the kernel no longer applies a 5.5× glow gain).
 	out[&"ruby_cr"] = _chromophore(&"ruby_cr", "Chromium (ruby, corundum)",
-		"Cr3+ in corundum. o-ray: Y band ~410 nm, U band ~556 nm (GIA G&G Spring 2020 Dubinsky et al.; Cr:Al2O3 405-408/550-558 nm), ~480 nm transmission window, R-line 694 nm. e-ray: ~420/~552 with weaker U band (modest pleochroism, o/e). Peak alpha ~1.7/mm so a ~5.4 mm stone saturates green/violet but keeps the red open.",
+		"Cr3+ in corundum. o-ray: Y band ~410 nm, U band ~556 nm (GIA G&G Spring 2020 Dubinsky et al.; Cr:Al2O3 405-408/550-558 nm), ~480 nm transmission window, R-line 694 nm. e-ray: ~420/~552 with weaker U band (modest pleochroism, o/e). Concentration 0.55 so a 5.4 mm stone keeps pavilion-returned red over a ~4×size TIR path. Daylight fluorescence override 0.05 @ 693 nm (not the UV-lamp 0.5 on the species).",
 		_curve(0.04, [[1.55, 410.0, 26.0], [1.65, 556.0, 34.0], [0.35, 380.0, 30.0], [0.05, 694.0, 6.0]]),
 		_curve(0.045, [[1.40, 420.0, 26.0], [1.30, 552.0, 31.0], [0.30, 380.0, 30.0], [0.05, 694.0, 6.0]]),
-		Color(0.88, 0.11, 0.25))
+		Color(0.88, 0.11, 0.25), 0.05, 693.0, 0.55)
 
 	# Fe2+-Ti4+ IVCT: broad band ~580 nm reaching 700, blue window 440-480,
 	# weak Fe3+ features ~377/388/450.
@@ -557,14 +561,15 @@ func _archetype(id: StringName, form: int, size_range: Vector2, aspect: float,
 
 func _chromophore(id: StringName, display_name: String, note: String,
 		curve: PackedFloat32Array, eray: PackedFloat32Array, ui: Color,
-		fluor_strength_override := -1.0, fluor_nm_override := 0.0) -> Resource:
+		fluor_strength_override := -1.0, fluor_nm_override := 0.0,
+		concentration := 1.0) -> Resource:
 	var chromo: Resource = ChromophoreScript.new()
 	chromo.chromophore_id = id
 	chromo.display_name = display_name
 	chromo.source_note = note
 	chromo.absorption_mm = curve
 	chromo.absorption_eray_mm = eray
-	chromo.concentration = 1.0
+	chromo.concentration = concentration
 	chromo.ui_color = ui
 	chromo.fluorescence_strength_override = fluor_strength_override
 	chromo.fluorescence_emission_nm_override = fluor_nm_override
@@ -663,7 +668,7 @@ const BL_KEYS := {
 
 
 func _print_beer_lambert(chromophores: Dictionary, stones: Array) -> void:
-	print("\nBeer-Lambert check, T = exp(-alpha * 2 * size_mm):")
+	print("\nBeer-Lambert check, T2 = exp(-alpha * 2 * size_mm), T4 = 4×size TIR path:")
 	for stone: Resource in stones:
 		if stone.chromophore == null:
 			continue
@@ -672,7 +677,8 @@ func _print_beer_lambert(chromophores: Dictionary, stones: Array) -> void:
 		var parts := PackedStringArray()
 		for wl: float in keys:
 			var idx := clampi(int(round((wl - 380.0) / 5.0)), 0, 80)
-			var alpha: float = chromo.absorption_mm[idx]
+			var alpha: float = chromo.absorption_mm[idx] * chromo.concentration
 			var t := exp(-alpha * 2.0 * stone.size_mm)
-			parts.append("%dnm a=%.3f T=%.3f" % [int(wl), alpha, t])
+			var t4 := exp(-alpha * 4.0 * stone.size_mm)
+			parts.append("%dnm a=%.3f T2=%.3f T4=%.3f" % [int(wl), alpha, t, t4])
 		print("  %-10s (%.2f mm): %s" % [stone.stone_id, stone.size_mm, "; ".join(parts)])

@@ -241,7 +241,8 @@ func _process(_delta: float) -> void:
 func _rebuild_now() -> void:
 	var instance := LapidaryStoneCompiler.compile(_stone)
 	_fingerprint = str(instance.get("fingerprint", ""))
-	_tracer.configure_stone(instance, GemRigCompiler.pack(_rig), GemRung.policy(GemRung.PREVIEW))
+	_tracer.configure_stone(instance, GemRigCompiler.pack(_rig),
+		GemRung.policy(GemRung.PREVIEW, GemRung.scatter_noisy(instance)))
 	# configure_stone does not ingest these itself (see atelier/TRACER_NEEDS.md).
 	_tracer.set_seed(int(instance["seed"]))
 	_tracer.set_background(GemRigCompiler.background(_rig))

@@ -81,8 +81,11 @@ light_count, grid, cell_px, bg zenith/horizon/below, spectral_norm, rad_clamp.
 
 ## Rung flags (engineering policy — `core/lapidary/tracer/rung.gd`)
 dispersion_split (per-λ paths), birefringence_fork, volume_mode
-(0 off / 1 single-forced-scatter / 2 full), max_bounces, spp per dispatch,
-internal resolution → output size, denoise (0 none / 1 à-trous light).
+(0 off / 1 single-forced-scatter / 2 full-features; both 1 and 2 allow at most
+one HG event — homogeneous volume *or* cloud/fingerprint primitive — then NEE
+the remaining hull; milk is σ, not bounce count. Needle/platelet silk stays
+rough-specular and does not consume the HG slot), max_bounces, spp per dispatch,
+internal resolution → output size, denoise (always 0; no à-trous).
 
 ## Clip sample (what a render call receives)
 time_norm, stone quaternion (rest ∘ motion), rig yaw (radians), per-role power

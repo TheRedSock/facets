@@ -43,12 +43,21 @@ const TABLE := {
 }
 
 ## Species hints may raise spp (scatter-noisy minerals), never lower physics.
+## "Noisy" is compiled σ_s (T1 quartz haze ~0.25/mm), not the species base.
+const SCATTER_NOISY_SIGMA := 0.12
+
+static func scatter_noisy(instance: Dictionary) -> bool:
+	var scat: Dictionary = instance.get("scatter", {})
+	return float(scat.get("sigma_per_mm", 0.0)) > SCATTER_NOISY_SIGMA
+
+
 static func policy(rung: int, species_scatter_noisy := false) -> Dictionary:
 	var p: Dictionary = TABLE[rung].duplicate()
 	if species_scatter_noisy and rung >= PREVIEW:
-		p["spp"] = int(p["spp"] * 1.5)
-	# Dispersion only splits paths for species where it reads (policy applied
-	# by the stone compiler against species dispersion strength).
+		# CLIP_BAKE/HERO: quartz at 160 spp is still sandy; 3x (~480) was the
+		# first usable stop on the spp ladder. Preview stays a lighter 1.5x.
+		var mul := 3.0 if (rung == CLIP_BAKE or rung == HERO) else 1.5
+		p["spp"] = int(round(float(p["spp"]) * mul))
 	return p
 
 

@@ -26,7 +26,8 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat3
 		background := Vector3(0.30, 0.16, 0.05), shared_tracer: GemTracer = null) -> Dictionary:
 	if stone == null or clip == null or stone.species == null or lights.is_empty():
 		return {}
-	var policy := GemRung.policy(rung)
+	var instance := LapidaryStoneCompiler.compile(stone)
+	var policy := GemRung.policy(rung, GemRung.scatter_noisy(instance))
 	var res: int = policy["res"]
 	var out: int = policy["out"]
 	var spp: int = policy["spp"]
@@ -41,7 +42,6 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat3
 		"shared_tracer size must match the rung's internal resolution")
 
 	var t0 := Time.get_ticks_usec()
-	var instance := LapidaryStoneCompiler.compile(stone)
 	tracer.configure_stone(instance, lights, policy)
 	tracer.set_seed(int(instance["seed"]))
 	tracer.set_background(background)
