@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://b2o4q4jx2in0k"
+path="res://.godot/imported/gem_pathtrace.glsl-23b2d4c2b469cc0d58300c7c3a741af8.res"
+
+[deps]
+
+source_file="res://core/lapidary/tracer/shaders/gem_pathtrace.glsl"
+dest_files=["res://.godot/imported/gem_pathtrace.glsl-23b2d4c2b469cc0d58300c7c3a741af8.res"]
+
+[params]
+

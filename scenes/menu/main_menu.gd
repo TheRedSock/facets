@@ -1,7 +1,7 @@
 extends Control
 
 ## Main Menu — entry point for the game.
-## Provides navigation to the Run scene and the active gem bake workbench.
+## Provides navigation to the Run scene and the Gem Atelier (lapidary designer).
 
 
 func _ready() -> void:
@@ -54,30 +54,18 @@ func _ready() -> void:
 	play_btn.pressed.connect(_on_play)
 	vbox.add_child(play_btn)
 
-	# ---- Gem Bake Workbench button ----
-	var gallery_btn := Button.new()
-	gallery_btn.text = "Gem Bake Workbench"
-	gallery_btn.custom_minimum_size = Vector2(300, 56)
-	gallery_btn.add_theme_font_size_override("font_size", 24)
-	gallery_btn.pressed.connect(_on_gallery)
-	vbox.add_child(gallery_btn)
-
-	# ---- Gem designer (runtime) ----
-	var designer_btn := Button.new()
-	designer_btn.text = "Gem Designer"
-	designer_btn.custom_minimum_size = Vector2(300, 56)
-	designer_btn.add_theme_font_size_override("font_size", 24)
-	designer_btn.pressed.connect(_on_designer)
-	vbox.add_child(designer_btn)
+	# ---- Gem Atelier (lapidary designer) ----
+	var atelier_btn := Button.new()
+	atelier_btn.text = "Gem Atelier"
+	atelier_btn.custom_minimum_size = Vector2(300, 56)
+	atelier_btn.add_theme_font_size_override("font_size", 24)
+	atelier_btn.pressed.connect(_on_atelier)
+	vbox.add_child(atelier_btn)
 
 
 func _on_play() -> void:
 	get_tree().change_scene_to_file("res://scenes/main/main.tscn")
 
 
-func _on_gallery() -> void:
-	get_tree().change_scene_to_file("res://scenes/design/gem_bake_workbench.tscn")
-
-
-func _on_designer() -> void:
-	get_tree().change_scene_to_file("res://scenes/design/gem_designer.tscn")
+func _on_atelier() -> void:
+	get_tree().change_scene_to_file("res://scenes/design/gem_atelier.tscn")

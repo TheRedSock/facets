@@ -55,33 +55,33 @@ Never hardcode gravity direction.
 ## Project Structure
 
 ```
-core/board/     Simulation: board, tiles, matching, effects, gravity, spawning
-core/rules/     Simulation: RNG, event logging, event timeline
-core/run/       Simulation: run lifecycle, turn pipeline
-core/visuals/   Gem geometry: spec loading, topology, projection, mesh assembly, lighting
-native/         C++ GDExtension: Embree ray tracer (GemTraceKernel)
-native/src/     C++ source for native tracer
-resources/      Resource class definitions (data schemas)
-data/tiles/     Tile definition .tres files (8-gem merge ladder)
-data/visuals/   GemVisualResource .tres + cut_specs/ for gem geometry
-config/         Version-controlled config (bake profiles)
-autoloads/      Singletons (config, replay, save, debug, tile registry, gem visuals)
-scenes/menu/    Main menu
-scenes/design/  Gem bake workbench (offline bake + preview)
-scenes/run/     Run gameplay (wires simulation to rendering)
-scenes/board/   Board rendering, animation, input
-scenes/tile/    Tile visuals (texture cache + procedural fallback)
-scenes/main/    Run entry point
-scenes/debug/   Debug panel (F1)
-tools/          Design-time utilities (board validator, bake CLI)
-tests/          Headless tests
-plans/          Design docs (reference only, not code)
+core/board/           Simulation: board, tiles, matching, effects, gravity, spawning
+core/rules/           Simulation: RNG, event logging, event timeline
+core/run/             Simulation: run lifecycle, turn pipeline
+core/lapidary/        GPU gem pipeline (CPU side): stone compiler, cut language, lighting, clips, eval
+core/lapidary/tracer/ GPU tracer host + GLSL compute shaders (path trace, print pass)
+resources/            Resource class definitions (data schemas)
+resources/lapidary/   Species, chromophore, grade, stone, cut, clip, rig, print schemas
+data/tiles/           Tile definition .tres files (merge ladders)
+data/lapidary/        Authored gem data: species/chromophores/grades/stones/cuts/clips/rigs
+autoloads/            Singletons (config, replay, save, debug, tile registry, GemForge)
+scenes/menu/          Main menu
+scenes/design/        Gem Atelier (progressive preview + clip scrub)
+scenes/run/           Run gameplay (wires simulation to rendering)
+scenes/board/         Board rendering, animation, input
+scenes/tile/          Tile visuals (GemForge clips + placeholder fallback)
+scenes/main/          Run entry point
+scenes/debug/         Debug panel (F1)
+tools/                Design-time utilities (board validator, data generator, GPU checks, eval sheets)
+tests/                Headless tests (simulation + lapidary CPU layers)
+docs/                 Architecture docs (lapidary-architecture.md is the pipeline authority)
+plans/                Design docs (reference only, not code)
+artifacts/            Rendered evaluation output (sheets, lookdev) — not shipped
 ```
 
 ### Deprecated
 
 - `autoloads/perf_monitor.gd` — not autoloaded, unused
-- `core/visuals/gem_material_sampler.gd` — used by procedural 2D renderer; native has C++ port
 - No runtime loading screen in current flow
 
 ### Layer Boundaries
@@ -90,8 +90,7 @@ plans/          Design docs (reference only, not code)
 |---|---|---|
 | `core/board/` | Other `core/`, `SeededRng` | Scenes, autoloads (exception: `EffectResolver` reads `TileRegistry` for merge chains) |
 | `core/run/` | `core/board/`, `core/rules/`, `ReplayService` | Scenes |
-| `core/visuals/` | `resources/visuals/` | Scenes, autoloads, `core/board/` |
-| `native/` | godot-cpp, Embree, `resources/visuals/` | GDScript, scenes, autoloads |
+| `core/lapidary/` | `resources/lapidary/`, `RenderingDevice` | Scenes, autoloads, `core/board/` |
 | `scenes/` | `core/` (read-only), autoloads | Must not mutate board state |
 | `autoloads/` | `core/`, `resources/` | Scenes |
 | `resources/` | Nothing | Everything |
@@ -149,7 +148,8 @@ RunScene._on_swap_requested(cell_a, cell_b)
 - **Survivor (first cascade):** prefers swap destination, then origin cell
 - **Survivor (later cascades):** last cell in match array (bottom-right bias)
 - Merge chain: `tile.merge_target_id` → `TileRegistry` lookup → new tile_id/tier/match_group/family_tags
-- **Ladder:** Quartz(T1) → Amethyst(T2) → Peridot(T3) → Topaz(T4) → Sapphire(T5) → Emerald(T6) → Ruby(T7) → Diamond(T8)
+- **Main ladder:** Quartz(T1) → Amethyst(T2) → Peridot(T3) → Topaz(T4) → Sapphire(T5) → Emerald(T6) → Ruby(T7) → Diamond(T8)
+- **Alternate ladder:** Fluorite(T1) → Smoky Quartz(T2) → Tourmaline(T3) → Rhodolite(T4) → Aquamarine(T5) → Alexandrite(T6) → Painite(T7) → Blue Garnet(T8)
 - T8 matches: pure removal. `EffectPlanner.MAX_STANDARD_TIER = 8`
 - Debug tiles (no merge_target_id): fallback `tier += 1`
 
@@ -242,92 +242,43 @@ Loads `.tres` from `data/tiles/`. Key API: `get_definition(tile_id)`, `create_ti
 
 Used by `SpawnResolver` (tile creation) and `EffectResolver` (merge chains). Both fall back gracefully when unavailable.
 
-### GemVisualRegistry
+### GemForge
 
-Loads `GemVisualResource` from `data/visuals/`, compiles/caches geometry on demand. Key API:
+Launcher/cache/manifest for gem visuals (`autoloads/gem_forge.gd`). Owns the GPU tracer instance and background clip baking. Key API:
 
-- `get_visual(tile_id)`, `get_cut(geometry_signature)`, `get_cut_model(geometry_signature)`
-- `ensure_gameplay_texture_cache(draw_size)` / `get_gameplay_texture(...)`
-- `get_gameplay_lighting_blend_set(...)` / `get_gameplay_rotation_blend_set(...)` → `{atlas, layer_index, weights}` for shader
-- `load_run_gems(tile_ids)` / `unload_run_gameplay_textures()` — run-scoped memory
-- `gameplay_texture_cache_rebuilt` signal
+- `get_clip(tile_id, clip_id) -> Dictionary` — cached authored clip frames (empty if not baked yet)
+- `ensure_required(tile_ids)` — priority-bakes the required-now set (run start), rest fills in the background
+- `get_placeholder_still(tile_id)` — synchronous single INTERACT-rung frame while clips bake
+- `cold_start_report()` — timing telemetry
+- `clip_ready(tile_id, clip_id)` signal — consumers upgrade visuals as bakes land
+
+Cache on disk keyed by stone fingerprint + clip id + rig + print + `look_version`; `data/lapidary/manifest.json` is the authored-catalog index. Requires a windowed process (GPU); in `--headless` it degrades to placeholder colours.
 
 ---
 
-## Gem Visual Pipeline
+## Lapidary — GPU Gem Pipeline
 
-Model-first: authored 3D geometry → offline-traced textures for gameplay, procedural 2D fallback when traced unavailable.
+Full architecture: `docs/lapidary-architecture.md` (pipeline authority). Buffer formats: `core/lapidary/tracer/KERNEL_CONTRACT.md`. Summary:
 
-### Pipeline Stages
-
-1. **GemCutSpecResource** (`data/visuals/cut_specs/`) — typed gem cut definition
-2. **GemCutCompiler3D** → **GemCutModelResource** — compiled 3D facet model (topology → normalize → validate)
-3. **GemCutProjector** → **GemProjectedCutResource** — 2D projection for procedural fallback
-4. **GemMeshAssembler** → **GemMeshResource** — trace-ready mesh for offline ray tracer
-
-All stages share `spec_id` / `geometry_signature` identifiers for cache coherence.
-
-### GemVisualResource
-
-`.tres` in `data/visuals/`, one per gem. References `cut_spec` + appearance config (color, specular, contrast, depth tint, dispersion, rim, translucency, extinction, etc.). See `resources/visuals/gem_visual_resource.gd` for full property list.
-
-### GemRenderer
-
-Pure `RefCounted`, no scene dependency. Computes flat-shaded per-facet colour via multi-pass lighting (diffuse half-lambert/lambert blend, Blinn-Phong specular, depth tint, gradient, translucency, rim, secondary specular, hue dispersion, sparkle, per-facet jitter, saturation boost, zone brilliance, transparency). Also `compute_pavilion_colors()` for extinction overlay.
+- **Tracer** — GLSL compute shader spectral path tracer on `RenderingDevice` (`core/lapidary/tracer/`). No CPU fallback, no denoiser. Deterministic Fresnel splitting (transmitted branch evaluates the analytic rig immediately; reflected/TIR branch continues) collapses variance at single-digit spp. 4 hero wavelengths share one path; dispersion-strong stones (diamond) split per wavelength.
+- **Geometry** — a stone is a convex plane set (tagged half-spaces), compiled from `GemCutTemplate` + silhouette by `core/lapidary/cut/cut_compiler.gd`, validated by the exact face test in `hull_validator.gd`. No triangle meshes, no BVH.
+- **Inclusions** — analytic primitives (needle, disc, ellipsoid, cloud, veil, fingerprint) seeded deterministically per stone from the species' inclusion vocabulary and the grade's clarity axis.
+- **Authoring layers** — `GemSpecies` (Sellmeier, birefringence, hardness, inclusion vocabulary) + `GemChromophore` (81-sample absorption curves, 380-780nm @ 5nm) + `GemCutTemplate` + `GemGrade` (cut/clarity/surface/crystal axes) + `GemStone` (the instance a tile references; `stone_id == tile_id`). All `.tres` under `data/lapidary/`, regenerated by `tools/generate_lapidary_data.gd` from published constants.
+- **Compilation** — `LapidaryStoneCompiler.compile(stone) -> Dictionary` (planes, absorption, inclusions, fingerprint). One compiled instance feeds both clip baking and live 3D draws; the board consumer is a packaging switch, decided by measured numbers.
+- **Lighting language** — `GemLightRig` resources (`data/lapidary/rigs/`), packed by `core/lapidary/lighting/rig_compiler.gd`. Grade is never faked with lighting; lighting changes are rig edits, A/B'd with `tools/rig_ab_check.gd`.
+- **House print** — mastering pass (`gem_print.glsl` + `GemPrint` resource): spectral → XYZ (2° CMFs) → linear sRGB (D65) → house tonescale/chroma governor → sRGB8, straight alpha. Applied identically to clips and live draws; versioned.
+- **Quality rungs** — `GemRung.TABLE`: `INTERACT`, `PREVIEW`, `BOARD_LIVE`, `CLIP_BAKE`, `HERO`. Policy objects (spp, bounces, dispersion, volume mode, batch size, rad clamp) — never hand-tune trace params per call site.
+- **Clips** — authored, named animations (`GemClip` in `data/lapidary/clips/`: idle, turn, flash) with lighting-relative motion, baked by the same kernel at `CLIP_BAKE`. No rotation/lighting lattice harvesting.
 
 ### TileView Visual Priority
 
-1. Offline-traced gameplay texture (when available)
-2. Procedural `_draw()` (compiled geometry + GemRenderer)
-3. Coloured rectangle (headless/debug fallback)
+1. GemForge authored clip (idle loop; event clips on merge/flash)
+2. GemForge placeholder still (synchronous INTERACT render)
+3. Coloured rectangle via `TileRegistry.get_tier_color` (headless / no data)
 
-Gameplay textures use `sampler2DArray` blend shader (`gameplay_sprite_blend.gdshader`). Registry provides `{atlas, layer_index, weights}` blend dicts. When no pre-built atlas exists, ad-hoc 4-layer atlas is constructed to keep the shader path unified.
+### GPU/Headless Constraint
 
----
-
-## Native Ray Tracer
-
-C++ GDExtension (`native/`) using Embree for BVH traversal. The sole tracer implementation.
-
-**API:** `trace_to_image(mesh_resource, visual, request) -> Image`, `get_last_trace_profile() -> Dictionary`.
-
-**Required:** The native extension must be compiled. The GDScript tracer (`gem_optics_tracer.gd`) has been removed; the native kernel is the sole implementation.
-
-**Build:** Requires MSVC 2022, Python 3.x, SCons.
-```bash
-cd native && python -m SCons platform=windows target=template_debug
-```
-Copy Embree DLLs once: `cp embree/bin/{embree4.dll,tbb12.dll} lib/win64/`
-
-### Offline Bake
-
-```bash
-godot --headless --path . --script res://tools/run_offline_gem_bake.gd -- [OPTIONS]
-```
-See script source for full flag reference.
-
-**Production bake** (profile-driven, spec at `config/bake_profiles/gameplay.json`):
-```bash
-godot --headless --path . --script res://tools/run_production_bake.gd -- --profile=res://config/bake_profiles/gameplay.json
-godot --headless --path . --script res://tools/validate_production_bake.gd -- --profile=res://config/bake_profiles/gameplay.json
-```
-
-### Bake Contexts
-
-| Context | Output | Manifest Priority |
-|---------|--------|-------------------|
-| Workbench / Dev CLI | `user://traced_bakes/` | 1st |
-| Production | `res://generated/traced_bakes/` | 2nd (fallback) |
-
-Runtime searches `user://` first, then `res://generated/`. To rebake: delete `user://traced_bakes/` manifest.
-
-**Gem appearance retuning policy:** Before editing per-gem spectra / phenomenon / gradients in `data/visuals/*.tres`, run an environment A/B (`neutral_warm_reference_v2.tres` vs `gameplay_studio_v2.tres`) with identical bake flags and `skip_stylize`, and review `tests/test_pavilion_proportions.gd` output — shallow crowns and cool-biased lighting can dominate “too cold” reads; isolate those first.
-
-### Asset Optimization
-
-- **GPU compression:** BC7/BPTC on load (constants in `GemTracedBakeContract`). ASTC on mobile, S3TC fallback. ~4x VRAM savings.
-- **Texture2DArray atlases:** per-gem lighting + rotation atlases. Shader samples 4 layers for bilinear blend.
-- **Run-scoped loading:** `load_run_gems(tile_ids)` / `unload_run_gameplay_textures()`. `GemAtlasCache` tracks scope + VRAM estimation.
+`RenderingDevice` does not exist under `--headless` (verified). GPU tools run windowed: `godot --path . --script res://tools/<tool>.gd`. Pure-CPU stages (cut compiler, data layer, stone compiler) stay headless-testable. Autoload identifiers are not compile-time-resolvable in `--script` mode — scene scripts resolve them via `get_node_or_null("/root/GemForge")` at runtime.
 
 ---
 
@@ -350,14 +301,15 @@ weights: Array[int] = [4, 3, 2, 1]     # INTEGER only
 ## Testing
 
 ```bash
-godot --headless --script tests/test_smoke.gd                # Core smoke tests
-godot --headless --script tests/test_gem_cuts.gd              # Cut regression
-godot --headless --script tests/test_native_trace_kernel.gd   # Native tracer
-godot --headless --script tests/test_trace_physics.gd         # Native spectral/uplift physics harness
-godot --headless --script tests/test_pavilion_proportions.gd  # Crown vs pavilion share (solver audit)
-godot --headless --script tests/test_rng_cross_platform.gd    # Cross-platform RNG
-godot --headless --script tests/test_gem_designer_contracts.gd # Designer JSON + preview enrich parity
+godot --headless --script tests/test_smoke.gd                       # Core simulation smoke
+godot --headless --script tests/test_rng_cross_platform.gd          # Cross-platform RNG
+godot --headless --script tests/lapidary/test_cut_compiler.gd       # Cut language -> hulls (30 cuts)
+godot --headless --script tests/lapidary/test_species_data.gd       # Species/chromophore/grade/stone data
+godot --headless --script tests/lapidary/test_clips.gd              # Clip resources + cache keys
+godot --headless --script tests/lapidary/test_board_consumer.gd     # TileView/GemForge contract
 ```
+
+GPU rendering checks are windowed tools, not headless tests: `tools/kernel_v1_check.gd`, `tools/rig_ab_check.gd`, `tools/ladder_check.gd`, `tools/board_grid_check.gd`, `tools/eval_sheets.gd`, `tools/board_visual_check.tscn`.
 
 ---
 
@@ -396,22 +348,22 @@ Designed but excluded from current scaffold. See `plans/deferred-systems-referen
 
 | Task | File(s) |
 |---|---|
-| New gem type | `.tres` in `data/tiles/` (auto-loaded) |
-| Gem visual appearance | `.tres` in `data/visuals/` |
-| New gem cut | `GemCutSpecResource` in `data/visuals/cut_specs/`, reference from `GemVisualResource` |
-| Cut outline math | `core/visuals/gem_cut_primitives.gd` |
-| Cut topology family | `core/visuals/gem_topology_builders_3d.gd` |
-| Lighting model | `core/visuals/gem_renderer.gd` — `compute_facet_color()` |
-| Visual modifier effect | `GemRenderer.compute_all_facet_colors()` modifiers dict |
-| New visual property | `resources/visuals/gem_visual_resource.gd` + `GemRenderer` + workbench if tooling needed |
-| Per-gem bake quality | `GemVisualResource.bake_quality_override` (-1.0 = auto) |
-| Pavilion extinction geometry | `core/visuals/gem_cut_projector.gd` / `gem_topology_builders_3d.gd` |
-| Pavilion extinction rendering | `core/visuals/gem_renderer.gd` — `compute_pavilion_colors()` |
-| Workbench preview/rebake | `scenes/design/gem_bake_workbench.tscn` |
-| Native trace logic | `native/src/gem_trace_kernel.cpp` (rebuild after) |
-| Native material sampling | `native/src/gem_trace_material.cpp` (rebuild after) |
-| Native Embree intersection | `native/src/gem_trace_scene.cpp` (rebuild after) |
-| Rebuild native extension | `cd native && python -m SCons platform=windows target=template_debug` |
+| New gem type | `.tres` in `data/tiles/` (auto-loaded) + `GemStone` in `data/lapidary/stones/` (`stone_id == tile_id`) |
+| Gem appearance (colour) | `GemChromophore` in `data/lapidary/chromophores/` (81-sample absorption) |
+| Mineral physics | `GemSpecies` in `data/lapidary/species/` (Sellmeier, birefringence, inclusions) |
+| Quality/wear per tier | `GemGrade` in `data/lapidary/grades/` (cut/clarity/surface/crystal) |
+| New gem cut | `GemCutTemplate` in `data/lapidary/cuts/` + `core/lapidary/cut/cut_compiler.gd` |
+| Regenerate data layer | `tools/generate_lapidary_data.gd` (headless) |
+| Trace/shading logic | `core/lapidary/tracer/shaders/gem_pathtrace.glsl` + `gem_tracer.gd` host |
+| Mastering / print | `core/lapidary/tracer/shaders/gem_print.glsl` + `GemPrint` resource |
+| GPU buffer formats | `core/lapidary/tracer/KERNEL_CONTRACT.md` (update when packing changes) |
+| Stone -> kernel packing | `core/lapidary/stone_compiler.gd` |
+| Quality rung policy | `core/lapidary/tracer/rung.gd` — `GemRung.TABLE` |
+| Lighting rigs | `data/lapidary/rigs/*.tres` + `core/lapidary/lighting/rig_compiler.gd` |
+| Named clip animations | `GemClip` in `data/lapidary/clips/` + `core/lapidary/clips/clip_baker.gd` |
+| Clip cache / manifest | `core/lapidary/clips/gem_cache.gd` / `gem_manifest.gd`, `autoloads/gem_forge.gd` |
+| Atelier preview/scrub | `scenes/design/gem_atelier.tscn` |
+| Evaluation sheets | `tools/eval_sheets.gd` -> `artifacts/eval/` |
 | Merge behavior (4/5-match) | `core/board/effect_planner.gd` — `_plan_match_4()`, `_plan_match_5_plus()` |
 | New effect type | `EffectPlanner` const + `EffectResolver.apply()` |
 | Gravity behavior | `core/board/board_physics.gd` |
@@ -424,11 +376,3 @@ Designed but excluded from current scaffold. See `plans/deferred-systems-referen
 | Input handling | `BoardScene._gui_input()` (board), `RunScene` (game-level) |
 | New autoload | `autoloads/` + register in `project.godot` `[autoload]` |
 | Board validation | `tools/board_validator.gd` |
-| VRAM compression | `core/visuals/gem_traced_bake_contract.gd` |
-| Atlas/blend API | `autoloads/gem_visual_registry.gd` |
-| Blend shader | `scenes/tile/gameplay_sprite_blend.gdshader` |
-| Production bake config | `config/bake_profiles/gameplay.json` |
-| Run production bake | `tools/run_production_bake.gd` |
-| Validate production bake | `tools/validate_production_bake.gd` |
-| Rebuild manifest | `tools/rebuild_traced_manifest_from_pngs.gd` |
-| Run-scoped gem loading | `autoloads/gem_visual_registry.gd` — `load_run_gems()` |

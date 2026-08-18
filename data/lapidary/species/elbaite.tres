@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="GemSpecies" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_yc1t2"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_a6eil"]
+
+[sub_resource type="Resource" id="Resource_15mlv"]
+script = ExtResource("1_yc1t2")
+archetype_id = &"elbaite_growth_tube"
+size_mm_range = Vector2(0.4, 1.3)
+aspect = 35.0
+orientation_axes = Array[Vector3]([Vector3(0, 0, 1)])
+scatter_density = 16.0
+tint = Color(0.96, 1, 0.97, 1)
+weight = 3.5
+center_bias = 0.2
+
+[sub_resource type="Resource" id="Resource_8s4xe"]
+script = ExtResource("1_yc1t2")
+archetype_id = &"elbaite_trichite_veil"
+form = 2
+size_mm_range = Vector2(0.3, 0.9)
+aspect = 24.0
+scatter_density = 8.0
+tint = Color(0.95, 1, 0.96, 1)
+weight = 2.0
+center_bias = 0.25
+
+[resource]
+script = ExtResource("2_a6eil")
+species_id = &"elbaite"
+display_name = "Elbaite tourmaline (Li borosilicate)"
+source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.635 (gemologyproject.com: usual RI 1.62-1.64) and B-G dispersion 0.018 (same source: 'Low, 0.018'); UV pole 0.025 um^2 + constant term. Uniaxial(-) delta-n 0.018 (lit. 0.014-0.021). Mohs 7.5. Strong colour zoning along c."
+sellmeier_b = Vector3(0.5922467, 1.0350355, 0)
+sellmeier_c_um2 = Vector3(0.025, 0, 0)
+birefringence = 0.018
+uniaxial_positive = false
+base_scatter_per_mm = 0.002
+hardness_mohs = 7.5
+inclusions = Array[ExtResource("1_yc1t2")]([SubResource("Resource_15mlv"), SubResource("Resource_8s4xe")])
+zoning_frequency = 2.5
+zoning_contrast = 0.45

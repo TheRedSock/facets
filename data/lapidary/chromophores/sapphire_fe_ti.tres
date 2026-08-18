@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GemChromophore" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="1_jmty5"]
+
+[resource]
+script = ExtResource("1_jmty5")
+chromophore_id = &"sapphire_fe_ti"
+display_name = "Iron-titanium (blue sapphire)"
+source_note = "Fe2+-Ti4+ intervalence charge transfer in corundum: broad band ~580 nm extending toward 700 nm (GIA G&G Spring 2020; Molecules 27:4716 FORS ~570 nm), blue window 440-480 nm, weak Fe3+ bands 377/388/450 nm. Isotropic approximation (no e-ray curve). Fluorescence override 0: iron QUENCHES the corundum Cr glow (blue sapphire is inert)."
+absorption_mm = PackedFloat32Array(0.49177, 0.50754, 0.4487, 0.34287, 0.22762, 0.13842, 0.08871, 0.07015, 0.06947, 0.07971, 0.10002, 0.13044, 0.16698, 0.20032, 0.22008, 0.22176, 0.21031, 0.19657, 0.19024, 0.19547, 0.21143, 0.2353, 0.26462, 0.29794, 0.33459, 0.37419, 0.41644, 0.461, 0.50741, 0.55516, 0.60365, 0.65222, 0.70015, 0.74671, 0.79116, 0.8328, 0.87096, 0.90505, 0.93458, 0.95917, 0.97856, 0.99263, 1.00141, 1.00505, 1.00383, 0.99813, 0.98843, 0.9753, 0.95931, 0.94107, 0.9212, 0.90028, 0.87882, 0.85729, 0.83609, 0.81551, 0.79577, 0.77701, 0.75927, 0.74253, 0.7267, 0.71165, 0.69722, 0.6832, 0.6694, 0.65561, 0.64163, 0.6273, 0.61246, 0.59701, 0.58085, 0.56394, 0.54627, 0.52785, 0.50873, 0.48899, 0.4687, 0.448, 0.42699, 0.40581, 0.3846)
+absorption_eray_mm = PackedFloat32Array()
+fluorescence_strength_override = 0.0
+ui_color = Color(0.15, 0.35, 0.85, 1)

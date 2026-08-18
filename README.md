@@ -7,36 +7,33 @@ Players swap tiles to form matches of 3+. Matched tiles merge into higher-tier g
 ## Project Structure
 
 ```
-autoloads/          # Singletons (GameConfig, DebugFlags, ReplayService, SaveService, TileRegistry, GemVisualRegistry)
+autoloads/          # Singletons (GameConfig, DebugFlags, ReplayService, SaveService, TileRegistry, GemForge)
 core/
   board/            # Simulation: board grid, tiles, matching, effects, gravity, spawning
   rules/            # Simulation: SeededRng, EventLog, EventTimeline
   run/              # Simulation: run lifecycle, turn pipeline orchestration
-  visuals/          # Model-first gem geometry, projection, mesh assembly, and lighting math
-native/             # C++ GDExtension: Embree-accelerated ray tracer (GemTraceKernel)
-  src/              # C++ source: trace kernel, Embree scene, material sampler, types
-  godot-cpp/        # Git submodule: Godot C++ bindings (4.5 branch)
-  embree/           # Vendored Intel Embree 4.x SDK
+  lapidary/         # GPU gem pipeline (CPU side): stone compiler, cut language, lighting, clips, eval
+    tracer/         # GPU tracer host + GLSL compute shaders (spectral path trace, print pass)
 data/
-  tiles/            # Tile definition .tres files (8-gem merge ladder)
-  visuals/          # GemVisualResource .tres files (per-gem colour, material, cut assignment)
+  tiles/            # Tile definition .tres files (two 8-gem merge ladders)
+  lapidary/         # Authored gem data: species, chromophores, grades, stones, cuts, clips, rigs
   spawn_tables/     # SpawnTableResource .tres files
-config/
-  bake_profiles/    # Version-controlled bake specifications (gameplay.json)
 plans/              # Design documents (reference only, not code)
+docs/               # Architecture docs (lapidary-architecture.md is the pipeline authority)
 resources/
   definitions/      # Resource class definitions (simulation data schemas)
-  visuals/          # Resource class definitions (GemCutSpecResource, GemCutModelResource, GemVisualResource, ...)
+  lapidary/         # Resource class definitions (GemSpecies, GemChromophore, GemStone, GemClip, ...)
 scenes/
   board/            # Board rendering, animation sequencer, input handling
-  menu/             # Main menu (Play + Gem Bake Workbench navigation)
-  design/           # Gem Bake Workbench (offline bake form + gameplay texture preview)
+  menu/             # Main menu (Play + Gem Atelier navigation)
+  design/           # Gem Atelier (progressive GPU preview + clip scrubbing)
   main/             # Run entry point scene (hosts RunScene)
   run/              # Run gameplay scene (wires simulation to rendering)
-  tile/             # Tile visuals (gameplay texture cache + procedural fallback)
+  tile/             # Tile visuals (GemForge clips + placeholder fallback)
   debug/            # Debug panel (F1 toggle, animation tuning sliders)
-tests/              # Headless smoke tests (40+ tests)
-tools/              # Board layout validator, offline bake CLI, production bake + validation
+tests/              # Headless tests (simulation + lapidary CPU layers)
+tools/              # Board validator, data generator, GPU render checks, eval sheets
+artifacts/          # Rendered evaluation output (not shipped)
 ```
 
 ## Core Pipeline
@@ -55,119 +52,76 @@ Each turn follows this deterministic pipeline:
 
 The simulation completes instantly and produces an `EventTimeline`. During gameplay, `RunScene` validates the swap, animates the visual swap first, then resolves the remaining cascades into one authoritative timeline for playback. `BoardScene` can split that precomputed timeline into independent async groups for clearer, more parallel-feeling animation without changing deterministic outcomes. See `AGENTS.md` for the full architectural reference.
 
-## Procedural Gem Rendering
+## Gem Rendering (Lapidary Pipeline)
 
-Gems are authored from a canonical 3D model-first pipeline. Normal gameplay consumes offline-traced textures generated from that source data; direct procedural drawing remains only as the visual fallback when a traced texture is unavailable. There is no hand-authored sprite atlas in the active path. The main layers are:
+Gems are rendered by a GPU spectral path tracer — a GLSL compute shader on Godot's `RenderingDevice`. There is no CPU tracer, no denoiser, and no hand-authored sprite atlas. Full design: [docs/lapidary-architecture.md](docs/lapidary-architecture.md).
 
-- **`GemCutSpecResource`** (`data/visuals/cut_specs/`) — typed authoring data for a cut family, symmetry, ring layout, pavilion, girdle, constraints, and optional named-loop patches
-- **`GemCutModelResource`** — canonical compiled 3D artifact with facet polygons, normals, zones, and a stable `geometry_signature`
-- **`GemProjectedCutResource`** — orthographic 2D projection packet derived from the compiled model for procedural fallback rendering
-- **`GemMeshResource`** — traced-bake mesh packet assembled from the compiled model for the ray tracer
-- **`GemVisualResource`** (`.tres` in `data/visuals/`) — per-gem appearance data plus a direct `cut_spec` reference and optional overrides
-- **`GemCutCompiler3D`**, **`GemCutProjector`**, **`GemMeshAssembler`** — the compile/project/mesh stages of the canonical geometry pipeline
-- **`GemRenderer`** — pure-math facet shading used by the procedural fallback and shared render bundles
-- **`GemVisualRegistry`** — shared cache owner for compiled geometry, projected cuts, render bundles, and offline-traced gameplay textures
-- **`GameplayGemBakeView`** — hidden raster surface for procedural preview/fallback rendering only; gameplay baking itself is sourced from offline traced output
+- A stone is a **convex plane set** compiled from a cut template + tier silhouette — exact, watertight, no meshes, no BVH.
+- Materials are **spectral**: 3-term Sellmeier IOR per species, 81-sample absorption curves per chromophore, Beer-Lambert body colour at the stone's physical size, birefringence, dispersion, fluorescence.
+- Quality flaws are **honest**: grade axes (cut/clarity/surface/crystal) drive facet-meeting jitter, analytic inclusions from the species' vocabulary, wear scratches, and scatter — rendered, not composited.
+- Lighting is a **language**: `GemLightRig` resources; grade is never faked with lighting.
+- Output goes through a versioned **house print** (spectral → XYZ → linear sRGB → house tonescale → sRGB8), identical for baked clips and live draws.
 
-Each tier has a distinct **silhouette shape** for instant visual identification:
+Authoring is layered — a shipping stone touches a handful of fields:
 
-| Tier | Gem | Shape | Signature Cut |
-|------|-----|-------|---------------|
-| T1 | Quartz | Octagon | Simple Octagon Step |
-| T2 | Amethyst | Square (rounded) | Cushion |
-| T3 | Peridot | Triangle (bowed edges) | Trillion |
-| T4 | Topaz | Oval | Oval Brilliant |
-| T5 | Sapphire | Rotated Square ◆ | Lozenge |
-| T6 | Emerald | Rectangle (portrait) | Emerald Step |
-| T7 | Ruby | Marquise | Marquise Brilliant |
-| T8 | Diamond | Pear/Teardrop | Pear Brilliant |
-
-Two additional shape categories are reserved for future non-standard tiers:
-
-- **T0 (Polygon):** Regular 5--7 sided shapes (pentagon, hexagon, heptagon) reserved for hazard/obstacle gems. Their equilateral geometry signals "not a normal gem" on the board.
-- **T9 (Special):** Ornate asymmetric shapes (heart, star, shield, etc.) reserved for transcendent artifact gems.
-
-The spec library includes alternate cuts per tier shape: Asscher, octagon step, radiant octagon, and princess for the square family; antique oval for oval; lozenge radiant and kite for diamond; baguette and tapered baguette for rectangle; navette for marquise; pendeloque for pear. The library also includes old European round, rose-cut family variants, and hexagon/pentagon polygon cuts for future T0 use.
-
-Higher tiers have progressively more dramatic shading, brighter specular highlights, deeper depth tints, stronger rim lighting, and more pronounced pavilion extinction patterns. Diamond features prismatic hue dispersion ("fire"), maximum sparkle, and strong secondary specular.
-
-`TileView` prefers an offline-traced gameplay texture from `GemVisualRegistry` and falls back to procedural `_draw()` only when that texture is unavailable. Both paths share the same compiled geometry and render-bundle caches, so the traced and procedural views stay aligned. The procedural draw pass still renders filled crown facets, pavilion extinction overlay, silhouette outline, and internal edge lines. Pavilion overlays are derived from projected model metadata, and `extinction` controls only overlay strength rather than also darkening crown facets. If no gem visual can be resolved, the remaining fallback is a coloured debug rectangle. Silhouette outlines are toggled via `DebugFlags.gem_silhouette_outline`.
-
-Gameplay baking is an offline-traced pipeline backed by the native C++ ray tracer (`GemTraceKernel` GDExtension with Intel Embree). The GDScript `GemOpticsTracer` is kept only as an internal fallback implementation for environments without the compiled extension. The bake pipeline, manifest format, and CLI usage are documented in [AGENTS.md](AGENTS.md) under "Native Ray Tracer" and "CLI Bake Reference".
-
-## Gem Bake Workbench
-
-The Gem Bake Workbench (`scenes/design/gem_bake_workbench.tscn`) is the active gem tooling surface. It provides:
-
-- **Offline bake form** — choose which gems to trace, lighting-grid density, rotation-axis sweeps, cell size, bake draw size, sample count, and worker threads
-- **Async job runner** — launches the traced bake in a separate headless Godot process and polls a status file so the UI stays responsive
-- **Gameplay preview board** — drag the selected gem around a run-style light grid to inspect the loaded lighting-bin blend
-- **Axis rotation cards** — preview pitch/yaw/roll rotation bins when the loaded manifest includes those sweeps
-- **Runtime reload** — refreshes the gameplay texture cache after a bake completes so subsequent runs use the new traced textures
-
-## Baking Workflow
-
-Traced textures are produced by the offline ray tracer and loaded at runtime. There are three bake contexts:
-
-- **Workbench** — Single-gem design iteration from the Gem Bake Workbench UI. Output goes to `user://traced_bakes/`. Use this when tweaking a gem's visual and wanting quick feedback.
-- **Development CLI** — `tools/run_offline_gem_bake.gd` with per-flag control. Output defaults to `user://traced_bakes/`. Use this for bulk bakes during development.
-- **Production** — `tools/run_production_bake.gd --profile=res://config/bake_profiles/gameplay.json`. Output goes to `res://generated/traced_bakes/` (gitignored). This is what ships in the exported build.
-
-The runtime backend searches `user://` first, then `res://generated/`. During development, workbench bakes override production bakes. In shipped builds, only `res://generated/` has files.
-
-When running from the Godot editor, `BoardScene` calls `ensure_gameplay_texture_cache()` at run start. If a valid manifest already exists, textures load from disk. If not, the registry bakes on-demand (slow first run, then cached). Delete `user://traced_bakes/` to force a rebake.
-
-Validate a production bake before export:
-```bash
-godot --headless --path . --script res://tools/validate_production_bake.gd -- \
-    --profile=res://config/bake_profiles/gameplay.json
+```
+GemSpecies      lattice physics of the mineral    data/lapidary/species/
+GemChromophore  why ruby ≠ sapphire               data/lapidary/chromophores/
+GemCutTemplate  facet program in the cut language data/lapidary/cuts/
+GemGrade        4 quality axes per tier           data/lapidary/grades/
+GemStone        the instance a tile references    data/lapidary/stones/   (stone_id == tile_id)
 ```
 
-See [AGENTS.md](AGENTS.md) for the full CLI flag table, asset optimization details, and bake configuration reference.
+Two 8-gem merge ladders ship, sharing per-tier silhouettes, grades, and sizes:
 
-## Building the Native Tracer
+| Tier | Silhouette | Main ladder | Alternate ladder |
+|------|-----------|-------------|------------------|
+| T1 | Round | Quartz | Fluorite |
+| T2 | Square | Amethyst | Smoky Quartz |
+| T3 | Triangle | Peridot | Tourmaline |
+| T4 | Oval | Topaz | Rhodolite |
+| T5 | Diamond ◆ | Sapphire | Aquamarine |
+| T6 | Rectangle | Emerald | Alexandrite |
+| T7 | Marquise | Ruby | Painite |
+| T8 | Pear | Diamond | Blue Garnet |
 
-The native `GemTraceKernel` GDExtension requires MSVC 2022 (Desktop C++ workload), Python 3.x, and SCons. Without building it, the project still works using the GDScript fallback tracer.
+All cuts are brilliant except the T6 rectangle tier, which carries the step cut. Every run seeds one gem per tier (`tier_tile_ids`), so boards mix the ladders across runs.
 
-```bash
-pip install scons
-cd native
-python -m SCons platform=windows target=template_debug
-# Copy Embree runtime DLLs (once):
-cp embree/bin/embree4.dll lib/win64/
-cp embree/bin/tbb12.dll lib/win64/
-```
+## Clips and GemForge
 
-After building, restart Godot. The bake pipeline will automatically detect and use the native kernel.
+Board tiles play **authored clips** — named, versioned animations (idle, turn, flash) with lighting-relative motion — baked by the same kernel that powers live previews. The `GemForge` autoload is the launcher: it serves cached clips, bakes missing manifest entries incrementally in the background (never a whole clip in one frame), and covers the cold gap with a synchronous placeholder still. The delivery catalog lives in `data/lapidary/manifest.json`; idles for the run's tile set are `required_now`, presentation clips follow.
+
+Live 3D on the board remains a packaging switch on the same compiled stone instance; the sprite-vs-live decision is held by measured numbers (`tools/board_grid_check.gd`).
+
+## Gem Atelier
+
+The Gem Atelier (`scenes/design/gem_atelier.tscn`, reachable from the main menu) is the design surface: pick any stone, watch a progressive GPU preview converge, scrub authored clips frame by frame, and compare lighting rigs.
 
 ## Playing
 
-Open in Godot 4.6 and run the project. The main menu provides navigation to Play (starts a run) or the Gem Bake Workbench. Click a tile to select it (yellow highlight), then click an adjacent tile to swap. Drag between adjacent tiles also works. Valid swaps trigger the full merge cascade with animations. Invalid swaps bounce back.
+Open in Godot 4.6 and run the project. The main menu provides navigation to Play (starts a run) or the Gem Atelier. Click a tile to select it (yellow highlight), then click an adjacent tile to swap. Drag between adjacent tiles also works. Valid swaps trigger the full merge cascade with animations. Invalid swaps bounce back.
 
 The HUD shows remaining moves and the current seed.
 
 ## Running Tests
 
+Headless (simulation + lapidary CPU layers):
+
 ```bash
 godot --headless --script tests/test_smoke.gd
+godot --headless --script tests/test_rng_cross_platform.gd
+godot --headless --script tests/lapidary/test_cut_compiler.gd
+godot --headless --script tests/lapidary/test_species_data.gd
+godot --headless --script tests/lapidary/test_clips.gd
+godot --headless --script tests/lapidary/test_board_consumer.gd
 ```
 
-Focused cut regression coverage:
+GPU render checks run windowed (no `--headless`; `RenderingDevice` requires a window):
 
 ```bash
-godot --headless --script tests/test_gem_cuts.gd
-```
-
-The test suites cover topology, match detection, merge mechanics, gravity, the full cascade pipeline, deterministic replay verification, cut generation, normalized geometry bounds, facet counts, silhouette stability, pavilion fragment integrity, pavilion symmetry metadata, and winding-independent clipping.
-
-Additional traced/bake coverage:
-
-```bash
-godot --headless --script tests/test_gem_meshes.gd
-godot --headless --script tests/test_gem_optics_tracer.gd
-godot --headless --script tests/test_native_trace_kernel.gd
-godot --headless --script tests/test_gameplay_bake_backends.gd
-godot --headless --script tests/test_gameplay_variant_math.gd
+godot --path . --script res://tools/ladder_check.gd        # both ladders, one dispatch
+godot --path . --script res://tools/kernel_v1_check.gd     # kernel feature renders
+godot --path . res://tools/board_visual_check.tscn         # live board smoke check
 ```
 
 Optional long-run balance harness:
@@ -176,24 +130,19 @@ Optional long-run balance harness:
 godot --headless res://tests/test_simulation.tscn
 ```
 
-Cross-platform RNG verification:
-```bash
-godot --headless --script tests/test_rng_cross_platform.gd
-```
-
 ## Key Architecture Decisions
 
 - **Simulation-first:** All game logic is in `core/` using `RefCounted` classes with zero scene tree dependency. Runs headlessly.
 - **Deterministic replay:** All randomness flows through `SeededRng` using integer-only operations. `BoardState.compute_hash()` provides checkpoint verification.
 - **Topology abstraction:** All adjacency uses `BoardState.get_neighbor()` which supports portals. All gravity uses `get_effective_gravity()` which supports per-cell and per-tile overrides.
 - **Event-driven rendering:** Simulation produces an authoritative `EventTimeline`; renderer plays it back via Godot Tweens and may overlap independent visual groups without re-running simulation.
-- **Model-first visuals:** Gem geometry is authored as `GemCutSpecResource`, compiled once into a canonical 3D model, then projected or meshed for each consumer. No hand-authored sprites are needed in the active path.
+- **Physics-first visuals:** Gems are spectral renders of real mineral data (published Sellmeier fits, absorption curves, inclusion vocabularies) — appearance emerges from physics plus grade, not per-gem art tuning.
 
 ## Documentation
 
 - [AGENTS.md](AGENTS.md) — Full architectural reference for AI agents and contributors
-- [core/visuals/README.md](core/visuals/README.md) — Procedural cut-system architecture and extension guide
-- [Traced Bake Pipeline Reference](plans/traced-bake-pipeline-reference.md) — Offline traced bake architecture, parameter flow, and recommended settings
+- [Lapidary Architecture](docs/lapidary-architecture.md) — GPU gem pipeline design and decisions
+- [Kernel Contract](core/lapidary/tracer/KERNEL_CONTRACT.md) — GPU buffer formats
 - [Gem Engine Proposal](plans/gem-engine-proposal.md) — Game design and architecture proposal
 - [Executive Analysis](plans/executive-analysis.md) — Proposal review and scaffolding audit
 - [Getting Started Guide](plans/getting-started-guide.md) — Godot overview and phased prototyping plan

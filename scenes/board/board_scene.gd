@@ -44,17 +44,11 @@ func _ready() -> void:
 	move_child(_grid_bg, 0)
 
 	resized.connect(_on_resized)
-	DebugFlags.visual_flags_changed.connect(_redraw_all_tiles)
 
 
 func _on_resized() -> void:
 	if _board_state != null:
 		_schedule_layout_refresh(false)
-
-
-func _redraw_all_tiles() -> void:
-	for view in _tile_views.values():
-		view.refresh_debug_visuals()
 
 
 ## Draws the board background: a filled rounded rect, alternating cell shading,
@@ -117,7 +111,6 @@ func _run_scheduled_layout_refresh() -> void:
 	var needs_rebuild := _layout_refresh_needs_rebuild
 	_layout_refresh_needs_rebuild = false
 	_compute_layout()
-	await _ensure_gameplay_texture_cache()
 	if not is_inside_tree():
 		return
 	if needs_rebuild:
@@ -1021,7 +1014,6 @@ func _make_bare_view() -> TileView:
 		view = tile_view_scene.instantiate()
 	else:
 		view = TileView.new()
-	view.use_gameplay_texture_cache = true
 	view.custom_minimum_size = Vector2(_cell_size)
 	view.size = Vector2(_cell_size)
 	tile_canvas.add_child(view)
@@ -1088,22 +1080,3 @@ func _pixel_to_cell(pixel: Vector2) -> Vector2i:
 	   not _board_state.is_blocked(candidate):
 		return candidate
 	return Vector2i(-1, -1)
-
-
-func _get_gameplay_cache_request_size() -> Vector2i:
-	if GemVisualRegistry == null:
-		return _cell_size
-	var manifest_summary: Dictionary = GemVisualRegistry.get_offline_traced_manifest_summary()
-	var manifest_cell_size: Vector2i = manifest_summary.get("cell_size", Vector2i.ZERO)
-	if manifest_cell_size.x > 0 and manifest_cell_size.y > 0:
-		return manifest_cell_size
-	return _cell_size
-
-
-func _ensure_gameplay_texture_cache() -> void:
-	if GemVisualRegistry != null:
-		var cache_request_size := _get_gameplay_cache_request_size()
-		if GemVisualRegistry.is_gameplay_texture_cache_current(cache_request_size):
-			return
-		GemVisualRegistry.ensure_gameplay_texture_cache(cache_request_size)
-		await GemVisualRegistry.gameplay_texture_cache_rebuilt

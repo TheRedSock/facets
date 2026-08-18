@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GemChromophore" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="1_80vop"]
+
+[resource]
+script = ExtResource("1_80vop")
+chromophore_id = &"peridot_fe2"
+display_name = "Iron (peridot, olivine)"
+source_note = "Fe2+ in olivine: diagnostic bands 453/477/497 nm (GIA Gem Encyclopedia; globalgemology.com), UV charge-transfer edge, and the visible tail of the broad Fe2+ band near ~1000 nm (modelled as a Gaussian at 900 nm) warming the deep red. Green-yellow window 520-600 nm."
+absorption_mm = PackedFloat32Array(1.17118, 1.2204, 1.25103, 1.26151, 1.25132, 1.221, 1.17213, 1.10742, 1.0313, 0.95229, 0.88717, 0.86164, 0.89509, 0.96908, 1.01663, 0.97429, 0.85927, 0.76667, 0.76326, 0.80845, 0.81931, 0.7837, 0.74691, 0.71529, 0.64506, 0.51477, 0.35777, 0.22461, 0.14028, 0.09911, 0.08347, 0.07907, 0.07859, 0.07931, 0.0804, 0.08169, 0.0831, 0.08463, 0.08625, 0.08797, 0.08978, 0.09168, 0.09367, 0.09576, 0.09793, 0.1002, 0.10257, 0.10502, 0.10758, 0.11023, 0.11297, 0.11582, 0.11875, 0.12178, 0.1249, 0.12812, 0.13142, 0.13481, 0.13829, 0.14185, 0.14548, 0.14919, 0.15297, 0.15682, 0.16072, 0.16468, 0.1687, 0.17275, 0.17684, 0.18096, 0.18511, 0.18927, 0.19344, 0.19761, 0.20177, 0.20591, 0.21003, 0.21411, 0.21815, 0.22214, 0.22606)
+absorption_eray_mm = PackedFloat32Array()
+ui_color = Color(0.62, 0.78, 0.2, 1)

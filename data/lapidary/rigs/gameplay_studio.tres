@@ -1,0 +1,81 @@
+[gd_resource type="Resource" script_class="GemLightRig" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_light_rig.gd" id="1_rig"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_rig_light.gd" id="2_light"]
+
+[sub_resource type="Resource" id="key"]
+script = ExtResource("2_light")
+role = 0
+azimuth_deg = -35.0
+elevation_deg = 55.0
+angular_radius_deg = 18.0
+inner_fraction = 0.55
+kelvin = 5200.0
+power = 5.0
+enabled = true
+
+[sub_resource type="Resource" id="spark"]
+script = ExtResource("2_light")
+role = 2
+azimuth_deg = -18.0
+elevation_deg = 30.0
+angular_radius_deg = 2.5
+inner_fraction = 0.5
+kelvin = 5600.0
+power = 30.0
+enabled = true
+
+[sub_resource type="Resource" id="fill"]
+script = ExtResource("2_light")
+role = 1
+azimuth_deg = 70.0
+elevation_deg = 15.0
+angular_radius_deg = 32.0
+inner_fraction = 0.5
+kelvin = 6500.0
+power = 0.55
+enabled = true
+
+[sub_resource type="Resource" id="rim"]
+script = ExtResource("2_light")
+role = 2
+azimuth_deg = 165.0
+elevation_deg = -32.0
+angular_radius_deg = 5.0
+inner_fraction = 0.5
+kelvin = 7200.0
+power = 3.6
+enabled = true
+
+[sub_resource type="Resource" id="bounce"]
+script = ExtResource("2_light")
+role = 3
+azimuth_deg = -10.0
+elevation_deg = -65.0
+angular_radius_deg = 40.0
+inner_fraction = 0.5
+kelvin = 4200.0
+power = 0.35
+enabled = true
+
+[sub_resource type="Resource" id="blocker"]
+script = ExtResource("2_light")
+role = 4
+azimuth_deg = 0.0
+elevation_deg = 6.0
+angular_radius_deg = 22.0
+inner_fraction = 0.55
+kelvin = 5500.0
+power = 0.45
+enabled = true
+
+[resource]
+script = ExtResource("1_rig")
+rig_id = &"gameplay_studio"
+display_name = "Gameplay Studio"
+lights = [SubResource("key"), SubResource("spark"), SubResource("rim"), SubResource("fill"), SubResource("bounce"), SubResource("blocker")]
+bg_zenith = 0.10
+bg_horizon = 0.05
+bg_below = 0.02
+bg_kelvin = 0.0
+dual_illuminant_kelvin = 0.0

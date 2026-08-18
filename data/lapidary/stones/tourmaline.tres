@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/verdelite_fe.tres" id="1_penoi"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_tmyq7"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t3.tres" id="3_fmq2k"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_b1ka8"]
+[ext_resource type="Resource" path="res://data/lapidary/species/elbaite.tres" id="5_7w7a6"]
+
+[resource]
+script = ExtResource("4_b1ka8")
+stone_id = &"tourmaline"
+species = ExtResource("5_7w7a6")
+chromophore = ExtResource("1_penoi")
+cut = ExtResource("2_tmyq7")
+silhouette = &"triangle"
+grade = ExtResource("3_fmq2k")
+seed = 47
+size_mm = 4.8

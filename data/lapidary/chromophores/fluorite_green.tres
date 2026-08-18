@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GemChromophore" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="1_vc12f"]
+
+[resource]
+script = ExtResource("1_vc12f")
+chromophore_id = &"fluorite_green"
+display_name = "Green fluorite centres"
+source_note = "Green fluorite: absorption in violet-blue and orange-red leaving a green window (colour centres / REE, variable by locality — authored broad-band, not a single verified ion). Band strengths tuned at 4.5 mm Beer-Lambert path: earlier 0.10/0.13 amps were too weak/broad to carve the window and the stone read neutral blue-grey."
+absorption_mm = PackedFloat32Array(0.38985, 0.41593, 0.43436, 0.44646, 0.45418, 0.45954, 0.46409, 0.46855, 0.47275, 0.47586, 0.47663, 0.47382, 0.4664, 0.45377, 0.43583, 0.4129, 0.38571, 0.35521, 0.32255, 0.28889, 0.25535, 0.22297, 0.19262, 0.16498, 0.14057, 0.11971, 0.10259, 0.08926, 0.0797, 0.07381, 0.07144, 0.07247, 0.07672, 0.08405, 0.09429, 0.10727, 0.12279, 0.1406, 0.1604, 0.18182, 0.20442, 0.22768, 0.25102, 0.2738, 0.29535, 0.315, 0.33212, 0.3461, 0.35647, 0.36285, 0.365, 0.36285, 0.35646, 0.34609, 0.33208, 0.31495, 0.29526, 0.27365, 0.25077, 0.22729, 0.20379, 0.18084, 0.15889, 0.13831, 0.11938, 0.10227, 0.08707, 0.07379, 0.06237, 0.0527, 0.04463, 0.038, 0.03264, 0.02836, 0.025, 0.02239, 0.02039, 0.01889, 0.01777, 0.01695, 0.01635)
+absorption_eray_mm = PackedFloat32Array()
+ui_color = Color(0.55, 0.85, 0.55, 1)

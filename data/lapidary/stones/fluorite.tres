@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/fluorite_green.tres" id="1_xxb5x"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_618sq"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t1.tres" id="3_smcay"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_4ief4"]
+[ext_resource type="Resource" path="res://data/lapidary/species/fluorite.tres" id="5_sc7gm"]
+
+[resource]
+script = ExtResource("4_4ief4")
+stone_id = &"fluorite"
+species = ExtResource("5_sc7gm")
+chromophore = ExtResource("1_xxb5x")
+cut = ExtResource("2_618sq")
+grade = ExtResource("3_smcay")
+seed = 41
+size_mm = 4.5

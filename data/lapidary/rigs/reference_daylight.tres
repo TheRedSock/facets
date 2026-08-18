@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="GemLightRig" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_light_rig.gd" id="1_rig"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_rig_light.gd" id="2_light"]
+
+[sub_resource type="Resource" id="key"]
+script = ExtResource("2_light")
+role = 0
+azimuth_deg = -30.0
+elevation_deg = 60.0
+angular_radius_deg = 20.0
+inner_fraction = 0.55
+kelvin = 6500.0
+power = 3.0
+enabled = true
+
+[sub_resource type="Resource" id="fill"]
+script = ExtResource("2_light")
+role = 1
+azimuth_deg = 60.0
+elevation_deg = 20.0
+angular_radius_deg = 35.0
+inner_fraction = 0.5
+kelvin = 5800.0
+power = 0.8
+enabled = true
+
+[sub_resource type="Resource" id="bounce"]
+script = ExtResource("2_light")
+role = 3
+azimuth_deg = 0.0
+elevation_deg = -60.0
+angular_radius_deg = 45.0
+inner_fraction = 0.5
+kelvin = 5500.0
+power = 0.5
+enabled = true
+
+[resource]
+script = ExtResource("1_rig")
+rig_id = &"reference_daylight"
+display_name = "Reference Daylight"
+lights = [SubResource("key"), SubResource("fill"), SubResource("bounce")]
+bg_zenith = 0.28
+bg_horizon = 0.18
+bg_below = 0.08
+bg_kelvin = 0.0
+dual_illuminant_kelvin = 2856.0

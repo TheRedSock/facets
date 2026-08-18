@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="GemSpecies" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_6ugde"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_6u52p"]
+
+[sub_resource type="Resource" id="Resource_6nt8i"]
+script = ExtResource("1_6ugde")
+archetype_id = &"diamond_pinpoint"
+form = 4
+size_mm_range = Vector2(0.03, 0.12)
+aspect = 1.0
+scatter_density = 16.0
+center_bias = 0.5
+
+[resource]
+script = ExtResource("2_6u52p")
+species_id = &"diamond"
+display_name = "Diamond (C)"
+source_note = "Sellmeier: F. Peter, Z. Phys. 15, 358-368 (1923) (refractiveindex.info C/Peter); published poles 0.1060/0.1750 um SQUARED to 0.011236/0.030625 um^2. n_D=2.4173 (lit. 2.41726, JHU/APL Tech. Digest 14-1). Cubic: birefringence 0. Mohs 10. Faint blue fluorescence ~440 nm (N3 centers)."
+sellmeier_b = Vector3(4.3356, 0.3306, 0)
+sellmeier_c_um2 = Vector3(0.011236, 0.030625, 0)
+base_scatter_per_mm = 0.0005
+fluorescence_emission_nm = 440.0
+fluorescence_strength = 0.05
+hardness_mohs = 10.0
+inclusions = Array[ExtResource("1_6ugde")]([SubResource("Resource_6nt8i")])

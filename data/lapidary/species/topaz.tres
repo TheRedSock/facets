@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="GemSpecies" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_rln28"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_1og4h"]
+
+[sub_resource type="Resource" id="Resource_jmu82"]
+script = ExtResource("1_rln28")
+archetype_id = &"topaz_tear_feather"
+form = 2
+size_mm_range = Vector2(0.3, 1)
+aspect = 26.0
+scatter_density = 8.0
+tint = Color(1, 0.98, 0.94, 1)
+weight = 3.0
+center_bias = 0.2
+
+[sub_resource type="Resource" id="Resource_owgaa"]
+script = ExtResource("1_rln28")
+archetype_id = &"topaz_cloud"
+form = 3
+size_mm_range = Vector2(0.3, 0.7)
+aspect = 1.0
+scatter_density = 5.5
+weight = 1.5
+center_bias = 0.3
+
+[resource]
+script = ExtResource("2_1og4h")
+species_id = &"topaz"
+display_name = "Topaz (Al2SiO4(F,OH)2)"
+source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.612 (F-rich topaz 1.61-1.62, gemologyproject.com; full range 1.606-1.644) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Biaxial(+), approximated uniaxial(+) with delta-n 0.010 (lit. 0.008-0.010). Mohs 8."
+sellmeier_b = Vector3(0.4538599, 1.1094764, 0)
+sellmeier_c_um2 = Vector3(0.025, 0, 0)
+birefringence = 0.01
+base_scatter_per_mm = 0.001
+hardness_mohs = 8.0
+inclusions = Array[ExtResource("1_rln28")]([SubResource("Resource_jmu82"), SubResource("Resource_owgaa")])

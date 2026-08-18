@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="GemCutTemplate" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://core/lapidary/cut/cut_template.gd" id="1_tmpl"]
+[ext_resource type="Script" path="res://core/lapidary/cut/cut_row.gd" id="2_row"]
+
+[sub_resource type="Resource" id="Resource_step_a"]
+script = ExtResource("2_row")
+kind = &"step"
+angle_deg = 45.0
+density = 1
+phase = 0.5
+span = 0.34
+
+[sub_resource type="Resource" id="Resource_step_b"]
+script = ExtResource("2_row")
+kind = &"step"
+angle_deg = 37.0
+density = 1
+phase = 0.5
+span = 0.33
+
+[sub_resource type="Resource" id="Resource_step_c"]
+script = ExtResource("2_row")
+kind = &"step"
+angle_deg = 28.0
+density = 1
+phase = 0.5
+span = 0.33
+
+[resource]
+script = ExtResource("1_tmpl")
+cut_id = &"step"
+girdle_half_height = 0.03
+crown_rows = Array[ExtResource("2_row")]([SubResource("Resource_step_a"), SubResource("Resource_step_b"), SubResource("Resource_step_c")])
+table_ratio = 0.62
+pavilion_style = &"step"
+pavilion_rows = 3
+pavilion_step_delta_deg = 7.0
+pavilion_keel_scale = 0.14
+pavilion_lower_half_delta_deg = 6.0

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/bluegarnet_v.tres" id="1_3knps"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_qb6px"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t8.tres" id="3_3ylki"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_yefgd"]
+[ext_resource type="Resource" path="res://data/lapidary/species/garnet.tres" id="5_hu5kv"]
+
+[resource]
+script = ExtResource("4_yefgd")
+stone_id = &"blue_garnet"
+species = ExtResource("5_hu5kv")
+chromophore = ExtResource("1_3knps")
+cut = ExtResource("2_qb6px")
+silhouette = &"pear"
+grade = ExtResource("3_3ylki")
+seed = 71
+size_mm = 5.5

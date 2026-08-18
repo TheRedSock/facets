@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/emerald_cr.tres" id="1_l3ky1"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/step.tres" id="2_ivlth"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t6.tres" id="3_8dukx"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_83wxx"]
+[ext_resource type="Resource" path="res://data/lapidary/species/beryl.tres" id="5_d67f1"]
+
+[resource]
+script = ExtResource("4_83wxx")
+stone_id = &"emerald"
+species = ExtResource("5_d67f1")
+chromophore = ExtResource("1_l3ky1")
+cut = ExtResource("2_ivlth")
+silhouette = &"rectangle"
+grade = ExtResource("3_8dukx")
+seed = 29
+size_mm = 5.25

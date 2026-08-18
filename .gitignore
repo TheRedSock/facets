@@ -2,41 +2,19 @@
 .godot/
 .nomedia
 
-# Godot-specific ignores
-.import/
+# Export configs
 export.cfg
 export_credentials.cfg
 
 # Imported translations (automatically generated from CSV files)
 *.translation
 
-# Mono-specific ignores
-.mono/
-data_*/
-mono_crash.*.json
-
 # Plans, concept, archive
 plans
 
-# Debug
-assets/debug_*/
-debug/
-tools/__pycache__/
-tools/generated_spectra.txt
-
-# Production bake output (build artifacts; add res://generated/ to export includes)
-generated/traced_bakes/
-# Local orthogonal / raw QA bakes (regenerate; large PNG/WebP trees)
-generated/traced_bakes_orthogonal_qa/
-
-# Native GDExtension build artifacts
-native/lib/
-native/embree/
-native/oidn/
-native/godot-cpp/
-*.obj
-*.o
-*.pdb
-*.exp
-.sconsign.dblite
-.scon*
+# Rendered evaluation output (regenerable via tools/; keep the textual records)
+artifacts/**
+!artifacts/.gdignore
+!artifacts/eval/
+!artifacts/eval/EVAL_NOTES.md
+!artifacts/eval/timings.json

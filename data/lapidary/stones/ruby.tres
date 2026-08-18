@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/ruby_cr.tres" id="1_dsrft"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_pmftw"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t7.tres" id="3_exres"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_6qi3b"]
+[ext_resource type="Resource" path="res://data/lapidary/species/corundum.tres" id="5_pnwhp"]
+
+[resource]
+script = ExtResource("4_6qi3b")
+stone_id = &"ruby"
+species = ExtResource("5_pnwhp")
+chromophore = ExtResource("1_dsrft")
+cut = ExtResource("2_pmftw")
+silhouette = &"marquise"
+grade = ExtResource("3_exres")
+seed = 31
+size_mm = 5.4

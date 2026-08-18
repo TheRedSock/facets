@@ -43,8 +43,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	if GemVisualRegistry != null:
-		GemVisualRegistry.unload_run_gameplay_textures()
+	# GemForge owns clip memory for now; nothing to release per-run.
+	pass
 
 
 
@@ -54,7 +54,7 @@ func _process(_delta: float) -> void:
 
 func _on_board_changed(board: BoardState) -> void:
 	board_scene.set_board_state(board)
-	_sync_run_scoped_gameplay_gems()
+	_ensure_forge_clips()
 
 
 func _on_run_state_changed(_run_state: RunState) -> void:
@@ -115,22 +115,13 @@ func _on_back_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn")
 
 
-func _gameplay_preload_cell_size(run_config: Dictionary) -> Vector2i:
-	var preload_cell_size := GameConfig.DEFAULT_CELL_SIZE
-	if board_scene != null:
-		preload_cell_size = board_scene.estimate_cell_size(
-			run_config.get("board_size", GameConfig.DEFAULT_BOARD_SIZE)
-		)
-	if GemVisualRegistry != null:
-		var manifest_summary: Dictionary = GemVisualRegistry.get_offline_traced_manifest_summary()
-		var manifest_cell_size: Vector2i = manifest_summary.get("cell_size", Vector2i.ZERO)
-		if manifest_cell_size.x > 0 and manifest_cell_size.y > 0:
-			preload_cell_size = manifest_cell_size
-	return preload_cell_size
-
-
-func _sync_run_scoped_gameplay_gems() -> void:
-	if GemVisualRegistry == null:
+## Queues background baking for any of the run's gems whose clips are not
+## cached yet. GemForge is lazy and non-blocking; cache hits are skipped.
+## Resolved by path, not identifier: compile-time autoload identifiers break
+## --script tool mode and headless tests.
+func _ensure_forge_clips() -> void:
+	var forge := get_node_or_null("/root/GemForge")
+	if forge == null:
 		return
 	var rs := run_controller.get_run_state()
 	var ids: Array = []
@@ -138,7 +129,7 @@ func _sync_run_scoped_gameplay_gems() -> void:
 		var tid: StringName = rs.tier_tile_ids[tier_key]
 		if tid != &"":
 			ids.append(tid)
-	GemVisualRegistry.load_run_gems(ids, Vector2i.ZERO)
+	forge.ensure_required(ids)
 
 
 func _start_run() -> void:
@@ -147,6 +138,3 @@ func _start_run() -> void:
 	if TileRegistry != null:
 		TileRegistry.preload_runtime_assets()
 	run_controller.start_new_run(run_config)
-	if GemVisualRegistry != null:
-		var preload_cell_size := _gameplay_preload_cell_size(run_config)
-		GemVisualRegistry.preload_runtime_assets([preload_cell_size])

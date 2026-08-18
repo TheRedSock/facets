@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/peridot_fe2.tres" id="1_ktbqd"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_8l87s"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t3.tres" id="3_cw5j5"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_0rflh"]
+[ext_resource type="Resource" path="res://data/lapidary/species/olivine.tres" id="5_pxg60"]
+
+[resource]
+script = ExtResource("4_0rflh")
+stone_id = &"peridot"
+species = ExtResource("5_pxg60")
+chromophore = ExtResource("1_ktbqd")
+cut = ExtResource("2_8l87s")
+silhouette = &"triangle"
+grade = ExtResource("3_cw5j5")
+seed = 17
+size_mm = 4.8

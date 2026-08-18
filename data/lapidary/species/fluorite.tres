@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="GemSpecies" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_fvqnh"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_joo0m"]
+
+[sub_resource type="Resource" id="Resource_1x8co"]
+script = ExtResource("1_fvqnh")
+archetype_id = &"fluorite_cleavage_flag"
+form = 2
+size_mm_range = Vector2(0.35, 1)
+aspect = 20.0
+scatter_density = 10.0
+tint = Color(0.96, 0.94, 1, 1)
+weight = 3.0
+center_bias = 0.2
+
+[sub_resource type="Resource" id="Resource_c4cyc"]
+script = ExtResource("1_fvqnh")
+archetype_id = &"fluorite_droplet_cloud"
+form = 3
+size_mm_range = Vector2(0.1, 0.3)
+aspect = 1.0
+scatter_density = 6.0
+tint = Color(0.98, 0.99, 1, 1)
+weight = 1.8
+center_bias = 0.35
+
+[resource]
+script = ExtResource("2_joo0m")
+species_id = &"fluorite"
+display_name = "Fluorite (CaF2)"
+source_note = "Sellmeier: I. H. Malitson, Appl. Opt. 2, 1103-1107 (1963) (refractiveindex.info CaF2/Malitson); published poles 0.050263605/0.1003909/34.649040 um SQUARED to um^2. n_D~1.4338, dispersion 0.007 (low). Cubic: birefringence 0. Mohs 4 — the wear model scratches it honestly. Blue fluorescence ~425 nm (Eu2+ activator; the word 'fluorescence' comes from this mineral). Strong colour banding (zoning)."
+sellmeier_b = Vector3(0.5675888, 0.4710914, 3.8484724)
+sellmeier_c_um2 = Vector3(0.0025262996, 0.010078334, 1200.556)
+base_scatter_per_mm = 0.003
+fluorescence_emission_nm = 425.0
+hardness_mohs = 4.0
+inclusions = Array[ExtResource("1_fvqnh")]([SubResource("Resource_1x8co"), SubResource("Resource_c4cyc")])
+zoning_axis = Vector3(0.2, 0, 0.98)
+zoning_frequency = 5.0
+zoning_contrast = 0.5

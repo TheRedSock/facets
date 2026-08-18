@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GemChromophore" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="1_xcscm"]
+
+[resource]
+script = ExtResource("1_xcscm")
+chromophore_id = &"aquamarine_fe"
+display_name = "Iron (aquamarine, beryl)"
+source_note = "Fe in beryl: dominant Fe2+ band ~820-825 nm (NIR, visible tail past 700; GIA G&G 44(3) Adamo et al.), Fe2+-Fe3+ IVCT ~620-640 nm absorbing orange-red (blue maker; Sci. Rep. 12:11916), weak Fe3+ 427 nm (slight yellow), UV Fe3+ edge. Blue window 460-500 nm. Amplitudes kept low: aquamarine is pale."
+absorption_mm = PackedFloat32Array(0.26205, 0.25712, 0.24293, 0.2213, 0.19527, 0.1692, 0.14814, 0.13544, 0.12901, 0.121, 0.10413, 0.07901, 0.05336, 0.03438, 0.02375, 0.01916, 0.01776, 0.0178, 0.01855, 0.01975, 0.0213, 0.0232, 0.02543, 0.02803, 0.031, 0.03437, 0.03816, 0.04238, 0.04704, 0.05214, 0.05766, 0.06359, 0.06988, 0.0765, 0.08339, 0.09048, 0.09768, 0.10491, 0.11207, 0.11906, 0.12577, 0.1321, 0.13796, 0.14323, 0.14785, 0.15175, 0.15485, 0.15714, 0.15859, 0.1592, 0.15901, 0.15804, 0.15637, 0.15407, 0.15124, 0.14798, 0.1444, 0.14064, 0.13679, 0.133, 0.12935, 0.12597, 0.12294, 0.12035, 0.11825, 0.1167, 0.11574, 0.11536, 0.11558, 0.11639, 0.11774, 0.11961, 0.12193, 0.12464, 0.12768, 0.13097, 0.13443, 0.13798, 0.14154, 0.14503, 0.14837)
+absorption_eray_mm = PackedFloat32Array()
+ui_color = Color(0.55, 0.8, 0.92, 1)

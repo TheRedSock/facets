@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/rhodolite_fe2.tres" id="1_biupn"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_87xnr"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t4.tres" id="3_wtnro"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_6ernq"]
+[ext_resource type="Resource" path="res://data/lapidary/species/garnet.tres" id="5_bc0qg"]
+
+[resource]
+script = ExtResource("4_6ernq")
+stone_id = &"rhodolite"
+species = ExtResource("5_bc0qg")
+chromophore = ExtResource("1_biupn")
+cut = ExtResource("2_87xnr")
+silhouette = &"oval"
+grade = ExtResource("3_wtnro")
+seed = 53
+size_mm = 4.95

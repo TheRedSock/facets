@@ -1,87 +1,49 @@
 # Tests
 
-Headless smoke tests for the Facets simulation engine. All tests run without a scene tree and verify the core pipeline from board creation through full cascade resolution.
+Headless tests for the simulation engine and the lapidary (GPU gem) pipeline's CPU-side layers. Everything here runs without a window; GPU-dependent checks live in `tools/` and require a windowed run.
 
-## Running Tests
+## Core Simulation
 
 ```bash
 godot --headless --script tests/test_smoke.gd
 ```
 
-Returns exit code 0 on success, 1 on failure. Output shows PASS/FAIL per test with a summary count.
+110+ assertions covering the board data layer, match detection, merge mechanic, gravity physics, spawn, cascade pipeline, replay determinism, and board validation. Exit code 0 on success.
 
-## Native Extension Test
+Coverage highlights:
+
+- **Data layer** — board creation, `CellState`/`TileState` properties, layouts, portals, `get_neighbor()`, effective gravity priority, board hash determinism
+- **Match detection** — match-3, unmatchable breaks, holes, classification (base/4/5+/L-T)
+- **Merge mechanic** — removes + survivor upgrade, max-tier pure removal
+- **Board physics** — gravity directions, overrides, barriers, diagonal fill, portal routing, convergence, cycle safety
+- **Pipeline** — effect planning/conflict/resolution, integer weighted spawn, EventTimeline, full cascade, SeededRng determinism
+- **Verification** — deterministic replay, BoardValidator cycles and portal targets
+
+## Lapidary (GPU gem pipeline)
 
 ```bash
-godot --headless --script tests/test_native_trace_kernel.gd
+godot --headless --script tests/lapidary/test_cut_compiler.gd    # cut language -> convex plane sets (30 cuts)
+godot --headless --script tests/lapidary/test_species_data.gd    # species/chromophore/grade/stone data layer
+godot --headless --script tests/lapidary/test_clips.gd           # clip resources, manifest, cache keys
+godot --headless --script tests/lapidary/test_board_consumer.gd  # TileView/GemForge contract (headless side)
 ```
 
-Verifies the C++ `GemTraceKernel` GDExtension loads, registers, instantiates, and exposes the expected methods. Requires the native extension to be compiled (see Building the Native Tracer in the project README). Skips gracefully if the extension is not available.
+- `test_cut_compiler.gd` — compiles every silhouette x cut-template combination, validates hulls with the exact face test (polygon clipping), checks solver angles, girdle counts, and pruning.
+- `test_species_data.gd` — asserts published n_D and B-G dispersion per species, 81-sample curve invariants, grade ramp monotonicity, stone/tile identity, cut assignments (brilliant everywhere, step on the T6 rectangle tier), fingerprint stability/uniqueness, and a `LapidaryStoneCompiler` consumption smoke.
+- GPU rendering itself cannot be tested headlessly (`RenderingDevice` is unavailable under `--headless`); see `tools/kernel_v1_check.gd` and friends.
 
-## Test Coverage (40+ tests)
-
-### Data Layer
-- Board creation, bounds checking
-- CellState properties (gravity direction, spawn entry, fill sources, tags)
-- TileState properties (gravity override, immovable, unmatchable, merge_target_id, duplicate)
-- BoardLayoutResource (apply layout with blocked cells, gravity, portals, fill sources)
-- Topology: `get_neighbor()` standard, out-of-bounds, and portal override
-- Effective gravity: default, cell override, tile override priority
-- Swap rejection for immovable tiles
-- Board hash determinism and change detection
-- ConflictResolver deduplication with Vector2i keys
-
-### Match Detection
-- Standard horizontal match-3
-- Unmatchable tile breaks runs
-- Holes break runs
-- Match classification (base, 4, 5+, L/T)
-
-### Merge Mechanic
-- Base match: 2 removes + 1 upgrade
-- 4-match: 3 removes + 1 upgrade
-- Max-tier match: all removes, no upgrade
-
-### Board Physics
-- Standard downward gravity
-- Gravity over blocked cells
-- Custom cell gravity direction (LEFT, RIGHT, etc.)
-- Per-tile gravity override
-- Immovable tile as barrier
-- Iterative convergence on L-shaped gravity paths
-- Diagonal fill from configured sources
-- Portal gravity routing
-- Move event recording
-- Gravity determinism
-- Cycle safety (MAX_SETTLE_ROUNDS cap)
-
-### Pipeline Integration
-- Effect planning (merge mechanic output)
-- Conflict resolution
-- Effect resolution (remove + upgrade with event collection)
-- Integer-only weighted spawn pick
-- Spawn determinism (same seed = same board)
-- EventTimeline structure (cascade steps with all event types)
-- Full TurnController cascade
-- SeededRng determinism
-
-### Verification
-- Deterministic replay (same seed + 5 turns = identical board hashes)
-- BoardValidator cycle detection
-- BoardValidator portal target validation
-
-## Cross-Platform RNG Test
+## Cross-Platform RNG
 
 ```bash
 godot --headless --script tests/test_rng_cross_platform.gd
 ```
 
-Prints 100 reference RNG values for seed 42. Run on each target platform (Windows, Android, iOS, web) and compare outputs. If they match, integer RNG is cross-platform safe.
+Prints 100 reference RNG values for seed 42. Run on each target platform and compare; matching output means integer RNG is cross-platform safe.
 
-## Optional Simulation Harness
-
-For longer balance / throughput runs with a simple greedy swap picker:
+## Balance Simulation Harness
 
 ```bash
 godot --headless res://tests/test_simulation.tscn
 ```
+
+Runs N full games with a greedy swap picker and prints per-run and aggregate statistics. Slow; for balance work, not CI.

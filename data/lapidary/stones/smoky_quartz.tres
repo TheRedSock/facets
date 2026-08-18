@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/smoky_al_hole.tres" id="1_ctuip"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_d2pp0"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t2.tres" id="3_bh5e2"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_oq32d"]
+[ext_resource type="Resource" path="res://data/lapidary/species/quartz.tres" id="5_2tp88"]
+
+[resource]
+script = ExtResource("4_oq32d")
+stone_id = &"smoky_quartz"
+species = ExtResource("5_2tp88")
+chromophore = ExtResource("1_ctuip")
+cut = ExtResource("2_d2pp0")
+silhouette = &"square"
+grade = ExtResource("3_bh5e2")
+seed = 43
+size_mm = 4.65

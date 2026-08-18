@@ -42,13 +42,13 @@ func _init() -> void:
 	for i in 100:
 		verify_values.append(rng.randi_range(0, 999999))
 
-	var match := true
+	var values_match := true
 	for i in 100:
 		if int_values[i] != verify_values[i]:
-			match = false
+			values_match = false
 			break
 
-	if match:
+	if values_match:
 		print("\nSame-run determinism: PASS")
 	else:
 		print("\nSame-run determinism: FAIL")

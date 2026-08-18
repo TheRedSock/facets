@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/painite_v_cr.tres" id="1_lkayf"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_n5f0v"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t7.tres" id="3_irr11"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_hdkti"]
+[ext_resource type="Resource" path="res://data/lapidary/species/painite.tres" id="5_ui7fr"]
+
+[resource]
+script = ExtResource("4_hdkti")
+stone_id = &"painite"
+species = ExtResource("5_ui7fr")
+chromophore = ExtResource("1_lkayf")
+cut = ExtResource("2_n5f0v")
+silhouette = &"marquise"
+grade = ExtResource("3_irr11")
+seed = 67
+size_mm = 5.4

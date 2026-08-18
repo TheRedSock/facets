@@ -27,7 +27,7 @@ SaveService="*res://autoloads/save_service.gd"
 ReplayService="*res://autoloads/replay_service.gd"
 DebugFlags="*res://autoloads/debug_flags.gd"
 TileRegistry="*res://autoloads/tile_registry.gd"
-GemVisualRegistry="*res://autoloads/gem_visual_registry.gd"
+GemForge="*res://autoloads/gem_forge.gd"
 
 [display]
 

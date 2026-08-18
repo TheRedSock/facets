@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/alexandrite_cr.tres" id="1_12t44"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/step.tres" id="2_vk2vf"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t6.tres" id="3_qgaiw"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_finip"]
+[ext_resource type="Resource" path="res://data/lapidary/species/chrysoberyl.tres" id="5_usqoy"]
+
+[resource]
+script = ExtResource("4_finip")
+stone_id = &"alexandrite"
+species = ExtResource("5_usqoy")
+chromophore = ExtResource("1_12t44")
+cut = ExtResource("2_vk2vf")
+silhouette = &"rectangle"
+grade = ExtResource("3_qgaiw")
+seed = 61
+size_mm = 5.25

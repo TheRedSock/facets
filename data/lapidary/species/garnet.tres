@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="GemSpecies" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_st222"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_jhkny"]
+
+[sub_resource type="Resource" id="Resource_0rh2a"]
+script = ExtResource("1_st222")
+archetype_id = &"garnet_needle_silk"
+size_mm_range = Vector2(0.3, 1.1)
+aspect = 22.0
+scatter_density = 14.0
+tint = Color(1, 0.96, 0.9, 1)
+weight = 3.0
+center_bias = 0.2
+
+[sub_resource type="Resource" id="Resource_apjer"]
+script = ExtResource("1_st222")
+archetype_id = &"garnet_crystal"
+form = 4
+size_mm_range = Vector2(0.12, 0.4)
+aspect = 1.4
+scatter_density = 8.0
+tint = Color(0.95, 0.96, 0.94, 1)
+weight = 1.5
+center_bias = 0.4
+
+[resource]
+script = ExtResource("2_jhkny")
+species_id = &"garnet"
+display_name = "Garnet, pyralspite (Mg,Fe,Mn)3Al2(SiO4)3"
+source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.760 (rhodolite RI 1.760 +0.010/-0.020, Wikipedia/Chemija 32:4549) and B-G dispersion 0.026 (Wikipedia rhodolite); UV pole 0.025 um^2 + constant term. Cubic: birefringence 0 (anomalous DR ignored). Mohs 7.25 (lit. 7-7.5). Colour-change pyrope-spessartine (~1.76) shares the species at this granularity."
+sellmeier_b = Vector3(0.9218419, 1.1042475, 0)
+sellmeier_c_um2 = Vector3(0.025, 0, 0)
+base_scatter_per_mm = 0.002
+hardness_mohs = 7.25
+inclusions = Array[ExtResource("1_st222")]([SubResource("Resource_0rh2a"), SubResource("Resource_apjer")])

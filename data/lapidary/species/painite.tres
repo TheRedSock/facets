@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="GemSpecies" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_i5cr6"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_ylu0r"]
+
+[sub_resource type="Resource" id="Resource_7i2jy"]
+script = ExtResource("1_i5cr6")
+archetype_id = &"painite_crystal"
+form = 4
+size_mm_range = Vector2(0.15, 0.45)
+aspect = 1.5
+scatter_density = 8.0
+tint = Color(0.95, 0.93, 0.9, 1)
+weight = 1.5
+center_bias = 0.4
+
+[sub_resource type="Resource" id="Resource_tpajj"]
+script = ExtResource("1_i5cr6")
+archetype_id = &"painite_feather"
+form = 2
+size_mm_range = Vector2(0.3, 0.9)
+aspect = 24.0
+scatter_density = 7.0
+tint = Color(1, 0.97, 0.93, 1)
+weight = 2.0
+center_bias = 0.25
+
+[resource]
+script = ExtResource("2_ylu0r")
+species_id = &"painite"
+display_name = "Painite (CaZrAl9O15(BO3))"
+source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.80 (published RI range ~1.787-1.816) and ASSUMED B-G dispersion 0.018 (no published dispersion found; corundum-like oxide assumed). Uniaxial(-) delta-n 0.028. Mohs 8. Sparse literature — constants are best-effort, flagged for revisit."
+sellmeier_b = Vector3(0.65183, 1.5376052, 0)
+sellmeier_c_um2 = Vector3(0.025, 0, 0)
+birefringence = 0.028
+uniaxial_positive = false
+base_scatter_per_mm = 0.001
+hardness_mohs = 8.0
+inclusions = Array[ExtResource("1_i5cr6")]([SubResource("Resource_7i2jy"), SubResource("Resource_tpajj")])

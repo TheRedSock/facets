@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/topaz_imperial.tres" id="1_lwdlo"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_3be4f"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t4.tres" id="3_2kjoo"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_mifdu"]
+[ext_resource type="Resource" path="res://data/lapidary/species/topaz.tres" id="5_ce8cq"]
+
+[resource]
+script = ExtResource("4_mifdu")
+stone_id = &"topaz"
+species = ExtResource("5_ce8cq")
+chromophore = ExtResource("1_lwdlo")
+cut = ExtResource("2_3be4f")
+silhouette = &"oval"
+grade = ExtResource("3_2kjoo")
+seed = 19
+size_mm = 4.95

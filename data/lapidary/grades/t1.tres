@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="GemGrade" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_grade.gd" id="1_tjhin"]
+
+[resource]
+script = ExtResource("1_tjhin")
+grade_id = &"t1"
+cut = 0.3
+clarity = 0.25
+surface = 0.28
+crystal = 0.25

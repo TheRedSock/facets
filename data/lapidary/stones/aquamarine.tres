@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/aquamarine_fe.tres" id="1_tf3ec"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="2_ivxy0"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t5.tres" id="3_6tndx"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_yfk7a"]
+[ext_resource type="Resource" path="res://data/lapidary/species/beryl.tres" id="5_6msoa"]
+
+[resource]
+script = ExtResource("4_yfk7a")
+stone_id = &"aquamarine"
+species = ExtResource("5_6msoa")
+chromophore = ExtResource("1_tf3ec")
+cut = ExtResource("2_ivxy0")
+silhouette = &"diamond"
+grade = ExtResource("3_6tndx")
+seed = 59
+size_mm = 5.1

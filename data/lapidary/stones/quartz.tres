@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="1_xlkyl"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t1.tres" id="2_rv82v"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="3_a6uk2"]
+[ext_resource type="Resource" path="res://data/lapidary/species/quartz.tres" id="4_j5mdv"]
+
+[resource]
+script = ExtResource("3_a6uk2")
+stone_id = &"quartz"
+species = ExtResource("4_j5mdv")
+cut = ExtResource("1_xlkyl")
+grade = ExtResource("2_rv82v")
+seed = 11
+size_mm = 4.5
