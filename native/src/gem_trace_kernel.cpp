@@ -5,6 +5,7 @@
 #include "gem_trace_fresnel.h"
 #include "gem_trace_volume.h"
 #include "gem_trace_rng.h"
+#include "gem_trace_denoise.h"
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -14,9 +15,40 @@
 #include <chrono>
 #include <cmath>
 
+#ifdef _WIN32
+#include <windows.h>
+// Opt out of Windows EcoQoS (Efficiency Mode) power throttling.
+// When a process's window is minimized or occluded, Windows 11 may
+// automatically apply EcoQoS which forces threads onto E-cores on
+// Intel big.LITTLE CPUs, halving trace throughput.  This disables
+// that behaviour so bake performance is consistent regardless of
+// window state.  Idempotent — safe to call more than once.
+static void disable_ecoqos_throttling() {
+    static bool done = false;
+    if (done) return;
+    done = true;
+    PROCESS_POWER_THROTTLING_STATE state = {};
+    state.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
+    state.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
+    state.StateMask = 0; // 0 = opt out of throttling
+    SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling,
+                          &state, sizeof(state));
+}
+#else
+static void disable_ecoqos_throttling() {} // no-op on non-Windows
+#endif
+
 using namespace godot;
 
 namespace gem {
+
+static void trace_stat_update_max(std::atomic<int64_t>& max_value, int64_t candidate) {
+    int64_t current = max_value.load(std::memory_order_relaxed);
+    while (candidate > current
+        && !max_value.compare_exchange_weak(
+            current, candidate, std::memory_order_relaxed, std::memory_order_relaxed)) {
+    }
+}
 
 // ===========================================================================
 // Bind methods
@@ -192,6 +224,20 @@ GemTraceProps GemTraceKernel::extract_props(Ref<Resource> visual) const {
     p.volume_absorption_variation = (double)(float)visual->get("volume_absorption_variation");
     p.volume_scattering_variation = (double)(float)visual->get("volume_scattering_variation");
 
+    // Structured haze density parameters
+    Variant hbd_var = visual->get("haze_base_density");
+    if (hbd_var.get_type() != Variant::NIL)
+        p.haze_base_density = (double)(float)hbd_var;
+    Variant hdv_var = visual->get("haze_density_variation");
+    if (hdv_var.get_type() != Variant::NIL)
+        p.haze_density_variation = (double)(float)hdv_var;
+    Variant hgc_var = visual->get("haze_growth_correlation");
+    if (hgc_var.get_type() != Variant::NIL)
+        p.haze_growth_correlation = (double)(float)hgc_var;
+    Variant hds_var = visual->get("haze_distribution_skew");
+    if (hds_var.get_type() != Variant::NIL)
+        p.haze_distribution_skew = (double)(float)hds_var;
+
     // Reactive
     p.reactive_effect_type = (int)(int64_t)visual->get("reactive_effect_type");
     p.reactive_color = Color(visual->get("reactive_color"));
@@ -212,6 +258,52 @@ GemTraceProps GemTraceKernel::extract_props(Ref<Resource> visual) const {
     p.material_tertiary_color = Color(visual->get("material_tertiary_color"));
 
     p.rotation_degrees = (double)(float)visual->get("rotation_degrees");
+
+    // Denoise strength
+    Variant denoise_var = visual->get("denoise_strength");
+    if (denoise_var.get_type() != Variant::NIL) {
+        p.denoise_strength = clampd((double)(float)denoise_var, 0.0, 1.0);
+    }
+
+    // Zone roughness overrides
+    Variant zone_rough_var = visual->get("zone_roughness_overrides");
+    if (zone_rough_var.get_type() == Variant::DICTIONARY) {
+        Dictionary zone_dict = zone_rough_var;
+        Array keys = zone_dict.keys();
+        for (int i = 0; i < (int)keys.size() && p.zone_roughness_count < GemTraceProps::MAX_ZONE_ROUGHNESS_ENTRIES; i++) {
+            String key_str = String(keys[i]);
+            uint32_t hash = key_str.hash();
+            double mult = (double)(float)zone_dict[keys[i]];
+            p.zone_roughness[p.zone_roughness_count] = {hash, mult};
+            p.zone_roughness_count++;
+        }
+    }
+
+    // Surface wear Lambertian diffuse albedo
+    Variant dmg_diffuse_var = visual->get("damage_diffuse_albedo");
+    if (dmg_diffuse_var.get_type() != Variant::NIL) {
+        // Cap raised from 0.5 → 1.0 in v4 wear revision: on near-white gems
+        // the old cap was the primary reason frosted wear read as invisible.
+        p.damage_diffuse_albedo = clampd((double)(float)dmg_diffuse_var, 0.0, 1.0);
+    }
+
+    // Surface wear tint (scratch / abrasion / edge). Per-gem authored colour
+    // so wear does not collapse to body-colour when display_color is near-white.
+    Variant dmg_tint_var = visual->get("damage_tint");
+    if (dmg_tint_var.get_type() == Variant::COLOR) {
+        p.damage_tint = Color(dmg_tint_var);
+    }
+    Variant dmg_tint_strength_var = visual->get("damage_tint_strength");
+    if (dmg_tint_strength_var.get_type() != Variant::NIL) {
+        p.damage_tint_strength = clampd((double)(float)dmg_tint_strength_var, 0.0, 1.0);
+    }
+
+    // Dirt patch tint. Kept separate from frosted wear tint so chromatic
+    // contamination does not leak into scratch/abrasion shading.
+    Variant dmg_dirt_tint_var = visual->get("damage_dirt_tint");
+    if (dmg_dirt_tint_var.get_type() == Variant::COLOR) {
+        p.damage_dirt_tint = Color(dmg_dirt_tint_var);
+    }
 
     // Inclusion properties
     Variant incl_var = visual->get("inclusion_profile");
@@ -505,12 +597,23 @@ TraceContext GemTraceKernel::build_context(
         (int)(int64_t)request.get("samples_per_pixel", 64), 16, 512);
     ctx.base_seed = (uint64_t)(int64_t)request.get("seed", 42);
 
-    // SPP-dependent variance budget — caps high-variance features at low SPP
-    ctx.variance_budget = VarianceBudget::from_spp(ctx.samples_per_pixel);
+    ctx.debug_surface_wear_mask = (bool)request.get("debug_surface_wear_mask", false);
+
+    // Denoise active flag: from request override or per-gem denoise_strength.
+    double denoise_strength = (double)request.get("denoise_strength",
+        (double)ctx.props.denoise_strength);
+    ctx.denoise_active = (!ctx.debug_surface_wear_mask && denoise_strength > 0.0001);
+
+    // SPP-dependent variance budget — caps high-variance features at low SPP.
+    // When denoise is active, the scattering cap is raised 4x.
+    ctx.variance_budget = VarianceBudget::from_spp(ctx.samples_per_pixel, ctx.denoise_active);
 
     // Feature flags
-    ctx.has_volume_patterns = (ctx.props.volume_pattern_mix > 0.001
-        && ctx.props.volume_pattern_type != MATERIAL_PATTERN_NONE);
+    bool is_structured_haze = (ctx.props.volume_pattern_type == MATERIAL_PATTERN_STRUCTURED_HAZE
+                               && ctx.props.haze_base_density > 0.001);
+    ctx.has_volume_patterns = is_structured_haze
+        || (ctx.props.volume_pattern_mix > 0.001
+            && ctx.props.volume_pattern_type != MATERIAL_PATTERN_NONE);
     ctx.has_surface_patterns = (
         (ctx.props.surface_pattern_mix > 0.001
          && ctx.props.surface_pattern_type != MATERIAL_PATTERN_NONE)
@@ -543,6 +646,7 @@ Ref<Image> GemTraceKernel::trace_to_image(
     Ref<Resource> visual,
     Dictionary request)
 {
+    disable_ecoqos_throttling();
     last_trace_profile_.clear();
     if (mesh_resource.is_null() || visual.is_null()) return Ref<Image>();
 
@@ -576,6 +680,7 @@ Ref<Image> GemTraceKernel::trace_to_image(
     Dictionary trace_data = Dictionary(request.get("_trace_data", Dictionary()));
     TraceScene scene;
     scene.build_from_trace_data(trace_data);
+    scene.set_surface_wear_pixel_floor(ctx.radius, target_size);
     double bvh_ms = elapsed_ms(phase_start);
     if (!scene.is_valid()) return Ref<Image>();
     if (verbose) {
@@ -599,6 +704,19 @@ Ref<Image> GemTraceKernel::trace_to_image(
 
     int total_pixels = target_size.x * target_size.y;
     std::vector<Color> pixels(total_pixels, Color(0, 0, 0, 0));
+
+    // AOV buffers for OIDN denoiser (allocated only when denoise is active).
+    double denoise_strength = (double)request.get("denoise_strength",
+        (double)ctx.props.denoise_strength);
+    bool do_denoise = (!ctx.debug_surface_wear_mask && denoise_strength > 0.0001);
+    std::vector<float> normal_aov;
+    std::vector<float> albedo_aov;
+    if (do_denoise) {
+        normal_aov.resize(total_pixels * 3, 0.0f);
+        albedo_aov.resize(total_pixels * 3, 0.0f);
+    }
+    std::vector<float>* normal_aov_ptr = do_denoise ? &normal_aov : nullptr;
+    std::vector<float>* albedo_aov_ptr = do_denoise ? &albedo_aov : nullptr;
 
     if (verbose) {
         UtilityFunctions::print(String("[trace] tracing: {0} threads  budget={1}  rows={2}  pixels={3}  work_units={4}")
@@ -666,15 +784,19 @@ Ref<Image> GemTraceKernel::trace_to_image(
     }
 
     TraceStats trace_stats;
+    trace_stats.surface_wear_entry_count.store(scene.surface_wear_count(), std::memory_order_relaxed);
 
     if (thread_count <= 1) {
-        trace_row_band(ctx, scene, 0, target_size.y, pixels, &rows_completed, &trace_stats);
+        trace_row_band(ctx, scene, 0, target_size.y, pixels, &rows_completed, &trace_stats,
+                       normal_aov_ptr, albedo_aov_ptr);
     } else {
         std::atomic<int> next_row{0};
         std::vector<std::thread> threads;
         for (int t = 0; t < thread_count; t++) {
-            threads.emplace_back([this, &ctx, &scene, &next_row, &pixels, &rows_completed, total_rows, &trace_stats]() {
-                trace_rows_dynamic(ctx, scene, next_row, total_rows, pixels, rows_completed, &trace_stats);
+            threads.emplace_back([this, &ctx, &scene, &next_row, &pixels, &rows_completed,
+                                  total_rows, &trace_stats, normal_aov_ptr, albedo_aov_ptr]() {
+                trace_rows_dynamic(ctx, scene, next_row, total_rows, pixels, rows_completed,
+                                   &trace_stats, normal_aov_ptr, albedo_aov_ptr);
             });
         }
         for (auto& th : threads) th.join();
@@ -693,6 +815,38 @@ Ref<Image> GemTraceKernel::trace_to_image(
                 String::num(total_samples, 0),
                 String::num(samples_per_sec, 0),
                 String::num((double)pixel_count * 1000.0 / std::max(trace_ms, 0.001), 0))));
+    }
+
+    // Phase 3.5: Denoise (between trace and encode)
+    double denoise_ms = 0.0;
+    if (do_denoise) {
+        phase_start = std::chrono::steady_clock::now();
+        // Convert pixel buffer to float3 for denoiser input.
+        std::vector<float> color_f3(total_pixels * 3);
+        for (int i = 0; i < total_pixels; i++) {
+            color_f3[i * 3]     = (float)pixels[i].r;
+            color_f3[i * 3 + 1] = (float)pixels[i].g;
+            color_f3[i * 3 + 2] = (float)pixels[i].b;
+        }
+        auto denoise_result = denoise_image(
+            color_f3.data(), target_size.x, target_size.y,
+            normal_aov.data(), albedo_aov.data(),
+            (float)denoise_strength);
+        if (denoise_result.success) {
+            for (int i = 0; i < total_pixels; i++) {
+                pixels[i].r = denoise_result.color[i * 3];
+                pixels[i].g = denoise_result.color[i * 3 + 1];
+                pixels[i].b = denoise_result.color[i * 3 + 2];
+            }
+        }
+        denoise_ms = elapsed_ms(phase_start);
+        if (verbose) {
+            UtilityFunctions::print(String("[trace] denoise: {0}ms  strength={1}  success={2}")
+                .format(Array::make(
+                    String::num(denoise_ms, 1),
+                    String::num(denoise_strength, 2),
+                    denoise_result.success ? "true" : "false")));
+        }
     }
 
     // Phase 4: Encode
@@ -730,6 +884,7 @@ Ref<Image> GemTraceKernel::trace_to_image(
     last_trace_profile_["context_build_elapsed_ms"] = ctx_ms;
     last_trace_profile_["bvh_build_elapsed_ms"] = bvh_ms;
     last_trace_profile_["trace_elapsed_ms"] = trace_ms;
+    last_trace_profile_["denoise_elapsed_ms"] = denoise_ms;
     last_trace_profile_["encode_elapsed_ms"] = encode_ms;
     last_trace_profile_["alpha_cleanup_elapsed_ms"] = alpha_ms;
     last_trace_profile_["total_wall_elapsed_ms"] = total_ms;
@@ -742,6 +897,19 @@ Ref<Image> GemTraceKernel::trace_to_image(
     last_trace_profile_["volume_sampling_count"] = (int64_t)trace_stats.volume_scatter_count.load();
     last_trace_profile_["bounce_count"] = (int64_t)trace_stats.bounce_count.load();
     last_trace_profile_["starvation_terminations"] = (int64_t)trace_stats.starvation_terminations.load();
+    int64_t wear_hit_count = trace_stats.surface_wear_hit_count.load();
+    int64_t wear_mask_sum = trace_stats.surface_wear_mask_sum_micros.load();
+    last_trace_profile_["surface_wear_entry_count"] =
+        (int64_t)trace_stats.surface_wear_entry_count.load();
+    int64_t wear_sample_count = trace_stats.surface_wear_sample_count.load();
+    last_trace_profile_["surface_wear_sample_count"] = wear_sample_count;
+    last_trace_profile_["surface_wear_hit_count"] = wear_hit_count;
+    last_trace_profile_["surface_wear_hit_coverage"] =
+        wear_sample_count > 0 ? (double)wear_hit_count / (double)wear_sample_count : 0.0;
+    last_trace_profile_["surface_wear_mask_avg"] =
+        wear_sample_count > 0 ? ((double)wear_mask_sum / 1000000.0) / (double)wear_sample_count : 0.0;
+    last_trace_profile_["surface_wear_mask_max"] =
+        (double)trace_stats.surface_wear_mask_max_micros.load() / 1000000.0;
 
     return image;
 }
@@ -757,7 +925,9 @@ void GemTraceKernel::trace_row_band(
     int row_end,
     std::vector<Color>& out_pixels,
     std::atomic<int>* rows_completed,
-    TraceStats* stats) const
+    TraceStats* stats,
+    std::vector<float>* normal_aov,
+    std::vector<float>* albedo_aov) const
 {
     int width = ctx.target_size.x;
     double inv_w = 1.0 / (double)ctx.target_size.x;
@@ -789,6 +959,76 @@ void GemTraceKernel::trace_row_band(
                 if (!first_hit.did_hit) continue;
 
                 hit_count += 1.0;
+                double wear_mask = clampd(first_hit.surface_wear_mask, 0.0, 1.0);
+                if (stats) {
+                    stats->surface_wear_sample_count.fetch_add(1, std::memory_order_relaxed);
+                    int64_t wear_micros = (int64_t)std::round(wear_mask * 1000000.0);
+                    stats->surface_wear_mask_sum_micros.fetch_add(wear_micros, std::memory_order_relaxed);
+                    trace_stat_update_max(stats->surface_wear_mask_max_micros, wear_micros);
+                    if (wear_mask > 0.001) {
+                        stats->surface_wear_hit_count.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
+
+                if (ctx.debug_surface_wear_mask) {
+                    xyz_sum += Vector3((float)wear_mask, (float)wear_mask, (float)wear_mask);
+                    continue;
+                }
+
+                // AOV collection: first sample only, noise-free by construction.
+                if (s == 0 && normal_aov && albedo_aov) {
+                    int aov_idx = (y * width + x) * 3;
+                    // Normal AOV: first-hit shading normal in world space.
+                    (*normal_aov)[aov_idx]     = (float)first_hit.normal.x;
+                    (*normal_aov)[aov_idx + 1] = (float)first_hit.normal.y;
+                    (*normal_aov)[aov_idx + 2] = (float)first_hit.normal.z;
+                    // Albedo AOV: base material color at first hit.
+                    // For transparent gems, use Beer-Lambert at representative
+                    // path length (~1.2x bounding radius) sampled at 3 wavelengths.
+                    float base_albedo_r = 1.0f;
+                    float base_albedo_g = 1.0f;
+                    float base_albedo_b = 1.0f;
+                    const auto& abs_spec = ctx.props.effective_absorption();
+                    if (!abs_spec.empty() && abs_spec.size() >= 81) {
+                        double path_length = ctx.radius * 1.2;
+                        double scale = ctx.props.absorption_strength_scale;
+                        // R ~ 610nm (index 46), G ~ 550nm (index 34), B ~ 470nm (index 18)
+                        double alpha_r = (double)abs_spec[46] * scale;
+                        double alpha_g = (double)abs_spec[34] * scale;
+                        double alpha_b = (double)abs_spec[18] * scale;
+                        base_albedo_r = (float)std::exp(-alpha_r * path_length);
+                        base_albedo_g = (float)std::exp(-alpha_g * path_length);
+                        base_albedo_b = (float)std::exp(-alpha_b * path_length);
+                    }
+                    // Surface wear AOV: blend albedo toward wear tint in worn
+                    // regions so OIDN's edge-preserving denoise keeps wear
+                    // contours sharp instead of smoothing them away. Higher
+                    // denoise strengths are now compatible with fine scratch /
+                    // abrasion / edge / dirt detail.
+                    if (wear_mask > 0.001 && ctx.props.damage_diffuse_albedo > 0.0) {
+                        Color wear_tint;
+                        if (first_hit.surface_wear_type == 3) {
+                            wear_tint = ctx.props.damage_dirt_tint;
+                        } else {
+                            double s_tint = ctx.props.damage_tint_strength;
+                            wear_tint = Color(
+                                (float)(ctx.props.display_color.r * (1.0 - s_tint)
+                                    + ctx.props.damage_tint.r * s_tint),
+                                (float)(ctx.props.display_color.g * (1.0 - s_tint)
+                                    + ctx.props.damage_tint.g * s_tint),
+                                (float)(ctx.props.display_color.b * (1.0 - s_tint)
+                                    + ctx.props.damage_tint.b * s_tint),
+                                1.0f);
+                        }
+                        double blend = clampd(wear_mask * 0.85, 0.0, 0.95);
+                        base_albedo_r = (float)lerpd(base_albedo_r, wear_tint.r, blend);
+                        base_albedo_g = (float)lerpd(base_albedo_g, wear_tint.g, blend);
+                        base_albedo_b = (float)lerpd(base_albedo_b, wear_tint.b, blend);
+                    }
+                    (*albedo_aov)[aov_idx]     = base_albedo_r;
+                    (*albedo_aov)[aov_idx + 1] = base_albedo_g;
+                    (*albedo_aov)[aov_idx + 2] = base_albedo_b;
+                }
 
                 // Stratified hero wavelength: divide spectrum into spp strata
                 double stratum = ((double)s + rng.next()) * inv_spp;
@@ -842,6 +1082,10 @@ void GemTraceKernel::trace_row_band(
             int pixel_index = y * width + x;
             if (hit_count <= 0.0) {
                 out_pixels[pixel_index] = Color(0.0, 0.0, 0.0, 0.0);
+            } else if (ctx.debug_surface_wear_mask) {
+                double mask = clampd((double)xyz_sum.x / hit_count, 0.0, 1.0);
+                double alpha = clampd(hit_count / (double)ctx.samples_per_pixel, 0.0, 1.0);
+                out_pixels[pixel_index] = Color((float)mask, (float)mask, (float)mask, (float)alpha);
             } else {
                 // Normalize the MC spectral estimate.
                 // Total spectral samples = HERO_WAVELENGTHS * hit_count.
@@ -898,12 +1142,15 @@ void GemTraceKernel::trace_rows_dynamic(
     int total_rows,
     std::vector<Color>& out_pixels,
     std::atomic<int>& rows_completed,
-    TraceStats* stats) const
+    TraceStats* stats,
+    std::vector<float>* normal_aov,
+    std::vector<float>* albedo_aov) const
 {
     while (true) {
         int y = next_row.fetch_add(1, std::memory_order_relaxed);
         if (y >= total_rows) break;
-        trace_row_band(ctx, scene, y, y + 1, out_pixels, &rows_completed, stats);
+        trace_row_band(ctx, scene, y, y + 1, out_pixels, &rows_completed, stats,
+                       normal_aov, albedo_aov);
     }
 }
 

@@ -22,11 +22,12 @@ static func generate_and_merge(mesh: Resource, profile: Resource, bounding_radiu
 	rng.seed = seed_base + profile.seed_offset
 
 	# Compute safe AABB from the gem mesh (before inclusions are added).
-	# Shrink each axis by 20% to keep inclusions well inside the gem volume.
-	# This replaces the old spherical containment which didn't account for
-	# non-spherical gem shapes (marquise, pear, kite, etc.).
+	# Shrink each axis by 25% to keep inclusions well inside the gem volume.
+	# 25% compensates for AABB over-estimation on non-box gem shapes (round,
+	# octagon, pear, etc.) where the gem surface is significantly inside the
+	# AABB at corners and diagonal positions.
 	var gem_aabb: AABB = mesh.compute_bounds()
-	var margin := gem_aabb.size * 0.2
+	var margin := gem_aabb.size * 0.25
 	var safe_min := gem_aabb.position + margin
 	var safe_max := gem_aabb.end - margin
 	var safe_aabb := AABB(safe_min, safe_max - safe_min)
@@ -109,10 +110,15 @@ static func _generate_layer(mesh: Resource, rng: RandomNumberGenerator, safe_aab
 			_:
 				facets = _generate_crystal(size, orient, pos)
 
-		# Validate all vertices are within the safe AABB before adding
+		# Validate all vertices are within the safe AABB before adding.
+		# Thin-sheet geometry (veil) uses orient_center=null (orient from gem
+		# origin) because centroid-to-inclusion-center is tangent to the sheet,
+		# making normal.dot(orient_dir) ≈ 0 and unreliable. Origin-based
+		# orientation is consistent for all triangles at similar positions.
 		if _all_vertices_in_aabb(facets, safe_aabb):
+			var orient_center = null if inclusion_type == &"veil" else pos
 			for verts in facets:
-				mesh.add_facet(verts, "inclusion", pos)
+				mesh.add_facet(verts, "inclusion", orient_center)
 
 
 # ---------------------------------------------------------------------------

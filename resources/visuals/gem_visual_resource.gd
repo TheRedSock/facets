@@ -22,6 +22,7 @@ const MATERIAL_PATTERN_CELLS := 4
 const MATERIAL_PATTERN_CLOUDS := 5
 const MATERIAL_PATTERN_LAYERS := 6
 const MATERIAL_PATTERN_GROWTH_ZONING := 7
+const MATERIAL_PATTERN_STRUCTURED_HAZE := 8
 const MATERIAL_REACTIVE_NONE := 0
 const MATERIAL_REACTIVE_CHATTOYANCY := 1
 const MATERIAL_REACTIVE_OPALESCENCE := 2
@@ -155,7 +156,7 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_range(-1.0, 1.0) var surface_pattern_roughness_variation: float = 0.0
 
 @export_subgroup("Volume Field")
-@export_enum("None", "Bands", "Concentric", "Fibers", "Cells", "Clouds", "Layers", "Growth Zoning") var volume_pattern_type: int = MATERIAL_PATTERN_NONE
+@export_enum("None", "Bands", "Concentric", "Fibers", "Cells", "Clouds", "Layers", "Growth Zoning", "Structured Haze") var volume_pattern_type: int = MATERIAL_PATTERN_NONE
 @export_range(0.0, 1.0) var volume_pattern_mix: float = 0.0
 @export var volume_pattern_scale: Vector3 = Vector3.ONE
 @export var volume_pattern_axis: Vector3 = Vector3.UP
@@ -164,7 +165,20 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 @export_range(0.0, 1.0) var volume_pattern_warp_strength: float = 0.0
 @export_range(0.1, 8.0) var volume_pattern_warp_scale: float = 1.0
 @export_range(-1.0, 1.0) var volume_absorption_variation: float = 0.0
-@export_range(-1.0, 1.0) var volume_scattering_variation: float = 0.0
+@export_range(-3.0, 3.0) var volume_scattering_variation: float = 0.0
+
+@export_subgroup("Scattering Density")
+## Base scattering coefficient when using Structured Haze pattern (type 8).
+## Replaces scattering_coefficient_override for haze-driven gems. 0 = disabled.
+@export_range(0.0, 3.0) var haze_base_density: float = 0.0
+## Spatial variation strength for haze density. 0 = uniform haze, 1 = high contrast.
+@export_range(0.0, 1.0) var haze_density_variation: float = 0.5
+## How much haze follows crystal growth zone structure. 0 = pure cloud noise,
+## 1 = strongly correlated with growth bands.
+@export_range(0.0, 1.0) var haze_growth_correlation: float = 0.5
+## Log-normal distribution skew. Higher values produce mostly-clear volume with
+## occasional high-density pockets. 0 = symmetric, 2 = heavy right tail.
+@export_range(0.0, 2.0) var haze_distribution_skew: float = 0.8
 
 @export_subgroup("Inclusions")
 ## Discrete inclusion geometry profile. null = no inclusions.
@@ -207,34 +221,103 @@ const MATERIAL_REACTIVE_IRIDESCENCE := 3
 ## sphene). Cost: ~4x slower trace; leave off for low-dispersion gems.
 @export var enable_dispersion: bool = false
 
-# ==== Stylization ====
+# ==== Stylization (v7) ====
 
 @export_group("Stylization")
-## Blends between the traced result and the gameplay stylization pass.
-## This keeps the traced output as the physical base while allowing
-## readability-driven shaping for board textures.
-@export_range(0.0, 1.0) var stylize_mix: float = 0.65
-## Strength of facet-edge crisping driven by image-space discontinuity guides.
-@export_range(0.0, 1.0) var stylize_facet_edge_gain: float = 0.55
-## Pushes lit planes brighter and dark planes deeper by compressing midtones.
-@export_range(0.0, 1.0) var stylize_plane_contrast: float = 0.35
-## Minimum light preserved inside dark regions after the stylized tone remap.
-@export_range(0.0, 0.35) var stylize_shadow_floor: float = 0.08
-## Strength of the tightly-thresholded internal bloom pass.
-@export_range(0.0, 1.0) var stylize_highlight_bloom_gain: float = 0.22
-## Brightness threshold where the stylized bloom starts to appear.
-@export_range(0.4, 1.0) var stylize_highlight_bloom_threshold: float = 0.8
-## Suppresses low-amplitude micro detail while preserving major facet edges.
-@export_range(0.0, 1.0) var stylize_microdetail_suppression: float = 0.28
-## Extra guided saturation for internal dispersion/absorption color structure.
-@export_range(0.0, 1.0) var stylize_internal_color_shift_gain: float = 0.2
-## Quantizes lighting into a small number of broad tone bands for a more
-## cel-shaded presentation while keeping the traced light response intact.
-@export_range(2, 8, 1) var stylize_tone_steps: int = 5
-## Darkens strong facet discontinuities with a tinted ink-like edge treatment.
-@export_range(0.0, 1.0) var stylize_edge_ink_strength: float = 0.16
-## Snaps very bright highlights into cleaner, more graphic specular shapes.
-@export_range(0.0, 1.0) var stylize_highlight_snap: float = 0.24
+## Master blend between the raw traced result and the stylized output.
+@export_range(0.0, 1.0) var stylize_mix: float = 0.7
+## Tier-progression quality knob (0.0 = humble/muted, 1.0 = dazzling).
+## Modulates contrast, vibrance, clarity, specular punch, edge definition, bloom.
+@export_range(0.0, 1.0) var stylize_visual_quality: float = 0.5
+## Clarity haze overlay for low-tier gems. Blends interior toward a softened,
+## desaturated, lifted version of itself.
+@export_range(0.0, 0.5) var stylize_haze: float = 0.0
+## Specular peak enhancement for high-tier gems. Boosts existing bright,
+## low-chroma pixels with optional micro-glow.
+@export_range(0.0, 1.0) var stylize_brilliance: float = 0.0
+## Soft Hermite toe curve — smoothly recovers shadow readability.
+@export_range(0.0, 0.5) var stylize_shadow_lift: float = 0.15
+## Adaptive S-curve contrast centered on the image's actual tonal midpoint.
+@export_range(0.0, 1.0) var stylize_contrast: float = 0.4
+## OKLCh chroma boost with vibrance weighting (under-saturated colors boosted more).
+@export_range(0.0, 1.5) var stylize_vibrance: float = 0.5
+## Unsharp mask at facet scale — enhances facet plane separation.
+@export_range(0.0, 1.0) var stylize_clarity: float = 0.35
+## Multiplicative highlight gain — color-preserving brightness boost on speculars.
+@export_range(0.0, 1.0) var stylize_specular_punch: float = 0.3
+## Sobel-guided local-color edge darkening for facet definition.
+@export_range(0.0, 1.0) var stylize_edge_definition: float = 0.25
+## Soft glow around highlights. Separable Gaussian with soft-knee threshold.
+@export_range(0.0, 1.0) var stylize_bloom_gain: float = 0.2
+## Brightness threshold where bloom starts to appear.
+@export_range(0.4, 1.0) var stylize_bloom_threshold: float = 0.7
+## Per-gem color temperature shift. Positive = warm, negative = cool.
+@export_range(-0.5, 0.5) var stylize_warmth: float = 0.0
+## Per-gem hue correction in degrees.
+@export_range(-30.0, 30.0) var stylize_hue_shift: float = 0.0
+
+@export_group("Denoising")
+## OIDN denoise strength. 0.0 = raw trace, 1.0 = full denoise.
+## Set > 0 for gems with scattering, inclusions, or dispersion noise.
+@export_range(0.0, 1.0) var denoise_strength: float = 0.0
+
+@export_group("Cut Quality")
+## Overall cut quality factor. 1.0 = optimal pavilion angles and proportions.
+## Lower values de-optimize pavilion angle, reduce crown height, and enlarge
+## the table — producing visible windowing and less fire. Physically accurate:
+## lower-grade gems ARE cut with less precision.
+@export_range(0.0, 1.0) var cut_quality: float = 1.0
+
+@export_group("Surface Quality")
+## Surface damage profile. null = no surface damage.
+## Generates non-geometric scratch, abrasion, edge-wear, and dirt masks. The
+## tracer shades these masks as exterior-only frosted dielectric material.
+@export var surface_damage_profile: Resource = null
+## Lambertian diffuse scatter fraction for surface wear masks. Real scratches
+## scatter light diffusely, producing frosted light marks. Without this,
+## roughness alone only broadens the specular lobe, which reads as
+## neutral-to-dark rather than frosted.
+## Recommended: T1=0.20-0.30, T2=0.10-0.15, T3=0.05, T4=0.02.
+@export_range(0.0, 1.0) var damage_diffuse_albedo: float = 0.0
+## Colour of the frosted wear layer for scratches, abrasion, and edge wear.
+## Replaces the gem body colour in wear shading when damage_tint_strength > 0.
+## Defaults to near-white so wear reads as a crystalline mineral film on any
+## body colour; per-gem overrides can pull wear back toward the body tint for
+## chromatic gems where monochromatic white wear looks foreign.
+@export var damage_tint: Color = Color(0.95, 0.95, 0.95, 1.0)
+## Blend between body display_color (0.0) and damage_tint (1.0) inside the
+## frosted wear shading. 1.0 = authored wear tint only.
+@export_range(0.0, 1.0) var damage_tint_strength: float = 1.0
+## Colour of dirt patches on the surface. Independent of scratch/abrasion/edge
+## wear tint because dirt is conceptually contamination rather than material
+## wear. Defaults to a neutral warm grey/brown.
+@export var damage_dirt_tint: Color = Color(0.70, 0.63, 0.50, 1.0)
+## Per-zone roughness multipliers. Keys are zone names (e.g. "girdle", "culet",
+## "pavilion"), values are multipliers on the base surface roughness.
+## Example: { "girdle": 2.5, "culet": 1.8, "pavilion": 1.3 }
+## Surface wear no longer uses zone names; its roughness is controlled by the
+## wear profile and native material mask.
+@export var zone_roughness_overrides: Dictionary = {}
+
+@export_subgroup("Color Grading (Advanced)")
+## ASC CDL lift — shadow color offset per channel.
+@export_range(-0.3, 0.3) var stylize_lift_r: float = 0.0
+## ASC CDL lift — shadow color offset per channel.
+@export_range(-0.3, 0.3) var stylize_lift_g: float = 0.0
+## ASC CDL lift — shadow color offset per channel.
+@export_range(-0.3, 0.3) var stylize_lift_b: float = 0.0
+## ASC CDL gamma — midtone color shift per channel.
+@export_range(-0.5, 0.5) var stylize_gamma_r: float = 0.0
+## ASC CDL gamma — midtone color shift per channel.
+@export_range(-0.5, 0.5) var stylize_gamma_g: float = 0.0
+## ASC CDL gamma — midtone color shift per channel.
+@export_range(-0.5, 0.5) var stylize_gamma_b: float = 0.0
+## ASC CDL gain — highlight color multiplier per channel.
+@export_range(-0.5, 0.5) var stylize_gain_r: float = 0.0
+## ASC CDL gain — highlight color multiplier per channel.
+@export_range(-0.5, 0.5) var stylize_gain_g: float = 0.0
+## ASC CDL gain — highlight color multiplier per channel.
+@export_range(-0.5, 0.5) var stylize_gain_b: float = 0.0
 ## Per-gem WebP quality override for the offline bake pipeline.
 ## -1.0 = use the adaptive quality heuristic (based on dispersion, sparkle, etc.).
 ## 0.5-0.99 = explicit lossy quality.
@@ -302,7 +385,7 @@ static func zone_spectrum_to_display_color(spectrum: PackedFloat32Array) -> Colo
 const VISUAL_JSON_SCHEMA_VERSION := 1
 
 ## Geometry + resource refs excluded from the generic property loop (handled explicitly).
-const _VISUAL_JSON_SKIP := [&"cut_spec", &"cut_overrides", &"cut_id", &"color_texture", &"mineral_template", &"bake_environment", &"inclusion_profile"]
+const _VISUAL_JSON_SKIP := [&"cut_spec", &"cut_overrides", &"cut_id", &"color_texture", &"mineral_template", &"bake_environment", &"inclusion_profile", &"surface_damage_profile"]
 
 
 ## Serialize all visual (non-geometry) properties to a JSON-safe dictionary.

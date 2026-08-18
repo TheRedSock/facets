@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="GemSurfaceDamageProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_surface_damage_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+scratch_count_range = Vector2i(24, 36)
+scratch_length_min = 0.06
+scratch_length_max = 0.22
+scratch_width = 0.0025
+scratch_cluster_size = 6
+scratch_cluster_spread_degrees = 28.0
+scratch_facet_crossing_ratio = 0.22
+scratch_taper_ratio = 0.65
+scratch_width_jitter = 0.45
+abrasion_count_range = Vector2i(3, 5)
+abrasion_radius = 0.035
+abrasion_density = 0.55
+abrasion_edge_bias = 0.85
+abrasion_segment_length_range = Vector2(0.015, 0.05)
+abrasion_segment_width = 0.003
+edge_wear_count = 18
+edge_wear_size = 0.011
+edge_wear_table_boost = 2.5
+dirt_count_range = Vector2i(8, 14)
+dirt_radius_min = 0.08
+dirt_radius_max = 0.22
+dirt_opacity = 0.35
+target_zones = []
+seed_offset = 100

@@ -4,7 +4,7 @@ extends RefCounted
 const DEFAULT_OUTPUT_ROOT := "user://traced_bakes"
 const DEFAULT_MANIFEST_NAME := "gameplay_manifest.json"
 const GENERATED_OUTPUT_ROOT := "res://generated/traced_bakes"
-const BAKED_LOOK_VERSION := 6
+const BAKED_LOOK_VERSION := 7
 
 ## Image output format constants.
 const IMAGE_FORMAT_PNG := &"png"
@@ -96,6 +96,13 @@ static func normalize_variant_settings(raw_value: Dictionary = {}) -> Dictionary
 		float(raw_value.get("rotation_step_degrees", defaults["rotation_step_degrees"])),
 		1.0
 	)
+	var full_turn_frame_count := maxi(int(raw_value.get("360_rotation_frames", 0)), 0)
+	if full_turn_frame_count > 0:
+		if full_turn_frame_count % 2 == 0:
+			axis_steps = int(full_turn_frame_count / 2)
+			step_degrees = 360.0 / float(full_turn_frame_count)
+		else:
+			push_warning("Ignoring 360_rotation_frames=%d because rotation axis sweeps require an even frame count." % full_turn_frame_count)
 	var raw_axes = raw_value.get("rotation_axes", defaults["rotation_axes"])
 	if raw_axes is String:
 		raw_axes = String(raw_axes).replace(";", ",").split(",", false)
@@ -109,6 +116,8 @@ static func normalize_variant_settings(raw_value: Dictionary = {}) -> Dictionary
 			continue
 		seen_axes[axis] = true
 		normalized_axes.append(axis)
+	if not normalized_axes.is_empty():
+		base_view_count = 0
 	var showroom_dir_count := maxi(
 		int(raw_value.get("showroom_direction_count", defaults["showroom_direction_count"])),
 		0

@@ -1,5 +1,6 @@
 #include "register_types.h"
 #include "gem_trace_kernel.h"
+#include "gem_trace_denoise.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -19,7 +20,8 @@ void uninitialize_gem_trace(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
-    // Nothing to clean up — Embree resources are per-instance via RAII.
+    // Release OIDN device and its TBB thread pool to prevent shutdown hangs.
+    gem::release_denoise_device();
 }
 
 extern "C" {

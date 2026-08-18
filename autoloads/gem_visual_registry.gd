@@ -2265,18 +2265,10 @@ func get_visual_cut_key(visual: GemVisualResource) -> String:
 func _build_visual_geometry_key(visual: GemVisualResource) -> String:
 	if visual == null:
 		return ""
-	var spec = visual.resolve_cut_spec()
-	if spec == null:
+	var resolved := GemCutGenerators.resolve_visual_geometry(visual)
+	if resolved.is_empty():
 		return ""
-	# Resolve pavilion from IOR so the geometry signature incorporates
-	# IOR-derived pavilion parameters (different IOR → different key).
-	var ior := GemPavilionSolverScript.DEFAULT_IOR
-	if visual.mineral_template != null and visual.mineral_template.has_method("get_reference_ior"):
-		ior = visual.mineral_template.get_reference_ior()
-	var pavilion_params := GemPavilionSolverScript.resolve(spec, ior)
-	var resolved_spec = spec.duplicate_spec()
-	resolved_spec.apply_pavilion_resolution(pavilion_params)
-	return resolved_spec.build_geometry_signature()
+	return String(resolved.geometry_signature)
 
 
 func _ensure_visual_geometry_cached(visual: GemVisualResource) -> String:
@@ -2285,18 +2277,10 @@ func _ensure_visual_geometry_cached(visual: GemVisualResource) -> String:
 		return ""
 	if _cut_models.has(geometry_key) and _cuts.has(geometry_key):
 		return geometry_key
-	var spec = visual.resolve_cut_spec()
-	if spec == null:
+	var resolved := GemCutGenerators.resolve_visual_geometry(visual)
+	if resolved.is_empty():
 		return ""
-	# Resolve pavilion parameters from gem IOR.
-	var ior := GemPavilionSolverScript.DEFAULT_IOR
-	if visual.mineral_template != null and visual.mineral_template.has_method("get_reference_ior"):
-		ior = visual.mineral_template.get_reference_ior()
-	var pavilion_params := GemPavilionSolverScript.resolve(spec, ior)
-	# Apply resolved dimensions to spec for signature + model metadata.
-	var resolved_spec = spec.duplicate_spec()
-	resolved_spec.apply_pavilion_resolution(pavilion_params)
-	var cut_model = GemCutCompiler3D.compile_spec(resolved_spec, pavilion_params)
+	var cut_model = GemCutCompiler3D.compile_spec(resolved.spec, resolved.pavilion_params)
 	if cut_model == null:
 		return ""
 	_cut_models[geometry_key] = cut_model

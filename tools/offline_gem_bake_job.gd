@@ -5,6 +5,7 @@ const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.
 const GemBakeStylizerScript = preload("res://core/visuals/gem_bake_stylizer.gd")
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 const GemInclusionGeneratorScript = preload("res://core/visuals/gem_inclusion_generator.gd")
+const GemSurfaceDamageGeneratorScript = preload("res://core/visuals/gem_surface_damage_generator.gd")
 
 const DEFAULT_OUTPUT_ROOT := GemTracedBakeContractScript.DEFAULT_OUTPUT_ROOT
 const DEFAULT_MANIFEST_NAME := GemTracedBakeContractScript.DEFAULT_MANIFEST_NAME
@@ -48,7 +49,8 @@ func build_designer_enriched_request(
 	var arr: Array = [req]
 	var enriched := _enrich_request_list(arr, sample_count, options, null)
 	if enriched.is_empty():
-		return req
+		push_error("Designer preview request enrichment failed")
+		return {}
 	return enriched[0]
 
 
@@ -717,9 +719,16 @@ func _enrich_request_list(
 					default_env = load("res://data/environments/gameplay_studio_v2_crown.tres")
 				if default_env != null and default_env.has_method("to_trace_dict"):
 					enriched_request["environment_profile"] = default_env.to_trace_dict()
+		var env_rotation := float(visual.optics_environment_rotation_degrees)
+		if absf(env_rotation) > 0.001:
+			if not enriched_request.has("environment_profile"):
+				push_error("Cannot apply optics_environment_rotation_degrees without an environment_profile")
+				continue
+			enriched_request["environment_profile"] = _rotate_environment_profile(
+				enriched_request["environment_profile"],
+				env_rotation
+			)
 		# Pass through request-level overrides from options
-		if options.has("zone_surface_scales") and not enriched_request.has("zone_surface_scales"):
-			enriched_request["zone_surface_scales"] = options.get("zone_surface_scales")
 		if options.has("output_grade") and not enriched_request.has("output_grade"):
 			enriched_request["output_grade"] = options.get("output_grade")
 		var mesh_cache_key := _resolve_request_mesh_cache_key(visual, enriched_request)
@@ -745,8 +754,12 @@ func _enrich_request_list(
 			enriched_request["skip_stylize"] = bool(options.get("skip_stylize", false))
 		if options.has("disable_edge_rounding"):
 			enriched_request["disable_edge_rounding"] = bool(options.get("disable_edge_rounding", false))
+		if options.has("debug_surface_wear_mask"):
+			enriched_request["debug_surface_wear_mask"] = bool(options.get("debug_surface_wear_mask", false))
 		if options.has("verbose_trace"):
 			enriched_request["verbose_trace"] = bool(options.get("verbose_trace", false))
+		if options.has("denoise_strength"):
+			enriched_request["denoise_strength"] = float(options.get("denoise_strength", 0.0))
 		# Image format and quality.
 		var image_format := GemTracedBakeContractScript.normalize_image_format(
 			options.get("image_format", GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT)
@@ -776,7 +789,27 @@ func _build_request_mesh(visual: GemVisualResource, request: Dictionary):
 	if mesh != null and request_model != null and visual != null and visual.inclusion_profile != null:
 		var radius: float = mesh.compute_bounding_radius()
 		GemInclusionGeneratorScript.generate_and_merge(mesh, visual.inclusion_profile, radius)
+	# Same for surface damage — the model path bypasses generate_from_visual.
+	if mesh != null and request_model != null and visual != null and visual.surface_damage_profile != null:
+		var radius: float = mesh.compute_bounding_radius()
+		GemSurfaceDamageGeneratorScript.generate_and_merge(mesh, visual.surface_damage_profile, radius)
 	return mesh
+
+
+func _rotate_environment_profile(environment_profile: Dictionary, degrees: float) -> Dictionary:
+	var rotated := environment_profile.duplicate(true)
+	var basis := Basis(Vector3.UP, deg_to_rad(degrees))
+	if rotated.has("blocker_dir"):
+		rotated["blocker_dir"] = basis * Vector3(rotated["blocker_dir"])
+	if rotated.has("cards"):
+		var cards: Array = rotated["cards"]
+		for i in cards.size():
+			var card: Dictionary = cards[i]
+			if card.has("dir"):
+				card["dir"] = basis * Vector3(card["dir"])
+			cards[i] = card
+		rotated["cards"] = cards
+	return rotated
 
 
 func _resolve_request_mesh_cache_key(visual: GemVisualResource, request: Dictionary) -> String:
@@ -1099,6 +1132,10 @@ func _finalize_batch_result(
 		"cell_size": cell_size,
 		"draw_size": draw_size,
 		"sample_count": sample_count,
+		"samples_per_pixel": int(batch_options.get(
+			"samples_per_pixel",
+			GemTracedBakeContractScript.DEFAULT_SAMPLES_PER_PIXEL
+		)),
 		"image_format": String(variant_settings.get(
 			"image_format",
 			GemTracedBakeContractScript.DEFAULT_IMAGE_FORMAT

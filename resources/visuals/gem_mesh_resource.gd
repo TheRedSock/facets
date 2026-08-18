@@ -11,6 +11,7 @@ var geometry_signature: String = ""
 var facet_vertices: Array[PackedVector3Array] = []
 var facet_normals: Array[Vector3] = []
 var facet_zones: PackedStringArray = PackedStringArray()
+var surface_wear_entries: Array[Dictionary] = []
 var _trace_data_cache: Dictionary = {}
 
 
@@ -68,6 +69,15 @@ func build_trace_data() -> Dictionary:
 	var triangle_centroids: Array[Vector3] = []
 	var triangle_facet_indices := PackedInt32Array()
 	var triangle_zones := PackedStringArray()
+	var surface_wear_types := PackedInt32Array()
+	var surface_wear_facet_indices := PackedInt32Array()
+	var surface_wear_p0: Array[Vector3] = []
+	var surface_wear_p1: Array[Vector3] = []
+	var surface_wear_normals: Array[Vector3] = []
+	var surface_wear_adjacent_normals: Array[Vector3] = []
+	var surface_wear_radii := PackedFloat32Array()
+	var surface_wear_intensities := PackedFloat32Array()
+	var surface_wear_seeds := PackedFloat32Array()
 	var min_v := Vector3(INF, INF, INF)
 	var max_v := Vector3(-INF, -INF, -INF)
 	var bounding_radius := 0.0
@@ -96,6 +106,19 @@ func build_trace_data() -> Dictionary:
 			triangle_centroids.append((a + b + c) / 3.0)
 			triangle_facet_indices.append(facet_index)
 			triangle_zones.append(facet_zones[facet_index] if facet_index < facet_zones.size() else "")
+	for entry in surface_wear_entries:
+		if typeof(entry) != TYPE_DICTIONARY:
+			push_error("GemMeshResource surface_wear_entries must contain Dictionary entries")
+			continue
+		surface_wear_types.append(int(entry.get("type", 0)))
+		surface_wear_facet_indices.append(int(entry.get("facet_index", -1)))
+		surface_wear_p0.append(entry.get("p0", Vector3.ZERO))
+		surface_wear_p1.append(entry.get("p1", Vector3.ZERO))
+		surface_wear_normals.append(entry.get("normal", Vector3.UP))
+		surface_wear_adjacent_normals.append(entry.get("adjacent_normal", entry.get("normal", Vector3.UP)))
+		surface_wear_radii.append(float(entry.get("radius", 0.0)))
+		surface_wear_intensities.append(float(entry.get("intensity", 1.0)))
+		surface_wear_seeds.append(float(entry.get("seed", 0.0)))
 	var bvh := _build_bvh(triangle_bounds, triangle_centroids)
 	var bounds := AABB()
 	if min_v.x != INF:
@@ -109,6 +132,15 @@ func build_trace_data() -> Dictionary:
 		"triangle_centroids": triangle_centroids,
 		"triangle_facet_indices": triangle_facet_indices,
 		"triangle_zones": triangle_zones,
+		"surface_wear_types": surface_wear_types,
+		"surface_wear_facet_indices": surface_wear_facet_indices,
+		"surface_wear_p0": surface_wear_p0,
+		"surface_wear_p1": surface_wear_p1,
+		"surface_wear_normals": surface_wear_normals,
+		"surface_wear_adjacent_normals": surface_wear_adjacent_normals,
+		"surface_wear_radii": surface_wear_radii,
+		"surface_wear_intensities": surface_wear_intensities,
+		"surface_wear_seeds": surface_wear_seeds,
 		"bounds": bounds,
 		"bounding_radius": bounding_radius,
 		"bvh_triangle_indices": bvh.get("triangle_indices", []),

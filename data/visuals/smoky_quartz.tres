@@ -1,9 +1,10 @@
-[gd_resource type="Resource" script_class="GemVisualResource" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/asscher_step.tres" id="1_6axxj"]
 [ext_resource type="Resource" path="res://data/minerals/quartz.tres" id="2"]
 [ext_resource type="Resource" path="res://data/visuals/inclusion_profiles/smoky_quartz_crystals.tres" id="3"]
+[ext_resource type="Resource" path="res://data/visuals/damage_profiles/moderate_wear.tres" id="dmg_1"]
 
 [resource]
 script = ExtResource("1")
@@ -12,24 +13,39 @@ cut_spec = ExtResource("1_6axxj")
 cut_id = &"asscher_step"
 display_color = Color(0.44, 0.36, 0.28, 1)
 mineral_template = ExtResource("2")
-absorption_strength_scale = 1.0
+absorption_strength_scale = 1.3
 absorption_spectrum_override = PackedFloat32Array(6.00000, 5.63196, 5.32206, 5.05965, 4.83613, 4.64459, 4.47947, 4.33624, 4.21128, 4.10160, 3.88117, 3.82043, 3.76387, 3.71121, 3.66218, 3.61653, 3.57403, 3.53446, 3.49762, 3.46331, 3.43137, 3.40163, 3.37395, 3.34817, 3.32417, 3.30182, 3.28101, 3.26164, 3.24360, 3.22681, 3.21117, 3.19662, 3.18306, 3.17044, 3.15869, 3.14775, 3.13757, 3.12808, 3.11925, 3.11103, 3.10338, 3.09625, 3.08962, 3.08344, 3.07769, 3.07233, 3.06734, 3.06270, 3.05838, 3.05436, 3.05061, 3.04712, 3.04387, 3.06168, 3.07970, 3.09791, 3.11630, 3.13486, 3.15358, 3.17244, 3.19144, 3.21057, 3.22981, 3.24916, 3.26862, 3.28817, 3.30781, 3.32753, 3.34732, 3.36719, 3.38713, 3.40713, 3.42718, 3.44729, 3.46745, 3.48765, 3.50790, 3.52819, 3.54852, 3.56888, 3.58927)
-surface_roughness_override = -1.0
-scattering_coefficient_override = -1.0
+surface_roughness_override = 0.028
+scattering_coefficient_override = 0.6
+zone_roughness_overrides = {
+"girdle": 2.5,
+"culet": 2.0,
+"pavilion": 1.3,
+"scratch": 3.0,
+"abrasion": 5.0,
+"chip": 3.0,
+"edge_wear": 3.0
+}
 gradient_color = Color(0.20, 0.17, 0.14, 1)
 gradient_strength = 0.20
 gradient_mode = 1
 volume_pattern_type = 7
 volume_pattern_mix = 0.20
 volume_absorption_variation = 0.04
+volume_scattering_variation = 1.5
 optics_environment_rotation_degrees = 8.0
-stylize_mix = 0.62
-stylize_facet_edge_gain = 0.5
-stylize_plane_contrast = 0.34
-stylize_shadow_floor = 0.14
-stylize_highlight_bloom_gain = 0.06
-stylize_highlight_bloom_threshold = 0.9
-stylize_microdetail_suppression = 0.42
-stylize_internal_color_shift_gain = 0.12
-stylize_highlight_snap = 0.14
+facet_edge_rounding_override = 0.02
+cut_quality = 0.5
+denoise_strength = 0.6
 inclusion_profile = ExtResource("3")
+surface_damage_profile = ExtResource("dmg_1")
+stylize_mix = 0.62
+stylize_visual_quality = 0.25
+stylize_haze = 0.12
+stylize_shadow_lift = 0.21
+stylize_contrast = 0.34
+stylize_vibrance = 0.24
+stylize_specular_punch = 0.14
+stylize_edge_definition = 0.21
+stylize_bloom_gain = 0.06
+stylize_bloom_threshold = 0.8

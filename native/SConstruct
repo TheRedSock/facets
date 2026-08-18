@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""SConstruct for the gem_trace GDExtension with Embree."""
+"""SConstruct for the gem_trace GDExtension with Embree and OIDN."""
 import os
 
 # Build godot-cpp first and inherit its environment.
@@ -9,16 +9,26 @@ env = SConscript("godot-cpp/SConstruct")
 embree_root = "embree"
 env.Append(CPPPATH=[os.path.join(embree_root, "include")])
 
+# Intel Open Image Denoise SDK (vendored, hard dependency)
+oidn_root = "oidn"
+env.Append(CPPPATH=[os.path.join(oidn_root, "include")])
+
 if env["platform"] == "windows":
     env.Append(LIBPATH=[os.path.join(embree_root, "lib")])
     env.Append(LIBS=["embree4", "tbb"])
+    env.Append(LIBPATH=[os.path.join(oidn_root, "lib", "win64")])
+    env.Append(LIBS=["OpenImageDenoise"])
 elif env["platform"] == "linux":
     env.Append(LIBPATH=[os.path.join(embree_root, "lib")])
     env.Append(LIBS=["embree4", "tbb"])
+    env.Append(LIBPATH=[os.path.join(oidn_root, "lib")])
+    env.Append(LIBS=["OpenImageDenoise"])
     env.Append(LINKFLAGS=["-Wl,-rpath,$ORIGIN"])
 elif env["platform"] == "macos":
     env.Append(LIBPATH=[os.path.join(embree_root, "lib")])
     env.Append(LIBS=["embree4", "tbb"])
+    env.Append(LIBPATH=[os.path.join(oidn_root, "lib")])
+    env.Append(LIBS=["OpenImageDenoise"])
 
 # Our source files
 env.Append(CPPPATH=["src/"])

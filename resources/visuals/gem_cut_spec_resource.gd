@@ -320,6 +320,8 @@ func apply_pavilion_resolution(params: Dictionary) -> void:
 		pavilion["depth"] = params["pavilion_depth"]
 	if params.has("crown_height"):
 		crown["height"] = params["crown_height"]
+	if params.has("table_ratio") and params["table_ratio"] != null:
+		crown["table_ratio"] = params["table_ratio"]
 	if params.has("upper_depth_ratio"):
 		pavilion["upper_depth_ratio"] = params["upper_depth_ratio"]
 	if params.has("lower_depth_ratio"):

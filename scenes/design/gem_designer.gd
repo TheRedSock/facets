@@ -9,6 +9,7 @@ const PREVIEW_SIZE := Vector2i(256, 256)
 const DEBOUNCE_SEC := 1.0
 
 const OfflineGemBakeJobScript = preload("res://tools/offline_gem_bake_job.gd")
+const GemBakeStylizerScript = preload("res://core/visuals/gem_bake_stylizer.gd")
 const GemMeshGeneratorsScript = preload("res://core/visuals/gem_mesh_generators.gd")
 const GemTracedBakeContractScript = preload("res://core/visuals/gem_traced_bake_contract.gd")
 const GemViewSphereSamplingScript = preload("res://core/visuals/gem_view_sphere_sampling.gd")
@@ -155,20 +156,33 @@ const _DEPENDENCY_RULES := {
 	&"reactive_density": { "requires": { &"reactive_effect_type": "!= 0", &"reactive_strength": "> 0" }, "reason": "Requires reactive effect active" },
 	&"reactive_scale": { "requires": { &"reactive_effect_type": "!= 0", &"reactive_strength": "> 0" }, "reason": "Requires reactive effect active" },
 	&"reactive_axis": { "requires": { &"reactive_effect_type": "!= 0", &"reactive_strength": "> 0" }, "reason": "Requires reactive effect active" },
-	&"stylize_facet_edge_gain": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_plane_contrast": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_shadow_floor": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_highlight_bloom_gain": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_highlight_bloom_threshold": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_microdetail_suppression": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_internal_color_shift_gain": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_tone_steps": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_edge_ink_strength": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
-	&"stylize_highlight_snap": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_visual_quality": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_haze": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_brilliance": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_shadow_lift": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_contrast": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_vibrance": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_clarity": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_specular_punch": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_edge_definition": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_bloom_gain": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_bloom_threshold": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_warmth": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_hue_shift": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_lift_r": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_lift_g": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_lift_b": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_gamma_r": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_gamma_g": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_gamma_b": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_gain_r": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_gain_g": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
+	&"stylize_gain_b": { "requires": { &"stylize_mix": "> 0" }, "reason": "Requires stylize mix > 0" },
 }
 
 const _PERCENTAGE_EXCLUSIONS := [
-	&"stylize_shadow_floor", &"stylize_highlight_bloom_threshold",
+	&"stylize_shadow_lift", &"stylize_bloom_threshold",
+	&"stylize_warmth", &"stylize_hue_shift",
 ]
 const _ALPHA_EDIT_PROPERTIES := [
 	&"gradient_color", &"phenomenon_color", &"edge_color",
@@ -176,7 +190,8 @@ const _ALPHA_EDIT_PROPERTIES := [
 	&"material_tertiary_color", &"reactive_color", &"reactive_secondary_color",
 ]
 const _DEFAULT_COLLAPSED_GROUPS := [
-	"Traced Optics", "Stylization", "Detailing",
+	"Traced Optics", "Stylization", "Color Grading (Advanced)", "Detailing",
+	"Denoising", "Cut Quality", "Surface Quality",
 ]
 const _GROUP_PREFIX_MAP := {
 	"Surface Field": "surface_pattern_",
@@ -2503,9 +2518,16 @@ func _attempt_preview_trace() -> void:
 		sample_count,
 		enrich_opts
 	)
+	var preview_mesh: GemMeshResource = req.get("mesh_resource", null)
+	if preview_mesh == null:
+		_set_preview_activity("Preview · enriched mesh failed", false)
+		if _status != null:
+			_status.text = "Preview: enriched mesh failed"
+		_preview_stop_process_if_no_worker()
+		return
 	var pack := {
 		"gen": gen,
-		"mesh": mesh,
+		"mesh": preview_mesh,
 		"visual": vis_snap,
 		"request": req,
 		"weak_self": weakref(self),
@@ -2554,6 +2576,8 @@ func _preview_thread_body(pack: Dictionary) -> void:
 		return
 	var tracer = OfflineGemBakeJobScript.create_tracer()
 	var img: Image = tracer.trace_to_image(mesh, visual, req)
+	if img != null and not bool(req.get("skip_stylize", false)):
+		img = GemBakeStylizerScript.apply(img, visual, req)
 	var node = w.get_ref()
 	if node != null:
 		node.call_deferred("_on_preview_image_ready", gen, img)

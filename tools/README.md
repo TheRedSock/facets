@@ -13,7 +13,7 @@ Usage:
 godot --headless --path . --script res://tools/run_offline_gem_bake.gd -- [OPTIONS]
 ```
 
-Key flags: `--gems`, `--size`, `--draw_size`, `--samples`, `--samples_per_pixel`, `--seed`, `--lighting_preset`, `--lighting_bins`, `--skip_lighting`, `--skip_rotations`, `--rotation_labels`, `--skip_stylize`, `--output`. See AGENTS.md "CLI Bake Reference" for the full flag table.
+Key flags: `--gems`, `--size`, `--draw_size`, `--samples`, `--samples_per_pixel`, `--seed`, `--lighting_preset`, `--lighting_bins`, `--skip_lighting`, `--skip_rotations`, `--rotation_axes`, `--360_rotation_frames`, `--rotation_labels`, `--skip_stylize`, `--output`. See AGENTS.md "CLI Bake Reference" for the full flag table.
 
 Example — bake all gems at gameplay size:
 ```bash

@@ -265,5 +265,6 @@ func _point_near_polygon_boundary(point: Vector2, polygon: PackedVector2Array, t
 func _make_visual(spec_id: StringName, rotation_degrees: float = 0.0) -> GemVisualResource:
 	var visual := GemVisualResource.new()
 	visual.cut_spec = load("res://data/visuals/cut_specs/%s.tres" % String(spec_id))
+	visual.mineral_template = load("res://data/minerals/quartz.tres")
 	visual.rotation_degrees = rotation_degrees
 	return visual

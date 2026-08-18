@@ -34,11 +34,26 @@ func _run() -> void:
 	var rotation_axes := _parse_rotation_axes(String(args.get("rotation_axes", "")))
 	if not rotation_axes.is_empty():
 		rotation_variant_options["rotation_axes"] = rotation_axes
+		rotation_variant_options["rotation_base_view_count"] = 0
+	var rotation_360_frame_count := maxi(int(args.get("360_rotation_frames", 0)), 0)
+	var has_valid_rotation_360_frames := false
+	if rotation_360_frame_count > 0 and rotation_axes.is_empty():
+		push_error("--360_rotation_frames requires --rotation_axes=pitch|yaw|roll")
+		quit(1)
+		return
+	if rotation_360_frame_count > 0:
+		if rotation_360_frame_count % 2 == 0:
+			has_valid_rotation_360_frames = true
+			rotation_variant_options["360_rotation_frames"] = rotation_360_frame_count
+			rotation_variant_options["rotation_axis_steps"] = int(rotation_360_frame_count / 2)
+			rotation_variant_options["rotation_step_degrees"] = 360.0 / float(rotation_360_frame_count)
+		else:
+			push_warning("Ignoring --360_rotation_frames=%d; expected an even integer." % rotation_360_frame_count)
 	var rotation_axis_steps := maxi(int(args.get("rotation_axis_steps", 0)), 0)
-	if rotation_axis_steps > 0:
+	if rotation_axis_steps > 0 and not has_valid_rotation_360_frames:
 		rotation_variant_options["rotation_axis_steps"] = rotation_axis_steps
 	var rotation_step_degrees := float(args.get("rotation_step_degrees", 0.0))
-	if rotation_step_degrees > 0.0:
+	if rotation_step_degrees > 0.0 and not has_valid_rotation_360_frames:
 		rotation_variant_options["rotation_step_degrees"] = rotation_step_degrees
 	# Showroom yaw/pitch sweep support (matches run_offline_gem_bake flags).
 	var showroom_axis_steps := maxi(int(args.get("showroom_axis_steps", 0)), 0)

@@ -47,15 +47,27 @@ static func compute_critical_angle(ior: float) -> float:
 
 
 ## Compute the target pavilion main facet angle (degrees from girdle plane)
-## for a given IOR using an empirical fit against known gemological data.
+## for a given IOR and cut quality using an empirical fit against known
+## gemological data.
 ##
-## Reference points:
+## Reference points (cut_quality=1.0):
 ##   Diamond (2.42) -> 40.7   Quartz (1.544) -> 43.4
 ##   Sapphire (1.76) -> 42.7  Fluorite (1.43) -> 43.7
-static func compute_target_pavilion_angle_deg(ior: float) -> float:
+##
+## cut_quality < 1.0 pushes the pavilion angle below the critical angle for TIR,
+## producing visible "windowing" (light passing through instead of reflecting).
+## At cut_quality=0, the angle sits 5° below critical — well into the window zone.
+## At cut_quality=1, the angle is at the gemological optimum.
+static func compute_target_pavilion_angle_deg(ior: float, cut_quality: float = 1.0) -> float:
 	# Linear fit: higher IOR permits shallower pavilion.
-	var angle := 45.0 - (ior - 1.0) * 3.0
-	return clampf(angle, MIN_PAVILION_ANGLE_DEG, MAX_PAVILION_ANGLE_DEG)
+	var optimal := 45.0 - (ior - 1.0) * 3.0
+	# Critical angle below which TIR fails — the boundary of windowing.
+	var critical_deg := rad_to_deg(asin(1.0 / maxf(ior, 1.01)))
+	# Window floor: 5° below critical = deep into the windowing zone.
+	var window_floor := critical_deg - 5.0
+	# Lerp from window floor (bad cut) to optimal (perfect cut).
+	var target := lerpf(window_floor, optimal, clampf(cut_quality, 0.0, 1.0))
+	return clampf(target, MIN_PAVILION_ANGLE_DEG, MAX_PAVILION_ANGLE_DEG)
 
 
 ## Convert a pavilion main angle (degrees from girdle plane) to depth,
@@ -113,7 +125,12 @@ static func compute_effective_radius(spec) -> float:
 ##
 ## Spec pavilion keys act as overrides: if present and not flagged auto,
 ## the explicit value is used. Otherwise the solver derives it.
-static func resolve(spec, ior: float = DEFAULT_IOR) -> Dictionary:
+##
+## cut_quality (0.0-1.0) controls geometric de-optimization:
+## - Shallow pavilion angles below the critical-angle regime (more windowing)
+## - Reduced crown height (less fire/dispersion)
+## - Larger table ratio (more "window", less brilliance)
+static func resolve(spec, ior: float = DEFAULT_IOR, cut_quality: float = 1.0) -> Dictionary:
 	var pav: Dictionary = spec.pavilion if spec.pavilion is Dictionary else {}
 	var cul: Dictionary = spec.culet if spec.culet is Dictionary else {}
 	var auto_depth: bool = _get_bool(pav, "auto_depth", true)
@@ -123,7 +140,7 @@ static func resolve(spec, ior: float = DEFAULT_IOR) -> Dictionary:
 	var critical_angle_deg := rad_to_deg(compute_critical_angle(ior))
 	var target_angle_deg: float = float(pav.get("target_angle_degrees", -1.0))
 	if target_angle_deg < 0.0:
-		target_angle_deg = compute_target_pavilion_angle_deg(ior)
+		target_angle_deg = compute_target_pavilion_angle_deg(ior, cut_quality)
 
 	var effective_radius := compute_effective_radius(spec)
 	var girdle_thickness: float = spec.get_girdle_thickness()
@@ -179,6 +196,23 @@ static func resolve(spec, ior: float = DEFAULT_IOR) -> Dictionary:
 	# --- Effective angle (diagnostic) ---
 	var effective_angle_deg := depth_to_angle_deg(pavilion_depth, effective_radius)
 
+	# --- Cut quality: crown height + table ratio scaling ---
+	# Lower cut_quality reduces crown height (less fire/dispersion) and
+	# enlarges the table (more "window", less brilliance).
+	var clamped_cq := clampf(cut_quality, 0.0, 1.0)
+	if clamped_cq < 0.9999:
+		# Crown scaling: lower cut_quality significantly reduces crown height.
+		# At cut_quality=0.3, crown is ~62% of optimal; at 0.0, 55%.
+		var crown_scale := lerpf(0.55, 1.0, clamped_cq)
+		crown_height *= crown_scale
+		crown_height = clampf(crown_height, MIN_CROWN_HEIGHT, MAX_CROWN_HEIGHT)
+
+	var table_ratio = null
+	if spec.crown.has("table_ratio"):
+		var base_table_ratio := float(spec.crown.get("table_ratio", 0.5))
+		var table_scale := lerpf(1.25, 1.0, clamped_cq)
+		table_ratio = clampf(base_table_ratio * table_scale, 0.1, 0.9)
+
 	# --- Ring parameters (use spec overrides or defaults) ---
 	var upper_depth_ratio := float(pav.get("upper_depth_ratio", 0.48))
 	var lower_depth_ratio := float(pav.get("lower_depth_ratio", 0.82))
@@ -220,6 +254,7 @@ static func resolve(spec, ior: float = DEFAULT_IOR) -> Dictionary:
 		"culet_style": culet_style,
 		"culet_flat_size": culet_flat_size,
 		"culet_flat_sides": culet_flat_sides,
+		"table_ratio": table_ratio,
 		"effective_pavilion_angle_deg": effective_angle_deg,
 		"critical_angle_deg": critical_angle_deg,
 	}

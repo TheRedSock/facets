@@ -6,6 +6,7 @@ extends RefCounted
 const GemCutGeneratorsScript = preload("res://core/visuals/gem_cut_generators.gd")
 const GemMeshAssemblerScript = preload("res://core/visuals/gem_mesh_assembler.gd")
 const GemInclusionGeneratorScript = preload("res://core/visuals/gem_inclusion_generator.gd")
+const GemSurfaceDamageGeneratorScript = preload("res://core/visuals/gem_surface_damage_generator.gd")
 
 
 static func supports_spec_id(spec_id: StringName) -> bool:
@@ -27,6 +28,9 @@ static func generate_from_visual(visual: GemVisualResource):
 	if mesh != null and visual.inclusion_profile != null:
 		var radius: float = mesh.compute_bounding_radius()
 		GemInclusionGeneratorScript.generate_and_merge(mesh, visual.inclusion_profile, radius)
+	if mesh != null and visual.surface_damage_profile != null:
+		var radius: float = mesh.compute_bounding_radius()
+		GemSurfaceDamageGeneratorScript.generate_and_merge(mesh, visual.surface_damage_profile, radius)
 	return mesh
 
 

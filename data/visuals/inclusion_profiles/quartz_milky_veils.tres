@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="GemInclusionProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/visuals/gem_inclusion_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+inclusion_type = &"veil"
+density = 0.45
+size_range = Vector2(0.03, 0.07)
+orientation_axis = Vector3(0, 1, 0)
+orientation_spread = 0.8
+material_ior = 1.55
+material_absorption = 0.8
+scatter_strength = 0.55
+count_range = Vector2i(3, 6)
+seed_offset = 20
+scale_layers = [{
+	"size_range": Vector2(0.008, 0.022),
+	"count_range": Vector2i(6, 12),
+	"density": 0.6,
+	"type_override": &"crystals"
+}, {
+	"size_range": Vector2(0.035, 0.08),
+	"count_range": Vector2i(2, 4),
+	"density": 0.4
+}]

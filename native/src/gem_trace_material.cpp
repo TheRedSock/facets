@@ -301,6 +301,45 @@ PatternSample growth_zoning_sample(Vector3 coord, double density, double contras
     return { apply_contrast(raw, contrast), 0.5 };  // no accent variation
 }
 
+// Structured haze: growth-zone-correlated volumetric density with fBm
+// modulation and log-normal distribution shaping. Produces realistic
+// non-uniform haze where impurity-rich growth fronts are predisposed to
+// higher scattering, with most of the volume moderately clear and
+// occasional high-density pockets.
+//
+// Unlike other patterns, the value channel can exceed 1.0 (via log-normal
+// shaping) for the high-density peaks. The [0.12, 4.0] clamp on
+// scattering_mult in sample_volume_material() handles extremes.
+PatternSample structured_haze_sample(Vector3 coord, double density, double contrast,
+                                     double growth_correlation, double distribution_skew) {
+    // 1. Growth-zone skeleton: warped concentric bands following crystal
+    //    growth fronts (reuses growth_zoning_sample's band math).
+    double warp = noise3(coord * 0.6) * 0.4;
+    double band_phase = (coord.x + warp) * density * Math_TAU * 2.0;
+    double band_value = 0.5 + 0.5 * sin(band_phase);
+
+    // 2. Density modulation: 3-octave fBm cloud noise. Band zones bias
+    //    the noise mean — impurity-rich fronts get predisposed to higher
+    //    scattering.
+    double cloud = fbm3(coord * 1.8 + Vector3(7.3, 13.1, 2.7));
+
+    // 3. Blend: growth_correlation controls how much haze follows growth
+    //    zone structure vs pure cloud noise.
+    double blended = lerpd(cloud, band_value * 0.6 + cloud * 0.4, growth_correlation);
+
+    // 4. Log-normal distribution shaping: exp(noise * skew - skew * 0.5).
+    //    Most of the volume is moderately clear (mult near 1.0) with
+    //    occasional high-density pockets reaching 2-3x at high skew.
+    double shaped = blended;
+    if (distribution_skew > 0.001) {
+        shaped = std::exp(blended * distribution_skew - distribution_skew * 0.5);
+    }
+
+    // Value: shaped density (can exceed 1.0 for high-density pockets).
+    // Accent: raw cloud channel for independent absorption correlation.
+    return { shaped, cloud };
+}
+
 // -------------------------------------------------------------------------
 // Surface pattern dispatch
 // -------------------------------------------------------------------------
@@ -352,6 +391,8 @@ static PatternSample sample_volume_pattern(const GemTraceProps& v, Vector3 obj_p
         case MATERIAL_PATTERN_CLOUDS:     return cloud_sample_3d(coord * density * 1.7, v.volume_pattern_contrast);
         case MATERIAL_PATTERN_LAYERS:     return volume_layer_sample(coord, density, v.volume_pattern_contrast);
         case MATERIAL_PATTERN_GROWTH_ZONING: return growth_zoning_sample(coord, density, v.volume_pattern_contrast);
+        case MATERIAL_PATTERN_STRUCTURED_HAZE: return structured_haze_sample(coord, density, v.volume_pattern_contrast,
+            v.haze_growth_correlation, v.haze_distribution_skew);
         default: return { 0.5, 0.5 };
     }
 }
@@ -446,16 +487,26 @@ VolumeMaterialSample sample_volume_material(const GemTraceProps& v, Vector3 obj_
                         resolve_tertiary_color(v, color),
                         ps.value, ps.accent, v.volume_pattern_mix);
 
-    double abs_mult = clampd(1.0 + v.volume_absorption_variation * ((ps.value - 0.5) * 2.0), 0.12, 4.0);
-    double scat_mult = clampd(1.0 + v.volume_scattering_variation * ((ps.accent - 0.5) * 2.0), 0.12, 4.0);
+    double abs_mult, scat_mult;
 
-    // Growth zoning: hard amplitude cap to prevent "CG fog" artefact.
-    // Max 5% absorption modulation regardless of authored variation.
-    // Scatter stays at 1.0 unless explicit scattering_variation opt-in.
-    if (v.volume_pattern_type == MATERIAL_PATTERN_GROWTH_ZONING) {
-        abs_mult = clampd(abs_mult, 0.95, 1.05);
-        if (v.volume_scattering_variation <= 0.0001) {
-            scat_mult = 1.0;
+    if (v.volume_pattern_type == MATERIAL_PATTERN_STRUCTURED_HAZE) {
+        // Structured haze: density variation drives scattering,
+        // absorption correlates at ~0.3x strength.
+        double var = v.haze_density_variation;
+        scat_mult = clampd(1.0 + var * ((ps.value - 0.5) * 2.0), 0.12, 4.0);
+        abs_mult = clampd(1.0 + var * 0.3 * ((ps.accent - 0.5) * 2.0), 0.12, 4.0);
+    } else {
+        abs_mult = clampd(1.0 + v.volume_absorption_variation * ((ps.value - 0.5) * 2.0), 0.12, 4.0);
+        scat_mult = clampd(1.0 + v.volume_scattering_variation * ((ps.accent - 0.5) * 2.0), 0.12, 4.0);
+
+        // Growth zoning: hard amplitude cap to prevent "CG fog" artefact.
+        // Max 5% absorption modulation regardless of authored variation.
+        // Scatter stays at 1.0 unless explicit scattering_variation opt-in.
+        if (v.volume_pattern_type == MATERIAL_PATTERN_GROWTH_ZONING) {
+            abs_mult = clampd(abs_mult, 0.95, 1.05);
+            if (v.volume_scattering_variation <= 0.0001) {
+                scat_mult = 1.0;
+            }
         }
     }
 

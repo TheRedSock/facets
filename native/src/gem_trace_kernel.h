@@ -54,13 +54,17 @@ private:
                         int row_start, int row_end,
                         std::vector<godot::Color>& out_pixels,
                         std::atomic<int>* rows_completed = nullptr,
-                        TraceStats* stats = nullptr) const;
+                        TraceStats* stats = nullptr,
+                        std::vector<float>* normal_aov = nullptr,
+                        std::vector<float>* albedo_aov = nullptr) const;
 
     void trace_rows_dynamic(const TraceContext& ctx, const TraceScene& scene,
                             std::atomic<int>& next_row, int total_rows,
                             std::vector<godot::Color>& out_pixels,
                             std::atomic<int>& rows_completed,
-                            TraceStats* stats = nullptr) const;
+                            TraceStats* stats = nullptr,
+                            std::vector<float>* normal_aov = nullptr,
+                            std::vector<float>* albedo_aov = nullptr) const;
 
     // --- Output ---
     static double apply_aces_channel(double value);

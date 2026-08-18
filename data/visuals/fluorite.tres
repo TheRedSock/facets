@@ -1,8 +1,10 @@
-[gd_resource type="Resource" script_class="GemVisualResource" format=3]
+[gd_resource type="Resource" script_class="GemVisualResource" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://resources/visuals/gem_visual_resource.gd" id="1"]
 [ext_resource type="Resource" path="res://data/visuals/cut_specs/old_european_round.tres" id="1_se2ob"]
 [ext_resource type="Resource" path="res://data/minerals/fluorite.tres" id="2"]
+[ext_resource type="Resource" path="res://data/visuals/inclusion_profiles/fluorite_crystals.tres" id="incl_1"]
+[ext_resource type="Resource" path="res://data/visuals/damage_profiles/heavy_wear.tres" id="dmg_1"]
 
 [resource]
 script = ExtResource("1")
@@ -11,26 +13,42 @@ cut_spec = ExtResource("1_se2ob")
 cut_id = &"old_european_round"
 display_color = Color(0.52, 0.88, 0.70, 1)
 mineral_template = ExtResource("2")
-absorption_strength_scale = 1.0
+absorption_strength_scale = 1.15
 absorption_spectrum_override = PackedFloat32Array(2.30075, 2.2833, 2.23655, 2.18004, 2.12808, 2.08731, 2.05704, 2.0315, 2.00278, 1.96343, 1.90808, 1.83408, 1.74141, 1.63215, 1.50978, 1.37863, 1.24327, 1.10812, 0.97717, 0.85378, 0.74055, 0.63933, 0.55123, 0.47674, 0.41582, 0.36808, 0.33289, 0.3095, 0.29718, 0.29528, 0.3033, 0.32088, 0.34784, 0.38414, 0.42983, 0.48501, 0.54976, 0.62406, 0.70775, 0.80044, 0.90149, 1.00995, 1.12453, 1.24363, 1.36537, 1.48762, 1.60805, 1.72431, 1.83405, 1.9351, 2.02556, 2.10391, 2.16909, 2.22056, 2.25827, 2.28264, 2.29445, 2.29473, 2.28459, 2.26505, 2.2369, 2.20063, 2.15635, 2.10382, 2.04255, 1.97195, 1.89151, 1.80099, 1.70062, 1.59118, 1.47408, 1.3513, 1.22529, 1.09882, 0.97473, 0.85573, 0.7442, 0.64206, 0.55063, 0.47061, 0.40215)
-surface_roughness_override = -1.0
-scattering_coefficient_override = 0.0
+surface_roughness_override = 0.038
+scattering_coefficient_override = 0.25
+zone_roughness_overrides = {
+"girdle": 3.0,
+"culet": 2.5,
+"pavilion": 1.5,
+"scratch": 3.0,
+"abrasion": 5.0,
+"chip": 3.0,
+"edge_wear": 3.0
+}
 volume_pattern_type = 7
 volume_pattern_mix = 0.20
 volume_pattern_contrast = 0.5
 volume_pattern_axis = Vector3(0.577, 0.577, 0.577)
 volume_absorption_variation = 0.04
+volume_scattering_variation = 1.5
 gradient_color = Color(0.52, 0.42, 0.82, 1)
 gradient_strength = 0.42
 gradient_angle_degrees = 68.0
 optics_environment_rotation_degrees = 4.0
+facet_edge_rounding_override = 0.0
+cut_quality = 0.3
+denoise_strength = 0.8
+inclusion_profile = ExtResource("incl_1")
+surface_damage_profile = ExtResource("dmg_1")
 stylize_mix = 0.62
-stylize_facet_edge_gain = 0.48
-stylize_plane_contrast = 0.34
-stylize_shadow_floor = 0.12
-stylize_highlight_bloom_gain = 0.08
-stylize_highlight_bloom_threshold = 0.9
-stylize_microdetail_suppression = 0.54
-stylize_internal_color_shift_gain = 0.24
-stylize_edge_ink_strength = 0.1
-stylize_highlight_snap = 0.12
+stylize_visual_quality = 0.12
+stylize_haze = 0.22
+stylize_shadow_lift = 0.18
+stylize_contrast = 0.34
+stylize_vibrance = 0.48
+stylize_clarity = 0.26
+stylize_specular_punch = 0.12
+stylize_edge_definition = 0.13
+stylize_bloom_gain = 0.08
+stylize_bloom_threshold = 0.8

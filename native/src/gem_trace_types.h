@@ -79,6 +79,7 @@ static constexpr int MATERIAL_PATTERN_CELLS = 4;
 static constexpr int MATERIAL_PATTERN_CLOUDS = 5;
 static constexpr int MATERIAL_PATTERN_LAYERS = 6;
 static constexpr int MATERIAL_PATTERN_GROWTH_ZONING = 7;
+static constexpr int MATERIAL_PATTERN_STRUCTURED_HAZE = 8;
 
 // Reactive types
 static constexpr int MATERIAL_REACTIVE_NONE = 0;
@@ -213,6 +214,12 @@ struct GemTraceProps {
     double volume_absorption_variation = 0.0;
     double volume_scattering_variation = 0.0;
 
+    // Structured haze density system (Phase 5)
+    double haze_base_density = 0.0;        // Effective σ_s when pattern = STRUCTURED_HAZE
+    double haze_density_variation = 0.5;   // Spatial variation strength (0=uniform, 1=high contrast)
+    double haze_growth_correlation = 0.5;  // How much haze follows growth zone structure (0=clouds, 1=banded)
+    double haze_distribution_skew = 0.8;   // Log-normal skew (0=symmetric, 2=heavy right tail)
+
     // Reactive effects (chatoyancy, opalescence, iridescence)
     int reactive_effect_type = MATERIAL_REACTIVE_NONE;
     Color reactive_color = Color(0, 0, 0, 0);
@@ -235,6 +242,37 @@ struct GemTraceProps {
     // View
     double rotation_degrees = 0.0;
 
+    // Denoising
+    double denoise_strength = 0.0;  // 0 = no denoise, 1 = full OIDN denoise
+
+    // Per-zone roughness overrides (populated from GemVisualResource)
+    static constexpr int MAX_ZONE_ROUGHNESS_ENTRIES = 8;
+    struct ZoneRoughnessEntry {
+        uint32_t zone_hash = 0;
+        double roughness_mult = 1.0;
+    };
+    ZoneRoughnessEntry zone_roughness[MAX_ZONE_ROUGHNESS_ENTRIES];
+    int zone_roughness_count = 0;
+
+    // Surface wear Lambertian diffuse scatter.
+    // Adds angle-independent diffuse reflection at frosted exterior wear masks,
+    // producing the bright/white marks characteristic of real gem scratches
+    // and abrasion. Roughness alone only broadens the specular lobe (neutral-
+    // to-dark); this adds actual diffuse energy return.
+    double damage_diffuse_albedo = 0.0;  // 0 = off, 0.2-0.3 typical T1
+
+    // Frosted wear tint (for scratch / abrasion / edge wear). Decoupled from
+    // body display_color so near-white gems can still produce visible wear
+    // against a near-white body. damage_tint_strength blends between body
+    // color (0) and authored tint (1).
+    Color damage_tint = Color(0.95f, 0.95f, 0.95f, 1.0f);
+    double damage_tint_strength = 1.0;
+
+    // Tint for dirt / discolouration patches. Conceptually contamination
+    // rather than material wear, so a warm grey/brown reads as "not clean"
+    // without competing with the gem body colour.
+    Color damage_dirt_tint = Color(0.70f, 0.63f, 0.50f, 1.0f);
+
     // Inclusion material properties
     double inclusion_ior = 1.5;
     double inclusion_absorption = 2.0;
@@ -250,6 +288,9 @@ struct GemTraceProps {
     }
 
     double effective_scattering() const {
+        // Structured haze: haze_base_density replaces the normal scattering path.
+        if (volume_pattern_type == MATERIAL_PATTERN_STRUCTURED_HAZE && haze_base_density > 0.0)
+            return haze_base_density;
         return (scattering_coefficient_override >= 0.0)
             ? scattering_coefficient_override : scattering_coefficient;
     }
@@ -257,6 +298,15 @@ struct GemTraceProps {
     double effective_roughness() const {
         return (surface_roughness_override >= 0.0)
             ? surface_roughness_override : surface_roughness;
+    }
+
+    double effective_roughness_for_zone(uint32_t zone_hash) const {
+        double base = effective_roughness();
+        for (int i = 0; i < zone_roughness_count; i++) {
+            if (zone_roughness[i].zone_hash == zone_hash)
+                return base * zone_roughness[i].roughness_mult;
+        }
+        return base;
     }
 
     double effective_fluorescence_yield() const {
@@ -350,8 +400,29 @@ struct HitResult {
     Vector3 geometric_normal;  // flat facet normal (always the true geometric surface)
     double distance = 0.0;
     int triangle_idx = -1;
+    int facet_idx = -1;
     bool front_face = true;    // determined from geometric_normal, not shading normal
     StringName zone;
+    uint32_t zone_hash = 0;   // precomputed hash of zone for fast roughness lookup
+    double surface_wear_mask = 0.0; // exterior frosted wear coverage at this hit
+    int surface_wear_type = -1;
+    Vector3 surface_wear_tangent = Vector3(0, 0, 0); // along-capsule dir for scratches
+    Vector3 surface_wear_ridge_normal = Vector3(0, 0, 0); // adjacent facet normal for edge wear
+};
+
+struct SurfaceWearEntry {
+    int type = 0; // 0 scratch, 1 abrasion, 2 edge wear, 3 dirt
+    int facet_index = -1;
+    Vector3 p0;
+    Vector3 p1;
+    Vector3 normal = Vector3(0, 1, 0);
+    // Adjacent facet normal for edge wear (type 2). Unused for other types.
+    // Set at generation time so the ridge-bevel shading can bias the effective
+    // normal between the two facets meeting at the worn edge.
+    Vector3 adjacent_normal = Vector3(0, 1, 0);
+    double radius = 0.0;
+    double intensity = 1.0;
+    double seed = 0.0;
 };
 
 // ---------------------------------------------------------------------------
@@ -393,24 +464,26 @@ struct CellularResult {
 // SPP-dependent variance budget
 // ---------------------------------------------------------------------------
 // Precomputed caps for high-variance features, scaled to the rendering budget.
-// At low SPP, features that inject stochastic variance (volumetric scattering,
-// fluorescence, inclusion scattering) are capped to values that converge within
-// the available sample count. At high SPP, the authored values are used as-is.
+// At low SPP, features that inject stochastic variance (fluorescence,
+// inclusion scattering) are capped to values that converge within the available
+// sample count. At high SPP, the authored values are used as-is.
 //
-// The caps are derived from the relationship:
+// Scattering cap: REMOVED. The OIDN denoiser handles scatter noise directly.
+// The old cap (0.0125 * sqrt(spp), raised 4x with denoise) was a pre-denoiser
+// workaround that prevented scattering from expressing at moderate coefficients.
+// With the denoiser integrated, authored scattering values pass through ungated.
+//
+// The remaining caps are derived from the relationship:
 //   required_SPP ≈ (feature_strength / safe_base)² × reference_SPP
 // Inverted: safe_cap = safe_base × sqrt(SPP / reference_SPP)
 
 struct VarianceBudget {
-    double scattering_cap;          // max effective scattering coefficient
     double fluorescence_yield_cap;  // max effective fluorescence quantum yield
     double inclusion_scatter_cap;   // max effective inclusion scatter_strength
 
-    static VarianceBudget from_spp(int spp) {
+    static VarianceBudget from_spp(int spp, bool denoise_active = false) {
         VarianceBudget vb;
         double s = std::sqrt((double)(spp > 0 ? spp : 1));
-        // Scattering: 0.20 converges at 256 SPP → k = 0.20/16 = 0.0125
-        vb.scattering_cap = 0.0125 * s;
         // Fluorescence yield: 0.10 converges at 256 SPP → k = 0.10/16 = 0.00625
         vb.fluorescence_yield_cap = 0.00625 * s;
         // Inclusion scatter: 0.20 converges at 256 SPP → k = 0.20/16 = 0.0125
@@ -418,8 +491,9 @@ struct VarianceBudget {
         return vb;
     }
 
+    /// Scattering: pass through authored value ungated (denoiser handles noise).
     inline double gate_scattering(double authored) const {
-        return authored < scattering_cap ? authored : scattering_cap;
+        return authored;
     }
     inline double gate_fluorescence_yield(double authored) const {
         return authored < fluorescence_yield_cap ? authored : fluorescence_yield_cap;
@@ -465,6 +539,12 @@ struct TraceContext {
 
     // SPP-dependent variance budget (computed from samples_per_pixel)
     VarianceBudget variance_budget;
+
+    // Denoise active flag — enables higher scattering caps and AOV collection.
+    bool denoise_active = false;
+
+    // Diagnostic output: render first-hit surface wear mask as grayscale.
+    bool debug_surface_wear_mask = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -479,6 +559,11 @@ struct TraceStats {
     std::atomic<int64_t> volume_scatter_count{0};         // scatter events
     std::atomic<int64_t> bounce_count{0};                 // total bounces across all paths
     std::atomic<int64_t> starvation_terminations{0};      // paths terminated by NEE starvation
+    std::atomic<int64_t> surface_wear_entry_count{0};     // analytic wear entries in scene
+    std::atomic<int64_t> surface_wear_sample_count{0};    // first camera hits tested for wear
+    std::atomic<int64_t> surface_wear_hit_count{0};       // first camera hits with mask > threshold
+    std::atomic<int64_t> surface_wear_mask_sum_micros{0}; // first-hit mask sum × 1e6
+    std::atomic<int64_t> surface_wear_mask_max_micros{0}; // max first-hit mask × 1e6
 };
 
 // ---------------------------------------------------------------------------

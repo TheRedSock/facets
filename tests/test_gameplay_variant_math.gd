@@ -29,6 +29,7 @@ func _run() -> void:
 		test_zero_variant_families_are_supported(registry)
 		test_build_requests_are_pure_and_explicit(registry)
 		test_rotation_axis_refinement_expands_request_suite(registry)
+		test_360_rotation_frame_shortcut(registry)
 		test_showroom_variant_settings_roundtrip()
 		test_showroom_angular_label()
 		registry.set_gameplay_variant_settings(original_settings, false)
@@ -109,7 +110,7 @@ func test_variant_settings_can_be_reconfigured(registry: Node) -> void:
 	var settings: Dictionary = registry.get_gameplay_variant_settings()
 	assert_eq(settings.get("lighting_grid_preset"), &"performance", "Lighting preset should reflect the configured manifest/workbench settings")
 	assert_eq(settings.get("lighting_grid_size"), Vector2i(3, 3), "Lighting grid should reflect the configured manifest/workbench settings")
-	assert_eq(settings.get("rotation_bin_count"), 10, "Rotation bin count should expand from the configured axis sweeps")
+	assert_eq(settings.get("rotation_bin_count"), 4, "Axis-specific rotation sweeps should suppress baseline orthographic views")
 	var axis_blend: Array = registry.compute_gameplay_rotation_axis_blend(&"pitch", 0.33)
 	var total := 0.0
 	for entry in axis_blend:
@@ -167,7 +168,7 @@ func test_rotation_axis_refinement_expands_request_suite(registry: Node) -> void
 	for request in requests:
 		if request.get("variant_type", &"") == &"rotation":
 			rotation_requests.append(request)
-	assert_eq(rotation_requests.size(), 14, "Rotation suite should add 4 frames per requested axis step pair on top of the 6 baseline views")
+	assert_eq(rotation_requests.size(), 8, "Rotation suite should emit only requested axis sweep frames when axes are specified")
 	var found_roll := false
 	var found_pitch := false
 	for request in rotation_requests:
@@ -177,6 +178,25 @@ func test_rotation_axis_refinement_expands_request_suite(registry: Node) -> void
 			found_pitch = true
 	assert_true(found_roll, "Rotation refinement should include roll-axis verification frames when requested")
 	assert_true(found_pitch, "Rotation refinement should include pitch-axis verification frames when requested")
+
+
+func test_360_rotation_frame_shortcut(registry: Node) -> void:
+	var defaults: Dictionary = registry.get_gameplay_variant_settings()
+	registry.set_gameplay_variant_settings({
+		"rotation_base_view_count": 6,
+		"rotation_axes": [&"yaw"],
+		"360_rotation_frames": 24,
+	}, false)
+	var settings: Dictionary = registry.get_gameplay_variant_settings()
+	assert_eq(settings.get("rotation_base_view_count"), 0, "Rotation axes should disable baseline orthographic views")
+	assert_eq(settings.get("rotation_axis_steps"), 12, "360-frame shortcut should derive half-frame axis steps")
+	assert_near(float(settings.get("rotation_step_degrees", 0.0)), 15.0, 0.0001, "360-frame shortcut should derive per-frame degrees")
+	assert_eq(settings.get("rotation_bin_count"), 24, "360-frame shortcut should produce the requested full-turn frame count")
+	var views: Array = settings.get("rotation_views", [])
+	if views.size() == 24:
+		assert_eq(views[0].get("label", ""), "yaw_00", "Full-turn rotation should start at the uniform yaw frame")
+		assert_eq(views[23].get("label", ""), "yaw_23", "Full-turn rotation should end before duplicating 360 degrees")
+	registry.set_gameplay_variant_settings(defaults, false)
 
 
 func test_showroom_variant_settings_roundtrip() -> void:

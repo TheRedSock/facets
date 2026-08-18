@@ -28,6 +28,8 @@ public:
 
     bool is_valid() const { return scene_ != nullptr; }
     int  triangle_count() const { return tri_count_; }
+    int  surface_wear_count() const { return (int)surface_wear_.size(); }
+    void set_surface_wear_pixel_floor(double bounding_radius, godot::Vector2i target_size);
 
 private:
     RTCDevice device_ = nullptr;
@@ -37,10 +39,15 @@ private:
     // Side-channel data that Embree doesn't store (indexed by primID)
     std::vector<godot::Vector3>    normals_;
     std::vector<godot::StringName> zones_;
+    std::vector<int>               facet_indices_;
+    std::vector<SurfaceWearEntry>  surface_wear_;
+    double surface_wear_pixel_radius_ = 0.0;
 
     // Per-vertex smoothed normals for facet edge rounding (indexed by primID)
     bool has_vertex_normals_ = false;
     std::vector<std::array<godot::Vector3, 3>> vertex_normals_; // [primID] = {n_a, n_b, n_c}
+
+    double evaluate_surface_wear(const SurfaceWearEntry& entry, godot::Vector3 point) const;
 };
 
 } // namespace gem

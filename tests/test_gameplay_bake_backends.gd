@@ -130,10 +130,16 @@ func _run_manifest_reload_case() -> void:
 	assert_eq(settings.get("lighting_grid_preset"), &"performance", "Reloading the traced manifest should preserve the baked lighting preset")
 	assert_eq(settings.get("lighting_grid_size"), Vector2i(3, 3), "Reloading the traced manifest should update the active lighting grid")
 	assert_eq(settings.get("lighting_runtime_grid_size"), Vector2i(1, 1), "Reloading the traced manifest should update the virtual runtime lighting grid")
-	assert_eq(settings.get("rotation_bin_count"), 8, "Reloading the traced manifest should update the active rotation suite")
+	assert_eq(settings.get("rotation_bin_count"), 2, "Reloading the traced manifest should update the active axis-only rotation suite")
 
 	# Manifest content checks: verify new fields are present
-	var manifest: Dictionary = registry.get_offline_traced_manifest()
+	var manifest_summary: Dictionary = registry.get_offline_traced_manifest_summary()
+	var manifest_path := String(manifest_summary.get("manifest_path", ""))
+	var manifest: Dictionary = {}
+	if not manifest_path.is_empty():
+		var parsed_manifest = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
+		if typeof(parsed_manifest) == TYPE_DICTIONARY:
+			manifest = parsed_manifest
 	if not manifest.is_empty():
 		assert_true(
 			manifest.has("samples_per_pixel"),

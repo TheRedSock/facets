@@ -20,6 +20,7 @@ plans
 
 # Debug
 assets/debug_*/
+debug/
 tools/__pycache__/
 tools/generated_spectra.txt
 
@@ -31,6 +32,7 @@ generated/traced_bakes_orthogonal_qa/
 # Native GDExtension build artifacts
 native/lib/
 native/embree/
+native/oidn/
 native/godot-cpp/
 *.obj
 *.o

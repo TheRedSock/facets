@@ -83,6 +83,17 @@ func _run() -> void:
 		options["skip_rotations"] = true
 		options["rotation_base_view_count"] = 0
 		options["rotation_axis_steps"] = 0
+	var rotation_360_frame_count := 0
+	if args.has("360_rotation_frames"):
+		rotation_360_frame_count = int(args.get("360_rotation_frames", 0))
+		if rotation_360_frame_count < 2 or rotation_360_frame_count % 2 != 0:
+			_write_status({
+				"stage": "error",
+				"status": "invalid_360_rotation_frames",
+			})
+			push_error("--360_rotation_frames must be an even integer >= 2")
+			quit(1)
+			return
 	var lighting_preset := String(args.get("lighting_preset", "")).strip_edges().to_lower()
 	if not lighting_preset.is_empty() and not skip_lighting:
 		options["lighting_grid_preset"] = StringName(lighting_preset)
@@ -119,16 +130,31 @@ func _run() -> void:
 	if not rotation_labels.is_empty():
 		options["rotation_labels"] = rotation_labels
 	var rotation_axes := _parse_rotation_axes(String(args.get("rotation_axes", "")))
-	if not rotation_axes.is_empty():
+	if rotation_360_frame_count > 0 and rotation_axes.is_empty() and not skip_rotations:
+		_write_status({
+			"stage": "error",
+			"status": "missing_rotation_axes",
+		})
+		push_error("--360_rotation_frames requires --rotation_axes=pitch|yaw|roll")
+		quit(1)
+		return
+	if not rotation_axes.is_empty() and not skip_rotations:
 		options["rotation_axes"] = rotation_axes
-	if args.has("rotation_base_view_count"):
+	if args.has("rotation_base_view_count") and not skip_rotations:
 		options["rotation_base_view_count"] = maxi(int(args.get("rotation_base_view_count", 0)), 0)
-	var rotation_axis_steps := maxi(int(args.get("rotation_axis_steps", 0)), 0)
-	if rotation_axis_steps > 0:
-		options["rotation_axis_steps"] = rotation_axis_steps
-	var rotation_step_degrees := float(args.get("rotation_step_degrees", 0.0))
-	if rotation_step_degrees > 0.0:
-		options["rotation_step_degrees"] = rotation_step_degrees
+	if not rotation_axes.is_empty():
+		options["rotation_base_view_count"] = 0
+	if rotation_360_frame_count > 0 and not skip_rotations:
+		options["360_rotation_frames"] = rotation_360_frame_count
+		options["rotation_axis_steps"] = int(rotation_360_frame_count / 2)
+		options["rotation_step_degrees"] = 360.0 / float(rotation_360_frame_count)
+	else:
+		var rotation_axis_steps := maxi(int(args.get("rotation_axis_steps", 0)), 0)
+		if rotation_axis_steps > 0 and not skip_rotations:
+			options["rotation_axis_steps"] = rotation_axis_steps
+		var rotation_step_degrees := float(args.get("rotation_step_degrees", 0.0))
+		if rotation_step_degrees > 0.0 and not skip_rotations:
+			options["rotation_step_degrees"] = rotation_step_degrees
 	if args.has("showroom_directions"):
 		options["showroom_direction_count"] = maxi(int(args.get("showroom_directions", 0)), 0)
 	if args.has("showroom_roll_steps"):
@@ -158,6 +184,13 @@ func _run() -> void:
 	# Disable facet edge rounding for A/B testing: --disable_edge_rounding
 	if args.has("disable_edge_rounding") or args.has("no_edge_rounding"):
 		options["disable_edge_rounding"] = true
+	# Render analytic first-hit wear mask instead of shaded color.
+	if args.has("debug_surface_wear_mask"):
+		options["debug_surface_wear_mask"] = true
+	# Denoise strength override: --denoise_strength=0.7
+	if args.has("denoise_strength"):
+		var ds := clampf(float(args.get("denoise_strength", 0.0)), 0.0, 1.0)
+		options["denoise_strength"] = ds
 	# Verbose native trace diagnostics: --verbose_trace
 	if args.has("verbose_trace"):
 		options["verbose_trace"] = true
