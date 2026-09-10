@@ -1,8 +1,8 @@
 class_name GemGrade
 extends Resource
 ## Legacy catalog quality recipes, not physical properties or a gemological
-## certificate. Cut controls empirical proportions/jitter; crystal controls
-## bulk haze/zoning. Clarity and surface recipes remain disabled pending visual
+## certificate. Cut is a label; explicit templates and workmanship own geometry.
+## Crystal still controls bulk haze/zoning. Clarity and surface remain disabled pending visual
 ## validation. GemCondition holds explicit realized defects in millimeters.
 ## Hardness, toughness, clarity and aesthetic rank must not be conflated.
 

@@ -364,7 +364,7 @@ func _summary_lines() -> PackedStringArray:
 	var lines := PackedStringArray()
 	lines.append("Contact sheet: %d stones (%d authored .tres + 4 in-code makers) all render non-empty with distinct silhouettes and body color under the gameplay rig; the print row darkens mids and reins in chroma relative to raw." % [
 		_contact_count, _tres_count])
-	lines.append("Grade sheet (corundum ruby, stops 0.15-1.00): low cut shows windowing streaks and outline jitter, low surface shows scratch glints, low crystal shows body haze; clarity silk is the subtlest axis at 176 px.")
+	lines.append("Grade sheet: only the legacy crystal haze/zoning recipe is active. Cut, clarity and surface labels do not create degradation; explicit cut, workmanship and condition resources own those properties.")
 	lines.append("Lighting sheet: gameplay rig reads warm with dark-field facet contrast; reference daylight is neutral and flatter; raw-vs-print deltas are visible but small at 64 spp; diamond fire barely reads at 224 px.")
 	if _timings.has("single_stone_ms_by_rung"):
 		var r: Dictionary = _timings["single_stone_ms_by_rung"]
@@ -545,6 +545,7 @@ static func _stone(sp: GemSpecies, ch: GemChromophore, g: Array, stone_seed: int
 	grade.surface = g[2]
 	grade.crystal = g[3]
 	var st := GemStone.new()
+	st.cut = load("res://data/lapidary/cuts/brilliant.tres")
 	st.material.species = sp
 	st.material.chromophore = ch
 	st.grade = grade

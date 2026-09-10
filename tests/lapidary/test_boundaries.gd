@@ -17,7 +17,11 @@ func _initialize() -> void:
 			continue
 		var stone: GemStone = load("res://data/lapidary/stones/" + name).duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 		for grade in [stone.grade.cut, 0.4, 0.7, 1.0]:
-			var compiled := LapidaryStoneCompiler.compile(stone, grade)
+			stone.condition.workmanship.azimuth_error_deg = 2.8 * (1.0 - grade)
+			stone.condition.workmanship.polar_error_deg = 0.4 * (1.0 - grade)
+			stone.condition.workmanship.inward_offset_mm = 0.004 * stone.size_mm * (1.0 - grade)
+			stone.condition.workmanship.girdle_inward_mm = 0.006 * stone.size_mm * (1.0 - grade)
+			var compiled := LapidaryStoneCompiler.compile(stone)
 			var mesh := GemShapeCompiler.from_hull(compiled["planes"])
 			check(mesh.validate().is_empty(), "%s q%.3f mesh closure: %s" % [name, grade, mesh.validate()])
 	var boundaries := GemBoundarySet.new()

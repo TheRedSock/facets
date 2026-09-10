@@ -166,8 +166,10 @@ incompatible film samples. `accumulate()` reports wall time; `profile()` separat
 raw estimator buffers and the global sample count. Release frees GPU resources.
 
 GemMaterial owns bulk properties, GemShape the procedural body recipe, GemCondition
-realized millimeter-scale defects and host finish. GemGrade remains a legacy cut/
-haze recipe, not a calibrated gemological grade. Automatic clarity and surface
+realized millimeter-scale defects, manufacturing tolerances and host finish.
+Cut templates carry explicit pavilion/crown/table/culet proportions: material
+IOR and grade never rewrite geometry. GemGrade retains a legacy crystal-haze
+recipe, not a calibrated gemological grade. Automatic clarity and surface
 recipes are disabled. Explicit fractures have not passed low-SPP visual acceptance.
 Recipe hashes cover physical input and optical source; producer hardware/driver
 are metadata. Determinism tests use tolerances across floating-point execution.

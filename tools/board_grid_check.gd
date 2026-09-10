@@ -117,6 +117,7 @@ static func _stone(sp: GemSpecies, ch: GemChromophore, g: Array, seed: int, size
 	grade.surface = g[2]
 	grade.crystal = g[3]
 	var st := GemStone.new()
+	st.cut = load("res://data/lapidary/cuts/brilliant.tres")
 	st.material.species = sp
 	st.material.chromophore = ch
 	st.grade = grade

@@ -19,9 +19,7 @@ extends Resource
 ## &"break" | &"step" | &"star"
 @export var kind: StringName = &"break"
 
-## Facet angle from the girdle plane, degrees, authored at cut_quality = 1.
-## The compiler scales all crown rows by the quality law applied to the
-## first row: lerp(19°, authored, q) / authored.
+## Explicit facet angle from the girdle plane in degrees.
 @export_range(5.0, 80.0) var angle_deg: float = 34.5
 
 ## Facet count multiplier: count = silhouette sectors × density (break/star

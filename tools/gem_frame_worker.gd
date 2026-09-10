@@ -48,7 +48,12 @@ func _initialize() -> void:
 			failures += 1
 			continue
 		var job: GemFrameJob = load(path)
-		if job == null or GemFramePlan.display_key(job) != key:
+		var admission_error := GemJobValidator.validate(job)
+		if not admission_error.is_empty():
+			printerr("Job rejected before identity evaluation: " + admission_error)
+			failures += 1
+			continue
+		if GemFramePlan.display_key(job) != key:
 			printerr("Job identity mismatch: " + key)
 			failures += 1
 			continue

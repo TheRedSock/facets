@@ -25,3 +25,9 @@ with `tools/reference-requirements.txt`. Pass its Python executable as
 `-ReferencePython <path>` to `check_engine.ps1`; add `-Gpu` to include actual GPU
 interface products. Mitsuba is a validation dependency only. Keep environments,
 comparison JSON and rendered reference images under ignored `artifacts/`.
+
+Cut design uses explicit template proportions and `GemCondition.workmanship`
+angular/millimeter tolerances. Run windowed `tools/optimize_cut.gd -- --stone=quartz`
+(or `--quick`) for a bounded pavilion/table/crown search. It writes exact candidate
+resources, training and held-out metrics, and comparison images under artifacts/.
+The brightness objective is not a cut grade; no candidate is promoted automatically.

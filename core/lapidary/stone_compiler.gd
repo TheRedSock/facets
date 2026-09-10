@@ -5,7 +5,7 @@ extends RefCounted
 ## This file owns the GRADE -> PHYSICS mapping. All randomness is a private
 ## deterministic hash sequence from the stone seed (never gameplay SeededRng).
 ##
-## Cut and crystal use legacy catalog recipes. Explicit GemCondition boundaries
+## Crystal still uses a legacy catalog recipe. Cut proportions are explicit. Explicit GemCondition boundaries
 ## and GemSurface finishes provide physical condition. Automatic clarity and
 ## surface grade mappings remain unaccepted; the old primitive placer is removed.
 
@@ -16,16 +16,14 @@ const WL_F := 486.1
 const WL_C := 656.3
 
 
-static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary:
+static func compile(stone: GemStone) -> Dictionary:
 	assert(stone != null and stone.material.species != null)
 	assert(stone.condition == null or stone.condition.validate_volume_fields().is_empty(), "Invalid spatial material condition")
 	var bulk := GemMaterialCompiler.compile(stone.material)
 	var species := stone.material.species
 	var grade := stone.grade if stone.grade != null else GemGrade.new()
-	var cut_q := grade.cut if cut_quality_override < 0.0 else cut_quality_override
-	var n_d := species.ior_at(589.3)
 
-	var geometry := _compile_cut(stone, n_d, cut_q)
+	var geometry := _compile_cut(stone)
 
 	var rng_state := [int(stone.seed) * 2654435761 + 1013904223]
 	
@@ -82,7 +80,7 @@ static func _resolve_fluorescence(species: GemSpecies, chromo: GemChromophore) -
 
 # ------------------------------------------------------------------ cut
 
-static func _compile_cut(stone: GemStone, n_d: float, cut_q: float) -> Dictionary:
+static func _compile_cut(stone: GemStone) -> Dictionary:
 	if stone.shape.mode == "cabochon" and stone.shape.outline in [&"round", &"oval"] and stone.shape.outline_points.is_empty():
 		return {"planes": PackedFloat32Array(), "outline": GemShapeCompiler.outline(stone.shape),
 			"analytic_shape": Vector4(1.0, 1.0 / stone.shape.aspect_ratio, stone.shape.dome_height, -0.04)}
@@ -93,22 +91,11 @@ static func _compile_cut(stone: GemStone, n_d: float, cut_q: float) -> Dictionar
 	assert(ResourceLoader.exists(CUT_COMPILER_PATH),
 		"LapidaryStoneCompiler: cut compiler missing at %s" % CUT_COMPILER_PATH)
 	var compiler: GDScript = load(CUT_COMPILER_PATH)
-	return compiler.call("compile", stone.cut, stone.shape.outline, n_d, cut_q, stone.seed, stone.shape)
+	var tolerances := Vector4.ZERO
+	if stone.condition != null and stone.condition.workmanship != null:
+		tolerances = stone.condition.workmanship.normalized_tolerances(stone.size_mm)
+	return compiler.call("compile", stone.cut, stone.shape, stone.seed, tolerances)
 
-
-## Pavilion law v2 (re-derived from the prototype's solver):
-##   critical = asin(1/n); optimal = 45 - (n - 1) * 3 (empirical lapidary fit)
-##   window target = critical - 6 deg (light leaks face-up), floored at 16 deg.
-##   No hard [38,48] clamp: low-critical minerals (diamond) window weakly,
-##   which is physically true — their grade must read via other axes too.
-static func solve_pavilion_deg(n_d: float, cut_q: float) -> float:
-	var critical_deg := rad_to_deg(asin(1.0 / maxf(n_d, 1.0001)))
-	var optimal := 45.0 - (n_d - 1.0) * 3.0
-	var windowed := maxf(critical_deg - 6.0, 16.0)
-	return lerpf(windowed, optimal, clampf(cut_q, 0.0, 1.0))
-
-
-# ------------------------------------------------------------------ grade axes
 
 static func _crystal_to_scatter(species: GemSpecies, grade: GemGrade) -> Dictionary:
 	# T1 crystal ~0.66: translucent, not milky-white. Mean free path stays

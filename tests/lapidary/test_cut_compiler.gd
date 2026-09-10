@@ -7,7 +7,7 @@ extends SceneTree
 ## {square, rectangle} x step x same qualities. Asserts: bounded hull, sane
 ## plane count, convex outline (rounded k-gon: k flats + symmetric corner
 ## arcs at q=1; X-mirror for smooth silhouettes), solved pavilion angle within 0.5 deg
-## of LapidaryStoneCompiler.solve_pavilion_deg, exact regularity at q = 1
+## of the explicit template angle, exact regularity at q = 1
 ## (zero jitter), determinism (same seed -> identical output; different seed
 ## -> different jitter), and zero compiler warnings. Planes with exactly-empty
 ## faces are PRUNED by the compiler (sliver facets erased by meeting error,
@@ -16,9 +16,7 @@ extends SceneTree
 
 const CutCompiler := preload("res://core/lapidary/cut/cut_compiler.gd")
 const SilhouetteLib := preload("res://core/lapidary/cut/silhouettes.gd")
-const StoneCompilerScript := preload("res://core/lapidary/stone_compiler.gd")
 
-const IOR := 1.76
 const SEED_A := 1234
 const SEED_B := 907351
 const QUALITIES: Array[float] = [0.15, 0.6, 1.0]
@@ -62,7 +60,7 @@ func _initialize() -> void:
 func _exercise(template: Resource, template_name: String, silhouette: StringName, q: float) -> void:
 	var label := "%s/%s q=%.2f" % [template_name, silhouette, q]
 	var fails := PackedStringArray()
-	var result: Dictionary = CutCompiler.compile(template, silhouette, IOR, q, SEED_A)
+	var result: Dictionary = CutCompiler.compile(template, GemShape.faceted_outline(silhouette), SEED_A, Vector4(2.8, 0.4, 0.004, 0.006) * (1.0 - q))
 	var planes: PackedFloat32Array = result["planes"]
 	var outline: PackedVector2Array = result["outline"]
 	var plane_count := planes.size() / 8
@@ -94,27 +92,27 @@ func _exercise(template: Resource, template_name: String, silhouette: StringName
 	if girdle_count < 3 or girdle_count > 48:
 		fails.append("girdle count %d out of [3, 48]" % girdle_count)
 
-	# Solved pavilion angle vs the solver law.
-	var solved: float = StoneCompilerScript.solve_pavilion_deg(IOR, q)
+	# Actual pavilion angle vs explicit design.
+	var solved: float = template.pavilion_angle_deg
 	var pav_angles := _pavilion_angles(planes, 4 if template_name == "brilliant" else 7)
 	if pav_angles.is_empty():
 		fails.append("no pavilion planes found")
 	elif template_name == "brilliant":
 		for a in pav_angles:
 			if absf(a - solved) > 0.5:
-				fails.append("pavilion main %.2f deg vs solver %.2f (>0.5)" % [a, solved])
+				fails.append("pavilion main %.2f deg vs authored %.2f (>0.5)" % [a, solved])
 				break
 	else:
 		var deepest := _min_of(pav_angles)
 		if absf(deepest - solved) > 0.5:
-			fails.append("deepest step row %.2f deg vs solver %.2f (>0.5)" % [deepest, solved])
+			fails.append("deepest step row %.2f deg vs authored %.2f (>0.5)" % [deepest, solved])
 
 	# Determinism: same seed -> byte-identical output.
-	var again: Dictionary = CutCompiler.compile(template, silhouette, IOR, q, SEED_A)
+	var again: Dictionary = CutCompiler.compile(template, GemShape.faceted_outline(silhouette), SEED_A, Vector4(2.8, 0.4, 0.004, 0.006) * (1.0 - q))
 	if planes != again["planes"] or outline != again["outline"]:
 		fails.append("same seed produced different output")
 
-	var other: Dictionary = CutCompiler.compile(template, silhouette, IOR, q, SEED_B)
+	var other: Dictionary = CutCompiler.compile(template, GemShape.faceted_outline(silhouette), SEED_B, Vector4(2.8, 0.4, 0.004, 0.006) * (1.0 - q))
 	if is_equal_approx(q, 1.0):
 		# q = 1: zero jitter -> output independent of seed, planes exactly regular.
 		if planes != other["planes"]:
@@ -128,12 +126,12 @@ func _exercise(template: Resource, template_name: String, silhouette: StringName
 	var mean_pav := _mean_of(pav_angles)
 	if fails.is_empty():
 		_pass_count += 1
-		print("  PASS %-26s planes=%3d girdle=%2d pav=%5.2f (solver %5.2f)" % [
+		print("  PASS %-26s planes=%3d girdle=%2d pav=%5.2f (authored %5.2f)" % [
 			label, plane_count, girdle_count, mean_pav, solved])
 	else:
 		_fail_count += 1
 		_failed_cases.append(label)
-		print("  FAIL %-26s planes=%3d girdle=%2d pav=%5.2f (solver %5.2f)" % [
+		print("  FAIL %-26s planes=%3d girdle=%2d pav=%5.2f (authored %5.2f)" % [
 			label, plane_count, girdle_count, mean_pav, solved])
 		for f in fails:
 			print("       - " + f)
@@ -263,8 +261,8 @@ func _pavilion_angles(planes: PackedFloat32Array, zone: int) -> PackedFloat32Arr
 	return out
 
 
-## q = 1 regularity: brilliant mains all exactly at the solver angle; step
-## pavilion angles exactly on one of the row values (solver + k * delta).
+## q = 1 regularity: brilliant mains all exactly at the authored angle; step
+## pavilion angles exactly on one of the row values (authored + k * delta).
 func _angles_regular(angles: PackedFloat32Array, solved: float, template_name: String) -> bool:
 	if template_name == "brilliant":
 		for a in angles:

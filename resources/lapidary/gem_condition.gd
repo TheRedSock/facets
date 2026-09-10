@@ -4,6 +4,7 @@ extends Resource
 ## describe realized physical features and remain stable under lighting/pose.
 @export var defects: Array[GemDefect] = []
 @export var finish: GemSurface = GemSurface.new()
+@export var workmanship: GemWorkmanship = GemWorkmanship.new()
 ## Spatial coefficient fields use physical millimeters in the host coordinate frame.
 @export var volume_fields: Array[GemVolumeField] = []
 

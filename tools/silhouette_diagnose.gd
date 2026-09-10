@@ -5,7 +5,6 @@ extends SceneTree
 const CutCompiler := preload("res://core/lapidary/cut/cut_compiler.gd")
 const SilhouetteLib := preload("res://core/lapidary/cut/silhouettes.gd")
 
-const IOR := 1.76
 const SEED := 23
 
 
@@ -33,7 +32,7 @@ func _report(sil_name: StringName, template: Resource, q: float) -> void:
 	var supports: Dictionary = SilhouetteLib.girdle_supports(sil)
 	var nrm: PackedVector2Array = supports["normals"]
 	var pts: PackedVector2Array = supports["points"]
-	var result: Dictionary = CutCompiler.compile(template, sil_name, IOR, q, SEED)
+	var result: Dictionary = CutCompiler.compile(template, GemShape.faceted_outline(sil_name), SEED, Vector4(2.8, 0.4, 0.004, 0.006) * (1.0 - q))
 	var outline: PackedVector2Array = result["outline"]
 	var max_turn := 0.0
 	var turns := PackedFloat32Array()

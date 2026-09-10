@@ -95,6 +95,8 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 	var condition := stone.condition
 	if condition == null:
 		return ""
+	if condition.workmanship != null and not condition.workmanship.validate().is_empty():
+		return "; ".join(condition.workmanship.validate())
 	if not condition.validate_volume_fields().is_empty():
 		return "; ".join(condition.validate_volume_fields())
 	if condition.finish != null and not condition.finish.validate().is_empty():

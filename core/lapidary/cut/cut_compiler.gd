@@ -1,50 +1,12 @@
 extends RefCounted
-## Lapidary cut compiler: GemCutTemplate x silhouette -> convex plane set.
-##
-## Public contract (frozen; called by LapidaryStoneCompiler._compile_cut):
-##   compile(cut_template, silhouette, ior_d, cut_quality, seed) -> {
-##     "planes":  PackedFloat32Array,  # 8 floats/plane per KERNEL_CONTRACT.md
-##     "outline": PackedVector2Array,  # girdle outline polygon, unit scale
-##   }
-## Additive diagnostic keys (callers may ignore): "solved_pavilion_deg",
-## "sectors", "warnings".
-##
-## Stone space: girdle plane z = 0, crown toward +Z, unit max girdle radius.
-## Planes are outward unit normals with inside = dot(n, x) <= d. The hull is
-## bounded and convex BY CONSTRUCTION; facet-meeting error from low cut
-## quality is per-plane jitter that never breaks the half-space form.
-##
-## Facet orientation:
-##   - break / star / solved-pavilion rows are RADIAL FANS: the facet normal's
-##     lateral direction is the anchor azimuth (cos phi, sin phi), anchored on
-##     the silhouette point. On a circle this equals the outline normal; on
-##     flat-sided silhouettes it keeps neighbouring facets non-parallel (a
-##     brilliant crown on a square is a fan meeting straight girdle edges,
-##     which is how real princess-family crowns behave).
-##   - step rows FOLLOW THE SILHOUETTE: the lateral direction is the local
-##     outline normal, so frames stay parallel to the sides (emerald read).
-##     On exact flats several azimuths collapse to one plane; duplicates are
-##     deduped before jitter so every emitted plane owns a face.
-##
-## Quality laws (grade axis "cut"):
-##   pavilion angle  = LapidaryStoneCompiler.solve_pavilion_deg(ior_d, q)
-##                     (below the critical angle the stone REALLY windows)
-##   crown angles    = scaled by lerp(19 deg, authored_main, q) / authored_main
-##   table ratio     = clamp(authored * lerp(1.25, 1.0, q), 0.1, 0.9)
-##   normal jitter   = azimuthal wobble up to ~2.8 deg * (1 - q) plus polar
-##                     wobble capped at 0.4 deg * (1 - q); the polar cap keeps
-##                     solved pavilion angles verifiable within 0.5 deg at any
-##                     quality while total normal deviation stays ~2 deg max
-##   offset jitter   = inward-only plane offsets (facet meeting error); the
-##                     girdle jitter amplitude adapts to the local normal gap
-##                     so an uneven girdle can never swallow a neighbour plane
-## At q = 1 no jitter draws happen at all, so output is bit-identical across
-## seeds. All jitter comes from a deterministic hash sequence seeded by
-## (seed, silhouette, cut_id) — never engine RNG.
+## Material-independent facet program. Explicit proportions create the nominal
+## shape; bounded workmanship errors change real plane normals and positions.
+## compile(template, shape, seed, tolerances) uses tolerances in degrees for
+## azimuth/polar and normalized stone units for inward/girdle offsets.
+## No refractive-index or grade law changes the authored design.
 
 const SilhouetteLib := preload("res://core/lapidary/cut/silhouettes.gd")
 const HullValidator := preload("res://core/lapidary/cut/hull_validator.gd")
-const StoneCompilerScript := preload("res://core/lapidary/stone_compiler.gd")
 
 # Zone ids per KERNEL_CONTRACT.md.
 const ZONE_TABLE := 0
@@ -59,48 +21,43 @@ const ZONE_STEP := 7
 const ROW_BREAK := &"break"
 const ROW_STEP := &"step"
 const ROW_STAR := &"star"
-const PAVILION_SOLVED := &"solved_brilliant"
+const PAVILION_FAN := &"fan_brilliant"
 const PAVILION_STEP := &"step"
 
-const CROWN_ANGLE_FLOOR_DEG := 19.0
-const TABLE_SCALE_AT_Q0 := 1.25
-const AZIMUTH_JITTER_DEG := 2.8
-const POLAR_JITTER_DEG := 0.4
-const OFFSET_JITTER := 0.004
-const GIRDLE_JITTER_MAX := 0.006
 const GIRDLE_JITTER_SAFETY := 0.3
-const CULET_TRIM := 0.96
 ## Step-row planes closer than this (normal angle / offset) are duplicates
 ## produced by exact silhouette flats.
 const STEP_DEDUP_ANGLE_RAD := 0.002
 const STEP_DEDUP_OFFSET := 1.0e-4
 
 
-static func compile(cut_template: Resource, silhouette: StringName, ior_d: float,
-		cut_quality: float, seed: int, shape: GemShape = null) -> Dictionary:
-	var template := _resolve_template(cut_template)
-	if template == null:
+static func compile(template: GemCutTemplate, shape: GemShape, seed: int, tolerances := Vector4.ZERO) -> Dictionary:
+	if shape == null:
+		push_error("Cut shape is missing")
 		return _failure()
+	if not tolerances.is_finite() or tolerances.x < 0 or tolerances.y < 0 or tolerances.z < 0 or tolerances.w < 0:
+		push_error("Cut tolerances must be finite and nonnegative")
+		return _failure()
+	var silhouette := shape.outline
 	var invalid_template := template_error(template)
 	if invalid_template != "":
-		push_error("cut_compiler: template '%s' invalid: %s" % [template.cut_id, invalid_template])
+		push_error("cut_compiler: template '%s' invalid: %s" % [str(template), invalid_template])
 		return _failure()
 	var sil: SilhouetteLib.Silhouette = SilhouetteLib.make(silhouette, shape)
 	if sil == null:
 		push_error("cut_compiler: unknown silhouette '%s'" % silhouette)
 		return _failure()
 
-	var q := clampf(cut_quality, 0.0, 1.0)
-	var jn := 1.0 - q
+	var jn := tolerances
 	var state := [_mix_seed(seed, silhouette, template.cut_id)]
-	var solved_pavilion_deg: float = StoneCompilerScript.solve_pavilion_deg(ior_d, q)
+	var pavilion_deg := template.pavilion_angle_deg
 
 	var planes := PackedFloat32Array()
 	var anchors := PackedVector3Array()
 
 	# ---- crown rows + table ------------------------------------------------
-	var table_eff := clampf(template.table_ratio * lerpf(TABLE_SCALE_AT_Q0, 1.0, q), 0.1, 0.9)
-	_build_crown(planes, anchors, template, sil, q, jn, table_eff, state)
+	var table_eff := template.table_ratio
+	_build_crown(planes, anchors, template, sil, jn, table_eff, state)
 
 	# ---- girdle ring (drives the outline) ----------------------------------
 	var supports: Dictionary = SilhouetteLib.girdle_supports(sil)
@@ -115,13 +72,13 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 			Vector3(p2.x, p2.y, 0.0))
 
 	# ---- pavilion + culet ---------------------------------------------------
-	_build_pavilion(planes, anchors, template, sil, jn, solved_pavilion_deg, state)
+	_build_pavilion(planes, anchors, template, sil, jn, pavilion_deg, state)
 	var axis_depth := INF
 	for i in planes.size() / 8:
 		var nz := planes[i * 8 + 2]
 		if nz < -0.05:
 			axis_depth = minf(axis_depth, planes[i * 8 + 3] / -nz)
-	var culet_d := CULET_TRIM * axis_depth
+	var culet_d := template.culet_depth_fraction * axis_depth
 	_emit(planes, anchors, Vector3(0, 0, -1), culet_d, ZONE_CULET, Vector3(0, 0, -culet_d))
 
 	# ---- outline + validation ----------------------------------------------
@@ -174,7 +131,7 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 		"planes": planes,
 		"facet_ids": facet_ids,
 		"outline": outline,
-		"solved_pavilion_deg": solved_pavilion_deg,
+		"pavilion_deg": pavilion_deg,
 		"sectors": sil.sectors,
 		"warnings": warnings,
 		"pruned_planes": pruned,
@@ -185,12 +142,12 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 # ------------------------------------------------------------------ crown
 
 static func _build_crown(planes: PackedFloat32Array, anchors: PackedVector3Array,
-		template: GemCutTemplate, sil: SilhouetteLib.Silhouette, q: float, jn: float,
+		template: GemCutTemplate, sil: SilhouetteLib.Silhouette, jn: Vector4,
 		table_eff: float, state: Array) -> void:
 	var g := template.girdle_half_height
 	var sectors := sil.sectors
 	var main_auth := maxf(template.crown_rows[0].angle_deg, 1.0)
-	var crown_factor := lerpf(CROWN_ANGLE_FLOOR_DEG, main_auth, q) / main_auth
+	var crown_factor := 1.0
 	var main_eff_rad := deg_to_rad(main_auth * crown_factor)
 
 	# Step rows: silhouette-following frames shrunk by PERPENDICULAR INSET
@@ -292,17 +249,17 @@ static func _build_crown(planes: PackedFloat32Array, anchors: PackedVector3Array
 # ------------------------------------------------------------------ pavilion
 
 static func _build_pavilion(planes: PackedFloat32Array, anchors: PackedVector3Array,
-		template: GemCutTemplate, sil: SilhouetteLib.Silhouette, jn: float,
-		solved_deg: float, state: Array) -> void:
+		template: GemCutTemplate, sil: SilhouetteLib.Silhouette, jn: Vector4,
+		authored_deg: float, state: Array) -> void:
 	var g := template.girdle_half_height
 	var sectors := sil.sectors
 	match template.pavilion_style:
-		PAVILION_SOLVED:
+		PAVILION_FAN:
 			# Radial fan; mains share the crown main phase (real brilliants
 			# align crown bezels with pavilion mains). Support anchoring, as
 			# in the crown, so facets graze the girdle instead of eating it.
 			var pav_phase := template.crown_rows[0].phase
-			var a_main := deg_to_rad(solved_deg)
+			var a_main := deg_to_rad(authored_deg)
 			for j in sectors:
 				var phi := TAU * (float(j) + pav_phase) / float(sectors)
 				var u := Vector2(cos(phi), sin(phi))
@@ -312,7 +269,7 @@ static func _build_pavilion(planes: PackedFloat32Array, anchors: PackedVector3Ar
 				var anchor := Vector3(p2.x, p2.y, -g)
 				var d := n.dot(anchor) - _offset_jitter(jn, state)
 				_emit(planes, anchors, n, d, ZONE_PAVILION_MAIN, anchor)
-			var a_half := deg_to_rad(solved_deg + template.pavilion_lower_half_delta_deg)
+			var a_half := deg_to_rad(authored_deg + template.pavilion_lower_half_delta_deg)
 			var half_count := 2 * sectors
 			for j in half_count:
 				var phi := TAU * (float(j) + 0.5) / float(half_count) + pav_phase * TAU / float(sectors)
@@ -326,7 +283,7 @@ static func _build_pavilion(planes: PackedFloat32Array, anchors: PackedVector3Ar
 		PAVILION_STEP:
 			# Concentric frames, girdle -> keel, eroded like crown steps.
 			# Convexity demands the pavilion flatten toward the keel, so the
-			# DEEPEST row carries the solved angle exactly and rows toward
+			# DEEPEST row carries the authored angle exactly and rows toward
 			# the girdle steepen by delta (real emerald pavilions ~57/49/43).
 			var rows := clampi(template.pavilion_rows, 2, 4)
 			var delta := template.pavilion_step_delta_deg
@@ -351,7 +308,7 @@ static func _build_pavilion(planes: PackedFloat32Array, anchors: PackedVector3Ar
 			var o := 0.0
 			var z := -g
 			for k in rows:
-				var a_rad := deg_to_rad(solved_deg + float(rows - 1 - k) * delta)
+				var a_rad := deg_to_rad(authored_deg + float(rows - 1 - k) * delta)
 				_emit_step_row(planes, anchors, m2s, p2s, o, z, a_rad, true, ZONE_STEP, jn, state)
 				z -= d_o * tan(a_rad)
 				o += d_o
@@ -363,7 +320,7 @@ static func _build_pavilion(planes: PackedFloat32Array, anchors: PackedVector3Ar
 ## a duplicate pair into two dead-ish planes).
 static func _emit_step_row(planes: PackedFloat32Array, anchors: PackedVector3Array,
 		m2s: PackedVector2Array, p2s: PackedVector2Array, o: float, z: float,
-		a_rad: float, downward: bool, zone: int, jn: float, state: Array) -> void:
+		a_rad: float, downward: bool, zone: int, jn: Vector4, state: Array) -> void:
 	var count := m2s.size()
 	var base_n: Array[Vector3] = []
 	var base_d := PackedFloat32Array()
@@ -413,37 +370,31 @@ static func _crown_surface_z(planes: PackedFloat32Array, crown_start: int,
 ## planes (mask bit 0) stay at authored support so rounding stays symmetric.
 ## Amplitude adapts to the local normal gap so jitter can never swallow a plane.
 static func _girdle_offsets(normals: PackedVector2Array, points: PackedVector2Array,
-		jn: float, state: Array, mask := PackedByteArray()) -> PackedFloat32Array:
+		jn: Vector4, state: Array, mask := PackedByteArray()) -> PackedFloat32Array:
 	var count := normals.size()
 	var ds := PackedFloat32Array()
 	for i in count:
 		var d := normals[i].dot(points[i])
 		var allowed := mask.is_empty() or (i < mask.size() and mask[i] != 0)
-		if jn > 0.0 and allowed:
+		if jn.w > 0.0 and allowed:
 			var prev := normals[(i - 1 + count) % count]
 			var next := normals[(i + 1) % count]
 			var gap := minf(absf(normals[i].angle_to(prev)), absf(normals[i].angle_to(next)))
-			var amp := minf(GIRDLE_JITTER_SAFETY * d * (1.0 - cos(gap)), GIRDLE_JITTER_MAX)
-			d -= jn * amp * _rndf(state)
+			var amp := minf(GIRDLE_JITTER_SAFETY * d * (1.0 - cos(gap)), jn.w)
+			d -= amp * _rndf(state)
 		ds.append(d)
 	return ds
 
 
 # ------------------------------------------------------------------ template
 
-static func _resolve_template(cut_template: Resource) -> GemCutTemplate:
-	if cut_template == null:
-		push_warning("cut_compiler: null cut template — using built-in brilliant defaults")
-		return _default_brilliant()
-	var template := cut_template as GemCutTemplate
-	if template == null:
-		push_error("cut_compiler: cut_template is not a GemCutTemplate (got %s)" % cut_template.get_class())
-	return template
-
-
 static func template_error(template: GemCutTemplate) -> String:
 	if template == null:
 		return "missing cut template"
+	if not is_finite(template.pavilion_angle_deg) or template.pavilion_angle_deg < 10 or template.pavilion_angle_deg > 70:
+		return "pavilion angle must be 10..70 degrees"
+	if not is_finite(template.culet_depth_fraction) or template.culet_depth_fraction < 0.5 or template.culet_depth_fraction > 1:
+		return "culet depth fraction must be 0.5..1"
 	if template.crown_rows.size() > 32:
 		return "at most 32 crown rows supported"
 	if template.crown_rows.is_empty():
@@ -469,7 +420,7 @@ static func template_error(template: GemCutTemplate) -> String:
 				if row.angle_deg >= prev_step_angle:
 					return "step rows must have strictly decreasing angles (convexity)"
 				prev_step_angle = row.angle_deg
-	if template.pavilion_style != PAVILION_SOLVED and template.pavilion_style != PAVILION_STEP:
+	if template.pavilion_style != PAVILION_FAN and template.pavilion_style != PAVILION_STEP:
 		return "unknown pavilion style '%s'" % template.pavilion_style
 	if not is_finite(template.table_ratio) or template.table_ratio < 0.05 or template.table_ratio > 0.95:
 		return "table_ratio %.2f out of [0.05, 0.95]" % template.table_ratio
@@ -480,35 +431,11 @@ static func template_error(template: GemCutTemplate) -> String:
 	for setting in [[template.pavilion_step_delta_deg, 1.0, 15.0], [template.pavilion_keel_scale, 0.02, 0.5], [template.pavilion_lower_half_delta_deg, 0.0, 15.0]]:
 		if not is_finite(setting[0]) or setting[0] < setting[1] or setting[0] > setting[2]:
 			return "invalid pavilion proportions"
+	var steepest := template.pavilion_angle_deg + (template.pavilion_rows - 1) * template.pavilion_step_delta_deg if template.pavilion_style == PAVILION_STEP else template.pavilion_angle_deg + template.pavilion_lower_half_delta_deg
+	if steepest >= 85:
+		return "combined pavilion rows must remain below 85 degrees"
 	return ""
 
-
-static func _default_brilliant() -> GemCutTemplate:
-	var t := GemCutTemplate.new()
-	t.cut_id = &"brilliant_builtin"
-	var mains := GemCutTemplateRow.new()
-	mains.kind = ROW_BREAK
-	mains.angle_deg = 34.5
-	mains.density = 1
-	mains.phase = 0.0
-	var halves := GemCutTemplateRow.new()
-	halves.kind = ROW_BREAK
-	halves.angle_deg = 42.5
-	halves.density = 2
-	halves.phase = 0.5
-	var stars := GemCutTemplateRow.new()
-	stars.kind = ROW_STAR
-	stars.angle_deg = 19.0
-	stars.phase = 0.5
-	stars.span = 0.5
-	t.crown_rows = [mains, halves, stars]
-	t.table_ratio = 0.56
-	t.pavilion_style = PAVILION_SOLVED
-	t.pavilion_lower_half_delta_deg = 6.0
-	return t
-
-
-# ------------------------------------------------------------------ helpers
 
 static func _emit(planes: PackedFloat32Array, anchors: PackedVector3Array,
 		n: Vector3, d: float, zone: int, anchor: Vector3) -> void:
@@ -523,23 +450,23 @@ static func _facet_normal(m: Vector2, polar: float, downward: bool) -> Vector3:
 	return Vector3(m.x * sp, m.y * sp, -cp if downward else cp)
 
 
-## No draws at jn <= 0 (q = 1): output must be bit-identical across seeds.
-static func _jitter_azimuth(m: Vector2, jn: float, state: Array) -> Vector2:
-	if jn <= 0.0:
+## Zero tolerance makes the nominal design independent of the seed.
+static func _jitter_azimuth(m: Vector2, jn: Vector4, state: Array) -> Vector2:
+	if jn.x <= 0.0:
 		return m
-	return m.rotated((_rndf(state) - 0.5) * 2.0 * deg_to_rad(AZIMUTH_JITTER_DEG) * jn)
+	return m.rotated((_rndf(state) - 0.5) * 2.0 * deg_to_rad(jn.x))
 
 
-static func _jitter_polar(jn: float, state: Array) -> float:
-	if jn <= 0.0:
+static func _jitter_polar(jn: Vector4, state: Array) -> float:
+	if jn.y <= 0.0:
 		return 0.0
-	return (_rndf(state) - 0.5) * 2.0 * deg_to_rad(POLAR_JITTER_DEG) * jn
+	return (_rndf(state) - 0.5) * 2.0 * deg_to_rad(jn.y)
 
 
-static func _offset_jitter(jn: float, state: Array) -> float:
-	if jn <= 0.0:
+static func _offset_jitter(jn: Vector4, state: Array) -> float:
+	if jn.z <= 0.0:
 		return 0.0
-	return jn * OFFSET_JITTER * _rndf(state)
+	return jn.z * _rndf(state)
 
 
 ## Girdle outline via half-plane intersection of the (jittered) girdle tangent

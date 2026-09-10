@@ -16,7 +16,7 @@ func _initialize() -> void:
 	for kind in [&"round", &"square", &"triangle", &"oval", &"diamond", &"rectangle", &"marquise", &"pear"]:
 		for grade in [0.6, 1.0]:
 			var shape := GemShape.faceted_outline(kind)
-			var compiled: Dictionary = CutCompiler.compile(template, kind, 1.54, grade, 71, shape)
+			var compiled: Dictionary = CutCompiler.compile(template, shape, 71, Vector4(2.8, 0.4, 0.004, 0.006) * (1.0 - grade))
 			var mesh := GemShapeCompiler.from_hull(compiled["planes"], compiled["facet_ids"])
 			var errors := mesh.validate()
 			check(errors.is_empty(), "%s q%.1f closed oriented mesh: %s" % [kind, grade, errors])
