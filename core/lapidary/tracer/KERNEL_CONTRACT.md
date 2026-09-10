@@ -277,3 +277,12 @@ not copied closed-form Fresnel expressions. Optional NumPy checks independently
 diagonalize the tangential Maxwell propagation matrix, then compare interface
 elimination to LAPACK. These validate the synthetic field solver, not catalog
 material measurements or a completed anisotropic gemstone renderer.
+
+
+`gem_crystal.glsl` ports the mode and complex interface field solve to float32.
+`tools/crystal_gpu_check.gd` compares actual GPU outputs against float64 CPU fields
+for rotated boundaries, including evanescent output modes. It is currently an
+isolated mathematical module, not called by the production path tracer. Input
+coverage does not yet establish accuracy arbitrarily close to every critical or
+optic-axis degeneracy. Full transport integration and critical-angle stress tests
+must precede promotion of a new rendering mode.
