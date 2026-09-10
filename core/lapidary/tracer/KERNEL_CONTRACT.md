@@ -514,3 +514,40 @@ packet is normalized and retained. These are algebra/storage optimizations, not
 lower precision or a changed branch estimator. Optional `crystal_benchmark.gd`
 compares saved baseline sources with current code using warmed repeated renders
 and complete linear-image differences. Performance remains device/scene dependent.
+
+
+## Authored cleavage condition and host crystal frame
+
+`GemStone.crystal_to_stone` is a unit quaternion from the declared host crystal
+frame to cut/object coordinates. It rotates the species base optic axis and
+`GemCleavageRecipe.normals`; render pose remains independent. A nonzero
+`optic_axis_override` explicitly supplies an object-space optic axis instead.
+These normals are Cartesian directions, not raw Miller indices for arbitrary
+non-orthogonal lattices. The opt-in diamond example declares the eight directed
+normals of four cubic {111} plane orientations, with GIA source attribution.
+Depth, plane choice, orientation and finish are authored inputs, not predicted
+from impact force, toughness or Mohs hardness. Catalog grading does not enable it.
+
+A condition may contain one cleavage recipe. A seeded choice selects a normal,
+and a physical depth below the host support plane defines the removed outside
+cap. The compiler constructs a finite air cutter enclosing the entire selected
+half-space intersection with the host; its other faces lie outside the host.
+The general priority-region backend therefore exposes a real cut face and changes
+silhouette, optical thickness, reflection and refraction. The cut face owns its
+surface finish. Zero depth retains pristine geometry; the authored maximum cap
+fraction rejects excessive removal. Rough cleavage remains outside the admitted
+crystal-transport domain. The general mesh route is currently substantially slower
+than a pristine convex stone; there is no specialized convex-cut fast path yet.
+
+The compiler and linear-master metadata include `condition_report.cleavage`.
+`host_cap_mm3` and `host_cap_fraction` describe the host **before other defects**,
+not net mass loss after overlapping cavities/fillings. A clipped-boundary volume
+integral uses an origin on the cutting plane, whose closing cap contributes zero.
+It supports concave closed meshes and reports the encoded mesh reference.
+Analytic round/oval hosts use exact support geometry, while volume estimates use
+an explicitly labeled tessellated analytic-host reference. No claim of exact
+analytic cap volume or fracture dynamics is made. Geometry companion identity
+includes cleavage geometry and its shared crystal frame, but excludes finish.
+`test_cleavage.gd` and `cleavage_gpu_check.gd` cover analytic cap/length checks,
+shared orientation, physical exposed-face AOVs, scalar/Mueller furnaces, binary
+jobs, checkpoint/resume, report retention and print-only reuse.

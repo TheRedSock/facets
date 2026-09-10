@@ -13,6 +13,9 @@ static func stone_error(stone: GemStone) -> String:
 		material["surfaces"] = [stone.condition.finish] if stone.condition.finish != null else []
 		material["volume_fields"] = stone.condition.volume_fields
 		material["zoning"] = stone.condition.banding.normalized(stone.size_mm) if stone.condition.banding != null else {}
+		var cleavage := stone.condition.cleavage
+		if cleavage != null and cleavage.depth_mm > 0 and cleavage.finish != null and cleavage.finish.has_roughness():
+			return "Crystal transport does not yet support rough cleavage boundaries"
 		for defect in stone.condition.defects:
 			if defect == null or not defect.enabled:
 				continue

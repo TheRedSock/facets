@@ -2,7 +2,7 @@ class_name GemDefect
 extends Resource
 ## A real closed boundary in physical millimeters, clipped to the host.
 ## Null filling = air/void. Overlap priority follows the authored array order.
-@export_enum("fracture", "chip", "crystal") var kind := "fracture"
+@export_enum("fracture", "chip", "crystal", "cleavage") var kind := "fracture"
 @export var center_mm := Vector3.ZERO
 @export var orientation := Quaternion.IDENTITY
 ## Half-widths. For fractures, z is half the maximum physical aperture.

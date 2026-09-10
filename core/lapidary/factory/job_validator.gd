@@ -65,8 +65,8 @@ static func validate(job: GemFrameJob) -> String:
 static func _stone(stone: GemStone, polarized: bool) -> String:
 	if stone == null:
 		return "missing specimen"
-	if not _between(stone.size_mm, 1e-4, 10000) or not stone.optic_axis_override.is_finite():
-		return "invalid physical size or optic axis"
+	if not _between(stone.size_mm, 1e-4, 10000) or not stone.optic_axis_override.is_finite() or not _rotation(stone.crystal_to_stone):
+		return "invalid physical size, optic axis, or crystal frame"
 	var error := _material(stone.material, polarized, stone.optic_axis_override)
 	if not error.is_empty():
 		return error
@@ -105,8 +105,7 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 		var bulk := GemMaterialCompiler.compile(stone.material)
 		bulk["volume_fields"] = condition.volume_fields if condition != null else []
 		bulk["zoning"] = condition.banding.normalized(stone.size_mm) if condition != null and condition.banding != null else {}
-		if stone.optic_axis_override != Vector3.ZERO:
-			bulk["optic_axis"] = stone.optic_axis_override
+		bulk["optic_axis"] = stone.resolved_optic_axis()
 		error = GemMaterialCompiler.polarization_error(bulk)
 		if not error.is_empty():
 			return error
@@ -116,14 +115,21 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 		return "; ".join(condition.workmanship.validate())
 	if condition.finish != null and not condition.finish.validate().is_empty():
 		return "; ".join(condition.finish.validate())
+	var descriptors: Array[GemDefect] = condition.defects.duplicate()
+	if condition.cleavage != null:
+		var event := GemCleavageCompiler.realize(LapidaryStoneCompiler.compile_geometry(stone),stone.shape,stone.size_mm,condition.cleavage,stone.crystal_to_stone)
+		if not event.error.is_empty():
+			return event.error
+		if event.has("defect"):
+			descriptors.append(event.defect)
 	var count := 0
 	var combined := GemMesh.new()
-	for defect in condition.defects:
+	for defect in descriptors:
 		if defect == null:
 			return "missing defect descriptor"
 		if not defect.enabled:
 			continue
-		if defect.kind not in ["fracture", "chip", "crystal"] or not defect.center_mm.is_finite() or not _rotation(defect.orientation):
+		if defect.kind not in ["fracture", "chip", "crystal", "cleavage"] or not defect.center_mm.is_finite() or not _rotation(defect.orientation):
 			return "invalid defect kind, center, or orientation"
 		for axis in 3:
 			if not _between(defect.half_extent_mm[axis], 1e-6, 10000):

@@ -16,6 +16,9 @@ extends Resource
 ## i.e. size_mm 5.0 = 10 mm girdle diameter. Beer-Lambert paths use it directly;
 ## authored absorption curves are co-tuned with these sizes.
 @export var size_mm := 4.0
+## Shared host crystal frame: rotates the species base optic axis and declared
+## cleavage directions into cut/object coordinates. Independent of render pose.
+@export var crystal_to_stone := Quaternion.IDENTITY
 ## Optional optic-axis override in stone space. ZERO = use species.optic_axis_stone.
 @export var optic_axis_override := Vector3.ZERO
 
@@ -28,4 +31,9 @@ func fingerprint() -> String:
 ## fingerprint() still tracks the authored record for editing/provenance.
 func transport_inputs() -> Dictionary:
 	return {"material": material, "condition": condition, "cut": cut, "shape": shape,
-		"seed": seed, "size_mm": size_mm, "optic_axis_override": optic_axis_override}
+		"seed": seed, "size_mm": size_mm, "crystal_to_stone": crystal_to_stone, "optic_axis_override": optic_axis_override}
+
+func resolved_optic_axis() -> Vector3:
+	if optic_axis_override != Vector3.ZERO:
+		return optic_axis_override.normalized()
+	return (crystal_to_stone * material.species.optic_axis_stone).normalized()

@@ -21,6 +21,8 @@ static func compile(stone: GemStone) -> Dictionary:
 	var geometry := compile_geometry(stone)
 	var compiled := {
 		"planes": geometry["planes"],
+		"shape_recipe": stone.shape,
+		"crystal_to_stone": stone.crystal_to_stone,
 		"facet_ids": geometry.get("facet_ids", PackedInt32Array()),
 		"outline": geometry.get("outline", PackedVector2Array()),
 		"absorption": bulk["absorption"],
@@ -33,7 +35,7 @@ static func compile(stone: GemStone) -> Dictionary:
 		"zoning": stone.condition.banding.normalized(stone.size_mm) if stone.condition != null and stone.condition.banding != null else {},
 		"index_offset": bulk["index_offset"],
 		"extraordinary_refraction": bulk["extraordinary_refraction"],
-		"optic_axis": _resolve_optic_axis(stone).normalized(),
+		"optic_axis": stone.resolved_optic_axis(),
 		"fluorescence": _resolve_fluorescence(species, stone.material.chromophore),
 		"dispersion_strong": dispersion_bg(species) >= 0.025,
 		"fingerprint": stone.fingerprint(),
@@ -50,12 +52,6 @@ static func compile(stone: GemStone) -> Dictionary:
 
 static func dispersion_bg(species: GemSpecies) -> float:
 	return species.ior_at(WL_F) - species.ior_at(WL_C)
-
-
-static func _resolve_optic_axis(stone: GemStone) -> Vector3:
-	if stone.optic_axis_override != Vector3.ZERO:
-		return stone.optic_axis_override
-	return stone.material.species.optic_axis_stone
 
 
 ## Fluorescence is chromophore-gated: the glow comes from the coloring ion

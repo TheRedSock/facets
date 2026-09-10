@@ -190,6 +190,9 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	assert(lights.size() / 8 <= MAX_LIGHTS, "GemTracer: rig exceeds %d lights" % MAX_LIGHTS)
 	var bound_radius := 0.0
 	for instance: Dictionary in instances:
+		if not str(instance.get("compilation_error", "")).is_empty():
+			configuration_error = instance.compilation_error
+			return false
 		var source_mesh: GemMesh = instance.get("mesh", null)
 		if source_mesh != null and not source_mesh.validate().is_empty():
 			configuration_error = "Invalid optical boundary mesh: %s" % source_mesh.validate()

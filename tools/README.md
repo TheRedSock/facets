@@ -148,3 +148,18 @@ standard library. `mesh_admission_benchmark.gd` measures dense fracture generati
 first admission and repeated content checks separately. Outputs stay under
 ignored `artifacts/geometry/`. Topological admission does not certify that tiny
 features are resolvable by a chosen GPU transport policy.
+
+Cleavage: attach the opt-in `data/lapidary/conditions/diamond_cleavage.tres` to
+`GemCondition.cleavage`, declare the host `GemStone.crystal_to_stone` frame and
+choose a depth in millimeters. The source family is cubic diamond {111}; do not
+silently apply it as a universal mineral fracture law. Run `test_cleavage.gd`
+headlessly and `cleavage_gpu_check.gd` windowed. `cleavage_lookdev.gd` compares
+pristine/.4/1.2mm cap removals on a pear-cut diamond at three view/light settings,
+writing images and physical reports to ignored `artifacts/cleavage/lookdev/`.
+Volume reports describe the host cap before other cavities or fillings. The
+operation is explicit, persistent geometry; automatic tier/grade assignment is
+not enabled. Linear master records retain the condition report for inspection.
+
+`cleavage_portable_check.gd` builds a fresh isolated source/job bundle with an
+enabled cleavage condition, launches its own worker, and verifies optical,
+geometry and physical-report outputs. It is included in the GPU check runner.

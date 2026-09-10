@@ -12,7 +12,7 @@ $stages = @(
     @{ Name = 'import'; Args = @('--headless', '--editor', '--quit') },
     @{ Name = 'source_check'; Args = @('--headless', '--quit-after', '600', 'res://tools/source_check.tscn') }
 )
-foreach ($name in @('test_foundation', 'test_mesh_admission', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_store_transfer', 'test_spectra', 'test_material_inputs', 'test_principal_indices', 'test_crystal_admission', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_crystal_modes', 'test_crystal_interface', 'test_crystal_packet', 'test_crystal_loss', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler', 'test_cut_design')) {
+foreach ($name in @('test_foundation', 'test_cleavage', 'test_mesh_admission', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_store_transfer', 'test_spectra', 'test_material_inputs', 'test_principal_indices', 'test_crystal_admission', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_crystal_modes', 'test_crystal_interface', 'test_crystal_packet', 'test_crystal_loss', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler', 'test_cut_design')) {
     $stages += @{ Name = $name; Args = @('--headless', '--quit-after', '600', '--script', "res://tests/lapidary/$name.gd") }
 }
 $stages += @{ Name = 'test_fracture'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_fracture.gd') }
@@ -24,6 +24,8 @@ if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'cleavage_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_gpu_check.gd') }
+	$stages += @{ Name = 'cleavage_portable_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/cleavage_portable_check.gd') }
 	$stages += @{ Name = 'finish_fields_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/finish_fields_gpu_check.gd') }
 	$stages += @{ Name = 'finish_fields_render_check'; Args = @('--quit-after', '600', '--script', 'res://tools/finish_fields_render_check.gd') }
 	$stages += @{ Name = 'microsurface_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/microsurface_gpu_check.gd') }

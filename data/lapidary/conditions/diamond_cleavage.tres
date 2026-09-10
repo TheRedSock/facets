@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="GemCleavageRecipe" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_cleavage_recipe.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+normals = PackedVector3Array(0.577350269, 0.577350269, 0.577350269, -0.577350269, 0.577350269, 0.577350269, 0.577350269, -0.577350269, 0.577350269, -0.577350269, -0.577350269, 0.577350269, 0.577350269, 0.577350269, -0.577350269, -0.577350269, 0.577350269, -0.577350269, 0.577350269, -0.577350269, -0.577350269, -0.577350269, -0.577350269, -0.577350269)
+depth_mm = 0.15
+source_note = "Diamond: four octahedral {111} cleavage plane orientations, represented by eight directed normals in an orthonormal cubic crystal frame. GIA https://www.gia.edu/gia-news-research/how-protect-diamond-chipping . Depth, event choice, frame orientation and finish are authored; no impact-force prediction. Opt-in example, not catalog grading."

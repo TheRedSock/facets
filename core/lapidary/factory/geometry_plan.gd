@@ -33,6 +33,8 @@ static func specimen_inputs(stone: GemStone) -> Dictionary:
 				fields["filled"] = defect.filling != null
 				defects.append(fields)
 	return {"shape": stone.shape, "cut": stone.cut, "size_mm": stone.size_mm, "seed": stone.seed,
+		"cleavage_crystal_frame": stone.crystal_to_stone if stone.condition != null and stone.condition.cleavage != null else null,
+		"cleavage": stone.condition.cleavage.geometry_inputs() if stone.condition != null and stone.condition.cleavage != null else null,
 		"workmanship": stone.condition.workmanship if stone.condition != null else null, "defects": defects}
 
 static func validate(job: GemFrameJob, coverage_side: int) -> String:

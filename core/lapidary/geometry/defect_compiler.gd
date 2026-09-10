@@ -3,11 +3,20 @@ extends RefCounted
 ## Procedural defect geometry. These are correlated geometric constructions,
 ## not a stress solver. Optical transport resolves both sides of every boundary.
 static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float) -> void:
-	if condition == null or condition.defects.is_empty():
+	if condition == null or (condition.defects.is_empty() and condition.cleavage == null):
 		return
 	var enabled: Array[GemDefect] = []
 	var geometries: Array[GemMesh] = []
-	for defect in condition.defects:
+	var descriptors: Array[GemDefect] = condition.defects.duplicate()
+	if condition.cleavage != null:
+		var event := GemCleavageCompiler.realize(compiled, compiled.get("shape_recipe"), size_mm, condition.cleavage, compiled.get("crystal_to_stone", Quaternion.IDENTITY))
+		if not event.error.is_empty():
+			compiled["compilation_error"] = event.error
+			return
+		compiled["condition_report"] = {"cleavage":event.report}
+		if event.has("defect"):
+			descriptors.append(event.defect)
+	for defect in descriptors:
 		if defect.enabled:
 			var surface := compile(defect, size_mm)
 			if defect.kind == "fracture" and surface.vertices.is_empty():
@@ -51,6 +60,11 @@ static func compile(defect: GemDefect, size_mm: float) -> GemMesh:
 	var extent := defect.half_extent_mm
 	if extent.x <= 0.0 or extent.y <= 0.0 or extent.z <= 0.0:
 		return GemMesh.new()
+	if defect.kind == "cleavage":
+		var mesh := GemShapeCompiler.loft(PackedVector2Array([Vector2(-1,-1),Vector2(1,-1),Vector2(1,1),Vector2(-1,1)]),PackedVector2Array([Vector2(-1,1),Vector2(1,1)]))
+		for i in mesh.vertices.size():
+			mesh.vertices[i] = (defect.center_mm+defect.orientation*(mesh.vertices[i]*extent))/size_mm
+		return mesh
 	if defect.kind == "fracture":
 		return GemFractureCompiler.compile(defect, size_mm)
 	var points := PackedVector2Array()
