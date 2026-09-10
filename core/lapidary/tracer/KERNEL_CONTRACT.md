@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v11)
+# Lapidary kernel contract (v12)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. All floats
@@ -47,7 +47,7 @@ for visibility, but transport processes their segments to preserve optical lengt
 | 3 | zoning axis.xyz, phase |
 | 4 | optic axis.xyz, fluorescence strength (disabled) |
 | 5 | fluorescence nm (disabled), absorb_scale, nested_volume_present, rough_present |
-| ivec4 6 | plane_offset, plane_count, reserved, reserved |
+| ivec4 6 | plane_offset, plane_count, volume_field_offset, volume_field_count |
 | ivec4 7 | absorb_offset, flags, bvh_root_plus_one, region_offset |
 
 Flags: bit0 has_eray, bit1 dispersion_strong. BVH selector0 is convex planes,
@@ -120,7 +120,7 @@ separate. An equal-cell grid maps pixels to instances; 1×1 is a single specimen
 ## Bindings and push constants
 
 Shared set0: 0 planes,1 lights,2 absorption,3 accumulated XYZ+coverage,4 standards,
-5 Stones,6 Instances,15 emission spectra. Binding7 is unused.
+5 Stones,6 Instances,7 spatial volume fields,15 emission spectra.
 Trace also uses8 guides (normal/depth sums, residual Y²/Y sum/min/max facet IDs),
 9 zero-scatter sums,10 residual sums,11 triangles,12 BVH nodes,13 region materials,
 14 boundary finishes. Guide stride32B; other film buffers16B/pixel.
@@ -193,3 +193,34 @@ resource and in its evidence. Importing data is not certification of its origin.
 Material validation also rejects invalid concentration, visible Sellmeier poles,
 unsupported model range and invalid scattering. Signed Sellmeier terms are
 consistent on CPU/GPU; invalid n² is not silently repaired on the CPU.
+
+## Spatial coefficient fields (48B, binding7)
+
+GemCondition.volume_fields defines at most16 additive, smooth fields in physical
+host-space millimeters. Each record is three vec4s: center.xyz/absorption amplitude,
+ellipsoid radii.xyz/scattering amplitude per mm, unit quaternion xyzw. Density is
+max(0,1−r²)^3; the value and first two derivatives vanish at its finite boundary.
+There is no refractive surface there. Host priority regions still control where
+material exists; a field never fills a cavity or changes silhouette.
+
+Absorption adds the field's concentration times the host absorption spectrum.
+Scattering adds the field coefficient to homogeneous σ_s, using the host HG phase
+function. This is an authored effective-medium model for spatial haze and color
+variation. It does not represent resolved crystals, polarized silk, stress,
+crystal-growth mechanics, or a calibrated clarity grade. No catalog grade enables
+these fields automatically.
+
+Restricting a field to a ray gives a degree-six polynomial over a clipped chord.
+Four-point Gauss-Legendre integrates that polynomial exactly apart from floating
+point rounding, with positive weights to avoid grazing cancellation. Reference:
+https://dlmf.nist.gov/3.5#v . Integrated σ_s is inverted with a safeguarded Newton/
+bisection solver (32 iterations, optical-depth residual target2e-6). Homogeneous
+media retain the analytic exponential inverse. Field geometry is cached per
+sampled segment. Transport uses the same integrated coefficients for Beer-Lambert
+and zero-scatter reconstruction. The relevant transmittance/free-flight framework
+is https://pbr-book.org/4ed/Light_Transport_II_Volume_Rendering/The_Equation_of_Transfer .
+
+`test_volume_fields.gd` compares columns to independent midpoint quadrature;
+`volume_gpu_check.gd` checks the actual GLSL collision sampler against independent
+CPU integrals and tests full heterogeneous transport. `volume_lookdev.gd` compares
+raw/reconstructed low-SPP renders to high-SPP transport at multiple poses.

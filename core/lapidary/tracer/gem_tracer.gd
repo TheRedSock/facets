@@ -126,6 +126,7 @@ func _compile_shaders() -> bool:
 		text = text.replace(INCLUDE_LINE, common)
 		text = text.replace("#include \"gem_mesh.glsl\"", FileAccess.get_file_as_string(SHADER_DIR + "gem_mesh.glsl"))
 		text = text.replace("#include \"gem_surface.glsl\"", FileAccess.get_file_as_string(SHADER_DIR + "gem_surface.glsl"))
+		text = text.replace('#include "gem_volume.glsl"', FileAccess.get_file_as_string(SHADER_DIR + "gem_volume.glsl"))
 		var src := RDShaderSource.new()
 		src.source_compute = text
 		var spirv := _rd.shader_compile_spirv_from_source(src)
@@ -196,6 +197,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	var node_data := PackedByteArray()
 	var region_data := PackedInt32Array()
 	var surface_data := PackedFloat32Array()
+	var volume_data := PackedFloat32Array()
 	var nested_materials: Array[Dictionary] = []
 	var host_index := 0
 	for inst: Dictionary in instances:
@@ -219,7 +221,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 					var nested: Dictionary = local_materials[material - 1].duplicate()
 					nested["size_mm"] = inst["size_mm"] # all boundaries share stone coordinates
 					nested_materials.append(nested)
-					if nested.get("scatter", {}).get("sigma_per_mm", 0.0) > 0.0:
+					if nested.get("scatter", {}).get("sigma_per_mm", 0.0) > 0.0 or _has_spatial_scattering(nested):
 						inst["volume_present"] = 1.0
 		var surfaces: Array = inst.get("surfaces", [])
 		for region in range(region_data.size() - int(inst["region_offset"])):
@@ -253,6 +255,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			stone_flags |= STONE_FLAG_HAS_ERAY
 		if inst.get("dispersion_strong", false):
 			stone_flags |= STONE_FLAG_DISPERSION_STRONG
+		_pack_volume_fields(inst, volume_data)
 		_pack_stone(stones, inst, plane_offset, p.size() / 8, absorb_offset, stone_flags)
 		host_index += 1
 	for material in nested_materials:
@@ -261,6 +264,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		absorb.append_array(ab)
 		var ab_e: PackedFloat32Array = material.get("absorption_eray", PackedFloat32Array())
 		absorb.append_array(ab_e)
+		_pack_volume_fields(material, volume_data)
 		_pack_stone(stones, material, 0, 0, offset, STONE_FLAG_HAS_ERAY if not ab_e.is_empty() else 0)
 	_plane_count_total = planes.size() / 8
 	if planes.is_empty():
@@ -270,7 +274,10 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	if node_data.is_empty():
 		node_data.resize(48)
 
+	if volume_data.is_empty():
+		volume_data.resize(12)
 	_free_scene_buffers()
+	_bufs["volume_fields"] = _rd.storage_buffer_create(volume_data.to_byte_array().size(), volume_data.to_byte_array())
 	_bufs["planes"] = _rd.storage_buffer_create(planes.to_byte_array().size(), planes.to_byte_array())
 	_upload_lighting_buffers()
 	_bufs["absorb"] = _rd.storage_buffer_create(absorb.to_byte_array().size(), absorb.to_byte_array())
@@ -316,6 +323,24 @@ static func _boundary_radius(instance: Dictionary) -> float:
 	return radius
 
 
+static func _has_spatial_scattering(instance: Dictionary) -> bool:
+	for field: GemVolumeField in instance.get("volume_fields", []):
+		if field.scatter_per_mm > 0.0:
+			return true
+	return false
+
+
+static func _pack_volume_fields(instance: Dictionary, packed: PackedFloat32Array) -> void:
+	var fields: Array = instance.get("volume_fields", [])
+	assert(fields.size() <= 16, "At most 16 coefficient fields per material")
+	instance["volume_offset"] = packed.size() / 12
+	instance["volume_count"] = fields.size()
+	if _has_spatial_scattering(instance):
+		instance["volume_present"] = 1.0
+	for field: GemVolumeField in fields:
+		packed.append_array(field.packed())
+
+
 func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 		a_off: int, stone_flags: int) -> void:
 	var sb: Vector3 = inst["sellmeier_b"]
@@ -332,7 +357,7 @@ func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 			optic.x, optic.y, optic.z, fluor.get("strength", 0.0),
 			fluor.get("nm", 0.0), inst.get("absorb_scale", 1.0), inst.get("volume_present", 0.0), inst.get("rough_present", 0.0)]:
 		b.put_float(v)
-	for v: int in [p_off, -1 if inst.has("analytic_shape") else p_cnt, 0, 0, a_off, stone_flags, inst.get("bvh_root", 0), inst.get("region_offset", 0)]:
+	for v: int in [p_off, -1 if inst.has("analytic_shape") else p_cnt, inst.get("volume_offset", 0), inst.get("volume_count", 0), a_off, stone_flags, inst.get("bvh_root", 0), inst.get("region_offset", 0)]:
 		b.put_32(v)
 	assert(b.data_array.size() % STONE_STRIDE_BYTES == 0)
 
@@ -349,7 +374,7 @@ func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_hal
 
 func _build_uniform_sets() -> void:
 	var names := {0: "planes", 1: "lights", 2: "absorb", 3: "accum", 4: "standards",
-		5: "stones", 6: "insts", 8: "guides", 9: "ballistic", 10: "residual",
+		5: "stones", 6: "insts", 7: "volume_fields", 8: "guides", 9: "ballistic", 10: "residual",
 		11: "triangles", 12: "nodes", 13: "regions", 14: "surfaces", 15: "spectra"}
 	var uniforms: Array[RDUniform] = []
 	for binding: int in names:
@@ -715,7 +740,7 @@ func profile() -> Dictionary:
 # ------------------------------------------------------------------ cleanup
 
 func _free_scene_buffers() -> void:
-	for key in ["planes", "lights", "spectra", "absorb", "stones", "insts", "triangles", "nodes", "regions", "surfaces"]:
+	for key in ["volume_fields", "planes", "lights", "spectra", "absorb", "stones", "insts", "triangles", "nodes", "regions", "surfaces"]:
 		if _bufs.has(key) and _bufs[key].is_valid():
 			_rd.free_rid(_bufs[key])
 			_bufs.erase(key)

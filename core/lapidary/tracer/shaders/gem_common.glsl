@@ -12,7 +12,7 @@ struct Stone {
 	vec4 zone_axis_phase;  // zoning axis xyz, phase
 	vec4 optic_fluor;      // optic axis xyz, fluorescence strength
 	vec4 misc;             // fluor_nm (disabled), absorb_scale, nested_volume_present, rough_present
-	ivec4 ranges0;         // plane_offset, plane_count, reserved, reserved
+	ivec4 ranges0;         // plane_offset, plane_count, volume_field_offset, volume_field_count
 	ivec4 ranges1;         // absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), pad, pad
 };
 

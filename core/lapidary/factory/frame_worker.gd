@@ -29,6 +29,8 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 	last_error = ""
 	if job == null or job.stone == null or job.rig == null or job.print_style == null or job.samples < 1 or job.resolution.x < 1 or job.resolution.y < 1 or job.output_size.x < 1 or job.output_size.y < 1:
 		return _fail("Incomplete frame job")
+	if job.stone.condition != null and not job.stone.condition.validate_volume_fields().is_empty():
+		return _fail("Invalid spatial condition: %s" % job.stone.condition.validate_volume_fields())
 	# Explicit preflight budget; workers may raise it for larger render hardware.
 	var budget: int = job.quality.get("device_memory_budget_mib", 1024) * 1024 * 1024
 	if job.resolution.x * job.resolution.y * 128 > budget:

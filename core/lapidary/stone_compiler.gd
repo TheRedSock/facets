@@ -18,6 +18,7 @@ const WL_C := 656.3
 
 static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary:
 	assert(stone != null and stone.material.species != null)
+	assert(stone.condition == null or stone.condition.validate_volume_fields().is_empty(), "Invalid spatial material condition")
 	var bulk := GemMaterialCompiler.compile(stone.material)
 	var species := stone.material.species
 	var grade := stone.grade if stone.grade != null else GemGrade.new()
@@ -51,6 +52,7 @@ static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary
 	if geometry.has("analytic_shape"):
 		compiled["analytic_shape"] = geometry["analytic_shape"]
 	compiled["surfaces"] = [stone.condition.finish if stone.condition != null and stone.condition.finish != null else GemSurface.new()]
+	compiled["volume_fields"] = stone.condition.volume_fields if stone.condition != null else []
 	GemDefectCompiler.apply(compiled, stone.condition, stone.size_mm)
 	return compiled
 

@@ -8,6 +8,7 @@
 #include "gem_common.glsl"
 #include "gem_mesh.glsl"
 #include "gem_surface.glsl"
+#include "gem_volume.glsl"
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
@@ -98,7 +99,7 @@ float zoning_column(Stone st, vec3 position, vec3 direction, float distance) {
 // alpha_k = cos^2(phi) alpha_o + sin^2(phi) alpha_e  (GIA G&G Spring 2021).
 vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl, int pol_mode) {
 	float size_mm = st.sell_b_size.w;
-	float L = zoning_column(st, pos, dir, t) * st.misc.y * size_mm;
+	float L = (zoning_column(st, pos, dir, t) + field_columns(st, pos, dir, t).x) * st.misc.y * size_mm;
 	if (!has_eray) {
 		vec4 alpha = vec4(absorb_at(a_off, wl.x), absorb_at(a_off, wl.y),
 			absorb_at(a_off, wl.z), absorb_at(a_off, wl.w));
@@ -172,8 +173,7 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 		}
 		if (before_medium >= 0) {
 			Stone medium = stones[before_medium];
-			float sigma = use_volume ? medium.scatter_zone.x * medium.sell_b_size.w : 0.0;
-			float free_flight = sigma > 0.0 ? -log(max(1e-7, 1.0 - rnd(rng))) / sigma : INF;
+			float free_flight = use_volume ? scatter_distance(medium, pos, dir, distance, -log(max(1e-7, 1.0 - rnd(rng)))) : INF;
 			float segment = min(free_flight, distance);
 			throughput *= segment_att(medium, pos, dir, segment, medium.ranges1.x, (medium.ranges1.y & 1) != 0, wl, pol_mode);
 			if (free_flight < distance) {
@@ -181,7 +181,7 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 				dir = hg_sample_u(dir, medium.scatter_zone.y, vec2(rnd(rng), rnd(rng)));
 				continue;
 			}
-			if (!use_volume && FLAG_VOLUME) { throughput *= exp(-medium.scatter_zone.x * medium.sell_b_size.w * distance); }
+			if (!use_volume && FLAG_VOLUME) { throughput *= exp(-scattering_depth(medium, pos, dir, distance)); }
 		}
 		pos += dir * distance;
 		uvec4 after = cross_region(st, region_state, triangle, pos, dir);
@@ -363,7 +363,7 @@ void main() {
 			// Deterministic zero-scattering contribution, used as a control
 			// image for reconstruction. Only the residual gets filtered, so
 			// sharp internal reflections cannot be mistaken for volume noise.
-			if (sigma_h > 0.0) {
+			if (reconstruct_volume) {
 				vec3 clear_pos = pos, clear_dir = dir;
 				vec4 clear_throughput = throughput;
 				for (uint hit = 0u; hit < pc.max_bounces; hit++) {
@@ -372,7 +372,7 @@ void main() {
 					hull_exit(p_off, p_cnt, clear_pos, clear_dir, distance, face);
 					if (distance >= INF * 0.5) { break; }
 					clear_throughput *= segment_att(st, clear_pos, clear_dir, distance, a_off, has_eray, wl, pol_mode)
-						* exp(-sigma_h * distance);
+						* exp(-scattering_depth(st, clear_pos, clear_dir, distance));
 					clear_pos += clear_dir * distance;
 					surface_exit_at(st, face, wl, n_wl, n_geom, q, rig_yaw, role_mult, 0.0,
 						clear_pos, clear_dir, clear_throughput, ballistic);
@@ -385,18 +385,18 @@ void main() {
 				float distance; int face;
 				hull_exit(p_off, p_cnt, pos, dir, distance, face);
 				if (distance >= INF * 0.5) { break; }
-				// Homogeneous free flight is analytic. The removed cloud/disc
-				// prototype previously did twenty bisections for this division.
-				float collision = sigma_h > 0.0 ? tau_free / sigma_h : INF;
+				// Preserve the low-variance convex path and its stratified first event.
+				float collision = FLAG_VOLUME ? scatter_distance(st, pos, dir, distance, tau_free) : INF;
 				float segment = min(collision, distance);
 				throughput *= segment_att(st, pos, dir, segment, a_off, has_eray, wl, pol_mode);
+				float traveled_depth = FLAG_VOLUME ? scattering_depth(st, pos, dir, segment) : 0.0;
 				pos += dir * segment;
 				if (collision < distance) {
 					dir = hg_sample_u(dir, hg_g, scatter_events == 0 ? u_scat : vec2(rnd(rng), rnd(rng)));
 					scatter_events++;
 					tau_free = -log(max(1e-7, 1.0 - rnd(rng)));
 				} else {
-					tau_free -= sigma_h * distance;
+					tau_free = max(0.0, tau_free - traveled_depth);
 					surface_exit_at(st, face, wl, n_wl, n_geom, q, rig_yaw, role_mult,
 						0.0, pos, dir, throughput, radiance);
 				}
