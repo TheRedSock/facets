@@ -8,13 +8,13 @@ func check(value: bool, label: String) -> void:
 		printerr("FAIL: " + label)
 
 func _initialize() -> void:
-	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate(true)
+	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var rig: GemLightRig = load("res://data/lapidary/rigs/gameplay_studio.tres")
 	var clip: GemClip = load("res://data/lapidary/clips/flash.tres")
 	var jobs := GemFramePlan.animation(stone, clip, rig, GemPrint.load_house(), GemRung.CLIP_BAKE)
 	var estimate := GemFramePlan.estimate(jobs)
 	check(estimate["unique_masters"] == 1 and estimate["requested_frames"] == 6, "exposure-only animation shares one optical master")
-	var job: GemFrameJob = jobs[0].duplicate(true)
+	var job: GemFrameJob = jobs[0].duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var key := GemFramePlan.master_key(job)
 	var display := GemFramePlan.display_key(job)
 	job.exposure *= 1.5

@@ -19,6 +19,13 @@ static func validate(recipe: GemSpectrum) -> String:
 		for value in recipe.samples:
 			if not is_finite(value) or value < 0.0:
 				return "Spectral radiance must be finite and nonnegative"
+	var values := _sample_values(recipe)
+	var scale := _normalization_scale(recipe, values)
+	if not is_finite(scale) or scale <= 0:
+		return "Spectrum has no energy at the requested normalization"
+	for value in values:
+		if not is_finite(value / scale) or value / scale > 3.4028234e38:
+			return "Normalized spectrum exceeds float32 range"
 	return ""
 
 static func compile(recipe: GemSpectrum) -> PackedFloat32Array:
@@ -30,6 +37,22 @@ static func compile(recipe: GemSpectrum) -> PackedFloat32Array:
 		recipe.wavelength_start_nm, recipe.wavelength_step_nm, recipe.samples, recipe.normalization])
 	if _cache.has(key):
 		return _cache[key].duplicate()
+	var values := _sample_values(recipe)
+	var scale := _normalization_scale(recipe, values)
+	if not is_finite(scale) or scale <= 0.0:
+		push_error("Spectrum has no energy at the requested normalization")
+		return PackedFloat32Array()
+	for index in values.size():
+		values[index] /= scale
+		if not is_finite(values[index]):
+			push_error("Normalized spectrum exceeds float32 range")
+			return PackedFloat32Array()
+	if _cache.size() >= CACHE_LIMIT:
+		_cache.erase(_cache.keys()[0])
+	_cache[key] = values.duplicate()
+	return values
+
+static func _sample_values(recipe: GemSpectrum) -> PackedFloat32Array:
 	var values := PackedFloat32Array()
 	for index in 401:
 		var wavelength := 380.0 + index
@@ -46,21 +69,13 @@ static func compile(recipe: GemSpectrum) -> PackedFloat32Array:
 					var first := int(position)
 					value = lerpf(recipe.samples[first], recipe.samples[mini(first + 1, recipe.samples.size() - 1)], position - first)
 		values.append(value)
+	return values
+
+static func _normalization_scale(recipe: GemSpectrum, values: PackedFloat32Array) -> float:
 	var scale := 1.0
 	match recipe.normalization:
 		GemSpectrum.Normalization.AT_560_NM:
 			scale = values[180]
 		GemSpectrum.Normalization.UNIT_LUMINANCE:
 			scale = GemColorimetry.spectrum_xyz(values).y
-	if not is_finite(scale) or scale <= 0.0:
-		push_error("Spectrum has no energy at the requested normalization")
-		return PackedFloat32Array()
-	for index in values.size():
-		values[index] /= scale
-		if not is_finite(values[index]):
-			push_error("Normalized spectrum exceeds float32 range")
-			return PackedFloat32Array()
-	if _cache.size() >= CACHE_LIMIT:
-		_cache.erase(_cache.keys()[0])
-	_cache[key] = values.duplicate()
-	return values
+	return scale

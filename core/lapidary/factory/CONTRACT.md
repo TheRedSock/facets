@@ -30,6 +30,20 @@ merge service are not yet validated. Do not confuse a prepared ZIP with that wor
 
 ## Retention and concurrency
 
+`GemJobValidator.validate` is CPU-only admission shared by workers and portable
+bundle creation. It checks finite physical inputs, supported optical modes,
+spectral normalization, camera transforms, procedural topology, known quality
+keys and film/payload bounds before GPU setup. Explicit polarization currently
+requires isotropic refraction and absorption in the host and every enabled
+filling. Invalid jobs return a field-specific error instead of silently selecting
+another transport model. Film budgets do not include all driver allocations.
+
+Exploratory disabled defects are ignored; missing array entries are errors.
+Numerical admission is not a physical calibration or visual-acceptance gate.
+When constructing a variant for editing, use
+`duplicate_deep(Resource.DEEP_DUPLICATE_ALL)`; `duplicate(true)` retains external
+resource references and can mutate the original specimen through nested data.
+
 `GemStoreGuard` registers render/publish/pack activity. Maintenance uses atomic mkdir
 and checks activity; workers register then recheck the maintenance directory before
 touching data. Maintenance cannot race cooperative workers or packaging. The marker

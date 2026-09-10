@@ -59,7 +59,7 @@ func _initialize() -> void:
 func _factory_identity() -> void:
 	var job := GemFrameJob.new()
 	job.stone = load("res://data/lapidary/stones/quartz.tres")
-	job.rig = load("res://data/lapidary/rigs/gameplay_studio.tres").duplicate(true)
+	job.rig = load("res://data/lapidary/rigs/gameplay_studio.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	job.print_style = GemPrint.load_house()
 	job.quality = GemRung.policy(GemRung.INTERACT)
 	var original := GemFramePlan.master_key(job)

@@ -27,29 +27,26 @@ func run(job: GemFrameJob, sample_limit := 0) -> Dictionary:
 
 func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 	last_error = ""
-	if job == null or job.stone == null or job.rig == null or job.print_style == null or job.samples < 1 or job.resolution.x < 1 or job.resolution.y < 1 or job.output_size.x < 1 or job.output_size.y < 1:
-		return _fail("Incomplete frame job")
-	if job.stone.condition != null and not job.stone.condition.validate_volume_fields().is_empty():
-		return _fail("Invalid spatial condition: %s" % job.stone.condition.validate_volume_fields())
-	# Explicit preflight budget; workers may raise it for larger render hardware.
-	var budget: int = job.quality.get("device_memory_budget_mib", 1024) * 1024 * 1024
-	if job.resolution.x * job.resolution.y * 128 > budget:
-		return _fail("Estimated film buffers exceed the job's device memory budget")
+	var admission_error := GemJobValidator.validate(job)
+	if not admission_error.is_empty():
+		return _fail(admission_error)
 	var display_key := GemFramePlan.display_key(job)
 	var master_key := GemFramePlan.master_key(job)
 	var existing := store.read(display_key)
 	if not existing.is_empty() and existing["metadata"].get("kind") == "display":
 		counters["display_hits"] += 1
 		return existing["metadata"]
+	var stone_key := job.stone.fingerprint()
+	if stone_key != compiled_key:
+		compiled = LapidaryStoneCompiler.compile(job.stone)
+		if compiled.get("planes", PackedFloat32Array()).is_empty() and not compiled.has("mesh") and not compiled.has("analytic_shape"):
+			return _fail("Specimen compiler produced no closed host geometry")
+		compiled_key = stone_key
 	if tracer == null or tracer.width != job.resolution.x or tracer.height != job.resolution.y:
 		release()
 		tracer = GemTracer.create(job.resolution.x, job.resolution.y)
 	if tracer == null:
 		return _fail("RenderingDevice unavailable; GPU workers need a supported display/Vulkan environment")
-	var stone_key := job.stone.fingerprint()
-	if stone_key != compiled_key:
-		compiled = LapidaryStoneCompiler.compile(job.stone)
-		compiled_key = stone_key
 	tracer.configure_stone(compiled, GemRigCompiler.compile(job.rig), job.quality)
 	tracer.set_seed(job.sample_seed)
 	tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), GemFramePlan.canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half)

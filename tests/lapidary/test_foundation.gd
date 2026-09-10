@@ -18,9 +18,9 @@ func check(condition: bool, label: String) -> void:
 		printerr("FAIL: " + label)
 
 func _identity() -> void:
-	var stone: GemStone = load("res://data/lapidary/stones/ruby.tres").duplicate(true)
+	var stone: GemStone = load("res://data/lapidary/stones/ruby.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var fingerprint := stone.fingerprint()
-	check(fingerprint == (stone.duplicate(true) as GemStone).fingerprint(), "deep copy preserves content")
+	check(fingerprint == (stone.duplicate_deep(Resource.DEEP_DUPLICATE_ALL) as GemStone).fingerprint(), "deep copy preserves content")
 	stone.material.chromophore.concentration *= 1.01
 	check(fingerprint != stone.fingerprint(), "chromophore content invalidates")
 	fingerprint = stone.fingerprint()
@@ -32,7 +32,7 @@ func _identity() -> void:
 	fingerprint = stone.fingerprint()
 	stone.size_mm += 0.00001
 	check(fingerprint != stone.fingerprint(), "small physical changes are not quantized away")
-	var clip: GemClip = load("res://data/lapidary/clips/flash.tres").duplicate(true)
+	var clip: GemClip = load("res://data/lapidary/clips/flash.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	fingerprint = clip.fingerprint()
 	clip.effect_envelopes["exposure_pulse"].set_point_value(1, 1.6)
 	check(fingerprint != clip.fingerprint(), "curve contents invalidate")

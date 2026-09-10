@@ -81,9 +81,9 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 	var template := _resolve_template(cut_template)
 	if template == null:
 		return _failure()
-	var template_error := _template_error(template)
-	if template_error != "":
-		push_error("cut_compiler: template '%s' invalid: %s" % [template.cut_id, template_error])
+	var invalid_template := template_error(template)
+	if invalid_template != "":
+		push_error("cut_compiler: template '%s' invalid: %s" % [template.cut_id, invalid_template])
 		return _failure()
 	var sil: SilhouetteLib.Silhouette = SilhouetteLib.make(silhouette, shape)
 	if sil == null:
@@ -441,7 +441,11 @@ static func _resolve_template(cut_template: Resource) -> GemCutTemplate:
 	return template
 
 
-static func _template_error(template: GemCutTemplate) -> String:
+static func template_error(template: GemCutTemplate) -> String:
+	if template == null:
+		return "missing cut template"
+	if template.crown_rows.size() > 32:
+		return "at most 32 crown rows supported"
 	if template.crown_rows.is_empty():
 		return "no crown rows"
 	var seen_break := false
@@ -451,8 +455,10 @@ static func _template_error(template: GemCutTemplate) -> String:
 			return "null crown row"
 		if row.kind != ROW_BREAK and row.kind != ROW_STEP and row.kind != ROW_STAR:
 			return "unknown row kind '%s'" % row.kind
-		if row.angle_deg <= 5.0 or row.angle_deg >= 80.0:
+		if not is_finite(row.angle_deg) or row.angle_deg <= 5.0 or row.angle_deg >= 80.0:
 			return "row angle %.1f out of (5, 80)" % row.angle_deg
+		if row.density < 1 or row.density > 4 or not is_finite(row.phase) or row.phase < 0 or row.phase > 1 or not is_finite(row.span) or row.span < 0 or row.span > 1:
+			return "invalid row density, phase, or span"
 		match row.kind:
 			ROW_BREAK:
 				seen_break = true
@@ -465,10 +471,15 @@ static func _template_error(template: GemCutTemplate) -> String:
 				prev_step_angle = row.angle_deg
 	if template.pavilion_style != PAVILION_SOLVED and template.pavilion_style != PAVILION_STEP:
 		return "unknown pavilion style '%s'" % template.pavilion_style
-	if template.table_ratio < 0.05 or template.table_ratio > 0.95:
+	if not is_finite(template.table_ratio) or template.table_ratio < 0.05 or template.table_ratio > 0.95:
 		return "table_ratio %.2f out of [0.05, 0.95]" % template.table_ratio
-	if template.girdle_half_height <= 0.0 or template.girdle_half_height > 0.15:
+	if not is_finite(template.girdle_half_height) or template.girdle_half_height <= 0.0 or template.girdle_half_height > 0.15:
 		return "girdle_half_height %.3f out of (0, 0.15]" % template.girdle_half_height
+	if template.pavilion_rows < 2 or template.pavilion_rows > 4:
+		return "pavilion_rows must be 2..4"
+	for setting in [[template.pavilion_step_delta_deg, 1.0, 15.0], [template.pavilion_keel_scale, 0.02, 0.5], [template.pavilion_lower_half_delta_deg, 0.0, 15.0]]:
+		if not is_finite(setting[0]) or setting[0] < setting[1] or setting[0] > setting[2]:
+			return "invalid pavilion proportions"
 	return ""
 
 

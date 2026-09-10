@@ -117,11 +117,11 @@ func _ruby_variants() -> Array:
 	thin["fluorescence"] = {"nm": 693.0, "strength": 0.0}
 	out.append({"name": "thin-body", "instance": thin})
 
-	var round_stone: GemStone = stone.duplicate(true)
+	var round_stone: GemStone = stone.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	round_stone.shape.outline = &"round"
 	out.append({"name": "round-cut", "instance": LapidaryStoneCompiler.compile(round_stone)})
 
-	var t8_stone: GemStone = stone.duplicate(true)
+	var t8_stone: GemStone = stone.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	t8_stone.grade = load("res://data/lapidary/grades/t8.tres")
 	out.append({"name": "t8-grade", "instance": LapidaryStoneCompiler.compile(t8_stone)})
 	return out

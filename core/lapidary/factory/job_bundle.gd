@@ -3,6 +3,11 @@ extends RefCounted
 ## A minimal independent Godot project plus bundled authored jobs. No game
 ## scenes, autoloads, imported textures, models or developer cache are required.
 static func write(root: String, jobs: Array[GemFrameJob], clips: Dictionary) -> Dictionary:
+	for index in jobs.size():
+		var error := GemJobValidator.validate(jobs[index])
+		if not error.is_empty():
+			push_error("Job %d rejected before packaging: %s" % [index, error])
+			return {}
 	var absolute := ProjectSettings.globalize_path(root).simplify_path().trim_suffix("/")
 	if absolute == ProjectSettings.globalize_path("res://").simplify_path().trim_suffix("/"):
 		push_error("A worker bundle cannot overwrite the current project")

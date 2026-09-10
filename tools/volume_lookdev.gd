@@ -12,7 +12,7 @@ func _initialize() -> void:
 	if tracer == null:
 		quit(1)
 		return
-	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate(true)
+	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	stone.grade.cut = 1.0
 	stone.material.scatter_per_mm = 0.0
 	var layer := GemVolumeField.new()

@@ -34,7 +34,7 @@ func _initialize() -> void:
 	field.scatter_per_mm = 1
 	field.radius_mm.x = 0
 	check(not field.validate().is_empty(), "singular spatial transform is rejected")
-	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate(true)
+	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var fingerprint := stone.fingerprint()
 	stone.condition.volume_fields.append(GemVolumeField.new())
 	check(stone.fingerprint() != fingerprint, "spatial condition participates in specimen identity")

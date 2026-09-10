@@ -11,7 +11,7 @@ $stages = @(
     @{ Name = 'import'; Args = @('--headless', '--editor', '--quit') },
     @{ Name = 'source_check'; Args = @('--headless', '--quit-after', '600', 'res://tools/source_check.tscn') }
 )
-foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_store_maintenance', 'test_spectra', 'test_material_inputs', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler')) {
+foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_spectra', 'test_material_inputs', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler')) {
     $stages += @{ Name = $name; Args = @('--headless', '--quit-after', '600', '--script', "res://tests/lapidary/$name.gd") }
 }
 if ($ReferencePython) {

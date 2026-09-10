@@ -8,7 +8,7 @@ func _initialize() -> void:
 		quit(1)
 		return
 	var rig: GemLightRig = load("res://data/lapidary/rigs/gameplay_studio.tres")
-	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate(true)
+	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	stone.grade.cut = 1.0
 	stone.grade.crystal = 1.0
 	var clean := LapidaryStoneCompiler.compile(stone)

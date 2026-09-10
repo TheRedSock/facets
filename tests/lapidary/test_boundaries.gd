@@ -15,7 +15,7 @@ func _initialize() -> void:
 	for name in DirAccess.get_files_at("res://data/lapidary/stones/"):
 		if not name.ends_with(".tres"):
 			continue
-		var stone: GemStone = load("res://data/lapidary/stones/" + name).duplicate(true)
+		var stone: GemStone = load("res://data/lapidary/stones/" + name).duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 		for grade in [stone.grade.cut, 0.4, 0.7, 1.0]:
 			var compiled := LapidaryStoneCompiler.compile(stone, grade)
 			var mesh := GemShapeCompiler.from_hull(compiled["planes"])
@@ -46,7 +46,7 @@ func _initialize() -> void:
 			defect.seed = seed_value
 			var surface := GemDefectCompiler.compile(defect, 4.0)
 			check(surface.validate().is_empty(), "%s seed%d closed thin boundary" % [kind, seed_value])
-	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate(true)
+	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var original := stone.fingerprint()
 	var defect := GemDefect.new()
 	stone.condition.defects.append(defect)

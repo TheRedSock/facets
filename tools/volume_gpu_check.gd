@@ -101,7 +101,7 @@ func _transport() -> void:
 	if tracer == null:
 		check(false, "tracer compiles")
 		return
-	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate(true)
+	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var field := GemVolumeField.new()
 	field.radius_mm = Vector3(3, 2, 0.6)
 	field.absorption_concentration = 3.0

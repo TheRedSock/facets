@@ -46,6 +46,14 @@ static func load_house() -> GemPrint:
 
 func validate() -> PackedStringArray:
 	var errors := PackedStringArray()
+	for key in ["exposure", "shoulder_strength", "contrast", "black_point", "chroma_ceiling", "chroma_soft", "highlight_desat"]:
+		var value: float = get(key)
+		if not is_finite(value) or value < 0 or value > 1e10:
+			errors.append("Print %s must be finite and nonnegative" % key)
+	if contrast <= 0 or chroma_soft <= 0:
+		errors.append("Print contrast and chroma softness must be positive")
+	if highlight_desat > 1 or black_point > 1:
+		errors.append("Print highlight desaturation and black point must be in [0, 1]")
 	for e in exceptions:
 		if String(e.get("reason", "")).strip_edges().is_empty():
 			errors.append("Print exception without a written reason: %s" % str(e.get("selector", "?")))

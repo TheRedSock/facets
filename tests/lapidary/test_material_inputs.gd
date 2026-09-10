@@ -58,7 +58,7 @@ func _import_units() -> void:
 	check(result.has("chromophore") and result["chromophore"].absorption_evidence.dataset_sha256 == FileAccess.get_sha256(path), "raw measurement SHA is retained")
 
 func _validation() -> void:
-	var material: GemMaterial = load("res://data/lapidary/stones/ruby.tres").material.duplicate(true)
+	var material: GemMaterial = load("res://data/lapidary/stones/ruby.tres").material.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	check(material.validate().is_empty(), "catalog material validates")
 	check(material.species.refraction_evidence.kind == GemOpticalEvidence.Kind.PUBLISHED_MODEL, "published refraction classification is explicit")
 	check(material.chromophore.absorption_evidence.kind == GemOpticalEvidence.Kind.AUTHORED_APPROXIMATION, "authored absorption does not inherit refraction credibility")

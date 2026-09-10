@@ -12,7 +12,7 @@ func _initialize() -> void:
 	policy["denoise_passes"] = 0
 	var report := []
 	for id in ["diamond", "fluorite"]:
-		var stone: GemStone = load("res://data/lapidary/stones/" + id + ".tres").duplicate(true)
+		var stone: GemStone = load("res://data/lapidary/stones/" + id + ".tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 		stone.material.scatter_per_mm = 0.0
 		var instance := LapidaryStoneCompiler.compile(stone)
 		for angle in [0.0, 0.3]:
