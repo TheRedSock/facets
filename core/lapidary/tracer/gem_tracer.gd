@@ -19,6 +19,7 @@ const SHADER_DIR := "res://core/lapidary/tracer/shaders/"
 const SHADER_PATH := SHADER_DIR + "gem_pathtrace.glsl"
 const FIELD_SHADER_PATH := SHADER_DIR + "gem_scatter_field.glsl"
 const PRINT_SHADER_PATH := SHADER_DIR + "gem_print.glsl"
+const DENOISE_SHADER_PATH := SHADER_DIR + "gem_denoise.glsl"
 const COMMON_PATH := SHADER_DIR + "gem_common.glsl"
 const INCLUDE_LINE := "#include \"gem_common.glsl\""
 const Colorimetry := preload("res://core/lapidary/lighting/colorimetry.gd")
@@ -47,6 +48,7 @@ const FLAG_DISPERSION := 1
 const FLAG_BIREF := 2
 const FLAG_VOLUME := 4
 const FLAG_FLUOR := 16
+const FLAG_FULL_SPECTRUM := 32
 
 const STONE_FLAG_HAS_ERAY := 1
 const STONE_FLAG_DISPERSION_STRONG := 2
@@ -58,6 +60,11 @@ var last_dispatch_ms := 0.0
 var last_field_ms := 0.0
 var last_accumulate_ms := 0.0
 var last_print_ms := 0.0
+var last_denoise_ms := 0.0
+var _denoise_passes := 0
+var _denoise_phi := 2.0
+var _filtered_samples := -1
+var _print_source: RID
 var field_build_count := 0
 var _instance_bytes := PackedByteArray()
 var _field_state_key := ""
@@ -80,6 +87,7 @@ var _inst_count := 1
 var _spectral_norm := 0.0
 var _seed := 1
 var _max_bounces := 32
+var _throughput_epsilon := 0.0001
 var _flags := 0
 var _grid := Vector2i.ONE
 var _cell := Vector2i.ZERO
@@ -118,6 +126,12 @@ static func create(p_width: int, p_height: int) -> GemTracer:
 	var zeros := PackedByteArray()
 	zeros.resize(p_width * p_height * 16)
 	t._bufs["accum"] = t._rd.storage_buffer_create(zeros.size(), zeros)
+	t._bufs["filter_a"] = t._rd.storage_buffer_create(zeros.size(), zeros)
+	t._bufs["filter_b"] = t._rd.storage_buffer_create(zeros.size(), zeros)
+	for name in ["ballistic", "residual", "reconstructed"]:
+		t._bufs[name] = t._rd.storage_buffer_create(zeros.size(), zeros)
+	zeros.resize(p_width * p_height * 32)
+	t._bufs["guides"] = t._rd.storage_buffer_create(zeros.size(), zeros)
 	t._spectral_norm = (400.0 / 4.0) / Colorimetry.integral_ybar()
 	t._cell = Vector2i(p_width, p_height)
 	return t
@@ -128,7 +142,7 @@ func _compile_shaders() -> bool:
 	if common.is_empty():
 		push_error("GemTracer: cannot read %s" % COMMON_PATH)
 		return false
-	for entry in [[SHADER_PATH, "trace"], [FIELD_SHADER_PATH, "field"], [PRINT_SHADER_PATH, "print"]]:
+	for entry in [[SHADER_PATH, "trace"], [FIELD_SHADER_PATH, "field"], [PRINT_SHADER_PATH, "print"], [DENOISE_SHADER_PATH, "denoise"]]:
 		var text := FileAccess.get_file_as_string(entry[0])
 		if text.is_empty():
 			push_error("GemTracer: cannot read %s" % entry[0])
@@ -167,10 +181,15 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	_cell = Vector2i(width / grid.x, height / grid.y)
 	_inst_count = grid.x * grid.y
 	_light_count = lights.size() / 8
+	_denoise_passes = clampi(policy.get("denoise_passes", 0), 0, 5)
+	_denoise_phi = clampf(policy.get("denoise_phi", 2.0), 0.1, 8.0)
 	_max_bounces = policy.get("max_bounces", 32)
+	_throughput_epsilon = clampf(policy.get("throughput_epsilon", 0.0001), 1.0e-8, 0.01)
 	_flags = 0
 	if policy.get("dispersion", false):
 		_flags |= FLAG_DISPERSION
+	if policy.get("spectral_geometry", "selective") == "full":
+		_flags |= FLAG_DISPERSION | FLAG_FULL_SPECTRUM
 	if policy.get("birefringence", false):
 		_flags |= FLAG_BIREF
 	if policy.get("volume", true):
@@ -330,13 +349,27 @@ func _build_uniform_sets() -> void:
 			f.add_id(_field_sampler)
 			f.add_id(_field_tex)
 		uniforms.append(f)
+		if shader_name == "trace":
+			var guide := RDUniform.new()
+			guide.binding = 8
+			guide.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+			guide.add_id(_bufs["guides"])
+			uniforms.append(guide)
+			for item in [[9, "ballistic"], [10, "residual"]]:
+				var uniform := RDUniform.new()
+				uniform.binding = item[0]
+				uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+				uniform.add_id(_bufs[item[1]])
+				uniforms.append(uniform)
 		_sets[shader_name] = _rd.uniform_set_create(uniforms, _shaders[shader_name], 0)
 
 	_create_print_target(Vector2i(width, height))
 
 
-func _create_print_target(size: Vector2i) -> void:
-	if _print_size == size and _sets.has("print") and _rd.uniform_set_is_valid(_sets["print"]):
+func _create_print_target(size: Vector2i, source := RID()) -> void:
+	if not source.is_valid():
+		source = _bufs["accum"]
+	if _print_size == size and source == _print_source and _sets.has("print") and _rd.uniform_set_is_valid(_sets["print"]):
 		return
 	if _print_tex.is_valid():
 		_rd.free_rid(_print_tex)
@@ -350,7 +383,8 @@ func _create_print_target(size: Vector2i) -> void:
 	var pu0 := RDUniform.new()
 	pu0.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
 	pu0.binding = 0
-	pu0.add_id(_bufs["accum"])
+	pu0.add_id(source)
+	_print_source = source
 	var pu1 := RDUniform.new()
 	pu1.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
 	pu1.binding = 1
@@ -425,8 +459,12 @@ func set_environment(env: Dictionary) -> void:
 func reset_accumulation() -> void:
 	var zeros := PackedByteArray()
 	zeros.resize(width * height * 16)
-	_rd.buffer_update(_bufs["accum"], 0, zeros.size(), zeros)
+	for name in ["accum", "ballistic", "residual"]:
+		_rd.buffer_update(_bufs[name], 0, zeros.size(), zeros)
 	samples_accumulated = 0
+	zeros.resize(width * height * 32)
+	_rd.buffer_update(_bufs["guides"], 0, zeros.size(), zeros)
+	_filtered_samples = -1
 
 
 func _field_push(band_group: int, texel_base: int) -> PackedByteArray:
@@ -546,7 +584,7 @@ func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
 	pcb.put_32(row_origin)
 	pcb.put_32(_inst_count)
 	pcb.put_float(_bg.w)
-	pcb.put_32(0)
+	pcb.put_float(_throughput_epsilon)
 	assert(pcb.data_array.size() == PUSH_SIZE)
 
 	var t0 := Time.get_ticks_usec()
@@ -565,11 +603,11 @@ func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
 # ------------------------------------------------------------------ output
 
 ## GPU print pass. print_res is required for house print; raw bypasses mastering.
-func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0, output_size := Vector2i.ZERO) -> Image:
+func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0, output_size := Vector2i.ZERO, reconstruct := true) -> Image:
 	var start := Time.get_ticks_usec()
 	var target := Vector2i(width, height) if output_size == Vector2i.ZERO else output_size
 	assert(target.x > 0 and target.y > 0)
-	_create_print_target(target)
+	_create_print_target(target, reconstruct_linear() if reconstruct and _denoise_passes > 0 else _bufs["accum"])
 	var pcb := StreamPeerBuffer.new()
 	pcb.put_32(target.x)
 	pcb.put_32(target.y)
@@ -605,6 +643,61 @@ func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0, o
 	return Image.create_from_data(target.x, target.y, false, Image.FORMAT_RGBA8, data)
 
 
+## Reconstruction never overwrites the reference accumulation. It is cached
+## by accumulated sample count, so exposure/style-only outputs reuse it.
+func set_reconstruction(passes: int, phi := 2.0) -> void:
+	_denoise_passes = clampi(passes, 0, 5)
+	_denoise_phi = clampf(phi, 0.1, 8.0)
+	_filtered_samples = -1
+
+
+func reconstruct_linear() -> RID:
+	if _denoise_passes <= 0 or samples_accumulated < 2:
+		return _bufs["accum"]
+	var output: RID = _bufs["residual"]
+	if _filtered_samples == samples_accumulated:
+		return _bufs["reconstructed"]
+	var start := Time.get_ticks_usec()
+	for pass_index in _denoise_passes + 1:
+		var input := output
+		output = _bufs["reconstructed"] if pass_index == _denoise_passes else _bufs["filter_a" if pass_index % 2 == 0 else "filter_b"]
+		var uniforms: Array[RDUniform] = []
+		var buffers := [input, _bufs["guides"], output, _bufs["ballistic"]]
+		for binding in 4:
+			var uniform := RDUniform.new()
+			uniform.binding = binding
+			uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+			uniform.add_id(buffers[binding])
+			uniforms.append(uniform)
+		var uniform_set := _rd.uniform_set_create(uniforms, _shaders["denoise"], 0)
+		var push := StreamPeerBuffer.new()
+		for value in [width, height, 0 if pass_index == _denoise_passes else 1 << pass_index]:
+			push.put_32(value)
+		for value in [float(samples_accumulated), _denoise_phi, 128.0, 0.0, 0.0]:
+			push.put_float(value)
+		var list := _rd.compute_list_begin()
+		_rd.compute_list_bind_compute_pipeline(list, _pipelines["denoise"])
+		_rd.compute_list_bind_uniform_set(list, uniform_set, 0)
+		_rd.compute_list_set_push_constant(list, push.data_array, 32)
+		@warning_ignore("integer_division")
+		_rd.compute_list_dispatch(list, (width + 7) / 8, (height + 7) / 8, 1)
+		_rd.compute_list_end()
+		_rd.submit()
+		_rd.sync()
+		_rd.free_rid(uniform_set)
+	_filtered_samples = samples_accumulated
+	last_denoise_ms = float(Time.get_ticks_usec() - start) / 1000.0
+	return output
+
+
+func read_reconstructed_xyz() -> PackedFloat32Array:
+	var data := _rd.buffer_get_data(reconstruct_linear()).to_float32_array()
+	var inv := 1.0 / maxf(float(samples_accumulated), 1.0)
+	for index in data.size():
+		data[index] *= inv
+	return data
+
+
 ## Reads back accumulated XYZ (normalized) + coverage. For physics tests.
 func read_xyz() -> PackedFloat32Array:
 	var raw := _rd.buffer_get_data(_bufs["accum"]).to_float32_array()
@@ -624,7 +717,7 @@ func read_linear_master() -> Image:
 func profile() -> Dictionary:
 	return {"accumulate_wall_ms": last_accumulate_ms, "trace_wall_ms": last_dispatch_ms,
 		"field_last_build_ms": last_field_ms, "field_builds": field_build_count,
-		"print_readback_wall_ms": last_print_ms, "samples": samples_accumulated,
+		"print_readback_wall_ms": last_print_ms, "denoise_wall_ms": last_denoise_ms, "samples": samples_accumulated,
 		"field": field_info()}
 
 
@@ -652,7 +745,7 @@ func _free_scene_buffers() -> void:
 
 func release() -> void:
 	_free_scene_buffers()
-	var rids: Array = [_bufs.get("accum", RID()), _print_tex, _field_tex, _field_sampler]
+	var rids: Array = [_bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex, _field_tex, _field_sampler]
 	rids.append_array(_pipelines.values())
 	rids.append_array(_shaders.values())
 	for rid in rids:

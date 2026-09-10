@@ -56,16 +56,19 @@ layout(push_constant, std430) uniform Params {
 	int row_origin;       // 80  first image row of this dispatch (host chunks work for TDR safety)
 	int field_insts;      // 84  instances stacked along the field's x axis
 	float bg_kelvin;      // 88  background spectrum (Planckian; 0 = flat)
-	int pad2;             // 92
+	float throughput_epsilon; // 92 numerical path termination threshold
 } pc;
 
 // In-scattered radiance field (SH l<=3 x spectral bands), built per frame by
 // gem_scatter_field.glsl. Hardware trilinear filtering does the spatial blend.
 layout(set = 0, binding = 7) uniform sampler3D field;
+layout(set = 0, binding = 8, std430) buffer Guides { vec4 guides[]; };
+layout(set = 0, binding = 9, std430) buffer Ballistic { vec4 ballistic_pixels[]; };
+layout(set = 0, binding = 10, std430) buffer Residual { vec4 residual_pixels[]; };
 
 const float WL_MIN = 380.0;
 const float WL_RANGE = 400.0;
-const float THROUGHPUT_EPS = 0.004;
+#define THROUGHPUT_EPS pc.throughput_epsilon
 const int MAX_CLOUD_SPANS = 8;
 
 #define FLAG_DISPERSION  ((pc.flags & 1u) != 0u)
@@ -419,7 +422,13 @@ void main() {
 	float hg_g = st.scatter_zone.y;
 
 	vec3 total_xyz = vec3(0.0);
+	vec3 total_ballistic = vec3(0.0);
+	vec3 total_residual = vec3(0.0);
 	float total_cov = 0.0;
+	vec4 geometry_sum = vec4(0.0);
+	vec2 moment_sum = vec2(0.0);
+	float min_facet = pc.sample_base == 0u ? 1e20 : guides[idx * 2u + 1u].z;
+	float max_facet = pc.sample_base == 0u ? -1.0 : guides[idx * 2u + 1u].w;
 
 	for (uint s = 0u; s < pc.spp; s++) {
 		uint n = pc.sample_base + s;
@@ -446,6 +455,9 @@ void main() {
 
 		vec3 p_hit = ro + rd * t_near;
 		vec3 n_entry = planes[entry_plane].n_d.xyz;
+		geometry_sum += vec4(quat_rot(q, n_entry), t_near);
+		min_facet = min(min_facet, float(entry_plane));
+		max_facet = max(max_facet, float(entry_plane));
 		float cos_i = clamp(-dot(rd, n_entry), 0.0, 1.0);
 
 		vec4 radiance = vec4(0.0);
@@ -455,7 +467,8 @@ void main() {
 			fresnel_diel(cos_i, 1.0 / n_wl.z), fresnel_diel(cos_i, 1.0 / n_wl.w));
 		radiance += r_surf * env_radiance(quat_rot(q, reflect(rd, n_entry)), wl, rig_yaw, role_mult, 0.0);
 
-		bool disp = FLAG_DISPERSION && (st.ranges1.y & 2) != 0;
+		vec4 ballistic = radiance;
+		bool disp = FLAG_DISPERSION && ((pc.flags & 32u) != 0u || (st.ranges1.y & 2) != 0);
 		bool biref = FLAG_BIREF && abs(st.sell_c_biref.w) > 0.015;
 		int n_passes = (disp ? 4 : 1) * (biref ? 2 : 1);
 
@@ -482,6 +495,25 @@ void main() {
 			vec3 dir = normalize(eta_in * rd + (eta_in * cos_i - ct) * n_entry);
 			vec4 throughput = (vec4(1.0) - r_surf) * mask * pass_w;
 			vec3 pos = p_hit - n_entry * (T_EPS * 4.0);
+			// Deterministic zero-scattering contribution, used as a control
+			// image for reconstruction. Only the residual gets filtered, so
+			// sharp internal reflections cannot be mistaken for volume noise.
+			if (sigma_h > 0.0) {
+				vec3 clear_pos = pos, clear_dir = dir;
+				vec4 clear_throughput = throughput;
+				for (uint hit = 0u; hit < pc.max_bounces; hit++) {
+					float distance;
+					int face;
+					hull_exit(p_off, p_cnt, clear_pos, clear_dir, distance, face);
+					if (distance >= INF * 0.5) { break; }
+					clear_throughput *= segment_att(st, clear_pos, clear_dir, distance, a_off, has_eray, wl, pol_mode)
+						* exp(-sigma_h * distance);
+					clear_pos += clear_dir * distance;
+					surface_exit_at(st, face, wl, n_wl, n_geom, q, rig_yaw, role_mult, 0.0,
+						clear_pos, clear_dir, clear_throughput, ballistic);
+					if (max(max(clear_throughput.x, clear_throughput.y), max(clear_throughput.z, clear_throughput.w)) < THROUGHPUT_EPS) { break; }
+				}
+			}
 			float fp = 0.0;
 			float tau_free = tau_free0;
 			int scatter_events = 0;
@@ -646,7 +678,17 @@ void main() {
 		vec3 xyz = (radiance.x * cie_xyz(wl.x) + radiance.y * cie_xyz(wl.y)
 			+ radiance.z * cie_xyz(wl.z) + radiance.w * cie_xyz(wl.w)) * pc.spectral_norm;
 		total_xyz += xyz;
+		vec3 ballistic_xyz = sigma_h > 0.0 ? (ballistic.x * cie_xyz(wl.x) + ballistic.y * cie_xyz(wl.y)
+			+ ballistic.z * cie_xyz(wl.z) + ballistic.w * cie_xyz(wl.w)) * pc.spectral_norm : xyz;
+		vec3 residual_xyz = xyz - ballistic_xyz;
+		total_ballistic += ballistic_xyz;
+		total_residual += residual_xyz;
+		moment_sum += vec2(residual_xyz.y * residual_xyz.y, residual_xyz.y);
 	}
 
 	accum[idx] += vec4(total_xyz, total_cov);
+	ballistic_pixels[idx] += vec4(total_ballistic, total_cov);
+	residual_pixels[idx] += vec4(total_residual, total_cov);
+	guides[idx * 2u] += geometry_sum;
+	guides[idx * 2u + 1u] = vec4(guides[idx * 2u + 1u].xy + moment_sum, min_facet, max_facet);
 }

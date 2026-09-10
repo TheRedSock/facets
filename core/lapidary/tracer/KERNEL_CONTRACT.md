@@ -1,4 +1,4 @@
-# Lapidary Kernel Contract (v3 — clean optics)
+# Lapidary Kernel Contract (v4 — spectral transport and linear reconstruction)
 
 The single interface between the data model and the GPU tracer. Everything that
 renders — designer preview, clip bake, live board draws, evaluation sheets —
@@ -86,12 +86,15 @@ grid 1×1 = single stone.
 
 ## Bindings (set 0)
 0 Planes, 1 Lights, 2 Absorb, 3 Accum (vec4 XYZ+coverage), 4 Prims, 5 Stones, 6 Insts,
-7 scatter field (`image3D` rgba16f in the pre-pass, `sampler3D` trilinear in the kernel).
+7 legacy scatter field (`image3D` in pre-pass, `sampler3D` in trace; production policies disable it).
++Trace-only bindings: 8 guides (two vec4 per pixel: normal/depth sums, residual Y squared/Y sum/min-max facet IDs), 9 zero-scatter XYZ/coverage sums, 10 residual XYZ/coverage sums.
++
++Reconstruction (`gem_denoise.glsl`) uses bindings 0 input sums, 1 guides, 2 output sums, 3 zero-scatter sums. Push constants (32B): resolution ivec2, step int, sample count float, phi float, normal exponent float, vec2 padding. Step zero composites filtered residual with untouched zero-scatter light. Other steps run positive, variance/normal-guided a-trous filtering. Coverage is never filtered. This is a biased optional reconstruction; `read_xyz` and `read_linear_master` always expose the unchanged reference accumulation.
 
 Kernel push constants (96 B): resolution, sample_base, spp, seed, max_bounces, flags
-(bit0 dispersion_split, bit1 birefringence, bit2 volume, bit4 fluorescence),
+(bit0 dispersion_split, bit1 birefringence approximation, bit2 volume, bit4 reserved, bit5 full wavelength geometry),
 light_count, grid, cell_px, bg zenith/horizon/below, spectral_norm, rad_clamp,
-env_filter_rad, field_exits, field_grid, row_origin, field_insts, bg_kelvin.
+env_filter_rad, field_exits, field_grid, row_origin, field_insts, bg_kelvin, throughput_epsilon.
 
 Scatter-field push constants (48 B): grid_n, field_exits, light_count, inst_count,
 dirs, band_group, env_filter_rad, texel_base, bg (zenith, horizon, below, kelvin).
@@ -121,7 +124,7 @@ colourless stone under the rig's dominant light prints white and every other lig
 keeps its relative warmth. Exposure is the house print's `exposure` only — tools and
 bakes pass 1.0.
 
-## Estimator (v3)
+## Estimator (v4)
 - Global sample index `n = sample_base + s` drives per-pixel Cranley-Patterson-rotated
   Halton for pixel filter, wavelength, unified free flight + medium choice, and the
   first scatter direction (field-off only). PCG covers remaining dimensions.
@@ -174,3 +177,5 @@ Seeded QMC + PCG from (pixel, frame, stone seed). Reproducible on the same GPU
 family + driver. NOT bit-exact across vendors — cache keys carry
 `look_version`; foreign caches regenerate. Physics tests assert with
 tolerances, never bit equality.
+
+Production policies use repeated scattering with no post-scatter environment blur. Full spectral geometry splits all four sampled wavelengths, not just high-dispersion species. `REFERENCE` is unfiltered but does not cure the still-approximate anisotropic model. Fluorescence is not rendered. `accumulate()` returns total wall time including any field work; `profile()` separates trace, field, reconstruction, and print/readback.

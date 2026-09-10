@@ -85,7 +85,7 @@ func _initialize() -> void:
 		DirAccess.make_dir_recursive_absolute(frame_dir_abs)
 
 		var t0 := Time.get_ticks_msec()
-		var gpu_ms := 0.0
+		var accumulate_wall_ms := 0.0
 		for i in frames:
 			# Linear 360° so frame N wraps seamlessly to frame 0.
 			var angle := TAU * float(i) / float(frames)
@@ -98,9 +98,8 @@ func _initialize() -> void:
 			var remaining := spp
 			while remaining > 0:
 				var n := mini(batch, remaining)
-				gpu_ms += tracer.accumulate(n)
+				accumulate_wall_ms += tracer.accumulate(n)
 				remaining -= n
-			gpu_ms += tracer.last_field_ms
 			var img := tracer.finalize_print(print_res, false, EXPOSURE)
 			img.save_png("%s/frame_%03d.png" % [frame_dir_abs, i])
 
@@ -114,7 +113,7 @@ func _initialize() -> void:
 			if not opts["keep_frames"]:
 				_remove_dir(frame_dir_abs)
 			print("  %-14s %3d frames  gpu %6.1fs  wall %6.1fs  sigma %.3f  incl %2d -> %s.gif" % [
-				tile_id, frames, gpu_ms / 1000.0,
+				tile_id, frames, accumulate_wall_ms / 1000.0,
 				float(Time.get_ticks_msec() - t0) / 1000.0,
 				instance["scatter"]["sigma_per_mm"], instance["inclusions"].size() / 16, tile_id])
 

@@ -57,6 +57,15 @@ func _initialize() -> void:
 		coverage += whole[i * 4 + 3]
 	check(max_difference < 0.000002, "sample partition invariant: %.8f" % max_difference)
 	check(absf(total_y / coverage - 1.0) < 0.015, "multiple-scatter equilibrium Y=%.6f" % (total_y / coverage))
+	var untouched := tracer.read_xyz()
+	tracer.set_reconstruction(3)
+	var reconstructed := tracer.read_reconstructed_xyz()
+	check(untouched == tracer.read_xyz(), "reconstruction preserves reference master")
+	var alpha_equal := true
+	for i in untouched.size() / 4:
+		alpha_equal = alpha_equal and untouched[i * 4 + 3] == reconstructed[i * 4 + 3]
+	check(alpha_equal, "reconstruction preserves coverage exactly")
+	_analytic_interfaces(tracer, inst, lights, policy)
 	# Changes to framing or print white balance cannot invalidate volume light.
 	policy["field_exits"] = 4
 	policy["field_grid"] = 4
@@ -78,6 +87,51 @@ func _initialize() -> void:
 	print("GPU foundation: %d checks, %d failures; partition error %.8f; equilibrium Y %.6f" % [checks, failures, max_difference, total_y / coverage])
 	tracer.release()
 	quit(1 if failures else 0)
+
+func _analytic_interfaces(tracer: GemTracer, instance: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
+	var inst := instance.duplicate(true)
+	var cube := PackedFloat32Array()
+	for axis in [Vector3.RIGHT, Vector3.UP, Vector3.BACK]:
+		for sign_value in [-1.0, 1.0]:
+			var normal: Vector3 = axis * sign_value
+			cube.append_array(PackedFloat32Array([normal.x, normal.y, normal.z, 1, 0, 0, 0, 0]))
+	inst["planes"] = cube
+	inst["size_mm"] = 1.0
+	inst["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
+	inst["sellmeier_b"] = Vector3(1.25, 0, 0) # exact wavelength-independent n=1.5
+	inst["sellmeier_c"] = Vector3.ZERO
+	inst["absorption"].fill(50.0)
+	for angle in [0.0, 0.3, 0.6]:
+		tracer.configure_stone(inst, lights, policy)
+		tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+		tracer.set_stone_orientation(Quaternion(Vector3.UP, angle))
+		tracer.accumulate(1024)
+		var ci := cos(angle)
+		var eta := 1.0 / 1.5
+		var ct := sqrt(1.0 - eta * eta * (1.0 - ci * ci))
+		var rs := pow((eta * ci - ct) / (eta * ci + ct), 2)
+		var rp := pow((ci - eta * ct) / (ci + eta * ct), 2)
+		var expected := (rs + rp) * 0.5
+		check(absf(_center_y(tracer) - expected) < 0.0003, "Fresnel at %.1frad matches analytic R=%.6f" % [angle, expected])
+	inst["absorption"].fill(0.2)
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(1024)
+	var t := exp(-0.2 * 2.0)
+	var expected := 0.04 + 0.96 * 0.96 * t / (1.0 - 0.04 * t)
+	check(absf(_center_y(tracer) - expected) < 0.001, "absorbing slab includes both Fresnel boundaries and internal returns")
+	var unfiltered := tracer.read_xyz()
+	tracer.set_reconstruction(3)
+	var filtered := tracer.read_reconstructed_xyz()
+	check(unfiltered == filtered, "zero-scatter reflections and transmission remain bit-identical")
+
+func _center_y(tracer: GemTracer) -> float:
+	var values := tracer.read_xyz()
+	var total := 0.0
+	for y in range(14, 18):
+		for x in range(14, 18):
+			total += values[(y * 32 + x) * 4 + 1]
+	return total / 16.0
 
 func _print_checks(tracer: GemTracer) -> void:
 	var values := PackedFloat32Array()

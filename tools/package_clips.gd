@@ -103,7 +103,7 @@ func _initialize() -> void:
 		baked += 1
 		var meta: Dictionary = result["meta"]
 		var gpu_total := 0.0
-		for ms: float in meta["frame_gpu_ms"]:
+		for ms: float in meta["frame_accumulate_wall_ms"]:
 			gpu_total += ms
 		print("  %s/%s@%s: %d frames @ %dpx (from %dpx, %d spp)  gpu %.1f ms  wall %.1f ms" % [
 			stone.stone_id, clip.clip_id, meta["rung"], (result["frames"] as Array).size(),
@@ -112,7 +112,7 @@ func _initialize() -> void:
 			turn_rows[String(stone.stone_id)] = result["frames"]
 		if smoke:
 			var per := PackedStringArray()
-			for ms: float in meta["frame_gpu_ms"]:
+			for ms: float in meta["frame_accumulate_wall_ms"]:
 				per.append("%.1f" % ms)
 			print("      per-frame gpu ms: [%s]" % ", ".join(per))
 
