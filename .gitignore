@@ -12,9 +12,10 @@ export_credentials.cfg
 # Plans, concept, archive
 plans
 
-# Rendered evaluation output (regenerable via tools/; keep the textual records)
+# Local reports, working notes, and regenerable render output.
+docs/
+generated/
 artifacts/**
 !artifacts/.gdignore
-!artifacts/eval/
-!artifacts/eval/EVAL_NOTES.md
-!artifacts/eval/timings.json
+__pycache__/
+*.pyc

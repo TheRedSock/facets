@@ -2,9 +2,14 @@
 // Lapidary print pass: XYZ accumulation -> display-ready sprite pixels.
 // Two modes:
 //   raw   — honest display transform (exposure + Reinhard + sRGB), for physics judgment
-//   print — the HOUSE PRINT: sprite tonescale, highlight desat, OKLCh chroma
-//           governor, black floor. Applied identically to baked clips and live
-//           draws. It publishes; it never fakes grade or lighting.
+//   print — the HOUSE PRINT: hue-preserving sprite tonescale, highlight desat,
+//           OKLCh chroma governor, optional black floor. Applied identically
+//           to baked clips and live draws. It publishes; it never fakes grade
+//           or lighting.
+//
+// The tonescale acts on the maximum RGB component and rescales the pixel, so
+// chromaticity (hue AND saturation) survives compression. Per-channel curves
+// desaturate toward white as they compress — the "washed out" look.
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
@@ -22,13 +27,11 @@ layout(push_constant, std430) uniform P {
 	float chroma_ceiling;  // 32
 	float chroma_soft;     // 36
 	float highlight_desat; // 40
-	float pad;             // 44 -> 48
+	float pad;             // 44
+	vec4 m0;               // 48  XYZ -> linear sRGB, columns (includes the rig's
+	vec4 m1;               // 64  as-shot white balance: Bradford CAT from the
+	vec4 m2;               // 80  rig's white_kelvin to D65)   -> 96
 } pc;
-
-const mat3 XYZ_TO_SRGB = mat3(
-	3.2406, -0.9689, 0.0557,
-	-1.5372, 1.8758, -0.2040,
-	-0.4986, 0.0415, 1.0570);
 
 float srgb_encode(float c) {
 	return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
@@ -61,6 +64,13 @@ vec3 oklab_to_srgb(vec3 lab) {
 		-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
 }
 
+// Extended Reinhard with white point, then contrast about mid-grey.
+float tonescale(float x) {
+	float w2 = pc.white_point * pc.white_point;
+	float y = x * (1.0 + x / w2) / (1.0 + x);
+	return pow(max(y, 0.0) / 0.18, pc.contrast) * 0.18;
+}
+
 void main() {
 	ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
 	if (pix.x >= pc.resolution.x || pix.y >= pc.resolution.y) { return; }
@@ -68,22 +78,24 @@ void main() {
 	vec3 xyz = acc.xyz * pc.inv_samples;
 	float cov = clamp(acc.w * pc.inv_samples, 0.0, 1.0);
 
-	vec3 rgb = max(XYZ_TO_SRGB * xyz, vec3(0.0)) * pc.exposure;
+	mat3 xyz_to_rgb = mat3(pc.m0.xyz, pc.m1.xyz, pc.m2.xyz);
+	vec3 rgb = max(xyz_to_rgb * xyz, vec3(0.0)) * pc.exposure;
 
 	if (pc.raw != 0u) {
 		rgb = rgb / (1.0 + rgb);
 	} else {
-		// Highlight desaturation before tone: clipped energy goes white-ish
-		// smoothly instead of hue-skewing.
+		// Highlight desaturation: clipped energy goes white-ish smoothly
+		// (sensor-like) instead of turning neon.
 		float lum = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
 		if (lum > 1.0) {
 			float f = pc.highlight_desat * (1.0 - 1.0 / lum);
 			rgb = mix(rgb, vec3(lum), clamp(f, 0.0, 1.0));
 		}
-		// Extended Reinhard with white point (per channel, then contrast about mid-gray).
-		float w2 = pc.white_point * pc.white_point;
-		rgb = rgb * (vec3(1.0) + rgb / w2) / (vec3(1.0) + rgb);
-		rgb = pow(max(rgb, vec3(0.0)) / 0.18, vec3(pc.contrast)) * 0.18;
+		// Hue- and saturation-preserving tonescale on the max component.
+		float m = max(rgb.r, max(rgb.g, rgb.b));
+		if (m > 1e-6) {
+			rgb *= tonescale(m) / m;
+		}
 		// Chroma governor in OKLCh: soft ceiling, forbidden neon.
 		vec3 lab = srgb_to_oklab(clamp(rgb, vec3(0.0), vec3(1.0)));
 		float chroma = length(lab.yz);
@@ -93,7 +105,7 @@ void main() {
 			lab.yz *= newc / max(chroma, 1e-5);
 			rgb = clamp(oklab_to_srgb(lab), vec3(0.0), vec3(1.0));
 		}
-		// Board black floor.
+		// Optional black floor (0 = none).
 		rgb = pc.black_point + rgb * (1.0 - pc.black_point);
 	}
 

@@ -18,10 +18,14 @@ extends Resource
 ## i.e. size_mm 5.0 = 10 mm girdle diameter. Beer-Lambert paths use it directly;
 ## authored absorption curves are co-tuned with these sizes.
 @export var size_mm := 4.0
+## Optional optic-axis override in stone space. ZERO = use species.optic_axis_stone.
+@export var optic_axis_override := Vector3.ZERO
 
 
 ## Stable identity for cache keys. Any visual-affecting change lands here.
 func fingerprint() -> String:
+	var axis := optic_axis_override if optic_axis_override != Vector3.ZERO \
+		else (species.optic_axis_stone if species else Vector3(0, 0, 1))
 	var parts := [
 		stone_id,
 		species.species_id if species else &"none",
@@ -31,5 +35,6 @@ func fingerprint() -> String:
 		"%.3f_%.3f_%.3f_%.3f" % [grade.cut, grade.clarity, grade.surface, grade.crystal] if grade else "g1",
 		str(seed),
 		"%.2f" % size_mm,
+		"%.3f_%.3f_%.3f" % [axis.x, axis.y, axis.z],
 	]
 	return "|".join(PackedStringArray(parts)).md5_text().substr(0, 16)

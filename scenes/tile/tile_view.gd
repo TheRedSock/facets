@@ -4,7 +4,7 @@ extends Control
 ## Renders one gem tile from authored clips served by the GemForge autoload.
 ##
 ## Visual priority:
-##   1. Clip strip from GemForge (idle loop; "turn"/"flash" oneshots on demand)
+##   1. Clip strip from GemForge (idle still; "turn" oneshot on upgrade)
 ##   2. GemForge placeholder still (synchronous INTERACT render)
 ##   3. ColorRect tinted via TileRegistry.get_tier_color (headless / no data)
 ##
@@ -96,14 +96,14 @@ func configure_from_data(p_tile_id: StringName, p_tier: int, p_cell: Vector2i) -
 		_show_idle_or_fallback()
 
 
-## Swaps to the new tile's idle visual, then plays the "flash" clip when the
-## forge can serve it (brightness pulse is baked into the clip frames).
+## Swaps to the new tile's idle visual. The board then plays the "turn"
+## clip (quick 360) via play_special_rotation_animation — do not start
+## flash here or the oneshot guard swallows the spin.
 func show_upgrade_full(new_tier: int, new_tile_id: StringName) -> void:
 	tier = new_tier
 	tile_id = new_tile_id
 	if is_inside_tree():
 		_show_idle_or_fallback()
-		play_clip(&"flash")
 
 
 ## Plays an authored clip if the forge can serve it; silently no-ops
@@ -119,10 +119,8 @@ func play_clip(clip_id: StringName, restart := true) -> void:
 	_apply_clip(clip, clip_id)
 
 
-## Legacy signature (duration/turns drove the old rotation-atlas scrub); a
-## call now just plays the authored "turn" clip from the start. Yields to an
-## in-flight oneshot so BoardScene's back-to-back show_upgrade_full +
-## play_special_rotation_animation keeps the upgrade flash.
+## Plays the authored "turn" clip (quick eased 360). Yields to an in-flight
+## oneshot so a second call in the same upgrade does not restart the spin.
 func play_special_rotation_animation(
 	_duration: float = SPECIAL_ROTATION_DEFAULT_DURATION,
 	_turns: float = SPECIAL_ROTATION_DEFAULT_TURNS,

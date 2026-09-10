@@ -1,24 +1,51 @@
 class_name GemTracer
 extends RefCounted
-## Lapidary GPU tracer host — kernel v1.
+## Lapidary GPU tracer host — kernel v3.
 ##
 ## Consumes StoneInstance dictionaries from LapidaryStoneCompiler plus a light
 ## rig, dispatches the spectral path tracer, and finalizes through the GPU
 ## print pass (house print or raw display transform). Batch-ready: stones are
 ## ranges in shared buffers, instances sit on a pixel grid (1x1 = single stone).
 ##
+## Scatter field: when the rung policy sets `field_exits > 0`, the first
+## accumulate() after an orientation / rig change runs the scatter-field
+## pre-pass (gem_scatter_field.glsl): the in-scattered radiance of the volume
+## on a 3D grid as SH (l<=3) per spectral band. The trace kernel then reads
+## single scattering deterministically at every scatter event.
+##
 ## Requires a RenderingDevice-capable context (NOT --headless).
 
-const SHADER_PATH := "res://core/lapidary/tracer/shaders/gem_pathtrace.glsl"
-const PRINT_SHADER_PATH := "res://core/lapidary/tracer/shaders/gem_print.glsl"
-const PUSH_SIZE := 80
-const PRINT_PUSH_SIZE := 48
-const STONE_STRIDE_BYTES := 144
+const SHADER_DIR := "res://core/lapidary/tracer/shaders/"
+const SHADER_PATH := SHADER_DIR + "gem_pathtrace.glsl"
+const FIELD_SHADER_PATH := SHADER_DIR + "gem_scatter_field.glsl"
+const PRINT_SHADER_PATH := SHADER_DIR + "gem_print.glsl"
+const COMMON_PATH := SHADER_DIR + "gem_common.glsl"
+const INCLUDE_LINE := "#include \"gem_common.glsl\""
+const Colorimetry := preload("res://core/lapidary/lighting/colorimetry.gd")
+
+const PUSH_SIZE := 96
+const FIELD_PUSH_SIZE := 48
+## Adaptive dispatch target (ms per GPU submission); far below any OS watchdog.
+const DISPATCH_TARGET_MS := 120.0
+const MAX_CHUNK_SPP := 64
+const PRINT_PUSH_SIZE := 96
+const STONE_STRIDE_BYTES := 128
 const INST_STRIDE_BYTES := 64
+
+# Must match gem_common.glsl.
+const FIELD_BANDS := 16
+const FIELD_SLABS := FIELD_BANDS * 4
+const FIELD_TEXELS_PER_GROUP := 4  # gem_scatter_field.glsl TEXELS_PER_GROUP
+const MAX_LIGHTS := 8
+## 3D texture depth limit (Vulkan maxImageDimension3D floor) bounds grid * slabs.
+const FIELD_MAX_DEPTH := 2048
+## GPU memory budget for the scatter field of one configure (the grid is
+## coarsened until the instance set fits).
+const FIELD_BUDGET_BYTES := 160 * 1024 * 1024
 
 const FLAG_DISPERSION := 1
 const FLAG_BIREF := 2
-const FLAG_VOLUME_SHIFT := 2
+const FLAG_VOLUME := 4
 const FLAG_FLUOR := 16
 
 const STONE_FLAG_HAS_ERAY := 1
@@ -28,29 +55,41 @@ var width := 0
 var height := 0
 var samples_accumulated := 0
 var last_dispatch_ms := 0.0
+var last_field_ms := 0.0
+var debug_chunks := false
 
 var _rd: RenderingDevice
 var _owns_rd := false
-var _shader: RID
-var _pipeline: RID
-var _print_shader: RID
-var _print_pipeline: RID
+var _shaders: Dictionary = {}    # name -> RID
+var _pipelines: Dictionary = {}  # name -> RID
 var _bufs: Dictionary = {}
-var _uniform_set: RID
-var _print_set: RID
+var _sets: Dictionary = {}       # name -> uniform set RID
 var _print_tex: RID
+var _field_tex: RID
+var _field_sampler: RID
 
 var _plane_count_total := 0
 var _light_count := 0
+var _inst_count := 1
 var _spectral_norm := 0.0
-var _frame := 0
 var _seed := 1
 var _max_bounces := 32
 var _flags := 0
 var _grid := Vector2i.ONE
 var _cell := Vector2i.ZERO
-var _bg := Vector3(0.30, 0.16, 0.05)
+var _bg := Vector4(0.30, 0.16, 0.05, 0.0)  # zenith, horizon, below, kelvin (0 = flat)
+var _xyz_to_rgb := Colorimetry.xyz_to_srgb(0.0)  # print matrix incl. as-shot white balance
 var _rad_clamp := 48.0
+var _env_filter_rad := 0.06
+var _field_exits := 0
+var _field_grid := 16
+var _field_dirs := 2048
+var _field_dirty := true
+# Adaptive dispatch unit (see accumulate()).
+var _chunk_spp := 1
+var _chunk_rows := 8
+var _field_chunk := 2048  # texels per scatter-field dispatch (adaptive)
+var _lights_packed := PackedFloat32Array()
 # Cached single-instance state (grid 1x1 convenience path).
 var _inst_state := {
 	"quat": Quaternion.IDENTITY, "rig_yaw": 0.0, "ortho_half": 1.25,
@@ -75,17 +114,22 @@ static func create(p_width: int, p_height: int, rd: RenderingDevice = null) -> G
 	var zeros := PackedByteArray()
 	zeros.resize(p_width * p_height * 16)
 	t._bufs["accum"] = t._rd.storage_buffer_create(zeros.size(), zeros)
-	t._spectral_norm = (400.0 / 4.0) / _integral_ybar()
+	t._spectral_norm = (400.0 / 4.0) / Colorimetry.integral_ybar()
 	t._cell = Vector2i(p_width, p_height)
 	return t
 
 
 func _compile_shaders() -> bool:
-	for entry in [[SHADER_PATH, "trace"], [PRINT_SHADER_PATH, "print"]]:
+	var common := FileAccess.get_file_as_string(COMMON_PATH)
+	if common.is_empty():
+		push_error("GemTracer: cannot read %s" % COMMON_PATH)
+		return false
+	for entry in [[SHADER_PATH, "trace"], [FIELD_SHADER_PATH, "field"], [PRINT_SHADER_PATH, "print"]]:
 		var text := FileAccess.get_file_as_string(entry[0])
 		if text.is_empty():
 			push_error("GemTracer: cannot read %s" % entry[0])
 			return false
+		text = text.replace(INCLUDE_LINE, common)
 		var src := RDShaderSource.new()
 		src.source_compute = text
 		var spirv := _rd.shader_compile_spirv_from_source(src)
@@ -93,31 +137,17 @@ func _compile_shaders() -> bool:
 			push_error("GemTracer %s shader compile error:\n%s" % [entry[1], spirv.compile_error_compute])
 			return false
 		var shader := _rd.shader_create_from_spirv(spirv)
-		if entry[1] == "trace":
-			_shader = shader
-			_pipeline = _rd.compute_pipeline_create(shader)
-		else:
-			_print_shader = shader
-			_print_pipeline = _rd.compute_pipeline_create(shader)
+		_shaders[entry[1]] = shader
+		_pipelines[entry[1]] = _rd.compute_pipeline_create(shader)
 	return true
-
-
-static func _integral_ybar() -> float:
-	var total := 0.0
-	for i in 401:
-		var w := 380.0 + float(i)
-		var t1 := (w - 568.8) * (0.0213 if w < 568.8 else 0.0247)
-		var t2 := (w - 530.9) * (0.0613 if w < 530.9 else 0.0322)
-		total += 0.821 * exp(-0.5 * t1 * t1) + 0.286 * exp(-0.5 * t2 * t2)
-	return total
 
 
 # ------------------------------------------------------------------ configure
 
 ## Full-featured path: StoneInstance from LapidaryStoneCompiler + lights + rung policy.
-## policy keys (see GemRung.TABLE): max_bounces, dispersion, birefringence, volume.
-## Ingests the instance's own seed; background still comes from set_background
-## (it belongs to the rig, not the stone).
+## policy keys (see GemRung.TABLE): max_bounces, dispersion, birefringence, volume,
+## rad_clamp, env_filter_rad, field_exits, field_grid, field_dirs. Ingests the instance's own
+## seed; background / white balance come from set_environment (they belong to the rig).
 func configure_stone(instance: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
 	if instance.has("seed"):
 		_seed = int(instance["seed"])
@@ -127,9 +157,11 @@ func configure_stone(instance: Dictionary, lights: PackedFloat32Array, policy: D
 ## Multi-stone batch: instances laid out on a grid of equal cells (board atlas).
 func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dictionary, grid: Vector2i) -> void:
 	assert(not instances.is_empty() and lights.size() % 8 == 0)
+	assert(lights.size() / 8 <= MAX_LIGHTS, "GemTracer: rig exceeds %d lights" % MAX_LIGHTS)
 	_grid = grid
 	@warning_ignore("integer_division")
 	_cell = Vector2i(width / grid.x, height / grid.y)
+	_inst_count = grid.x * grid.y
 	_light_count = lights.size() / 8
 	_max_bounces = policy.get("max_bounces", 32)
 	_flags = 0
@@ -137,10 +169,23 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 		_flags |= FLAG_DISPERSION
 	if policy.get("birefringence", false):
 		_flags |= FLAG_BIREF
-	_flags |= (int(policy.get("volume", 1)) & 3) << FLAG_VOLUME_SHIFT
+	if policy.get("volume", true):
+		_flags |= FLAG_VOLUME
 	if policy.get("fluorescence", true):
 		_flags |= FLAG_FLUOR
 	_rad_clamp = policy.get("rad_clamp", 48.0)
+	_env_filter_rad = policy.get("env_filter_rad", 0.06)
+	_field_exits = clampi(policy.get("field_exits", 0), 0, 64)
+	@warning_ignore("integer_division")
+	_field_grid = clampi(policy.get("field_grid", 32), 4, FIELD_MAX_DEPTH / FIELD_SLABS)
+	_field_dirs = clampi(policy.get("field_dirs", 2048), 64, 16384)
+	while _field_exits > 0 and _field_grid > 6 and _field_bytes_for(_field_grid) > FIELD_BUDGET_BYTES:
+		_field_grid -= 2
+	_lights_packed = lights
+	# Kernel cost changed: restart the adaptive dispatch unit conservatively.
+	_chunk_spp = 1
+	_chunk_rows = mini(height, 64)
+	_field_chunk = 2048
 
 	var planes := PackedFloat32Array()
 	var prims := PackedFloat32Array()
@@ -176,40 +221,45 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	_bufs["stones"] = _rd.storage_buffer_create(stones.data_array.size(), stones.data_array)
 
 	var insts := StreamPeerBuffer.new()
-	for i in grid.x * grid.y:
+	for i in _inst_count:
 		_pack_inst(insts, Quaternion.IDENTITY, 0.0, 1.25, [1.0, 1.0, 1.0, 1.0], mini(i, instances.size() - 1))
 	_bufs["insts"] = _rd.storage_buffer_create(insts.data_array.size(), insts.data_array)
 
+	_create_field_texture()
 	_build_uniform_sets()
+	_field_dirty = true
 	reset_accumulation()
 
 
-## Compatibility path (spike-era API): single stone, no inclusions/wear.
-func configure(planes: PackedFloat32Array, lights: PackedFloat32Array, absorb: PackedFloat32Array, params: Dictionary) -> void:
-	var instance := {
-		"planes": planes,
-		"absorption": absorb,
-		"inclusions": PackedFloat32Array(),
-		"sellmeier_b": params.get("sellmeier_b", Vector3.ZERO),
-		"sellmeier_c": params.get("sellmeier_c", Vector3.ZERO),
-		"size_mm": params.get("size_mm", 3.0),
-		"seed": params.get("seed", 1),
-		"scatter": {"sigma_per_mm": 0.0, "g": 0.6},
-		"zoning": {"axis": Vector3(0, 0, 1), "frequency": 0.0, "contrast": 0.0, "phase": 0.0},
-		"wear": {"roughness_boost": 0.01, "scratch_density": 0.0, "scratch_aniso": 0.75,
-			"abrasion": 0.0, "dirt": 0.0, "edge_round": 0.008},
-		"birefringence": 0.0,
-		"optic_axis": Vector3(0, 0, 1),
-		"fluorescence": {"nm": 0.0, "strength": 0.0},
-		"dispersion_strong": false,
-		"absorb_scale": params.get("absorb_scale", 1.0),
-	}
-	_seed = params.get("seed", 1)
-	_bg = params.get("background", Vector3(0.30, 0.16, 0.05))
-	configure_stone(instance, lights, {"max_bounces": params.get("max_bounces", 32), "volume": 0})
-	_inst_state["quat"] = params.get("stone_quat", Quaternion.IDENTITY)
-	_inst_state["ortho_half"] = params.get("ortho_half", 1.25)
-	_push_inst_state()
+func _field_bytes_for(gn: int) -> int:
+	return _inst_count * gn * gn * gn * FIELD_SLABS * 8  # RGBA16F
+
+
+## Scatter field texture: x = instances stacked, y, z = FIELD_SLABS slabs of
+## grid_n. Written by the field pre-pass (image), read by the kernel (sampler).
+func _create_field_texture() -> void:
+	if _field_tex.is_valid():
+		_rd.free_rid(_field_tex)
+		_field_tex = RID()
+	var gn := _field_grid if _field_exits > 0 else 1
+	var fmt := RDTextureFormat.new()
+	fmt.texture_type = RenderingDevice.TEXTURE_TYPE_3D
+	fmt.width = gn * _inst_count
+	fmt.height = gn
+	fmt.depth = gn * FIELD_SLABS
+	fmt.format = RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT
+	fmt.usage_bits = RenderingDevice.TEXTURE_USAGE_STORAGE_BIT | RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT \
+		| RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT
+	_field_tex = _rd.texture_create(fmt, RDTextureView.new())
+	if not _field_sampler.is_valid():
+		var ss := RDSamplerState.new()
+		ss.min_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
+		ss.mag_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
+		ss.mip_filter = RenderingDevice.SAMPLER_FILTER_NEAREST
+		ss.repeat_u = RenderingDevice.SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE
+		ss.repeat_v = RenderingDevice.SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE
+		ss.repeat_w = RenderingDevice.SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE
+		_field_sampler = _rd.sampler_create(ss)
 
 
 func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
@@ -218,7 +268,6 @@ func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 	var sc: Vector3 = inst["sellmeier_c"]
 	var scat: Dictionary = inst.get("scatter", {})
 	var zon: Dictionary = inst.get("zoning", {})
-	var wear: Dictionary = inst.get("wear", {})
 	var fluor: Dictionary = inst.get("fluorescence", {})
 	var optic: Vector3 = inst.get("optic_axis", Vector3(0, 0, 1))
 	var zaxis: Vector3 = zon.get("axis", Vector3(0, 0, 1))
@@ -227,13 +276,11 @@ func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 			scat.get("sigma_per_mm", 0.0), scat.get("g", 0.6), zon.get("frequency", 0.0), zon.get("contrast", 0.0),
 			zaxis.x, zaxis.y, zaxis.z, zon.get("phase", 0.0),
 			optic.x, optic.y, optic.z, fluor.get("strength", 0.0),
-			wear.get("roughness_boost", 0.01), wear.get("scratch_density", 0.0),
-			wear.get("scratch_aniso", 0.75), wear.get("abrasion", 0.0),
-			wear.get("dirt", 0.0), wear.get("edge_round", 0.008),
-			fluor.get("nm", 0.0), inst.get("absorb_scale", 1.0)]:
+			fluor.get("nm", 0.0), inst.get("absorb_scale", 1.0), 0.0, 0.0]:
 		b.put_float(v)
 	for v: int in [p_off, p_cnt, i_off, i_cnt, a_off, stone_flags, 0, 0]:
 		b.put_32(v)
+	assert(b.data_array.size() % STONE_STRIDE_BYTES == 0)
 
 
 func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_half: float,
@@ -247,23 +294,28 @@ func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_hal
 
 
 func _build_uniform_sets() -> void:
+	# Binding order (gem_common.glsl): 0 planes, 1 lights, 2 absorb, 3 accum, 4 prims,
+	# 5 stones, 6 insts; 7 = scatter field (image in the pre-pass, sampler in the kernel).
 	var names := ["planes", "lights", "absorb", "accum", "prims", "stones", "insts"]
-	var uniforms: Array[RDUniform] = []
-	for i in names.size():
-		var u := RDUniform.new()
-		u.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
-		u.binding = i if i != 3 else 3
-		u.add_id(_bufs[names[i]])
-		uniforms.append(u)
-	# Binding order in shader: 0 planes, 1 lights, 2 absorb, 3 accum, 4 prims, 5 stones, 6 insts
-	uniforms[0].binding = 0
-	uniforms[1].binding = 1
-	uniforms[2].binding = 2
-	uniforms[3].binding = 3
-	uniforms[4].binding = 4
-	uniforms[5].binding = 5
-	uniforms[6].binding = 6
-	_uniform_set = _rd.uniform_set_create(uniforms, _shader, 0)
+	for shader_name in ["trace", "field"]:
+		var uniforms: Array[RDUniform] = []
+		for i in names.size():
+			var u := RDUniform.new()
+			u.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+			u.binding = i
+			u.add_id(_bufs[names[i]])
+			uniforms.append(u)
+		var f := RDUniform.new()
+		f.binding = 7
+		if shader_name == "field":
+			f.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
+			f.add_id(_field_tex)
+		else:
+			f.uniform_type = RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE
+			f.add_id(_field_sampler)
+			f.add_id(_field_tex)
+		uniforms.append(f)
+		_sets[shader_name] = _rd.uniform_set_create(uniforms, _shaders[shader_name], 0)
 
 	if not _print_tex.is_valid():
 		var fmt := RDTextureFormat.new()
@@ -280,7 +332,7 @@ func _build_uniform_sets() -> void:
 	pu1.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
 	pu1.binding = 1
 	pu1.add_id(_print_tex)
-	_print_set = _rd.uniform_set_create([pu0, pu1], _print_shader, 0)
+	_sets["print"] = _rd.uniform_set_create([pu0, pu1], _shaders["print"], 0)
 
 
 # ------------------------------------------------------------------ per-frame state
@@ -306,6 +358,7 @@ func _push_inst_state() -> void:
 	_pack_inst(b, _inst_state["quat"], _inst_state["rig_yaw"], _inst_state["ortho_half"],
 		_inst_state["role_mult"], _inst_state["stone_index"])
 	_rd.buffer_update(_bufs["insts"], 0, b.data_array.size(), b.data_array)
+	_field_dirty = true
 
 
 ## Board batch path: update every instance (array of {quat, rig_yaw, ortho_half, role_mult, stone_index}).
@@ -316,32 +369,121 @@ func set_instances(states: Array) -> void:
 		_pack_inst(b, s.get("quat", Quaternion.IDENTITY), s.get("rig_yaw", 0.0),
 			s.get("ortho_half", 1.25), [rm.x, rm.y, rm.z, rm.w], s.get("stone_index", 0))
 	_rd.buffer_update(_bufs["insts"], 0, b.data_array.size(), b.data_array)
+	_field_dirty = true
 
 
 func set_seed(s: int) -> void:
 	_seed = s
 
 
-func set_background(bg: Vector3) -> void:
-	_bg = bg
+## Rig environment from GemRigCompiler.environment(): "bg" Vector4 (zenith,
+## horizon, below, kelvin; 0 = flat spectrum) and "white_kelvin" (as-shot white
+## balance of the print; 0 = none).
+func set_environment(env: Dictionary) -> void:
+	_bg = env["bg"]
+	_xyz_to_rgb = Colorimetry.xyz_to_srgb(float(env.get("white_kelvin", 0.0)))
+	_field_dirty = true
 
-
-# ------------------------------------------------------------------ dispatch
 
 func reset_accumulation() -> void:
 	var zeros := PackedByteArray()
 	zeros.resize(width * height * 16)
 	_rd.buffer_update(_bufs["accum"], 0, zeros.size(), zeros)
 	samples_accumulated = 0
-	_frame = 0
 
 
+func _field_push(band_group: int, texel_base: int) -> PackedByteArray:
+	var pcb := StreamPeerBuffer.new()
+	for v: int in [_field_grid, _field_exits, _light_count, _inst_count, _field_dirs, band_group]:
+		pcb.put_32(v)
+	pcb.put_float(_env_filter_rad)
+	pcb.put_32(texel_base)
+	for v: float in [_bg.x, _bg.y, _bg.z, _bg.w]:
+		pcb.put_float(v)
+	assert(pcb.data_array.size() == FIELD_PUSH_SIZE)
+	return pcb.data_array
+
+
+## Rebuild the scatter field now (normally implicit in accumulate()). Work is
+## issued per 4 spectral bands x texel chunk, each its own submission, so no
+## dispatch approaches the OS GPU watchdog whatever the grid / dirs / exits
+## policy. Returns ms.
+func build_scatter_field() -> float:
+	if _field_exits <= 0:
+		_field_dirty = false
+		return 0.0
+	var t0 := Time.get_ticks_usec()
+	var texels := _inst_count * _field_grid * _field_grid * _field_grid
+	@warning_ignore("integer_division")
+	for band_group in FIELD_BANDS / 4:
+		var base := 0
+		while base < texels:
+			var n := mini(_field_chunk, texels - base)
+			var t1 := Time.get_ticks_usec()
+			var cl := _rd.compute_list_begin()
+			_rd.compute_list_bind_compute_pipeline(cl, _pipelines["field"])
+			_rd.compute_list_bind_uniform_set(cl, _sets["field"], 0)
+			_rd.compute_list_set_push_constant(cl, _field_push(band_group, base), FIELD_PUSH_SIZE)
+			@warning_ignore("integer_division")
+			_rd.compute_list_dispatch(cl, (n + FIELD_TEXELS_PER_GROUP - 1) / FIELD_TEXELS_PER_GROUP, 1, 1)
+			_rd.compute_list_end()
+			_rd.submit()
+			_rd.sync()
+			base += n
+			# Adapt the chunk toward DISPATCH_TARGET_MS (same watchdog policy as the kernel).
+			var ms := float(Time.get_ticks_usec() - t1) / 1000.0
+			if debug_chunks:
+				print("    field dispatch band %d texels %d -> %.1f ms" % [band_group, n, ms])
+			if n == _field_chunk:
+				if ms > DISPATCH_TARGET_MS * 1.6:
+					_field_chunk = maxi(FIELD_TEXELS_PER_GROUP * 64, _field_chunk / 2)
+				elif ms < DISPATCH_TARGET_MS * 0.4:
+					_field_chunk = mini(1 << 20, _field_chunk * 2)
+	_field_dirty = false
+	last_field_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	return last_field_ms
+
+
+## Accumulate `spp` more samples per pixel. TDR-safe: the work is issued as
+## (row band x spp chunk) dispatches whose size adapts to the measured kernel
+## cost (dense milk and inclusions make a path many times dearer than clean
+## optics), so no single dispatch approaches the OS GPU watchdog. Returns ms.
 func accumulate(spp: int) -> float:
+	if _field_dirty:
+		build_scatter_field()
+	var t0 := Time.get_ticks_usec()
+	var remaining := spp
+	while remaining > 0:
+		var spp_now := mini(_chunk_spp, remaining)
+		var row := 0
+		while row < height:
+			var rows_now := mini(_chunk_rows, height - row)
+			var ms := _dispatch_trace(row, rows_now, spp_now)
+			if debug_chunks:
+				print("    dispatch rows %d spp %d -> %.1f ms" % [rows_now, spp_now, ms])
+			if ms > DISPATCH_TARGET_MS * 1.6:
+				if _chunk_spp > 1:
+					_chunk_spp = maxi(1, _chunk_spp / 2)
+				else:
+					_chunk_rows = maxi(8, (_chunk_rows / 2 + 7) / 8 * 8)
+			elif ms < DISPATCH_TARGET_MS * 0.4:
+				if _chunk_rows < height:
+					_chunk_rows = mini(height, _chunk_rows * 2)
+				else:
+					_chunk_spp = mini(MAX_CHUNK_SPP, _chunk_spp * 2)
+			row += rows_now
+		samples_accumulated += spp_now
+		remaining -= spp_now
+	last_dispatch_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	return last_dispatch_ms
+
+
+func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
 	var pcb := StreamPeerBuffer.new()
 	pcb.put_32(width)
 	pcb.put_32(height)
-	pcb.put_u32(_frame)
-	pcb.put_u32(spp)
+	pcb.put_u32(samples_accumulated)
+	pcb.put_u32(spp_now)
 	pcb.put_u32(_seed)
 	pcb.put_u32(_max_bounces)
 	pcb.put_u32(_flags)
@@ -355,30 +497,31 @@ func accumulate(spp: int) -> float:
 	pcb.put_float(_bg.z)
 	pcb.put_float(_spectral_norm)
 	pcb.put_float(_rad_clamp)
-	pcb.put_float(0.0)
-	pcb.put_float(0.0)
-	pcb.put_float(0.0)
+	pcb.put_float(_env_filter_rad)
+	pcb.put_32(_field_exits)
+	pcb.put_32(_field_grid)
+	pcb.put_32(row_origin)
+	pcb.put_32(_inst_count)
+	pcb.put_float(_bg.w)
+	pcb.put_32(0)
 	assert(pcb.data_array.size() == PUSH_SIZE)
 
 	var t0 := Time.get_ticks_usec()
 	var cl := _rd.compute_list_begin()
-	_rd.compute_list_bind_compute_pipeline(cl, _pipeline)
-	_rd.compute_list_bind_uniform_set(cl, _uniform_set, 0)
+	_rd.compute_list_bind_compute_pipeline(cl, _pipelines["trace"])
+	_rd.compute_list_bind_uniform_set(cl, _sets["trace"], 0)
 	_rd.compute_list_set_push_constant(cl, pcb.data_array, PUSH_SIZE)
 	@warning_ignore("integer_division")
-	_rd.compute_list_dispatch(cl, (width + 7) / 8, (height + 7) / 8, 1)
+	_rd.compute_list_dispatch(cl, (width + 7) / 8, (rows + 7) / 8, 1)
 	_rd.compute_list_end()
 	_rd.submit()
 	_rd.sync()
-	last_dispatch_ms = float(Time.get_ticks_usec() - t0) / 1000.0
-	samples_accumulated += spp
-	_frame += 1
-	return last_dispatch_ms
+	return float(Time.get_ticks_usec() - t0) / 1000.0
 
 
 # ------------------------------------------------------------------ output
 
-## GPU print pass. print_res == null uses neutral defaults; raw bypasses the house print.
+## GPU print pass. print_res is required for house print; raw bypasses mastering.
 func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0) -> Image:
 	var pcb := StreamPeerBuffer.new()
 	pcb.put_32(width)
@@ -393,11 +536,15 @@ func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0) -
 	pcb.put_float(print_res.chroma_soft if print_res != null else 0.1)
 	pcb.put_float(print_res.highlight_desat if print_res != null else 0.0)
 	pcb.put_float(0.0)
+	# XYZ -> linear sRGB with the rig's as-shot white balance, as mat3 columns.
+	for col: Vector3 in [_xyz_to_rgb.x, _xyz_to_rgb.y, _xyz_to_rgb.z]:
+		for v: float in [col.x, col.y, col.z, 0.0]:
+			pcb.put_float(v)
 	assert(pcb.data_array.size() == PRINT_PUSH_SIZE)
 
 	var cl := _rd.compute_list_begin()
-	_rd.compute_list_bind_compute_pipeline(cl, _print_pipeline)
-	_rd.compute_list_bind_uniform_set(cl, _print_set, 0)
+	_rd.compute_list_bind_compute_pipeline(cl, _pipelines["print"])
+	_rd.compute_list_bind_uniform_set(cl, _sets["print"], 0)
 	_rd.compute_list_set_push_constant(cl, pcb.data_array, PRINT_PUSH_SIZE)
 	@warning_ignore("integer_division")
 	_rd.compute_list_dispatch(cl, (width + 7) / 8, (height + 7) / 8, 1)
@@ -417,30 +564,17 @@ func read_xyz() -> PackedFloat32Array:
 	return raw
 
 
-## CPU finalize (compat; prefer finalize_print).
-func finalize_image(exposure := 1.0) -> Image:
-	var data := read_xyz()
-	var bytes := PackedByteArray()
-	bytes.resize(width * height * 4)
-	for i in width * height:
-		var x := data[i * 4 + 0]
-		var y := data[i * 4 + 1]
-		var z := data[i * 4 + 2]
-		var cov := clampf(data[i * 4 + 3], 0.0, 1.0)
-		var r := (3.2406 * x - 1.5372 * y - 0.4986 * z) * exposure
-		var g := (-0.9689 * x + 1.8758 * y + 0.0415 * z) * exposure
-		var bl := (0.0557 * x - 0.2040 * y + 1.0570 * z) * exposure
-		r = maxf(0.0, r)
-		g = maxf(0.0, g)
-		bl = maxf(0.0, bl)
-		r = r / (1.0 + r)
-		g = g / (1.0 + g)
-		bl = bl / (1.0 + bl)
-		bytes[i * 4 + 0] = int(clampf(pow(r, 1.0 / 2.2), 0.0, 1.0) * 255.0)
-		bytes[i * 4 + 1] = int(clampf(pow(g, 1.0 / 2.2), 0.0, 1.0) * 255.0)
-		bytes[i * 4 + 2] = int(clampf(pow(bl, 1.0 / 2.2), 0.0, 1.0) * 255.0)
-		bytes[i * 4 + 3] = int(cov * 255.0)
-	return Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, bytes)
+## Raw scatter-field texel data (RGBA16F), for tools that inspect the field.
+func debug_field_bytes() -> PackedByteArray:
+	if not _field_tex.is_valid():
+		return PackedByteArray()
+	return _rd.texture_get_data(_field_tex, 0)
+
+
+## Scatter-field configuration in effect (diagnostics).
+func field_info() -> Dictionary:
+	return {"exits": _field_exits, "grid": _field_grid, "dirs": _field_dirs,
+		"bytes": _field_bytes_for(_field_grid) if _field_exits > 0 else 0, "build_ms": last_field_ms}
 
 
 # ------------------------------------------------------------------ cleanup
@@ -454,10 +588,15 @@ func _free_scene_buffers() -> void:
 
 func release() -> void:
 	_free_scene_buffers()
-	for rid in [_bufs.get("accum", RID()), _print_tex, _pipeline, _shader, _print_pipeline, _print_shader]:
+	var rids: Array = [_bufs.get("accum", RID()), _print_tex, _field_tex, _field_sampler]
+	rids.append_array(_pipelines.values())
+	rids.append_array(_shaders.values())
+	for rid in rids:
 		if rid is RID and rid.is_valid():
 			_rd.free_rid(rid)
 	_bufs.clear()
+	_pipelines.clear()
+	_shaders.clear()
 	if _owns_rd and _rd != null:
 		_rd.free()
 		_rd = null

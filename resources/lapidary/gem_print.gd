@@ -4,17 +4,23 @@ extends Resource
 ## (baked clips AND live draws — same print). It is not the gem, not the
 ## grade, not the lighting. Grade cues must survive it; the evaluation
 ## harness A/Bs raw vs print on every sheet.
+##
+## Sprite readability policies (edge rounding, env filter) live on GemRung,
+## not here. Bloom is not implemented — do not author bloom_* fields.
+
+const HOUSE_PATH := "res://data/lapidary/print/house_print.tres"
 
 @export var print_version := 1
 
 @export_group("Tone")
 @export var exposure := 1.0
-## Sprite tonescale: toe lift keeps board black-point readable,
-## shoulder rolls highlights off without bleaching absorption color.
-@export var toe := 0.02
+## Hue-preserving sprite tonescale (max-RGB extended Reinhard): the shoulder
+## rolls highlights off without bleaching absorption colour; contrast is
+## applied about mid-grey. black_point is an optional board floor (0 = none;
+## any lift reads as "brightness turned up in post").
 @export var shoulder_strength := 0.85
 @export var contrast := 1.05
-@export var black_point := 0.012
+@export var black_point := 0.0
 
 @export_group("Chroma")
 ## OKLCh-space chroma ceiling with soft rolloff (forbidden-neon governor).
@@ -23,22 +29,19 @@ extends Resource
 ## Desaturate only where luminance clips (keeps fire from going white mush).
 @export var highlight_desat := 0.35
 
-@export_group("Print bloom")
-## Micro-bloom as PRINT (readability at 112px), never as fake brilliance.
-@export var bloom_threshold := 0.80
-@export var bloom_strength := 0.12
-@export var bloom_radius_px := 2.0
-
-@export_group("House policies (reach back into tracer config; versioned here)")
-## Roughness floor at sprite rungs so polish never aliases into single-pixel fireflies.
-@export var sprite_roughness_floor := 0.015
-## Minimum key angular radius (deg) so facet gradients survive 112px.
-@export var key_angular_floor_deg := 10.0
-
 @export_group("Exceptions")
 ## Rare, justified per-family deltas: [{selector:String, deltas:Dictionary, reason:String}].
 ## Empty reason = validation failure. Kept as data here, never as per-stone knobs.
 @export var exceptions: Array[Dictionary] = []
+
+
+## Authoritative house print. Hard-fails if the resource is missing.
+static func load_house() -> GemPrint:
+	assert(ResourceLoader.exists(HOUSE_PATH),
+		"GemPrint.load_house: missing %s — author data/lapidary/print/house_print.tres" % HOUSE_PATH)
+	var p := load(HOUSE_PATH) as GemPrint
+	assert(p != null, "GemPrint.load_house: failed to load %s" % HOUSE_PATH)
+	return p
 
 
 func validate() -> PackedStringArray:

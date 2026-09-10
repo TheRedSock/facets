@@ -2,7 +2,7 @@ class_name GemManifest
 extends RefCounted
 ## Build catalog: the exact stone x clip x rung list with priority classes.
 ## REQUIRED_NOW = idles for the run's tile set (block-ish: placeholder covers
-## the gap), SOON = presentation clips (turn, flash), LATER = everything else.
+## the gap), SOON = upgrade spin (turn), LATER = flash (not the merge beat).
 ## Data lives in data/lapidary/manifest.json; this class owns the ordering and
 ## filtering logic the launcher and the packaging CLI share.
 

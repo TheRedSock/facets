@@ -14,7 +14,7 @@ const STONES_DIR := "res://data/lapidary/stones"
 const RIG_GAMEPLAY_PATH := "res://data/lapidary/rigs/gameplay_studio.tres"
 const RIG_REFERENCE_PATH := "res://data/lapidary/rigs/reference_daylight.tres"
 const ORTHO_HALF := 1.3
-const EXPOSURE := 1.6
+const EXPOSURE := 1.0  # the rig lights the stone; the house print is the only exposure knob
 ## Ladder display order for the contact sheet; unknown ids append after.
 const LADDER := ["quartz", "amethyst", "peridot", "topaz", "sapphire", "emerald", "ruby", "diamond"]
 ## HERO cost projection from the measured PREVIEW tiles:
@@ -85,7 +85,7 @@ func _sheet_contact() -> void:
 		var ms := _render(tracer, entry["instance"], entry["seed"], _rig_gameplay,
 			policy, 64, int(policy["batch"]))
 		raw_tiles.append({"image": tracer.finalize_print(null, true, EXPOSURE), "label": entry["name"]})
-		print_tiles.append({"image": tracer.finalize_print(GemPrint.new(), false, EXPOSURE), "label": entry["name"]})
+		print_tiles.append({"image": tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE), "label": entry["name"]})
 		print("  contact %-16s %7.1f ms" % [entry["name"], ms])
 	tracer.release()
 	_contact_count = stones.size()
@@ -118,7 +118,7 @@ func _sheet_grade() -> void:
 			stone.grade = _axis_grade(axis, stop)
 			var instance := LapidaryStoneCompiler.compile(stone)
 			row_ms += _render(tracer, instance, stone.seed, _rig_gameplay, policy, 48, int(policy["batch"]))
-			tiles.append({"image": tracer.finalize_print(GemPrint.new(), false, EXPOSURE),
+			tiles.append({"image": tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE),
 				"label": "%s %.2f" % [axis, stop]})
 		print("  grade row %-8s %7.1f ms" % [axis, row_ms])
 	tracer.release()
@@ -147,10 +147,10 @@ func _sheet_lighting() -> void:
 		var stone: GemStone = s[1]
 		var instance := LapidaryStoneCompiler.compile(stone)
 		for r: Array in rigs:
-			var policy := {"max_bounces": 32, "volume": 2, "dispersion": s[0] == "DIAMOND"}
+			var policy := {"max_bounces": 32, "volume": true, "dispersion": s[0] == "DIAMOND"}
 			var ms := _render(tracer, instance, stone.seed, r[1], policy, 64, 16)
 			tiles.append({"image": tracer.finalize_print(null, true, EXPOSURE), "label": ""})
-			tiles.append({"image": tracer.finalize_print(GemPrint.new(), false, EXPOSURE), "label": ""})
+			tiles.append({"image": tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE), "label": ""})
 			print("  lighting %-8s @ %-9s %7.1f ms" % [s[0], r[0], ms])
 	tracer.release()
 	var cols: Array = []
@@ -195,13 +195,13 @@ func _sheet_rungs() -> void:
 		for sd: Array in stone_defs:
 			var stone: GemStone = sd[1]
 			var inst: Dictionary = instances[sd[0]]
-			var stone_policy: Dictionary = GemRung.policy(rung, GemRung.scatter_noisy(inst))
+			var stone_policy: Dictionary = GemRung.policy(rung)
 			var stone_spp := _hero_spp if rung == GemRung.HERO else int(stone_policy["spp"])
 			var ms := _render(tracer, inst, stone.seed, _rig_gameplay,
 				stone_policy, stone_spp, int(stone_policy["batch"]))
 			if rung == GemRung.PREVIEW:
 				preview_ms_sum += ms
-			var img := tracer.finalize_print(GemPrint.new(), false, EXPOSURE)
+			var img := tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE)
 			if img.get_width() != 224:
 				img.resize(224, 224, Image.INTERPOLATE_NEAREST)
 			tile_by_key["%s|%d" % [sd[0], rung]] = {
@@ -241,7 +241,7 @@ func _measure_timings() -> void:
 	var stone := _ruby_fine()
 	var instance := LapidaryStoneCompiler.compile(stone)
 	var lights := GemRigCompiler.pack(_rig_gameplay)
-	var bg := GemRigCompiler.background(_rig_gameplay)
+	var bg := GemRigCompiler.environment(_rig_gameplay)
 	var by_rung := {}
 	for rung: int in [GemRung.INTERACT, GemRung.PREVIEW, GemRung.BOARD_LIVE, GemRung.CLIP_BAKE, GemRung.HERO]:
 		var policy: Dictionary = GemRung.policy(rung)
@@ -253,7 +253,7 @@ func _measure_timings() -> void:
 			_fail("timings: no RenderingDevice")
 			return
 		tracer.set_seed(stone.seed)
-		tracer.set_background(bg)
+		tracer.set_environment(bg)
 		tracer.configure_stone(instance, lights, policy)
 		tracer.set_clip_sample(_face_up, 0.0, Vector4.ONE, ORTHO_HALF)
 		var probe_ms := tracer.accumulate(1)
@@ -285,7 +285,7 @@ func _measure_timings() -> void:
 		if tracer == null:
 			_fail("timings: no RenderingDevice (grid %d)" % grid_n)
 			return
-		tracer.set_background(bg)
+		tracer.set_environment(bg)
 		tracer.configure_stones(instances, lights, policy_bl, Vector2i(grid_n, grid_n))
 		var states: Array = []
 		for i in count:
@@ -391,7 +391,7 @@ func _summary_lines() -> PackedStringArray:
 func _render(tracer: GemTracer, instance: Dictionary, stone_seed: int, rig: GemLightRig,
 		policy: Dictionary, spp: int, batch: int) -> float:
 	tracer.set_seed(stone_seed)
-	tracer.set_background(GemRigCompiler.background(rig))
+	tracer.set_environment(GemRigCompiler.environment(rig))
 	tracer.configure_stone(instance, GemRigCompiler.pack(rig), policy)
 	tracer.set_clip_sample(_face_up, 0.0, Vector4.ONE, ORTHO_HALF)
 	var ms := tracer.accumulate(1)

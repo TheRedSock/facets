@@ -5,7 +5,8 @@ extends SceneTree
 ##
 ## Battery: 8 silhouettes x brilliant x quality {0.15, 0.6, 1.0} plus
 ## {square, rectangle} x step x same qualities. Asserts: bounded hull, sane
-## plane count, non-empty convex outline, solved pavilion angle within 0.5 deg
+## plane count, convex outline (rounded k-gon: k flats + symmetric corner
+## arcs at q=1; X-mirror for smooth silhouettes), solved pavilion angle within 0.5 deg
 ## of LapidaryStoneCompiler.solve_pavilion_deg, exact regularity at q = 1
 ## (zero jitter), determinism (same seed -> identical output; different seed
 ## -> different jitter), and zero compiler warnings. Planes with exactly-empty
@@ -14,6 +15,7 @@ extends SceneTree
 ## drop at tips (knife-edge) while the 2D outline keeps every girdle line.
 
 const CutCompiler := preload("res://core/lapidary/cut/cut_compiler.gd")
+const SilhouetteLib := preload("res://core/lapidary/cut/silhouettes.gd")
 const StoneCompilerScript := preload("res://core/lapidary/stone_compiler.gd")
 
 const IOR := 1.76
@@ -67,14 +69,16 @@ func _exercise(template: Resource, template_name: String, silhouette: StringName
 
 	if planes.is_empty() or planes.size() % 8 != 0:
 		fails.append("planes empty/malformed")
-	if plane_count < 20 or plane_count > 140:
-		fails.append("plane count %d out of [20, 140]" % plane_count)
+	if plane_count < 16 or plane_count > 140:
+		fails.append("plane count %d out of [16, 140]" % plane_count)
 	if not _is_bounded(planes):
 		fails.append("hull unbounded")
-	if outline.size() < 8:
+	if outline.size() < 3:
 		fails.append("outline too small (%d)" % outline.size())
 	elif not _is_convex(outline):
 		fails.append("outline not convex")
+	if is_equal_approx(q, 1.0):
+		_check_silhouette_outline(silhouette, outline, fails)
 	if not result.get("warnings", PackedStringArray()).is_empty():
 		fails.append("compiler warnings: %s" % ", ".join(result["warnings"]))
 
@@ -87,8 +91,8 @@ func _exercise(template: Resource, template_name: String, silhouette: StringName
 	# but a recognizable girdle band must survive. Outline fidelity is gated
 	# separately (outline keeps all girdle lines regardless of pruning).
 	var girdle_count: int = zones.get(3, 0)
-	if girdle_count < 6 or girdle_count > 48:
-		fails.append("girdle count %d out of [6, 48]" % girdle_count)
+	if girdle_count < 3 or girdle_count > 48:
+		fails.append("girdle count %d out of [3, 48]" % girdle_count)
 
 	# Solved pavilion angle vs the solver law.
 	var solved: float = StoneCompilerScript.solve_pavilion_deg(IOR, q)
@@ -166,6 +170,73 @@ func _is_convex(outline: PackedVector2Array) -> bool:
 		if e0.length() < 1.0e-9 or e1.length() < 1.0e-9:
 			continue
 		if e0.normalized().cross(e1.normalized()) < -1.0e-4:
+			return false
+	return true
+
+
+## q=1 polygon outlines: k long flats plus symmetric Minkowski corner arcs.
+## Smooth silhouettes are mirror-symmetric across X (half-offset support ring).
+func _check_silhouette_outline(silhouette: StringName, outline: PackedVector2Array,
+		fails: PackedStringArray) -> void:
+	match silhouette:
+		&"square", &"rectangle":
+			var expect := 4 * (1 + SilhouetteLib.CORNER_ARC_SAMPLES)
+			if outline.size() != expect:
+				fails.append("%s outline %d verts, expected %d (4 edges + arcs)" % [
+					silhouette, outline.size(), expect])
+				return
+			if _count_long_axis_flats(outline) != 4:
+				fails.append("%s missing 4 long axis-aligned flats" % silhouette)
+			if not _mirror_x(outline) or not _mirror_y(outline):
+				fails.append("%s outline is not axis-mirror symmetric" % silhouette)
+		&"diamond":
+			var expect := 4 * (1 + SilhouetteLib.CORNER_ARC_SAMPLES)
+			if outline.size() != expect:
+				fails.append("diamond outline %d verts, expected %d" % [outline.size(), expect])
+				return
+			if not _mirror_x(outline) or not _mirror_y(outline):
+				fails.append("diamond outline is not axis-mirror symmetric")
+		&"triangle":
+			var expect := 3 * (1 + SilhouetteLib.CORNER_ARC_SAMPLES)
+			if outline.size() != expect:
+				fails.append("triangle outline %d verts, expected %d" % [outline.size(), expect])
+			elif not _mirror_x(outline):
+				fails.append("triangle outline is not mirror-symmetric across X")
+		&"pear", &"oval", &"marquise", &"round":
+			if not _mirror_x(outline):
+				fails.append("%s outline is not mirror-symmetric across X" % silhouette)
+
+
+func _count_long_axis_flats(outline: PackedVector2Array) -> int:
+	var n := outline.size()
+	var flats := 0
+	for i in n:
+		var a := outline[i]
+		var b := outline[(i + 1) % n]
+		if a.distance_to(b) < 0.25:
+			continue
+		if absf(a.x - b.x) < 1.0e-3 or absf(a.y - b.y) < 1.0e-3:
+			flats += 1
+	return flats
+
+
+func _mirror_x(outline: PackedVector2Array) -> bool:
+	return _has_mirrors(outline, true, false)
+
+
+func _mirror_y(outline: PackedVector2Array) -> bool:
+	return _has_mirrors(outline, false, true)
+
+
+func _has_mirrors(outline: PackedVector2Array, flip_y: bool, flip_x: bool) -> bool:
+	for p in outline:
+		var want := Vector2(-p.x if flip_x else p.x, -p.y if flip_y else p.y)
+		var found := false
+		for q in outline:
+			if q.distance_to(want) < 0.02:
+				found = true
+				break
+		if not found:
 			return false
 	return true
 

@@ -12,9 +12,12 @@ extends Resource
 ## 3-term Sellmeier, ordinary ray: n^2 - 1 = sum B_i * L^2 / (L^2 - C_i), L in micrometers.
 @export var sellmeier_b := Vector3.ZERO
 @export var sellmeier_c_um2 := Vector3.ZERO
-## Birefringence delta-n at 589 nm (0 for cubic minerals).
+## Birefringence |delta-n| at 589 nm (0 for cubic minerals). Sign from uniaxial_positive.
 @export var birefringence := 0.0
 @export var uniaxial_positive := true
+## Optic axis in stone space (girdle plane z=0, crown +Z). Corundum cutters
+## typically set the table perpendicular to c; tourmaline parallel to c.
+@export var optic_axis_stone := Vector3(0.0, 0.0, 1.0)
 
 @export_group("Pure crystal volume")
 ## Scatter of the flawless crystal (usually ~0; milkiness comes from grade).

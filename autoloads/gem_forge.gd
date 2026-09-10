@@ -15,7 +15,6 @@ signal clip_ready(tile_id: StringName, clip_id: StringName)
 
 const STONES_DIR := "res://data/lapidary/stones/"
 const CLIPS_DIR := "res://data/lapidary/clips/"
-## Designed rig from the lighting workstream; placeholder until it lands.
 const RIG_PATH := "res://data/lapidary/rigs/gameplay_studio.tres"
 
 var _manifest: GemManifest = null
@@ -127,7 +126,7 @@ func get_placeholder_still(tile_id: StringName) -> ImageTexture:
 	if tracer == null:
 		return null
 	var baked := GemClipBaker.bake(stone, clip, GemRung.INTERACT,
-		_active_rig_lights(), _active_rig_background(), tracer)
+		_active_rig_lights(), _active_rig_environment(), tracer)
 	if baked.is_empty():
 		return null
 	var tex := ImageTexture.create_from_image((baked["frames"] as Array)[0])
@@ -151,14 +150,14 @@ func _process(_delta: float) -> void:
 func _begin_job(item: Dictionary) -> Dictionary:
 	var stone: GemStone = item["stone"]
 	var instance := LapidaryStoneCompiler.compile(stone)
-	var policy := GemRung.policy(item["rung"], GemRung.scatter_noisy(instance))
+	var policy := GemRung.policy(item["rung"])
 	var tracer := _tracer_for(int(policy["res"]))
 	if tracer == null:
 		_abort_queue()
 		return {}
 	tracer.configure_stone(instance, _active_rig_lights(), policy)
 	tracer.set_seed(int(instance["seed"]))
-	tracer.set_background(_active_rig_background())
+	tracer.set_environment(_active_rig_environment())
 
 	var job := item.duplicate()
 	job["policy"] = policy
@@ -319,21 +318,16 @@ func _headless() -> bool:
 
 # ------------------------------------------------------------------ lighting rig
 
-## PLACEHOLDER — the lighting workstream replaces this hookup. Prefers the
-## designed rig resource when it exists; falls back to the spike light set
-## (GemClipBaker.placeholder_rig_lights).
+func _load_rig() -> GemLightRig:
+	assert(ResourceLoader.exists(RIG_PATH), "GemForge: missing lighting rig %s" % RIG_PATH)
+	var rig := load(RIG_PATH) as GemLightRig
+	assert(rig != null and not rig.lights.is_empty(), "GemForge: rig unloadable or empty")
+	return rig
+
+
 func _active_rig_lights() -> PackedFloat32Array:
-	if ResourceLoader.exists(RIG_PATH):
-		var rig := load(RIG_PATH) as GemLightRig
-		if rig != null and not rig.lights.is_empty():
-			return GemClipBaker.pack_rig_lights(rig)
-	return GemClipBaker.placeholder_rig_lights()
+	return GemRigCompiler.pack(_load_rig())
 
 
-## PLACEHOLDER — background gradient companion to _active_rig_lights().
-func _active_rig_background() -> Vector3:
-	if ResourceLoader.exists(RIG_PATH):
-		var rig := load(RIG_PATH) as GemLightRig
-		if rig != null:
-			return Vector3(rig.bg_zenith, rig.bg_horizon, rig.bg_below)
-	return GemClipBaker.placeholder_rig_background()
+func _active_rig_environment() -> Dictionary:
+	return GemRigCompiler.environment(_load_rig())

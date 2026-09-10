@@ -7,23 +7,23 @@ extends RefCounted
 ##   - Long axis along +X (oval, diamond, rectangle, marquise, pear).
 ##   - Pear points toward +X; triangle has a vertex at +X.
 ##   - All outlines are CONVEX by construction:
-##       circle/ellipse, superellipse (n >= 2), Minkowski-rounded regular
-##       polygons, vesica (disc intersection), disc+point convex hull.
+##       circle/ellipse, Minkowski-rounded regular polygons (square / triangle
+##       / diamond / rectangle), vesica, disc+point convex hull.
+##   - Polygon girdles: k exact edge planes plus a symmetric fan of support
+##     planes on each corner arc. Flats stay flat; rounding is the same at
+##     every corner. The old curvature walk broke 4-fold symmetry and read as
+##     wobble. Girdle-unevenness jitter applies to the k edges only, never the
+##     corner arcs.
+##   - Smooth girdles: 32 support planes on a half-offset normal ring.
 ##   - `sectors` is the gameplay symmetry count used to anchor facet rows.
 ##     Profiles are oriented so multiples of TAU/sectors land on silhouette
 ##     features (vertices / edge centers) where the shape has them.
 
 const SUPERSAMPLE := 720
-const GIRDLE_MIN := 16
-const GIRDLE_MAX := 44
-const FAN_MAX := 10
-## Share of the sampling measure distributed uniformly in theta (the rest
-## follows turning angle, i.e. curvature mass).
-const UNIFORM_MEASURE_SHARE := 0.35
-## Minimum normal-angle gap between girdle planes (~6 deg). Near-parallel
-## tangent planes on flat silhouette segments are redundant and make the
-## outline fragile under girdle unevenness jitter.
-const MIN_NORMAL_GAP_RAD := 0.1047
+const GIRDLE_SMOOTH := 32
+## Support planes per rounded corner, not counting the two adjoining edges.
+## 4 samples over 90 deg ≈ 18 deg — smooth at 112px, still 4-fold symmetric.
+const CORNER_ARC_SAMPLES := 4
 
 const KINDS: Array[StringName] = [
 	&"round", &"square", &"triangle", &"oval",
@@ -34,13 +34,10 @@ const KINDS: Array[StringName] = [
 class Silhouette:
 	var kind: StringName = &"round"
 	var sectors: int = 8
-	# Rounded regular polygon (square / triangle / diamond).
+	# Rounded regular polygon (square / triangle / diamond / rectangle).
 	var poly_k: int = 0
 	var poly_phase: float = 0.0
 	var corner_r: float = 0.0
-	# Superellipse (rectangle).
-	var exponent: float = 4.0
-	var semi_b: float = 1.0
 	# Ellipse (oval).
 	var ellipse_b: float = 1.0
 	# Vesica lens (marquise): two discs radius ves_r centered (0, ±ves_c).
@@ -108,12 +105,8 @@ class Silhouette:
 				var c := cos(theta)
 				var s := sin(theta)
 				return ellipse_b / sqrt(ellipse_b * ellipse_b * c * c + s * s)
-			&"square", &"triangle", &"diamond":
+			&"square", &"triangle", &"diamond", &"rectangle":
 				return _rounded_polygon_radius(theta)
-			&"rectangle":
-				var cn := pow(absf(cos(theta)), exponent)
-				var sn := pow(absf(sin(theta)) / semi_b, exponent)
-				return pow(cn + sn, -1.0 / exponent)
 			&"marquise":
 				var c := cos(theta)
 				return -ves_c * absf(sin(theta)) + sqrt(ves_r * ves_r - ves_c * ves_c * c * c)
@@ -177,8 +170,11 @@ static func make(kind: StringName) -> Silhouette:
 			s.corner_r = 0.07
 			s.scale_y = 1.0 / 1.3
 		&"rectangle":
-			s.exponent = 5.0
-			s.semi_b = 1.0 / 1.35
+			# Emerald-cut outline: elongated rounded rectangle, exact flats.
+			s.poly_k = 4
+			s.poly_phase = PI / 4.0
+			s.corner_r = 0.10
+			s.scale_y = 1.0 / 1.35
 		&"marquise":
 			# Vesica lens, points at +-X, aspect ~1.8.
 			var w := 1.0 / 1.8
@@ -200,85 +196,64 @@ static func make(kind: StringName) -> Silhouette:
 	return s
 
 
-## Sample the silhouette into girdle supports: {"points": PackedVector2Array,
-## "normals": PackedVector2Array}, azimuth-ordered. Each support is a tangent
-## contact for one vertical girdle plane. The plane count adapts to curvature
-## concentration (16 for a circle, up to GIRDLE_MAX for pointed shapes) and
-## the distribution follows turning angle, with explicit fans at tangent
-## discontinuities (marquise / pear tips).
+## Sample the silhouette into girdle supports: {points, normals, jitter}.
+## `jitter` is a 0/1 mask: 1 = this plane may take girdle-unevenness; 0 =
+## corner-arc planes that must stay symmetric. Smooth rings jitter every plane.
+##
+## Polygon kinds: k exact edge supports plus CORNER_ARC_SAMPLES arc supports
+## per vertex (equal steps in the exterior angle). Smooth kinds: GIRDLE_SMOOTH
+## normals, half-step offset so a vertex does not land on an axis of symmetry.
 static func girdle_supports(sil: Silhouette) -> Dictionary:
-	var m := SUPERSAMPLE
-	var pts := sil._pts
-	var seg_n := PackedVector2Array()
-	seg_n.resize(m)
-	for i in m:
-		var t := pts[(i + 1) % m] - pts[i]
-		seg_n[i] = Vector2(t.y, -t.x).normalized()
-	var turn := PackedFloat32Array()
-	turn.resize(m)
-	var sum_t := 0.0
-	var sum_t2 := 0.0
-	for i in m:
-		var a := seg_n[(i - 1 + m) % m]
-		var b := seg_n[i]
-		var ang := absf(atan2(a.cross(b), a.dot(b)))
-		turn[i] = ang
-		sum_t += ang
-		sum_t2 += ang * ang
-	# Effective corner count (inverse participation ratio): SUPERSAMPLE for a
-	# circle, ~feature count for pointed shapes. Drives the plane budget.
-	var ipr := sum_t * sum_t / maxf(sum_t2, 1.0e-12)
-	var concentration := clampf(1.0 - ipr / float(m), 0.0, 1.0)
-	var target := clampi(int(roundf(16.0 + 24.0 * concentration)), GIRDLE_MIN, GIRDLE_MAX)
+	if sil.poly_k >= 3:
+		return _polygon_supports(sil)
+	return _support_ring(sil, GIRDLE_SMOOTH, true)
 
-	var uniform_step := UNIFORM_MEASURE_SHARE * sum_t / float(m)
-	var quota := sum_t * (1.0 + UNIFORM_MEASURE_SHARE) / float(target)
+
+static func _polygon_supports(sil: Silhouette) -> Dictionary:
 	var out_p := PackedVector2Array()
 	var out_n := PackedVector2Array()
-	var cum := quota * 0.5
-	for i in m:
-		if turn[i] > quota * 1.5:
-			# Tangent discontinuity: fan planes across the corner, all
-			# touching the corner point (a polyhedral tip, no truncation).
-			# Fan spacing respects MIN_NORMAL_GAP_RAD so no plane gets deduped.
-			var fan := clampi(int(ceilf(turn[i] / quota)), 2, FAN_MAX)
-			fan = mini(fan, maxi(int(floorf(turn[i] / MIN_NORMAL_GAP_RAD)), 2))
-			var n_in := seg_n[(i - 1 + m) % m]
-			var n_out := seg_n[i]
-			var full := atan2(n_in.cross(n_out), n_in.dot(n_out))
-			for f in fan:
-				var nf := n_in.rotated(full * (float(f) + 0.5) / float(fan))
-				_emit_support(out_p, out_n, pts[i], nf)
-			cum = 0.0
-		else:
-			cum += turn[i] + uniform_step
-			if cum >= quota:
-				cum -= quota
-				var nv := (seg_n[(i - 1 + m) % m] + seg_n[i]).normalized()
-				_emit_support(out_p, out_n, pts[i], nv)
-	# Wraparound dedup: last vs first.
-	if out_n.size() >= 2:
-		var a := out_n[out_n.size() - 1]
-		var b := out_n[0]
-		if absf(atan2(a.cross(b), a.dot(b))) < MIN_NORMAL_GAP_RAD:
-			out_p.remove_at(out_p.size() - 1)
-			out_n.remove_at(out_n.size() - 1)
-	if out_p.size() < GIRDLE_MIN:
-		# Degenerate walk (should not happen): uniform fallback ring.
-		out_p.clear()
-		out_n.clear()
-		for j in GIRDLE_MIN:
-			var theta := TAU * float(j) / float(GIRDLE_MIN)
-			out_p.append(sil.point(theta))
-			out_n.append(sil.outward_normal(theta))
-	return {"points": out_p, "normals": out_n}
+	var jitter := PackedByteArray()
+	var k := sil.poly_k
+	var sector := TAU / float(k)
+	var edge0 := sil.poly_phase + sector * 0.5
+	var edge_n := PackedVector2Array()
+	for i in k:
+		var ang := edge0 + sector * float(i)
+		var n := Vector2(cos(ang), sin(ang))
+		if sil.scale_y != 1.0:
+			n = Vector2(n.x, n.y / sil.scale_y).normalized()
+		edge_n.append(n)
+	var arc_n := 0 if sil.corner_r <= 1.0e-6 else CORNER_ARC_SAMPLES
+	for i in k:
+		out_p.append(sil.support_point(edge_n[i]))
+		out_n.append(edge_n[i])
+		jitter.append(1)
+		if arc_n == 0:
+			continue
+		var a := edge_n[i]
+		var b := edge_n[(i + 1) % k]
+		var full := atan2(a.cross(b), a.dot(b))
+		for s in arc_n:
+			var t := float(s + 1) / float(arc_n + 1)
+			var n := a.rotated(full * t).normalized()
+			out_p.append(sil.support_point(n))
+			out_n.append(n)
+			jitter.append(0)
+	return {"points": out_p, "normals": out_n, "jitter": jitter}
 
 
-static func _emit_support(out_p: PackedVector2Array, out_n: PackedVector2Array,
-		p: Vector2, n: Vector2) -> void:
-	if out_n.size() > 0:
-		var last := out_n[out_n.size() - 1]
-		if absf(atan2(last.cross(n), last.dot(n))) < MIN_NORMAL_GAP_RAD:
-			return
-	out_p.append(p)
-	out_n.append(n)
+## `count` support planes whose normals are equally spaced on the circle.
+## half_offset: start at 0.5 step so no normal sits on 0/90/180/270 — a vertex
+## on those axes reads as a bump on an otherwise smooth cap (pear head, oval).
+static func _support_ring(sil: Silhouette, count: int, half_offset: bool) -> Dictionary:
+	var out_p := PackedVector2Array()
+	var out_n := PackedVector2Array()
+	var jitter := PackedByteArray()
+	var shift := 0.5 if half_offset else 0.0
+	for i in count:
+		var ang := TAU * (float(i) + shift) / float(count)
+		var n := Vector2(cos(ang), sin(ang))
+		out_p.append(sil.support_point(n))
+		out_n.append(n)
+		jitter.append(1)
+	return {"points": out_p, "normals": out_n, "jitter": jitter}

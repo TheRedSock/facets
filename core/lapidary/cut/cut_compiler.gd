@@ -106,7 +106,8 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 	var supports: Dictionary = SilhouetteLib.girdle_supports(sil)
 	var girdle_normals: PackedVector2Array = supports["normals"]
 	var girdle_points: PackedVector2Array = supports["points"]
-	var girdle_ds := _girdle_offsets(girdle_normals, girdle_points, jn, state)
+	var jitter_mask: PackedByteArray = supports.get("jitter", PackedByteArray())
+	var girdle_ds := _girdle_offsets(girdle_normals, girdle_points, jn, state, jitter_mask)
 	for i in girdle_points.size():
 		var n2 := girdle_normals[i]
 		var p2 := girdle_points[i]
@@ -397,16 +398,17 @@ static func _crown_surface_z(planes: PackedFloat32Array, crown_start: int,
 	return z if z < INF else fallback
 
 
-## Girdle unevenness: inward-only offsets whose amplitude adapts to the local
-## normal gap (a plane may consume at most GIRDLE_JITTER_SAFETY of the sagitta
-## to its nearest neighbour, so jitter can never swallow a plane).
+## Girdle unevenness: inward-only offsets on the k long edges. Corner-arc
+## planes (mask bit 0) stay at authored support so rounding stays symmetric.
+## Amplitude adapts to the local normal gap so jitter can never swallow a plane.
 static func _girdle_offsets(normals: PackedVector2Array, points: PackedVector2Array,
-		jn: float, state: Array) -> PackedFloat32Array:
+		jn: float, state: Array, mask := PackedByteArray()) -> PackedFloat32Array:
 	var count := normals.size()
 	var ds := PackedFloat32Array()
 	for i in count:
 		var d := normals[i].dot(points[i])
-		if jn > 0.0:
+		var allowed := mask.is_empty() or (i < mask.size() and mask[i] != 0)
+		if jn > 0.0 and allowed:
 			var prev := normals[(i - 1 + count) % count]
 			var next := normals[(i + 1) % count]
 			var gap := minf(absf(normals[i].angle_to(prev)), absf(normals[i].angle_to(next)))

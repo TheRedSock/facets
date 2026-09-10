@@ -139,7 +139,7 @@ static func _build_control_panel(parent: Control, c: Dictionary) -> void:
 	_section(box, "RIG")
 	c["rigs"] = _picker_row(box, "Rig")
 	c["yaw"] = _slider_row(box, "Rig yaw", -180.0, 180.0, 1.0, 0.0, "%.0f")
-	c["exposure"] = _slider_row(box, "Exposure", 0.25, 4.0, 0.05, 1.6, "%.2f")
+	c["exposure"] = _slider_row(box, "Exposure", 0.25, 4.0, 0.05, 1.0, "%.2f")
 
 	_section(box, "ORIENTATION")
 	c["tilt"] = _slider_row(box, "Tilt", -45.0, 45.0, 1.0, -12.0, "%.0f")

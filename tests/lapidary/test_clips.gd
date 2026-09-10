@@ -75,14 +75,16 @@ func _test_clip_frame_math() -> void:
 		"idle is a 1-frame still")
 	_check(is_equal_approx(idle.frame_time(0), 0.0), "idle frame_time(0) == 0")
 
-	_check(turn.frame_count() == 7, "turn 0.6s @ 12fps -> 7 frames")
+	_check(turn.frame_count() == 12, "turn 0.4s @ 30fps -> 12 frames")
 	_check(turn.stone_motion == GemClip.StoneMotion.TURNTABLE and not turn.loop,
 		"turn is a non-looping turntable")
 	_check(turn.turntable_axis.is_equal_approx(Vector3(0, 1, 0))
-		and is_equal_approx(turn.turntable_degrees, 90.0), "turn: 90 deg around (0,1,0)")
+		and is_equal_approx(turn.turntable_degrees, 360.0), "turn: 360 deg around (0,1,0)")
 	_check(turn.easing != null, "turn has an easing curve")
+	_check(turn.easing.sample(0.2) < 0.18, "turn easing starts slow (accel)")
+	_check(turn.easing.sample(0.8) > 0.82, "turn easing finishes slow (decel)")
 	_check(is_equal_approx(turn.frame_time(0), 0.0)
-		and is_equal_approx(turn.frame_time(6), 1.0), "turn frame_time spans 0..1")
+		and is_equal_approx(turn.frame_time(11), 1.0), "turn frame_time spans 0..1")
 
 	_check(flash.frame_count() == 6, "flash 0.3s @ 20fps -> 6 frames")
 	var pulse: Curve = flash.effect_envelopes.get("exposure_pulse")
@@ -107,10 +109,12 @@ func _test_baker_sample_math() -> void:
 	var q0: Quaternion = ClipBakerScript.frame_orientation(turn, 0.0)
 	_check(q0.angle_to(rest) < 0.001, "turn t=0 orientation == rest tilt")
 	var q1: Quaternion = ClipBakerScript.frame_orientation(turn, 1.0)
-	var expected := rest * Quaternion(Vector3(0, 1, 0), deg_to_rad(90.0))
-	_check(q1.angle_to(expected) < 0.001, "turn t=1 orientation == rest * 90deg turntable")
+	_check(q1.angle_to(rest) < 0.001, "turn t=1 (360 deg) returns to rest tilt")
 	var qm: Quaternion = ClipBakerScript.frame_orientation(turn, 0.5)
-	_check(qm.angle_to(q0) > 0.01 and qm.angle_to(q1) > 0.01, "turn t=0.5 is mid-motion")
+	_check(qm.angle_to(q0) > 1.0, "turn t=0.5 is far from rest (spin mid)")
+	var q_early: Quaternion = ClipBakerScript.frame_orientation(turn, 0.2)
+	_check(q_early.angle_to(rest) < deg_to_rad(50.0),
+		"turn t=0.2 has not spun far yet (accel)")
 
 	var flash := load("res://data/lapidary/clips/flash.tres") as GemClip
 	_check(absf(ClipBakerScript.frame_exposure(flash, 0.5) - 1.8) < 0.01,
@@ -126,8 +130,9 @@ func _test_baker_sample_math() -> void:
 	_check(ClipBakerScript.frame_role_mult(idle, 0.5).is_equal_approx(Vector4.ONE),
 		"role multipliers default to 1")
 
-	var lights: PackedFloat32Array = ClipBakerScript.placeholder_rig_lights()
-	_check(lights.size() % 8 == 0 and lights.size() / 8 == 3, "placeholder rig packs 3 lights")
+	var lights: PackedFloat32Array = GemRigCompiler.pack(
+		load("res://data/lapidary/rigs/gameplay_studio.tres") as GemLightRig)
+	_check(lights.size() % 8 == 0 and lights.size() / 8 >= 1, "gameplay_studio packs >= 1 light")
 
 
 # ------------------------------------------------------------------ cache keys
@@ -151,6 +156,13 @@ func _test_cache_keys() -> void:
 	var clip_changed := _make_clip(&"keytest", 2.0)
 	_check(key_a != CacheScript.cache_key(stone_a, clip_changed, GemRung.CLIP_BAKE),
 		"clip duration change -> new key (fingerprint)")
+
+	var clip_ease := _make_clip(&"keytest")
+	clip_ease.easing = Curve.new()
+	clip_ease.easing.add_point(Vector2(0.0, 0.0))
+	clip_ease.easing.add_point(Vector2(1.0, 1.0))
+	_check(key_a != CacheScript.cache_key(stone_a, clip_ease, GemRung.CLIP_BAKE),
+		"clip easing change -> new key (fingerprint)")
 
 	var v1: String = CacheScript.versioned_key(stone_a, clip, GemRung.CLIP_BAKE, 1)
 	var v2: String = CacheScript.versioned_key(stone_a, clip, GemRung.CLIP_BAKE, 2)
@@ -199,6 +211,21 @@ func _test_manifest() -> void:
 	_check(true, "required_now entries are idle@clip_bake")
 	_check(live.required_now(["quartz", "ruby"]).size() == 2,
 		"shipped manifest filters to active tile set")
+	var soon_n := 0
+	var later_n := 0
+	for e: Dictionary in live.entries():
+		if e["priority"] == ManifestScript.PRIORITY_SOON:
+			soon_n += 1
+			if e["clip_id"] != &"turn":
+				_check(false, "soon entries are turn")
+				return
+		elif e["priority"] == ManifestScript.PRIORITY_LATER:
+			later_n += 1
+			if e["clip_id"] != &"flash":
+				_check(false, "later entries are flash")
+				return
+	_check(soon_n == 16, "shipped manifest: 16 soon turns")
+	_check(later_n == 16, "shipped manifest: 16 later flashes")
 
 
 # ------------------------------------------------------------------ strip roundtrip
@@ -304,23 +331,25 @@ func _test_gpu_smoke() -> void:
 	probe.release()
 
 	var stone := _make_stone(7)
+	var lights: PackedFloat32Array = GemRigCompiler.pack(
+		load("res://data/lapidary/rigs/gameplay_studio.tres") as GemLightRig)
 	var idle := load("res://data/lapidary/clips/idle.tres") as GemClip
-	var baked: Dictionary = ClipBakerScript.bake(stone, idle, GemRung.INTERACT,
-		ClipBakerScript.placeholder_rig_lights())
+	var baked: Dictionary = ClipBakerScript.bake(stone, idle, GemRung.INTERACT, lights)
 	_check(not baked.is_empty(), "INTERACT bake produces a result")
 	if baked.is_empty():
 		return
 	var frames: Array = baked["frames"]
 	_check(frames.size() == 1, "idle bakes exactly 1 frame")
 	var img: Image = frames[0]
-	_check(img.get_width() == 128 and img.get_height() == 128, "INTERACT output is 128px")
-	var center := img.get_pixel(64, 64)
+	var policy := GemRung.policy(GemRung.INTERACT)
+	_check(img.get_width() == int(policy["out"]) and img.get_height() == int(policy["out"]),
+		"INTERACT output matches rung out size")
+	var center := img.get_pixel(img.get_width() / 2, img.get_height() / 2)
 	_check(center.a > 0.5, "stone covers the frame center (coverage alpha)")
 
 	# Effect track reaches the print pass: flash mid-frames must be brighter.
 	var flash := load("res://data/lapidary/clips/flash.tres") as GemClip
-	var flashed: Dictionary = ClipBakerScript.bake(stone, flash, GemRung.INTERACT,
-		ClipBakerScript.placeholder_rig_lights())
+	var flashed: Dictionary = ClipBakerScript.bake(stone, flash, GemRung.INTERACT, lights)
 	_check(not flashed.is_empty(), "flash INTERACT bake produces a result")
 	if flashed.is_empty():
 		return

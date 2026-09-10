@@ -31,6 +31,7 @@ display_name = "Garnet, pyralspite (Mg,Fe,Mn)3Al2(SiO4)3"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.760 (rhodolite RI 1.760 +0.010/-0.020, Wikipedia/Chemija 32:4549) and B-G dispersion 0.026 (Wikipedia rhodolite); UV pole 0.025 um^2 + constant term. Cubic: birefringence 0 (anomalous DR ignored). Mohs 7.25 (lit. 7-7.5). Colour-change pyrope-spessartine (~1.76) shares the species at this granularity."
 sellmeier_b = Vector3(0.9218419, 1.1042475, 0)
 sellmeier_c_um2 = Vector3(0.025, 0, 0)
+optic_axis_stone = Vector3(0, 0, 1)
 base_scatter_per_mm = 0.002
 hardness_mohs = 7.25
 inclusions = Array[ExtResource("1_st222")]([SubResource("Resource_0rh2a"), SubResource("Resource_apjer")])

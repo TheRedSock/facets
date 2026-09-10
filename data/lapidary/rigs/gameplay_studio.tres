@@ -3,15 +3,36 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_light_rig.gd" id="1_rig"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_rig_light.gd" id="2_light"]
 
+; Measured face-up return (tools/return_sweep.gd: one 15-deg unit light swept
+; over the angle theta from the viewing axis, clean stones, rest pose):
+; every cut in the line returns most light from theta 0..30 deg (quartz
+; peaks at 10-20, diamond/ruby at 0-10, emerald cut at 20-30), a tenth of
+; that from 40-70 (crown flashes) and a little from 150 (backlight through
+; the pavilion). The body is therefore lit by a broad softbox on the
+; camera axis (a beauty dish behind the lens); the room is dim so the
+; facets that map beyond 40 deg stay dark and give the contrast pattern.
+; Nothing blocks the axis: a head shadow would sit exactly on the return.
+
+[sub_resource type="Resource" id="beauty"]
+script = ExtResource("2_light")
+role = 1
+azimuth_deg = 0.0
+elevation_deg = 0.0
+angular_radius_deg = 30.0
+inner_fraction = 0.6
+kelvin = 5600.0
+power = 2.0
+enabled = true
+
 [sub_resource type="Resource" id="key"]
 script = ExtResource("2_light")
 role = 0
 azimuth_deg = -35.0
-elevation_deg = 55.0
-angular_radius_deg = 18.0
+elevation_deg = 40.0
+angular_radius_deg = 20.0
 inner_fraction = 0.55
-kelvin = 5200.0
-power = 5.0
+kelvin = 5600.0
+power = 3.0
 enabled = true
 
 [sub_resource type="Resource" id="spark"]
@@ -28,12 +49,12 @@ enabled = true
 [sub_resource type="Resource" id="fill"]
 script = ExtResource("2_light")
 role = 1
-azimuth_deg = 70.0
+azimuth_deg = 45.0
 elevation_deg = 15.0
-angular_radius_deg = 32.0
+angular_radius_deg = 28.0
 inner_fraction = 0.5
 kelvin = 6500.0
-power = 0.55
+power = 0.9
 enabled = true
 
 [sub_resource type="Resource" id="rim"]
@@ -58,24 +79,14 @@ kelvin = 4200.0
 power = 0.35
 enabled = true
 
-[sub_resource type="Resource" id="blocker"]
-script = ExtResource("2_light")
-role = 4
-azimuth_deg = 0.0
-elevation_deg = 6.0
-angular_radius_deg = 22.0
-inner_fraction = 0.55
-kelvin = 5500.0
-power = 0.45
-enabled = true
-
 [resource]
 script = ExtResource("1_rig")
 rig_id = &"gameplay_studio"
 display_name = "Gameplay Studio"
-lights = [SubResource("key"), SubResource("spark"), SubResource("rim"), SubResource("fill"), SubResource("bounce"), SubResource("blocker")]
-bg_zenith = 0.10
-bg_horizon = 0.05
-bg_below = 0.02
-bg_kelvin = 0.0
+lights = [SubResource("key"), SubResource("spark"), SubResource("rim"), SubResource("beauty"), SubResource("fill"), SubResource("bounce")]
+bg_zenith = 0.14
+bg_horizon = 0.09
+bg_below = 0.03
+bg_kelvin = 5600.0
+white_kelvin = 5600.0
 dual_illuminant_kelvin = 0.0

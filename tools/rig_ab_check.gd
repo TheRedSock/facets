@@ -1,118 +1,120 @@
 extends SceneTree
-## Lighting A/B: diamond + ruby-ish under gameplay_studio vs reference_daylight,
-## raw and printed. The first-class environment A/B tool (replaces the old
-## "compare two environment tres by hand" policy).
-## Run:  godot --path . --script res://tools/rig_ab_check.gd
+## Lighting A/B: a row of authored stones per rig, house-printed, stacked into
+## one sheet. The first-class environment A/B tool: lighting changes are rig
+## edits judged here, never print or exposure tweaks.
+## Run:  godot --path . --script res://tools/rig_ab_check.gd [--rigs=a.tres,b.tres]
+##       [--stones=quartz,ruby,...] [--spp=64] [--res=192]
+## Rig paths are relative to data/lapidary/rigs/ and stone ids to
+## data/lapidary/stones/ unless they contain a "/" (ad-hoc variants for A/B).
 
 const OUT_DIR := "res://artifacts/lookdev/rig_ab"
+const RIG_DIR := "res://data/lapidary/rigs/"
+const DEFAULT_RIGS := ["gameplay_studio.tres", "reference_daylight.tres"]
+const DEFAULT_STONES := ["quartz", "amethyst", "sapphire", "emerald", "ruby", "diamond"]
+const TILT := Quaternion(Vector3(1, 0, 0), deg_to_rad(-12.0))
 
 
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
-	var rigs := {
-		"gameplay": load("res://data/lapidary/rigs/gameplay_studio.tres") as GemLightRig,
-		"reference": load("res://data/lapidary/rigs/reference_daylight.tres") as GemLightRig,
-	}
-	var stones := {
-		"diamond": _diamond_stone(),
-		"ruby": _ruby_stone(),
-	}
+	var args := OS.get_cmdline_user_args()
+	var rig_paths: Array = DEFAULT_RIGS
+	var stone_ids: Array = DEFAULT_STONES
+	var spp := 64
+	var res := 192
+	for a: String in args:
+		if a.begins_with("--rigs="):
+			rig_paths = a.trim_prefix("--rigs=").split(",")
+		elif a.begins_with("--stones="):
+			stone_ids = a.trim_prefix("--stones=").split(",")
+		elif a.begins_with("--spp="):
+			spp = int(a.trim_prefix("--spp="))
+		elif a.begins_with("--res="):
+			res = int(a.trim_prefix("--res="))
+
 	var failures := 0
-	for rig_name: String in rigs:
-		var rig: GemLightRig = rigs[rig_name]
+	var rows: Array[Image] = []
+	for rp: String in rig_paths:
+		var path := rp if rp.contains("/") else RIG_DIR + rp
+		var rig := load(path) as GemLightRig
 		if rig == null:
-			print("  rig %s FAILED TO LOAD" % rig_name)
+			print("  rig %s FAILED TO LOAD" % path)
 			failures += 1
 			continue
 		var lights := GemRigCompiler.pack(rig)
-		for stone_name: String in stones:
-			var stone: GemStone = stones[stone_name]
+		var env := GemRigCompiler.environment(rig)
+		var row := Image.create(res * stone_ids.size(), res, false, Image.FORMAT_RGBA8)
+		row.fill(Color(0.06, 0.06, 0.07, 1.0))
+		var col := 0
+		for sid: String in stone_ids:
+			var stone := load(sid if sid.contains("/") else "res://data/lapidary/stones/%s.tres" % sid) as GemStone
+			if stone == null or stone.species == null:
+				print("  stone %s FAILED TO LOAD" % sid)
+				failures += 1
+				col += 1
+				continue
 			var instance := LapidaryStoneCompiler.compile(stone)
-			var tracer := GemTracer.create(256, 256)
+			var tracer := GemTracer.create(res, res)
 			if tracer == null:
 				failures += 1
-				continue
+				break
+			var policy := GemRung.policy(GemRung.PREVIEW)
+			tracer.configure_stone(instance, lights, policy)
 			tracer.set_seed(stone.seed)
-			tracer.set_background(GemRigCompiler.background(rig))
-			var disp: bool = stone_name == "diamond"
-			tracer.configure_stone(instance, lights, {"max_bounces": 32, "volume": 2, "dispersion": disp})
-			tracer.set_clip_sample(Quaternion(Vector3(1, 0, 0), deg_to_rad(-12.0)), 0.0, Vector4.ONE, 1.3)
-			var spp := 128 if disp else 96
-			var batches := int(ceil(spp / 16.0))
-			var ms := 0.0
-			for i in batches:
-				ms += tracer.accumulate(16)
-			var img_raw := tracer.finalize_print(null, true, 1.6)
-			var img_print := tracer.finalize_print(GemPrint.new(), false, 1.6)
-			img_raw.save_png(ProjectSettings.globalize_path("%s/%s_%s_raw.png" % [OUT_DIR, stone_name, rig_name]))
-			img_print.save_png(ProjectSettings.globalize_path("%s/%s_%s_print.png" % [OUT_DIR, stone_name, rig_name]))
-			print("  %s @ %s: %.0f ms" % [stone_name, rig_name, ms])
+			tracer.set_environment(env)
+			tracer.set_clip_sample(TILT, 0.0, Vector4.ONE, 1.3)
+			var t0 := Time.get_ticks_usec()
+			var remaining := spp
+			while remaining > 0:
+				var n := mini(16, remaining)
+				tracer.accumulate(n)
+				remaining -= n
+			var img := tracer.finalize_print(GemPrint.load_house(), false, 1.0)
+			row.blend_rect(img, Rect2i(0, 0, res, res), Vector2i(col * res, 0))
+			var st := _print_stats(img)
+			print("  %-22s %-12s %6.0f ms   mean %.2f  p10 %.2f  p90 %.2f  clipped %4.1f%%  dark %4.1f%%" % [
+				rig.rig_id, sid, float(Time.get_ticks_usec() - t0) / 1000.0,
+				st["mean"], st["p10"], st["p90"], st["clipped"] * 100.0, st["dark"] * 100.0])
 			tracer.release()
+			col += 1
+		var name := String(rig.rig_id)
+		row.save_png(ProjectSettings.globalize_path("%s/%s.png" % [OUT_DIR, name]))
+		rows.append(row)
+
+	if rows.size() > 0:
+		var sheet := Image.create(rows[0].get_width(), res * rows.size(), false, Image.FORMAT_RGBA8)
+		for i in rows.size():
+			sheet.blit_rect(rows[i], Rect2i(0, 0, rows[i].get_width(), res), Vector2i(0, i * res))
+		sheet.save_png(ProjectSettings.globalize_path("%s/ab.png" % OUT_DIR))
 	print("RIG_AB %s" % ("FAILED" if failures > 0 else "COMPLETE"))
 	quit(1 if failures > 0 else 0)
 
 
-func _diamond_stone() -> GemStone:
-	var sp := GemSpecies.new()
-	sp.species_id = &"check_diamond"
-	sp.sellmeier_b = Vector3(4.3356, 0.3306, 0.0)
-	sp.sellmeier_c_um2 = Vector3(0.011236, 0.030625, 0.0)
-	sp.hardness_mohs = 10.0
-	sp.base_polish_roughness = 0.004
-	var st := GemStone.new()
-	st.stone_id = &"ab_diamond"
-	st.species = sp
-	st.grade = _grade(1, 1, 1, 1)
-	st.seed = 3
-	st.size_mm = 5.5
-	return st
-
-
-func _ruby_stone() -> GemStone:
-	var sp := GemSpecies.new()
-	sp.species_id = &"check_corundum"
-	sp.sellmeier_b = Vector3(1.4313493, 0.65054713, 5.3414021)
-	sp.sellmeier_c_um2 = Vector3(0.00527993, 0.01423827, 325.01783)
-	sp.birefringence = 0.008
-	sp.hardness_mohs = 9.0
-	sp.base_polish_roughness = 0.006
-	sp.fluorescence_emission_nm = 693.0
-	sp.fluorescence_strength = 0.5
-	var ch := GemChromophore.new()
-	ch.chromophore_id = &"check_ruby"
-	ch.absorption_mm = _ruby_placeholder()
-	var st := GemStone.new()
-	st.stone_id = &"ab_ruby"
-	st.species = sp
-	st.chromophore = ch
-	st.grade = _grade(0.92, 0.85, 0.9, 0.95)
-	st.seed = 7
-	st.size_mm = 5.2
-	return st
-
-
-static func _grade(c: float, cl: float, su: float, cr: float) -> GemGrade:
-	var g := GemGrade.new()
-	g.cut = c
-	g.clarity = cl
-	g.surface = su
-	g.crystal = cr
-	return g
-
-
-static func _ruby_placeholder() -> PackedFloat32Array:
-	var arr := PackedFloat32Array()
-	arr.resize(81)
-	for i in 81:
-		var wl := 380.0 + float(i) * 5.0
-		var a := 0.04
-		if wl < 445.0:
-			a = 0.70
-		elif wl < 500.0:
-			a = 0.22
-		elif wl < 610.0:
-			a = 0.95
-		elif wl < 640.0:
-			a = 0.25
-		arr[i] = a
-	return arr
+## Contrast discipline numbers over covered pixels (sRGB-encoded luma):
+## mean, 10th/90th percentile, fraction with a clipped channel, fraction
+## darker than 0.08.
+static func _print_stats(img: Image) -> Dictionary:
+	var lum := PackedFloat32Array()
+	var clipped := 0
+	var dark := 0
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var l := 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+			lum.append(l)
+			if c.r >= 0.996 or c.g >= 0.996 or c.b >= 0.996:
+				clipped += 1
+			if l < 0.08:
+				dark += 1
+	if lum.is_empty():
+		return {"mean": 0.0, "p10": 0.0, "p90": 0.0, "clipped": 0.0, "dark": 0.0}
+	lum.sort()
+	var sum := 0.0
+	for v in lum:
+		sum += v
+	var n := lum.size()
+	return {
+		"mean": sum / n, "p10": lum[int(n * 0.1)], "p90": lum[int(n * 0.9)],
+		"clipped": float(clipped) / n, "dark": float(dark) / n,
+	}

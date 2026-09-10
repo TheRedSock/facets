@@ -2,15 +2,13 @@
 
 Written by the atelier workstream against `gem_tracer.gd` kernel v1 while
 building the interactive designer preview (`scenes/design/gem_atelier.gd`).
-The host API covers the whole v1 feature set; nothing below blocks. Items 1–2
-duplicate the clips workstream's findings (`core/lapidary/clips/TRACER_NEEDS.md`)
-and are confirmed independently from the interactive path.
+The host API covers the whole v1 feature set; nothing below blocks.
 
 1. **Seed / background ingestion**: `configure_stone()` receives the
    StoneInstance (which carries `seed`) and the caller has the rig in hand,
    but the tracer applies neither — every reconfigure must be followed by
    `set_seed(instance["seed"])` + `set_background(GemRigCompiler.background(rig))`
-   or the render silently uses seed 1 and the spike-era background. Suggest
+   or the render silently uses seed 1 and a stale background. Suggest
    `configure_stone` read the seed itself and grow an optional background
    argument.
 

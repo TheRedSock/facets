@@ -34,6 +34,7 @@ sellmeier_b = Vector3(0.5922467, 1.0350355, 0)
 sellmeier_c_um2 = Vector3(0.025, 0, 0)
 birefringence = 0.018
 uniaxial_positive = false
+optic_axis_stone = Vector3(1, 0, 0)
 base_scatter_per_mm = 0.002
 hardness_mohs = 7.5
 inclusions = Array[ExtResource("1_yc1t2")]([SubResource("Resource_15mlv"), SubResource("Resource_8s4xe")])

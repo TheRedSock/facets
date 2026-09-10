@@ -142,11 +142,21 @@ func _test_cached_clip_path(forge: Node, _registry: Node) -> void:
 	view.configure_from_data(&"quartz", 1, Vector2i.ZERO)
 	_check(_has_visible_texture_rect(view), "cached idle clip shows the TextureRect path")
 	_check(not view.is_processing(), "1-frame idle does not process per-frame")
-	view.play_clip(&"turn")
-	_check(view.is_processing(), "turn oneshot starts frame advancing")
+	var turn_served: Dictionary = forge.get_clip(&"quartz", &"turn")
+	if turn_served.is_empty():
+		print("  SKIP turn oneshot (no packaged 360 turn cache)")
+	else:
+		view.play_clip(&"turn")
+		_check(view.is_processing(), "turn oneshot starts frame advancing")
 	view.show_upgrade_full(2, &"amethyst")
-	_check(view.tile_id == &"amethyst" and _has_visible_texture_rect(view),
-		"upgrade swaps to the new tile's served visual")
+	_check(view.tile_id == &"amethyst" and view.tier == 2,
+		"upgrade updates tile_id/tier")
+	var amethyst_idle: Dictionary = forge.get_clip(&"amethyst", &"idle")
+	if amethyst_idle.is_empty():
+		print("  SKIP upgrade clip swap (no packaged amethyst idle)")
+	else:
+		_check(_has_visible_texture_rect(view),
+			"upgrade swaps to the new tile's served visual")
 	view.queue_free()
 
 

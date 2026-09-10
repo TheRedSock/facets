@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="GemPrint" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_print.gd" id="1_print"]
+
+[resource]
+script = ExtResource("1_print")
+print_version = 3
+exposure = 1.0
+shoulder_strength = 0.85
+contrast = 1.05
+black_point = 0.0
+chroma_ceiling = 0.34
+chroma_soft = 0.1
+highlight_desat = 0.3

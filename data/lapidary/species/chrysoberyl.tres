@@ -33,6 +33,7 @@ source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.746 (
 sellmeier_b = Vector3(0.5266873, 1.4809717, 0)
 sellmeier_c_um2 = Vector3(0.025, 0, 0)
 birefringence = 0.009
+optic_axis_stone = Vector3(0, 0, 1)
 base_scatter_per_mm = 0.001
 hardness_mohs = 8.5
 inclusions = Array[ExtResource("1_ck67h")]([SubResource("Resource_vr0uu"), SubResource("Resource_3pe48")])

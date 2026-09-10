@@ -26,9 +26,7 @@ const FIRST_BATCH_SPP := 4
 const STEP_SPP := 12
 const DEBOUNCE_MS := 250
 
-var _c: Dictionary = {}
-var _tracer: GemTracer
-var _default_print := GemPrint.new()
+var _default_print: GemPrint
 
 var _stones: Array[GemStone] = []
 var _rigs: Array[GemLightRig] = []
@@ -50,6 +48,7 @@ var _last_image: Image
 
 
 func _ready() -> void:
+	_default_print = GemPrint.load_house()
 	_c = AtelierUi.build(self)
 	_load_libraries()
 	_populate_pickers()
@@ -242,10 +241,10 @@ func _rebuild_now() -> void:
 	var instance := LapidaryStoneCompiler.compile(_stone)
 	_fingerprint = str(instance.get("fingerprint", ""))
 	_tracer.configure_stone(instance, GemRigCompiler.pack(_rig),
-		GemRung.policy(GemRung.PREVIEW, GemRung.scatter_noisy(instance)))
-	# configure_stone does not ingest these itself (see atelier/TRACER_NEEDS.md).
+		GemRung.policy(GemRung.PREVIEW))
+	# configure_stone does not ingest seed/background itself — set them after.
 	_tracer.set_seed(int(instance["seed"]))
-	_tracer.set_background(GemRigCompiler.background(_rig))
+	_tracer.set_environment(GemRigCompiler.environment(_rig))
 	_configured = true
 	_apply_pose()
 

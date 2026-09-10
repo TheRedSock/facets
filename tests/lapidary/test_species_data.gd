@@ -176,7 +176,7 @@ func _test_grades(grades: Dictionary) -> void:
 	if by_tier.has(1):
 		for axis in ["cut", "clarity", "surface", "crystal"]:
 			var v: float = by_tier[1].get(axis)
-			_check(v >= 0.2 and v <= 0.4, "t1 %s should be humble (0.2-0.4), got %.2f" % [axis, v])
+			_check(v >= 0.52 and v <= 0.72, "t1 %s should be the compressed floor (0.52-0.72), got %.2f" % [axis, v])
 	if by_tier.has(8):
 		for axis in ["cut", "clarity", "surface", "crystal"]:
 			_check(by_tier[8].get(axis) == 1.0, "t8 %s must be 1.0" % axis)
@@ -254,6 +254,18 @@ func _test_compiler_consumption(stones: Dictionary) -> void:
 		_check(instance["absorption"].size() == 81, "%s: compiled absorption must be 81 samples" % label)
 		_check(instance["inclusions"].size() % 16 == 0,
 			"%s: inclusion primitives must have stride 16" % label)
+		var prims: PackedFloat32Array = instance["inclusions"]
+		for i in range(0, prims.size(), 16):
+			var ptype := int(prims[i + 3])
+			var r0: float = prims[i + 7]
+			var style: float = prims[i + 14]
+			if ptype == 2:
+				_check(r0 <= 0.055 + 1e-5, "%s: cloud major must be wisp-capped (%.3f)" % [label, r0])
+			elif ptype == 3:
+				_check(r0 <= 0.016 + 1e-5, "%s: crystal must be a pinpoint (%.3f)" % [label, r0])
+			elif ptype == 1:
+				_check(is_equal_approx(style, 0.0) or is_equal_approx(style, 1.0),
+					"%s: disc style must be platelet(0) or veil(1)" % label)
 		_check(instance["fingerprint"] == stone.fingerprint(),
 			"%s: compiled fingerprint must match the stone's" % label)
 		var strong: bool = instance["dispersion_strong"]

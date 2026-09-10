@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_7de68")
 grade_id = &"t4"
-cut = 0.5
-clarity = 0.46
-surface = 0.48
-crystal = 0.53
+cut = 0.79
+clarity = 0.76
+surface = 0.78
+crystal = 0.81

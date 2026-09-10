@@ -35,9 +35,9 @@ func _initialize() -> void:
 	if tracer == null:
 		quit(1)
 		return
-	tracer.set_background(GemRigCompiler.background(rig))
+	tracer.set_environment(GemRigCompiler.environment(rig))
 	tracer.configure_stones(instances, lights,
-		{"max_bounces": 28, "volume": 2, "dispersion": true, "birefringence": true, "rad_clamp": 24.0},
+		{"max_bounces": 28, "volume": true, "dispersion": true, "birefringence": true, "rad_clamp": 24.0},
 		Vector2i(8, 2))
 	var states: Array = []
 	for i in ORDER.size():
@@ -50,8 +50,8 @@ func _initialize() -> void:
 	var ms := 0.0
 	for b in 8:
 		ms += tracer.accumulate(16)
-	var img_print := tracer.finalize_print(GemPrint.new(), false, 1.6)
-	var img_raw := tracer.finalize_print(null, true, 1.6)
+	var img_print := tracer.finalize_print(GemPrint.load_house(), false, 1.0)
+	var img_raw := tracer.finalize_print(null, true, 1.0)
 	img_print.save_png(ProjectSettings.globalize_path(OUT_DIR + "/ladder_print.png"))
 	img_raw.save_png(ProjectSettings.globalize_path(OUT_DIR + "/ladder_raw.png"))
 	print("  ladder %d gems @%dpx 128spp: %.0f ms -> ladder_{print,raw}.png" % [ORDER.size(), CELL, ms])

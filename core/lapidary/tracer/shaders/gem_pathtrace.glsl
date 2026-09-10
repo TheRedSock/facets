@@ -1,69 +1,47 @@
 #version 450
-// Lapidary gem path tracer — kernel v1.
+// Lapidary gem path tracer — kernel v3 (clean optics).
 //
 // Stone = convex plane set (intersection of half-spaces) + analytic inclusion
 // primitives + volumetric media. Transport = spectral, 4 hero wavelengths
 // sharing path geometry; per-wavelength path split when the rung enables
 // dispersion; entry birefringence fork when the rung + species enable it.
+// Facets are perfect specular dielectric interfaces (no wear model).
 //
 // Deterministic Fresnel splitting: at every interior exit the transmitted
 // branch immediately evaluates the analytic environment; the reflected / TIR
-// branch continues. HG scatter (homogeneous volume or cloud primitive) is
-// the same bet: at most one event, then the remaining chord to the hull
-// evaluates the analytic rig (NEE). Needle/platelet silk is rough-specular
-// and does not consume that slot.
-// Stochastic parts: AA jitter, hero-lambda stratification, GGX wear,
-// the scatter direction, inclusion hits.
+// branch continues. The first inclusion surface hit splits deterministically
+// (reflected + transmitted branches) instead of a Bernoulli choice.
+//
+// Volume: unified free flight over homogeneous milk + cloud primitives. At a
+// scatter event the scattered radiance (every light AND the background,
+// through every Fresnel exit until the throughput dies) is read
+// DETERMINISTICALLY from the per-frame SH scatter field
+// (gem_scatter_field.glsl), convolved analytically with the HG phase function
+// (band l scaled by g^l), and the path terminates: the field IS the
+// continuation. Higher scattering orders are delivered forward (the medium
+// attenuates by absorption only after the sampled event), the same model on
+// both sides of the estimator. field_exits = 0 keeps the stochastic HG
+// continuation (reference estimator for the physics check).
+//
+// Structured dimensions use per-pixel Cranley-Patterson-rotated Halton with a
+// GLOBAL sample index; PCG covers the remainder.
 //
 // Batch-ready: instances are laid out on a pixel grid (grid 1x1 = single
 // stone). Stones are ranges into shared plane/inclusion/absorption buffers.
 //
 // CIE CMF analytic fit: Wyman, Sloan, Shirley, JCGT 2013 (multi-lobe).
 
+#include "gem_common.glsl"
+
 layout(local_size_x = 8, local_size_y = 8) in;
-
-struct Plane { vec4 n_d; vec4 aux; };          // aux: zone, roughness, reserved
-struct Light { vec4 dir_cos; vec4 kel_pow; };  // kel_pow: kelvin, power, cos_inner, role(0 emit,1 blocker)
-struct Prim  { vec4 a; vec4 b; vec4 c; vec4 d; };
-// Prim: a = center.xyz, type (0 needle,1 platelet,2 cloud,3 crystal)
-//       b = axis.xyz, r0 (half-length / radius)
-//       c = r1, scatter_density, tint.r, tint.g
-//       d = tint.b, reserved x3
-
-struct Stone {
-	vec4 sell_b_size;      // sellmeier B xyz, size_mm
-	vec4 sell_c_biref;     // sellmeier C xyz (um^2), birefringence dn
-	vec4 scatter_zone;     // sigma_per_mm, hg_g, zoning_freq, zoning_contrast
-	vec4 zone_axis_phase;  // zoning axis xyz, phase
-	vec4 optic_fluor;      // optic axis xyz, fluorescence strength
-	vec4 wear0;            // roughness_boost, scratch_density, scratch_aniso, abrasion
-	vec4 wear1;            // dirt, edge_round, fluor_nm, absorb_scale
-	ivec4 ranges0;         // plane_offset, plane_count, incl_offset, incl_count
-	ivec4 ranges1;         // absorb_offset, stone_flags (bit0 has_eray), pad, pad
-};
-
-struct Inst {
-	vec4 quat;         // stone->world
-	vec4 rig;          // rig_yaw (radians), ortho_half, key_mult, fill_mult
-	vec4 rig2;         // rim_mult, bounce_mult, pad, pad
-	ivec4 which;       // stone_index, pad x3
-};
-
-layout(set = 0, binding = 0, std430) restrict readonly buffer Planes  { Plane planes[]; };
-layout(set = 0, binding = 1, std430) restrict readonly buffer Lights  { Light lights[]; };
-layout(set = 0, binding = 2, std430) restrict readonly buffer Absorb  { float absorb_mm[]; };
-layout(set = 0, binding = 3, std430) restrict buffer Accum            { vec4 accum[]; };
-layout(set = 0, binding = 4, std430) restrict readonly buffer Prims   { Prim prims[]; };
-layout(set = 0, binding = 5, std430) restrict readonly buffer Stones  { Stone stones[]; };
-layout(set = 0, binding = 6, std430) restrict readonly buffer Insts   { Inst insts[]; };
 
 layout(push_constant, std430) uniform Params {
 	ivec2 resolution;     // 0
-	uint frame;           // 8
+	uint sample_base;     // 8   global sample index of this dispatch's first sample
 	uint spp;             // 12
 	uint seed;            // 16
 	uint max_bounces;     // 20
-	uint flags;           // 24  bit0 dispersion_split, bit1 birefringence, bit2-3 volume_mode, bit4 fluorescence
+	uint flags;           // 24  bit0 dispersion_split, bit1 birefringence, bit2 volume, bit4 fluorescence
 	uint light_count;     // 28
 	ivec2 grid;           // 32  cols, rows
 	ivec2 cell_px;        // 40
@@ -72,29 +50,33 @@ layout(push_constant, std430) uniform Params {
 	float bg_below;       // 56
 	float spectral_norm;  // 60
 	float rad_clamp;      // 64  per-sample radiance ceiling (firefly control; rung policy)
-	float pad0;           // 68
-	float pad1;           // 72
-	float pad2;           // 76 -> 80
+	float env_filter_rad; // 68  footprint floor for the post-scatter environment
+	int field_exits;      // 72  Fresnel exits integrated by the scatter field (0 = field off: stochastic continuation)
+	int field_grid;       // 76  scatter-field texels per axis
+	int row_origin;       // 80  first image row of this dispatch (host chunks work for TDR safety)
+	int field_insts;      // 84  instances stacked along the field's x axis
+	float bg_kelvin;      // 88  background spectrum (Planckian; 0 = flat)
+	int pad2;             // 92
 } pc;
+
+// In-scattered radiance field (SH l<=3 x spectral bands), built per frame by
+// gem_scatter_field.glsl. Hardware trilinear filtering does the spatial blend.
+layout(set = 0, binding = 7) uniform sampler3D field;
 
 const float WL_MIN = 380.0;
 const float WL_RANGE = 400.0;
-const float T_EPS = 1e-5;
 const float THROUGHPUT_EPS = 0.004;
-const float INF = 1e30;
+const int MAX_CLOUD_SPANS = 8;
 
 #define FLAG_DISPERSION  ((pc.flags & 1u) != 0u)
 #define FLAG_BIREF       ((pc.flags & 2u) != 0u)
-#define VOLUME_MODE      int((pc.flags >> 2u) & 3u)
+#define FLAG_VOLUME      ((pc.flags & 4u) != 0u)
 #define FLAG_FLUOR       ((pc.flags & 16u) != 0u)
 
-// ---------------------------------------------------------------- RNG
-uint pcg(inout uint s) {
-	s = s * 747796405u + 2891336453u;
-	uint w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
-	return (w >> 22u) ^ w;
-}
-float rnd(inout uint s) { return float(pcg(s)) * (1.0 / 4294967296.0); }
+// Polarisation modes for Beer-Lambert.
+const int POL_UNPOL = 0;
+const int POL_O = 1;
+const int POL_K = 2;
 
 // ---------------------------------------------------------------- CIE / spectra
 float cie_x(float w) {
@@ -115,193 +97,40 @@ float cie_z(float w) {
 }
 vec3 cie_xyz(float w) { return vec3(cie_x(w), cie_y(w), cie_z(w)); }
 
-float planck_rel(float wl, float kelvin) {
-	float c2 = 1.4388e7;
-	float r = 560.0 / wl;
-	return r * r * r * r * r * (exp(c2 / (560.0 * kelvin)) - 1.0) / max(exp(c2 / (wl * kelvin)) - 1.0, 1e-12);
+// Uniaxial extraordinary index for propagation at angle phi to the optic axis
+// (ca = |cos phi|). Converges to n_o along the axis.
+float n_e_phi(float n_o, float dn, float ca) {
+	float n_e = n_o + dn;
+	float c2 = ca * ca;
+	float s2 = 1.0 - c2;
+	float inv2 = c2 / max(n_o * n_o, 1e-6) + s2 / max(n_e * n_e, 1e-6);
+	return inversesqrt(max(inv2, 1e-6));
 }
 
-float sellmeier(vec3 B, vec3 C, float wl_nm) {
-	float l2 = (wl_nm * 1e-3) * (wl_nm * 1e-3);
-	float s = 1.0 + B.x * l2 / (l2 - C.x) + B.y * l2 / (l2 - C.y);
-	if (B.z > 0.0) { s += B.z * l2 / (l2 - C.z); }
-	return sqrt(max(s, 1.0));
-}
-
-float absorb_at(int base, float wl_nm) {
-	float f = clamp((wl_nm - 380.0) / 5.0, 0.0, 80.0);
-	int i = int(f);
-	return mix(absorb_mm[base + i], absorb_mm[base + min(i + 1, 80)], f - float(i));
-}
-
-// ---------------------------------------------------------------- math
-vec3 quat_rot(vec4 q, vec3 v) { return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
-vec4 quat_conj(vec4 q) { return vec4(-q.xyz, q.w); }
-vec3 rot_y(vec3 v, float a) {
-	float c = cos(a), s = sin(a);
-	return vec3(c * v.x + s * v.z, v.y, -s * v.x + c * v.z);
-}
-
-float fresnel_diel(float cos_i, float eta) {
-	float s2 = eta * eta * (1.0 - cos_i * cos_i);
-	if (s2 >= 1.0) { return 1.0; }
-	float ct = sqrt(1.0 - s2);
-	float rs = (eta * cos_i - ct) / (eta * cos_i + ct);
-	float rp = (cos_i - eta * ct) / (cos_i + eta * ct);
-	return 0.5 * (rs * rs + rp * rp);
-}
-
-void basis(vec3 n, out vec3 t1, out vec3 t2) {
-	t1 = normalize(cross(n, abs(n.z) < 0.9 ? vec3(0, 0, 1) : vec3(1, 0, 0)));
-	t2 = cross(n, t1);
-}
-
-// GGX normal perturbation (isotropic, alpha = roughness^2).
-vec3 ggx_perturb(vec3 n, float rough, inout uint rng) {
-	if (rough <= 0.001) { return n; }
-	float a = rough * rough;
-	float x1 = rnd(rng), x2 = rnd(rng);
-	float ct = sqrt((1.0 - x1) / (1.0 + (a * a - 1.0) * x1));
-	float st = sqrt(max(0.0, 1.0 - ct * ct));
-	float phi = 6.2831853 * x2;
-	vec3 t1, t2;
-	basis(n, t1, t2);
-	return normalize(t1 * (st * cos(phi)) + t2 * (st * sin(phi)) + n * ct);
-}
-
-// Henyey-Greenstein direction sample.
-vec3 hg_sample(vec3 dir, float g, inout uint rng) {
-	float x1 = rnd(rng), x2 = rnd(rng);
+// ---------------------------------------------------------------- phase function
+// Henyey-Greenstein direction from stratified (u1,u2).
+vec3 hg_sample_u(vec3 dir, float g, vec2 u) {
 	float ct;
 	if (abs(g) < 0.01) {
-		ct = 1.0 - 2.0 * x1;
+		ct = 1.0 - 2.0 * u.x;
 	} else {
-		float sq = (1.0 - g * g) / (1.0 - g + 2.0 * g * x1);
+		float sq = (1.0 - g * g) / (1.0 - g + 2.0 * g * u.x);
 		ct = (1.0 + g * g - sq * sq) / (2.0 * g);
 	}
 	float st = sqrt(max(0.0, 1.0 - ct * ct));
-	float phi = 6.2831853 * x2;
+	float phi = TAU * u.y;
 	vec3 t1, t2;
 	basis(dir, t1, t2);
 	return normalize(t1 * (st * cos(phi)) + t2 * (st * sin(phi)) + dir * ct);
 }
 
 // ---------------------------------------------------------------- environment
-vec4 env_radiance(vec3 dir, vec4 wl, float rig_yaw, vec4 role_mult) {
-	float up = dir.y;
-	float bg = (up >= 0.0)
-		? mix(pc.bg_horizon, pc.bg_zenith, smoothstep(0.0, 0.85, up))
-		: mix(pc.bg_horizon, pc.bg_below, smoothstep(0.0, 0.6, -up));
-	vec4 rad = vec4(bg);
-	float blocker = 1.0;
-	for (uint li = 0u; li < pc.light_count; li++) {
-		Light L = lights[li];
-		vec3 ldir = rot_y(L.dir_cos.xyz, rig_yaw);
-		float d = dot(dir, ldir);
-		float w = smoothstep(L.dir_cos.w, L.kel_pow.z, d);
-		if (w <= 0.0) { continue; }
-		if (L.kel_pow.w > 0.5) {
-			blocker *= 1.0 - clamp(L.kel_pow.y, 0.0, 1.0) * w;
-			continue;
-		}
-		float mult = li == 0u ? role_mult.x : (li == 1u ? role_mult.y : (li == 2u ? role_mult.z : role_mult.w));
-		vec4 spd = vec4(planck_rel(wl.x, L.kel_pow.x), planck_rel(wl.y, L.kel_pow.x),
-			planck_rel(wl.z, L.kel_pow.x), planck_rel(wl.w, L.kel_pow.x));
-		rad += spd * (L.kel_pow.y * w * mult);
-	}
-	return rad * blocker;
-}
-
-// ---------------------------------------------------------------- hull
-bool hull_entry(int off, int count, vec3 ro, vec3 rd, out float t_near, out int near_plane) {
-	t_near = -INF;
-	float t_far = INF;
-	near_plane = -1;
-	for (int i = 0; i < count; i++) {
-		vec3 n = planes[off + i].n_d.xyz;
-		float d = planes[off + i].n_d.w;
-		float denom = dot(n, rd);
-		float dist = d - dot(n, ro);
-		if (abs(denom) < 1e-9) {
-			if (dist < 0.0) { return false; }
-			continue;
-		}
-		float t = dist / denom;
-		if (denom < 0.0) {
-			if (t > t_near) { t_near = t; near_plane = off + i; }
-		} else {
-			t_far = min(t_far, t);
-		}
-		if (t_near > t_far) { return false; }
-	}
-	return near_plane >= 0 && t_near > T_EPS;
-}
-
-void hull_exit(int off, int count, vec3 ro, vec3 rd, out float t_exit, out int exit_plane) {
-	t_exit = INF;
-	exit_plane = off;
-	for (int i = 0; i < count; i++) {
-		vec3 n = planes[off + i].n_d.xyz;
-		float denom = dot(n, rd);
-		if (denom <= 1e-9) { continue; }
-		float t = (planes[off + i].n_d.w - dot(n, ro)) / denom;
-		if (t > T_EPS && t < t_exit) { t_exit = t; exit_plane = off + i; }
-	}
-}
-
-// Edge rounding as shading: near a neighboring half-space boundary, bend the
-// normal toward that plane's normal. Silhouette untouched.
-vec3 rounded_normal(int off, int count, vec3 p, int hit_plane, float radius) {
-	vec3 n = planes[hit_plane].n_d.xyz;
-	if (radius <= 0.0005) { return n; }
-	vec3 acc = n;
-	for (int i = 0; i < count; i++) {
-		if (off + i == hit_plane) { continue; }
-		float slack = planes[off + i].n_d.w - dot(planes[off + i].n_d.xyz, p);
-		if (slack < radius) {
-			float w = 1.0 - clamp(slack / radius, 0.0, 1.0);
-			acc += planes[off + i].n_d.xyz * (w * w * 0.6);
-		}
-	}
-	return normalize(acc);
-}
-
-// ---------------------------------------------------------------- wear
-// Procedural scratch field in facet-local UV. Returns extra roughness.
-float scratch_field(Stone st, int plane_idx, vec3 p, vec3 n, uint seed_mix) {
-	float density = st.wear0.y;
-	if (density <= 0.01) { return 0.0; }
-	vec3 t1, t2;
-	basis(n, t1, t2);
-	vec2 uv = vec2(dot(p, t1), dot(p, t2));
-	float total = 0.0;
-	uint h = uint(plane_idx) * 7919u + seed_mix * 31u + 977u;
-	// Sparse individual scratches, not a woven fabric: few lines, hairline
-	// width, angles clustered around a per-facet wipe direction.
-	int lines = int(clamp(density * 0.5, 1.0, 6.0));
-	float wipe = float(pcg(h)) * (6.2831853 / 4294967296.0);
-	for (int k = 0; k < lines; k++) {
-		float ang = wipe + (float(pcg(h)) * (1.0 / 4294967296.0) - 0.5) * 1.1;
-		float freq = 12.0 + float(pcg(h) & 127u) * 0.9;
-		float phase = float(pcg(h)) * (6.2831853 / 4294967296.0);
-		float s = sin((uv.x * cos(ang) + uv.y * sin(ang)) * freq + phase);
-		total += smoothstep(0.9975, 1.0, abs(s));
-	}
-	// Abrasion patches: broad low-frequency roughness blotches.
-	float ab = st.wear0.w;
-	if (ab > 0.005) {
-		float blotch = sin(uv.x * 9.1 + float(h & 15u)) * sin(uv.y * 7.3 + float(h & 31u));
-		total += ab * smoothstep(0.2, 0.9, blotch);
-	}
-	return clamp(total, 0.0, 1.0) * 0.30;
-}
-
-float surface_roughness(Stone st, int plane_idx, vec3 p, vec3 n, uint seed_mix) {
-	return clamp(planes[plane_idx].aux.y + st.wear0.x + scratch_field(st, plane_idx, p, n, seed_mix), 0.0, 0.6);
+vec4 env_radiance(vec3 dir, vec4 wl, float rig_yaw, vec4 role_mult, float fp) {
+	return env_radiance_ex(dir, wl, rig_yaw, role_mult, fp, true,
+		vec4(pc.bg_zenith, pc.bg_horizon, pc.bg_below, pc.bg_kelvin), pc.light_count);
 }
 
 // ---------------------------------------------------------------- inclusions
-// Analytic ray tests. Returns t or INF.
 float isect_capsule(vec3 ro, vec3 rd, vec3 c, vec3 axis, float half_len, float radius) {
 	vec3 pa = c - axis * half_len;
 	vec3 ba = axis * (2.0 * half_len);
@@ -316,7 +145,6 @@ float isect_capsule(vec3 ro, vec3 rd, vec3 c, vec3 axis, float half_len, float r
 	float t = (-b - sqrt(h)) / max(a, 1e-9);
 	float y = baoa + t * bard;
 	if (y > 0.0 && y < baba && t > T_EPS) { return t; }
-	// caps
 	vec3 oc = (y <= 0.0) ? oa : ro - (pa + ba);
 	b = dot(rd, oc);
 	cc = dot(oc, oc) - radius * radius;
@@ -338,47 +166,90 @@ float isect_sphere(vec3 ro, vec3 rd, vec3 c, float radius) {
 	return t > T_EPS ? t : INF;
 }
 
-float isect_disc(vec3 ro, vec3 rd, vec3 c, vec3 n, float radius, float half_th) {
+float disc_coverage(vec3 hit, vec3 c, vec3 n, float radius, float style, uint seed) {
+	vec3 q = hit - c;
+	vec3 t1, t2;
+	basis(n, t1, t2);
+	float x = dot(q, t1);
+	float y = dot(q, t2);
+	float r = sqrt(x * x + y * y);
+	float ang = atan(y, x);
+	float irreg = style > 0.5 ? 0.72 : 0.0;
+	float wobble = 1.0 + irreg * 0.55 * (
+		sin(ang * 3.0 + float(seed % 97u) * 0.11)
+		* sin(ang * 5.0 + float(seed % 53u) * 0.07)
+		+ 0.4 * sin(ang * 2.0 + float(seed % 29u) * 0.13));
+	if (r > radius * max(wobble, 0.12)) { return 0.0; }
+	if (style > 0.5) {
+		float along = x * 0.82 + y * 0.57;
+		float across = -x * 0.57 + y * 0.82;
+		float wave = radius * 0.16 * sin(along * 18.0 + float(seed) * 0.01);
+		float band = abs(across - wave) / max(radius, 1e-5);
+		float taper = smoothstep(1.0, 0.35, r / max(radius, 1e-5));
+		if (band > mix(0.22, 0.08, taper)) { return 0.0; }
+	} else {
+		float nr = r / max(radius * (0.96 + 0.04 * sin(ang * 2.0 + float(seed % 17u))), 1e-5);
+		if (nr < 0.80 || nr > 1.0) { return 0.0; }
+	}
+	return 1.0;
+}
+
+float isect_disc(vec3 ro, vec3 rd, vec3 c, vec3 n, float radius, float style, uint seed) {
 	float denom = dot(rd, n);
 	if (abs(denom) < 1e-6) { return INF; }
 	float t = dot(c - ro, n) / denom;
 	if (t <= T_EPS) { return INF; }
-	vec3 q = ro + rd * t - c;
-	if (dot(q, q) - pow(dot(q, n), 2.0) > radius * radius) { return INF; }
-	return t; // thin: half_th folded into scatter probability
+	vec3 hit = ro + rd * t;
+	if (disc_coverage(hit, c, n, radius, style, seed) <= 0.0) { return INF; }
+	return t;
 }
 
-float isect_ellipsoid(vec3 ro, vec3 rd, vec3 c, vec3 axis, float r_major, float r_minor) {
-	vec3 t1, t2;
-	basis(axis, t1, t2);
+bool ellipsoid_span(vec3 ro, vec3 rd, vec3 c, vec3 axis, float r_major, float r_minor,
+		float t_max, out float t0, out float t1) {
+	vec3 t1b, t2b;
+	basis(axis, t1b, t2b);
+	float rm = max(r_minor, 1e-5);
+	float rM = max(r_major, 1e-5);
 	vec3 lo = ro - c;
-	vec3 o = vec3(dot(lo, t1) / r_minor, dot(lo, t2) / r_minor, dot(lo, axis) / r_major);
-	vec3 d = vec3(dot(rd, t1) / r_minor, dot(rd, t2) / r_minor, dot(rd, axis) / r_major);
-	float a = dot(d, d), b = dot(o, d), cc = dot(o, o) - 1.0;
+	vec3 o = vec3(dot(lo, t1b) / rm, dot(lo, t2b) / rm, dot(lo, axis) / rM);
+	vec3 d = vec3(dot(rd, t1b) / rm, dot(rd, t2b) / rm, dot(rd, axis) / rM);
+	float a = dot(d, d);
+	if (a < 1e-12) { return false; }
+	float b = dot(o, d);
+	float cc = dot(o, o) - 1.0;
 	float h = b * b - a * cc;
-	if (h < 0.0) { return INF; }
-	float t = (-b - sqrt(h)) / max(a, 1e-9);
-	return t > T_EPS ? t : INF;
+	if (h < 0.0) { return false; }
+	float s = sqrt(h);
+	float ia = 1.0 / a;
+	t0 = (-b - s) * ia;
+	t1 = (-b + s) * ia;
+	if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; }
+	t0 = max(t0, T_EPS);
+	t1 = min(t1, t_max);
+	return t1 > t0;
 }
 
+// Nearest inclusion SURFACE (needle / disc / crystal). Clouds are volumes.
 float inclusions_hit(Stone st, vec3 ro, vec3 rd, float t_max, out int hit_prim) {
 	hit_prim = -1;
 	float best = t_max;
 	for (int i = 0; i < st.ranges0.w; i++) {
 		Prim pr = prims[st.ranges0.z + i];
 		int type = int(pr.a.w);
+		if (type == 2) { continue; }
 		float t = INF;
 		if (type == 0) { t = isect_capsule(ro, rd, pr.a.xyz, pr.b.xyz, pr.b.w, pr.c.x); }
-		else if (type == 1) { t = isect_disc(ro, rd, pr.a.xyz, pr.b.xyz, pr.b.w, pr.c.x); }
-		else if (type == 2) { t = isect_ellipsoid(ro, rd, pr.a.xyz, pr.b.xyz, pr.b.w, pr.c.x); }
-		else { t = isect_sphere(ro, rd, pr.a.xyz, pr.b.w); }
+		else if (type == 1) {
+			uint seed = uint(abs(dot(pr.a.xyz, vec3(12.9898, 78.233, 37.719))) * 4096.0) + pc.seed;
+			t = isect_disc(ro, rd, pr.a.xyz, pr.b.xyz, pr.b.w, pr.d.z, seed);
+		} else {
+			t = isect_sphere(ro, rd, pr.a.xyz, pr.b.w);
+		}
 		if (t < best) { best = t; hit_prim = st.ranges0.z + i; }
 	}
 	return hit_prim >= 0 ? best : INF;
 }
 
-// Broad-band tint applied per hero wavelength (documented approximation:
-// R drives >580nm, G 490-580, B <490).
 vec4 tint_for(vec4 wl, vec3 tint) {
 	vec4 o;
 	for (int i = 0; i < 4; i++) {
@@ -389,53 +260,81 @@ vec4 tint_for(vec4 wl, vec3 tint) {
 	return o;
 }
 
-// ---------------------------------------------------------------- zoning
+// ---------------------------------------------------------------- unified free flight
+// Cloud ellipsoid spans along the chord [0, t_max]; densities in stone units.
+int gather_clouds(Stone st, vec3 ro, vec3 rd, float t_max,
+		out float c_t0[MAX_CLOUD_SPANS], out float c_t1[MAX_CLOUD_SPANS],
+		out float c_dens[MAX_CLOUD_SPANS], out int c_prim[MAX_CLOUD_SPANS]) {
+	int n = 0;
+	float size_mm = st.sell_b_size.w;
+	for (int i = 0; i < st.ranges0.w && n < MAX_CLOUD_SPANS; i++) {
+		Prim pr = prims[st.ranges0.z + i];
+		if (int(pr.a.w) != 2) { continue; }
+		float t0, t1;
+		if (!ellipsoid_span(ro, rd, pr.a.xyz, pr.b.xyz, pr.b.w, pr.c.x, t_max, t0, t1)) { continue; }
+		c_t0[n] = t0;
+		c_t1[n] = t1;
+		c_dens[n] = max(pr.c.y, 0.0) * size_mm;
+		c_prim[n] = st.ranges0.z + i;
+		n++;
+	}
+	return n;
+}
+
+float optical_depth(float t, float sigma_h, int n_c, float c_t0[MAX_CLOUD_SPANS], float c_t1[MAX_CLOUD_SPANS], float c_dens[MAX_CLOUD_SPANS]) {
+	float tau = sigma_h * t;
+	for (int i = 0; i < n_c; i++) {
+		tau += c_dens[i] * clamp(t - c_t0[i], 0.0, c_t1[i] - c_t0[i]);
+	}
+	return tau;
+}
+
+// ---------------------------------------------------------------- zoning / absorption
 float zoning_scale(Stone st, vec3 p) {
 	float contrast = st.scatter_zone.w;
 	if (contrast <= 0.001) { return 1.0; }
-	float band = sin(dot(p, st.zone_axis_phase.xyz) * st.scatter_zone.z * 3.14159 + st.zone_axis_phase.w);
+	float band = sin(dot(p, st.zone_axis_phase.xyz) * st.scatter_zone.z * PI + st.zone_axis_phase.w);
 	return 1.0 + contrast * band;
 }
 
-// Beer-Lambert over a chord. Zoning sampled at the midpoint.
-vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl) {
+// Beer-Lambert. pol_mode: UNPOL = 0.5 To + 0.5 Tk; O = pure o-ray; K = mixed k-ray.
+// alpha_k = cos^2(phi) alpha_o + sin^2(phi) alpha_e  (GIA G&G Spring 2021).
+vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl, int pol_mode) {
 	float size_mm = st.sell_b_size.w;
 	vec3 mid = pos + dir * (t * 0.5);
-	float zf = zoning_scale(st, mid) * st.wear1.w;
-	vec4 alpha;
-	if (has_eray) {
-		float ca = abs(dot(dir, st.optic_fluor.xyz));
-		float mix_e = ca * ca;
-		for (int i = 0; i < 4; i++) {
-			alpha[i] = mix(absorb_at(a_off, wl[i]), absorb_at(a_off + 81, wl[i]), mix_e);
-		}
-	} else {
-		alpha = vec4(absorb_at(a_off, wl.x), absorb_at(a_off, wl.y), absorb_at(a_off, wl.z), absorb_at(a_off, wl.w));
+	float zf = zoning_scale(st, mid) * st.misc.y;
+	float L = t * size_mm;
+	if (!has_eray) {
+		vec4 alpha = vec4(absorb_at(a_off, wl.x), absorb_at(a_off, wl.y),
+			absorb_at(a_off, wl.z), absorb_at(a_off, wl.w));
+		return exp(-alpha * zf * L);
 	}
-	return exp(-alpha * zf * (t * size_mm));
+	float ca = abs(dot(dir, st.optic_fluor.xyz));
+	float c2 = ca * ca;
+	float s2 = 1.0 - c2;
+	vec4 alpha_o, alpha_e, alpha_k;
+	for (int i = 0; i < 4; i++) {
+		alpha_o[i] = absorb_at(a_off, wl[i]);
+		alpha_e[i] = absorb_at(a_off + 81, wl[i]);
+		alpha_k[i] = c2 * alpha_o[i] + s2 * alpha_e[i];
+	}
+	if (pol_mode == POL_O) { return exp(-alpha_o * zf * L); }
+	if (pol_mode == POL_K) { return exp(-alpha_k * zf * L); }
+	return 0.5 * exp(-alpha_o * zf * L) + 0.5 * exp(-alpha_k * zf * L);
 }
 
-// After an HG scatter (homogeneous volume or cloud primitive): remaining
-// chord to the hull, then the analytic rig. Continues only the TIR/reflect
-// branch. One HG event per path — milk is σ, not bounce count.
-void scatter_nee(Stone st, int p_off, int p_cnt, int a_off, bool has_eray,
-		vec4 wl, vec4 n_wl, float n_geom, vec4 q, float rig_yaw, vec4 role_mult, vec4 dirt_tint,
-		inout vec3 pos, inout vec3 dir, inout vec4 throughput, inout vec4 radiance,
-		inout float fluor_absorbed, inout uint rng) {
-	float t_nee;
-	int nee_plane;
-	hull_exit(p_off, p_cnt, pos, dir, t_nee, nee_plane);
-	vec4 att_n = segment_att(st, pos, dir, t_nee, a_off, has_eray, wl);
-	if (FLAG_FLUOR && st.optic_fluor.w > 0.0) {
-		vec4 pump = smoothstep(vec4(620.0), vec4(480.0), wl);
-		fluor_absorbed += dot(throughput * (vec4(1.0) - att_n), pump);
-	}
-	throughput *= att_n;
-	pos += dir * t_nee;
-	float rough = surface_roughness(st, nee_plane, pos, planes[nee_plane].n_d.xyz, pc.seed);
-	vec3 en = rounded_normal(p_off, p_cnt, pos, nee_plane, st.wear1.y);
-	en = ggx_perturb(en, rough, rng);
-	if (dot(dir, en) < 0.02) { en = planes[nee_plane].n_d.xyz; }
+void accumulate_fp(inout float fp, float rough, bool reflect_branch) {
+	float a = rough * rough;
+	float add = reflect_branch ? (2.0 * a) : a;
+	fp = sqrt(fp * fp + add * add);
+}
+
+// ---------------------------------------------------------------- surfaces
+// Specular dielectric exit at a known plane (segment attenuation already applied).
+void surface_exit_at(Stone st, int exit_plane, vec4 wl, vec4 n_wl, float n_geom, vec4 q,
+		float rig_yaw, vec4 role_mult, float fp_env,
+		inout vec3 pos, inout vec3 dir, inout vec4 throughput, inout vec4 radiance) {
+	vec3 en = planes[exit_plane].n_d.xyz;
 	float ci = clamp(dot(dir, en), 0.0, 1.0);
 	float s2o = n_geom * n_geom * (1.0 - ci * ci);
 	if (s2o < 1.0) {
@@ -444,48 +343,87 @@ void scatter_nee(Stone st, int p_off, int p_cnt, int a_off, bool has_eray,
 			fresnel_diel(ci, n_wl.z), fresnel_diel(ci, n_wl.w));
 		float cto = sqrt(1.0 - s2o);
 		vec3 dout = normalize(n_geom * dir - (n_geom * ci - cto) * en);
-		radiance += throughput * (vec4(1.0) - r_exit) * dirt_tint
-			* env_radiance(quat_rot(q, dout), wl, rig_yaw, role_mult);
+		radiance += throughput * (vec4(1.0) - r_exit)
+			* env_radiance(quat_rot(q, dout), wl, rig_yaw, role_mult, fp_env);
 		throughput *= r_exit;
 	}
 	dir = normalize(reflect(dir, en));
-	if (dot(dir, planes[nee_plane].n_d.xyz) > 0.0) {
-		dir = normalize(reflect(dir, planes[nee_plane].n_d.xyz));
+	pos -= en * (T_EPS * 4.0);
+}
+
+// ---------------------------------------------------------------- scatter field
+// HG-scattered radiance at x toward the camera path direction `dir` for the
+// 4 hero wavelengths, from the precomputed SH field (see gem_scatter_field).
+// Convolution with the HG kernel scales SH band l by g^l.
+vec4 field_scatter(int inst_idx, vec3 x, vec3 dir, float g, vec4 wl) {
+	int gn = pc.field_grid;
+	vec3 gp = clamp((x + vec3(FIELD_HALF)) * (float(gn) / (2.0 * FIELD_HALF)), vec3(0.5), vec3(float(gn) - 0.5));
+	float u = (float(inst_idx * gn) + gp.x) / float(pc.field_insts * gn);
+	float v = gp.y / float(gn);
+	float Y[16];
+	sh16(dir, Y);
+	float gl[4] = float[](1.0, g, g * g, g * g * g);
+	vec4 out_rad = vec4(0.0);
+	for (int c = 0; c < 4; c++) {
+		float fb = clamp((wl[c] - 380.0) / FIELD_BAND_NM - 0.5, 0.0, float(FIELD_BANDS - 1));
+		int b0 = int(fb);
+		int b1 = min(b0 + 1, FIELD_BANDS - 1);
+		float f = fb - float(b0);
+		float L = 0.0;
+		for (int t = 0; t < 4; t++) {
+			float w0 = ((float(b0 * 4 + t) * float(gn)) + gp.z) / float(FIELD_SLABS * gn);
+			float w1 = ((float(b1 * 4 + t) * float(gn)) + gp.z) / float(FIELD_SLABS * gn);
+			// Explicit LOD: implicit-LOD sampling is undefined outside fragment shaders.
+			vec4 coef = mix(textureLod(field, vec3(u, v, w0), 0.0), textureLod(field, vec3(u, v, w1), 0.0), f);
+			// Coefficients t*4 .. t*4+3: l = 0 | 1 1 1 | 2 2 2 2 2 | 3 3 3 3 3 3 3
+			int k = t * 4;
+			L += coef.x * Y[k] * gl[(k == 0) ? 0 : ((k < 4) ? 1 : ((k < 9) ? 2 : 3))];
+			L += coef.y * Y[k + 1] * gl[(k + 1 < 4) ? 1 : ((k + 1 < 9) ? 2 : 3)];
+			L += coef.z * Y[k + 2] * gl[(k + 2 < 4) ? 1 : ((k + 2 < 9) ? 2 : 3)];
+			L += coef.w * Y[k + 3] * gl[(k + 3 < 4) ? 1 : ((k + 3 < 9) ? 2 : 3)];
+		}
+		out_rad[c] = max(L, 0.0);
 	}
-	pos -= planes[nee_plane].n_d.xyz * (T_EPS * 4.0);
+	return out_rad;
 }
 
 // ================================================================= main
 void main() {
-	ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 pix = ivec2(gl_GlobalInvocationID.xy) + ivec2(0, pc.row_origin);
 	if (pix.x >= pc.resolution.x || pix.y >= pc.resolution.y) { return; }
 	uint idx = uint(pix.y) * uint(pc.resolution.x) + uint(pix.x);
 
-	// Which instance does this pixel belong to?
 	int col = min(pix.x / pc.cell_px.x, pc.grid.x - 1);
 	int row = min(pix.y / pc.cell_px.y, pc.grid.y - 1);
-	Inst inst = insts[row * pc.grid.x + col];
+	int inst_idx = row * pc.grid.x + col;
+	Inst inst = insts[inst_idx];
 	Stone st = stones[inst.which.x];
 	vec2 cell_uv = vec2(pix - ivec2(col, row) * pc.cell_px) / vec2(pc.cell_px);
 
-	uint rng = (uint(pix.x) * 1973u + uint(pix.y) * 9277u + pc.frame * 26699u + pc.seed * 30011u) | 1u;
+	// Fixed per-pixel CP rotation (independent of dispatch); PCG stream per dispatch.
+	uint prot = (uint(pix.x) * 1973u + uint(pix.y) * 9277u + pc.seed * 30011u) | 1u;
+	vec2 pix_rot = vec2(rnd(prot), rnd(prot));
+	uint rng = (uint(pix.x) * 1973u + uint(pix.y) * 9277u + pc.sample_base * 26699u + pc.seed * 30011u) | 1u;
+	pcg(rng);
 	vec4 q = inst.quat;
 	vec4 qc = quat_conj(q);
 	vec4 role_mult = vec4(inst.rig.z, inst.rig.w, inst.rig2.x, inst.rig2.y);
 	float rig_yaw = inst.rig.x;
+	float ortho_half = inst.rig.y;
 	int p_off = st.ranges0.x;
 	int p_cnt = st.ranges0.y;
 	int a_off = st.ranges1.x;
 	bool has_eray = (st.ranges1.y & 1) != 0;
 	float size_mm = st.sell_b_size.w;
-	float sigma = st.scatter_zone.x;
+	float sigma_h = FLAG_VOLUME ? st.scatter_zone.x * size_mm : 0.0;
 	float hg_g = st.scatter_zone.y;
 
 	vec3 total_xyz = vec3(0.0);
 	float total_cov = 0.0;
 
 	for (uint s = 0u; s < pc.spp; s++) {
-		float xi = rnd(rng);
+		uint n = pc.sample_base + s;
+		float xi = qmc(n, 2u, pix_rot);
 		vec4 wl = WL_MIN + (vec4(0.0, 1.0, 2.0, 3.0) + xi) * (WL_RANGE / 4.0);
 		vec4 n_wl = vec4(
 			sellmeier(st.sell_b_size.xyz, st.sell_c_biref.xyz, wl.x),
@@ -493,9 +431,9 @@ void main() {
 			sellmeier(st.sell_b_size.xyz, st.sell_c_biref.xyz, wl.z),
 			sellmeier(st.sell_b_size.xyz, st.sell_c_biref.xyz, wl.w));
 
-		// Camera ray (ortho, cell-local), into stone space.
-		vec2 ndc = (cell_uv + (vec2(rnd(rng), rnd(rng)) - 0.5) / vec2(pc.cell_px)) * 2.0 - 1.0;
-		vec3 ro_w = vec3(ndc.x * inst.rig.y, -ndc.y * inst.rig.y, 5.0);
+		vec2 r2 = qmc2(n, 0u, 1u, pix_rot);
+		vec2 ndc = (cell_uv + (r2 - 0.5) / vec2(pc.cell_px)) * 2.0 - 1.0;
+		vec3 ro_w = vec3(ndc.x * ortho_half, -ndc.y * ortho_half, 5.0);
 		vec3 ro = quat_rot(qc, ro_w);
 		vec3 rd = quat_rot(qc, vec3(0.0, 0.0, -1.0));
 
@@ -505,158 +443,204 @@ void main() {
 		total_cov += 1.0;
 
 		vec3 p_hit = ro + rd * t_near;
-		float entry_rough = surface_roughness(st, entry_plane, p_hit, planes[entry_plane].n_d.xyz, pc.seed);
-		vec3 n_entry = rounded_normal(p_off, p_cnt, p_hit, entry_plane, st.wear1.y);
-		n_entry = ggx_perturb(n_entry, entry_rough, rng);
-		if (dot(n_entry, rd) > -0.02) { n_entry = planes[entry_plane].n_d.xyz; }
+		vec3 n_entry = planes[entry_plane].n_d.xyz;
 		float cos_i = clamp(-dot(rd, n_entry), 0.0, 1.0);
 
 		vec4 radiance = vec4(0.0);
 		float fluor_absorbed = 0.0;
 
-		// Surface reflection lobe.
 		vec4 r_surf = vec4(
 			fresnel_diel(cos_i, 1.0 / n_wl.x), fresnel_diel(cos_i, 1.0 / n_wl.y),
 			fresnel_diel(cos_i, 1.0 / n_wl.z), fresnel_diel(cos_i, 1.0 / n_wl.w));
-		radiance += r_surf * env_radiance(quat_rot(q, reflect(rd, n_entry)), wl, rig_yaw, role_mult);
+		radiance += r_surf * env_radiance(quat_rot(q, reflect(rd, n_entry)), wl, rig_yaw, role_mult, 0.0);
 
-		// Dirt film: broadband loss + brownish bias at entry.
-		vec4 dirt_tint = vec4(1.0);
-		if (st.wear1.x > 0.005) {
-			vec4 dirt_a = vec4(0.9, 0.75, 0.55, 0.45); // more loss at short wavelengths
-			dirt_tint = mix(vec4(1.0), dirt_a, clamp(st.wear1.x, 0.0, 1.0));
-		}
-
-		// Pass setup: dispersion split -> 4 single-lambda passes;
-		// birefringence -> x2 passes with n_o / n_e.
 		bool disp = FLAG_DISPERSION && (st.ranges1.y & 2) != 0;
-		bool biref = FLAG_BIREF && st.sell_c_biref.w > 0.015;
+		bool biref = FLAG_BIREF && abs(st.sell_c_biref.w) > 0.015;
 		int n_passes = (disp ? 4 : 1) * (biref ? 2 : 1);
+
+		// Structured dimensions shared by all passes of this sample.
+		float tau_free0 = -log(max(1e-6, 1.0 - qmc(n, 3u, pix_rot)));
+		vec2 u_scat = qmc2(n, 4u, 5u, pix_rot);
+		float u_med = qmc(n, 6u, pix_rot);
 
 		for (int pass_i = 0; pass_i < n_passes; pass_i++) {
 			int wl_i = disp ? (pass_i % 4) : -1;
 			bool eray = biref && (pass_i >= n_passes / 2);
 			vec4 mask = disp ? vec4(wl_i == 0 ? 1.0 : 0.0, wl_i == 1 ? 1.0 : 0.0, wl_i == 2 ? 1.0 : 0.0, wl_i == 3 ? 1.0 : 0.0) : vec4(1.0);
 			float pass_w = (biref ? 0.5 : 1.0);
-			float n_geom = disp ? n_wl[wl_i] : n_wl.x;
-			if (eray) { n_geom += st.sell_c_biref.w; }
+			// Shared geometry uses a mid-spectrum index when not splitting.
+			float n_o = disp ? n_wl[wl_i] : 0.5 * (n_wl.y + n_wl.z);
+			float ca_in = abs(dot(rd, st.optic_fluor.xyz));
+			float n_geom = eray ? n_e_phi(n_o, st.sell_c_biref.w, ca_in) : n_o;
+			int pol_mode = biref ? (eray ? POL_K : POL_O) : POL_UNPOL;
 
 			float eta_in = 1.0 / n_geom;
 			float s2 = eta_in * eta_in * (1.0 - cos_i * cos_i);
 			if (s2 >= 1.0) { continue; }
 			float ct = sqrt(1.0 - s2);
 			vec3 dir = normalize(eta_in * rd + (eta_in * cos_i - ct) * n_entry);
-			vec4 throughput = (vec4(1.0) - r_surf) * dirt_tint * mask * pass_w;
-			vec3 pos = p_hit - planes[entry_plane].n_d.xyz * (T_EPS * 4.0);
+			vec4 throughput = (vec4(1.0) - r_surf) * mask * pass_w;
+			vec3 pos = p_hit - n_entry * (T_EPS * 4.0);
+			float fp = 0.0;
+			float tau_free = tau_free0;
 			int scatter_events = 0;
+			uint b = 0u;
 
-			for (uint b = 0u; b < pc.max_bounces; b++) {
-				float t_exit;
-				int exit_plane;
-				hull_exit(p_off, p_cnt, pos, dir, t_exit, exit_plane);
+			// One-slot split stack for the first inclusion surface hit.
+			bool has_alt = false;
+			vec3 alt_pos = pos, alt_dir = dir;
+			vec4 alt_thr = throughput;
+			float alt_fp = 0.0, alt_tau = tau_free;
+			int alt_scat = 0;
+			uint alt_b = 0u;
 
-				int hit_prim;
-				float t_incl = inclusions_hit(st, pos, dir, t_exit, hit_prim);
-
-				float t_scat = INF;
-				int vol_mode = VOLUME_MODE;
-				// One scatter event even in VOLUME_FULL: a random walk of HG
-				// events is the quartz noise source. Milk reads from sigma, not
-				// from bounce count. VOLUME_OFF still skips scatter entirely.
-				bool vol_allowed = vol_mode != 0 && scatter_events == 0;
-				if (sigma > 0.001 && vol_allowed) {
-					t_scat = -log(max(1e-6, 1.0 - rnd(rng))) / (sigma * size_mm);
+			for (int branch = 0; branch < 2; branch++) {
+				if (branch == 1) {
+					if (!has_alt) { break; }
+					pos = alt_pos; dir = alt_dir; throughput = alt_thr; fp = alt_fp;
+					tau_free = alt_tau; scatter_events = alt_scat; b = alt_b;
 				}
+				for (; b < pc.max_bounces; b++) {
+					float t_exit;
+					int exit_plane;
+					hull_exit(p_off, p_cnt, pos, dir, t_exit, exit_plane);
+					if (t_exit >= INF * 0.5) { break; }
 
-				float t_ev = min(t_exit, min(t_incl, t_scat));
+					int hit_prim;
+					float t_incl = inclusions_hit(st, pos, dir, t_exit, hit_prim);
+					float t_lim = min(t_exit, t_incl);
 
-				vec4 seg_att = segment_att(st, pos, dir, t_ev, a_off, has_eray, wl);
-				if (FLAG_FLUOR && st.optic_fluor.w > 0.0) {
-					vec4 pump = smoothstep(vec4(620.0), vec4(480.0), wl);
-					fluor_absorbed += dot(throughput * (vec4(1.0) - seg_att), pump);
-				}
-				throughput *= seg_att;
-
-				if (t_scat <= t_incl && t_scat <= t_exit) {
-					pos += dir * t_scat;
-					dir = hg_sample(dir, hg_g, rng);
-					scatter_events++;
-					scatter_nee(st, p_off, p_cnt, a_off, has_eray, wl, n_wl, n_geom, q,
-						rig_yaw, role_mult, dirt_tint, pos, dir, throughput, radiance,
-						fluor_absorbed, rng);
-				} else if (t_incl < t_exit) {
-					// Inclusion interaction. Needles (rutile silk) and platelets are
-					// rough-SPECULAR reflectors off their geometry — silk reads as
-					// bright streaks, not as diffuse fog. Clouds stay HG scatter.
-					pos += dir * t_incl;
-					Prim pr = prims[hit_prim];
-					int type = int(pr.a.w);
-					vec4 tnt = tint_for(wl, vec3(pr.c.z, pr.c.w, pr.d.x));
-					float dens = clamp(pr.c.y * 0.30, 0.1, 0.95);
-					if (type == 3) {
-						vec3 n_p = normalize(pos - pr.a.xyz);
-						dir = normalize(reflect(dir, ggx_perturb(n_p, 0.25, rng)));
-						throughput *= tnt * 0.9;
-					} else if (type == 0) {
-						vec3 ap = pr.a.xyz + pr.b.xyz * dot(pos - pr.a.xyz, pr.b.xyz);
-						vec3 n_cyl = normalize(pos - ap);
-						if (dot(n_cyl, dir) > 0.0) { n_cyl = -n_cyl; }
-						if (rnd(rng) < dens) {
-							dir = normalize(reflect(dir, ggx_perturb(n_cyl, 0.30, rng)));
-							throughput *= tnt;
+					// Unified free flight over homogeneous milk + cloud spans.
+					float t_scat = INF;
+					int scat_medium = -1;  // -1 homogeneous, else cloud prim index
+					if (FLAG_VOLUME && scatter_events == 0) {
+						float c_t0[MAX_CLOUD_SPANS], c_t1[MAX_CLOUD_SPANS], c_dens[MAX_CLOUD_SPANS];
+						int c_prim[MAX_CLOUD_SPANS];
+						int n_c = gather_clouds(st, pos, dir, t_lim, c_t0, c_t1, c_dens, c_prim);
+						float tau_chord = optical_depth(t_lim, sigma_h, n_c, c_t0, c_t1, c_dens);
+						if (tau_chord > 0.0 && tau_free < tau_chord) {
+							float lo = 0.0, hi = t_lim;
+							for (int it = 0; it < 20; it++) {
+								float mid = 0.5 * (lo + hi);
+								if (optical_depth(mid, sigma_h, n_c, c_t0, c_t1, c_dens) < tau_free) { lo = mid; } else { hi = mid; }
+							}
+							t_scat = 0.5 * (lo + hi);
+							// Choose the medium at t_scat proportional to local extinction.
+							float total = sigma_h;
+							for (int i = 0; i < n_c; i++) {
+								if (t_scat >= c_t0[i] && t_scat <= c_t1[i]) { total += c_dens[i]; }
+							}
+							float pick = u_med * total;
+							float acc = sigma_h;
+							if (pick >= acc) {
+								for (int i = 0; i < n_c; i++) {
+									if (t_scat >= c_t0[i] && t_scat <= c_t1[i]) {
+										acc += c_dens[i];
+										if (pick < acc) { scat_medium = c_prim[i]; break; }
+									}
+								}
+							}
 						} else {
-							pos += dir * (T_EPS * 8.0);
+							tau_free -= tau_chord;
 						}
-					} else if (type == 1) {
-						vec3 n_dsc = pr.b.xyz;
-						if (dot(n_dsc, dir) > 0.0) { n_dsc = -n_dsc; }
-						if (rnd(rng) < dens) {
-							dir = normalize(reflect(dir, ggx_perturb(n_dsc, 0.22, rng)));
-							throughput *= tnt;
-						} else {
+					}
+
+					float t_ev = min(t_lim, t_scat);
+					vec4 seg_att = segment_att(st, pos, dir, t_ev, a_off, has_eray, wl, pol_mode);
+					if (FLAG_FLUOR && st.optic_fluor.w > 0.0) {
+						vec4 pump = smoothstep(vec4(620.0), vec4(480.0), wl);
+						fluor_absorbed += dot(throughput * (vec4(1.0) - seg_att), pump);
+					}
+					throughput *= seg_att;
+
+					if (t_scat < t_lim) {
+						// ---- scatter event
+						pos += dir * t_scat;
+						float g_phase = hg_g;
+						vec4 tnt = vec4(1.0);
+						if (scat_medium >= 0) {
+							Prim pr = prims[scat_medium];
+							tnt = tint_for(wl, vec3(pr.c.z, pr.c.w, pr.d.x));
+							g_phase = 0.45;
+						}
+						if (pc.field_exits > 0) {
+							// The field integrates every exit of the continuation: the
+							// path ends here.
+							radiance += throughput * tnt * field_scatter(inst_idx, pos, dir, g_phase, wl);
+							break;
+						}
+						// Field off: stochastic HG continuation (reference estimator).
+						vec2 u_dir = (scatter_events == 0 && branch == 0) ? u_scat : vec2(rnd(rng), rnd(rng));
+						dir = hg_sample_u(dir, g_phase, u_dir);
+						throughput *= tnt;
+						scatter_events++;
+					} else if (t_incl < t_exit) {
+						pos += dir * t_incl;
+						Prim pr = prims[hit_prim];
+						int type = int(pr.a.w);
+						vec4 tnt = tint_for(wl, vec3(pr.c.z, pr.c.w, pr.d.x));
+						float chord_mm = max(pr.c.x, 0.01) * size_mm;
+						float dens = clamp(1.0 - exp(-max(pr.c.y, 0.0) * chord_mm), 0.05, 0.95);
+						if (type == 3) {
+							vec3 n_p = normalize(pos - pr.a.xyz);
+							if (dot(n_p, dir) > 0.0) { n_p = -n_p; }
+							vec3 sparkle = normalize(reflect(dir, n_p));
+							float fp_s = fp;
+							accumulate_fp(fp_s, 0.25, true);
+							radiance += throughput * tnt * 0.18
+								* env_radiance(quat_rot(q, sparkle), wl, rig_yaw, role_mult, fp_s);
+							throughput *= mix(vec4(1.0), tnt, 0.22);
 							pos += dir * (T_EPS * 8.0);
+						} else {
+							vec3 n_i;
+							float p_reflect;
+							float rough;
+							if (type == 0) {
+								vec3 ap = pr.a.xyz + pr.b.xyz * dot(pos - pr.a.xyz, pr.b.xyz);
+								n_i = normalize(pos - ap);
+								p_reflect = dens;
+								rough = 0.30;
+							} else {
+								n_i = pr.b.xyz;
+								bool veil = pr.d.z > 0.5;
+								rough = veil ? 0.58 : 0.42;
+								p_reflect = veil ? dens * 0.28 : dens * 0.16;
+							}
+							if (dot(n_i, dir) > 0.0) { n_i = -n_i; }
+							bool do_reflect;
+							if (!has_alt) {
+								// Deterministic split: transmitted branch parked, reflected continues.
+								has_alt = true;
+								alt_pos = pos + dir * (T_EPS * 8.0);
+								alt_dir = dir;
+								alt_thr = throughput * (1.0 - p_reflect);
+								alt_fp = fp;
+								alt_tau = tau_free;
+								alt_scat = scatter_events;
+								alt_b = b + 1u;
+								throughput *= p_reflect;
+								do_reflect = true;
+							} else {
+								do_reflect = rnd(rng) < p_reflect;
+							}
+							if (do_reflect) {
+								dir = normalize(reflect(dir, n_i));
+								accumulate_fp(fp, rough, true);
+								throughput *= tnt;
+							} else {
+								pos += dir * (T_EPS * 8.0);
+							}
 						}
 					} else {
-						// Cloud / fingerprint (kernel type 2). Same one-HG+NEE
-						// contract as volume milk — a cloud random-walk is the
-						// remaining quartz grain at 160 spp.
-						if (scatter_events == 0 && rnd(rng) < dens) {
-							dir = hg_sample(dir, 0.45, rng);
-							throughput *= tnt;
-							scatter_events++;
-							scatter_nee(st, p_off, p_cnt, a_off, has_eray, wl, n_wl, n_geom, q,
-								rig_yaw, role_mult, dirt_tint, pos, dir, throughput, radiance,
-								fluor_absorbed, rng);
-						} else {
-							pos += dir * (T_EPS * 8.0);
-						}
+						pos += dir * t_exit;
+						// Post-scatter chains (field off only) see the environment
+						// through the same footprint floor the field pre-pass uses.
+						float fp_env = (scatter_events > 0) ? max(fp, pc.env_filter_rad) : fp;
+						surface_exit_at(st, exit_plane, wl, n_wl, n_geom, q, rig_yaw, role_mult,
+							fp_env, pos, dir, throughput, radiance);
 					}
-				} else {
-					// Hull exit: deterministic Fresnel split.
-					pos += dir * t_exit;
-					float rough = surface_roughness(st, exit_plane, pos, planes[exit_plane].n_d.xyz, pc.seed);
-					vec3 en = rounded_normal(p_off, p_cnt, pos, exit_plane, st.wear1.y);
-					en = ggx_perturb(en, rough, rng);
-					if (dot(dir, en) < 0.02) { en = planes[exit_plane].n_d.xyz; }
-					float ci = clamp(dot(dir, en), 0.0, 1.0);
-					float s2o = n_geom * n_geom * (1.0 - ci * ci);
-					if (s2o < 1.0) {
-						vec4 r_exit = vec4(
-							fresnel_diel(ci, n_wl.x), fresnel_diel(ci, n_wl.y),
-							fresnel_diel(ci, n_wl.z), fresnel_diel(ci, n_wl.w));
-						float cto = sqrt(1.0 - s2o);
-						vec3 dout = normalize(n_geom * dir - (n_geom * ci - cto) * en);
-						radiance += throughput * (vec4(1.0) - r_exit) * dirt_tint
-							* env_radiance(quat_rot(q, dout), wl, rig_yaw, role_mult);
-						throughput *= r_exit;
-					}
-					dir = normalize(reflect(dir, en));
-					if (dot(dir, planes[exit_plane].n_d.xyz) > 0.0) {
-						dir = normalize(reflect(dir, planes[exit_plane].n_d.xyz));
-					}
-					pos -= planes[exit_plane].n_d.xyz * (T_EPS * 4.0);
+					if (max(max(throughput.x, throughput.y), max(throughput.z, throughput.w)) < THROUGHPUT_EPS) { break; }
 				}
-				if (max(max(throughput.x, throughput.y), max(throughput.z, throughput.w)) < THROUGHPUT_EPS) { break; }
 			}
 		}
 
@@ -664,12 +648,9 @@ void main() {
 		vec3 xyz = (radiance.x * cie_xyz(wl.x) + radiance.y * cie_xyz(wl.y)
 			+ radiance.z * cie_xyz(wl.z) + radiance.w * cie_xyz(wl.w)) * pc.spectral_norm;
 		if (FLAG_FLUOR && st.optic_fluor.w > 0.0 && fluor_absorbed > 0.0) {
-			// Daylight fluorescence: pump-band losses re-emitted at the
-			// authored line. Strength on the chromophore is the yield lever;
-			// do not multiply by an extra gain (that was a matte wash on ruby).
 			float pump = min(fluor_absorbed, 1.0);
-			pump *= pump * (3.0 - 2.0 * pump); // ease-in: weak paths glow weakly
-			xyz += cie_xyz(st.wear1.z) * (pump * st.optic_fluor.w * pc.spectral_norm);
+			pump *= pump * (3.0 - 2.0 * pump);
+			xyz += cie_xyz(st.misc.x) * (pump * st.optic_fluor.w * pc.spectral_norm);
 		}
 		total_xyz += xyz;
 	}

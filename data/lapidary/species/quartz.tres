@@ -7,9 +7,9 @@
 script = ExtResource("1_kruo5")
 archetype_id = &"quartz_milk_bank"
 form = 3
-size_mm_range = Vector2(0.3, 0.8)
+size_mm_range = Vector2(0.08, 0.22)
 aspect = 1.0
-scatter_density = 13.0
+scatter_density = 6.0
 weight = 4.0
 
 [sub_resource type="Resource" id="Resource_ipch2"]
@@ -31,6 +31,7 @@ source_note = "Sellmeier: G. Ghosh, Opt. Commun. 163, 95-102 (1999), alpha-quart
 sellmeier_b = Vector3(1.0704409, 1.1020224, 0.2860414)
 sellmeier_c_um2 = Vector3(0.0100585995, 100, 0)
 birefringence = 0.009
+optic_axis_stone = Vector3(0, 0, 1)
 base_scatter_per_mm = 0.002
 scatter_anisotropy_g = 0.55
 inclusions = Array[ExtResource("1_kruo5")]([SubResource("Resource_ejd13"), SubResource("Resource_ipch2")])

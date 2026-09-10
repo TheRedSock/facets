@@ -18,7 +18,7 @@ center_bias = 0.2
 script = ExtResource("1_rln28")
 archetype_id = &"topaz_cloud"
 form = 3
-size_mm_range = Vector2(0.3, 0.7)
+size_mm_range = Vector2(0.08, 0.22)
 aspect = 1.0
 scatter_density = 5.5
 weight = 1.5
@@ -32,6 +32,7 @@ source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.612 (
 sellmeier_b = Vector3(0.4538599, 1.1094764, 0)
 sellmeier_c_um2 = Vector3(0.025, 0, 0)
 birefringence = 0.01
+optic_axis_stone = Vector3(0, 0, 1)
 base_scatter_per_mm = 0.001
 hardness_mohs = 8.0
 inclusions = Array[ExtResource("1_rln28")]([SubResource("Resource_jmu82"), SubResource("Resource_owgaa")])

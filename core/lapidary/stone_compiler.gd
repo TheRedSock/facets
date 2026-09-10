@@ -4,8 +4,17 @@ extends RefCounted
 ## StoneInstance dictionary consumed by the GPU kernel (see KERNEL_CONTRACT.md).
 ## This file owns the GRADE -> PHYSICS mapping. All randomness is a private
 ## deterministic hash sequence from the stone seed (never gameplay SeededRng).
+##
+## Grade axes consumed: cut (geometry), crystal (milk, zoning). The `surface`
+## axis has NO kernel effect (wear model removed; clean-optics baseline).
+## `clarity` is data only while INCLUSIONS_ENABLED is false — the primitive
+## placer is gated so the kernel never sees needles / lily pads / clouds.
+## Flip the const when the inclusion look is ready to re-assess.
 
 const CUT_COMPILER_PATH := "res://core/lapidary/cut/cut_compiler.gd"
+## Temporary clean-optics gate. Species vocabularies and grade.clarity stay
+## authored; nothing is packed into the kernel until this is true again.
+const INCLUSIONS_ENABLED := false
 const MAX_INCLUSION_PRIMS := 64
 const HULL_MARGIN := 0.07
 
@@ -36,6 +45,7 @@ static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary
 			absorption_eray[i] *= stone.chromophore.concentration
 
 	var rng_state := [int(stone.seed) * 2654435761 + 1013904223]
+	var signed_dn := species.birefringence * (1.0 if species.uniaxial_positive else -1.0)
 
 	return {
 		"planes": geometry["planes"],
@@ -49,9 +59,8 @@ static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary
 		"seed": stone.seed,
 		"scatter": _crystal_to_scatter(species, grade),
 		"zoning": _crystal_to_zoning(species, grade, rng_state),
-		"wear": _surface_to_wear(species, grade),
-		"birefringence": species.birefringence,
-		"optic_axis": Vector3(0.31, 0.12, 0.94).normalized(),
+		"birefringence": signed_dn,
+		"optic_axis": _resolve_optic_axis(stone).normalized(),
 		"fluorescence": _resolve_fluorescence(species, stone.chromophore),
 		"dispersion_strong": dispersion_bg(species) >= 0.025,
 		"fingerprint": stone.fingerprint(),
@@ -60,6 +69,12 @@ static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary
 
 static func dispersion_bg(species: GemSpecies) -> float:
 	return species.ior_at(WL_F) - species.ior_at(WL_C)
+
+
+static func _resolve_optic_axis(stone: GemStone) -> Vector3:
+	if stone.optic_axis_override != Vector3.ZERO:
+		return stone.optic_axis_override
+	return stone.species.optic_axis_stone
 
 
 ## Fluorescence is chromophore-gated: the glow comes from the coloring ion
@@ -78,11 +93,10 @@ static func _resolve_fluorescence(species: GemSpecies, chromo: GemChromophore) -
 # ------------------------------------------------------------------ cut
 
 static func _compile_cut(stone: GemStone, n_d: float, cut_q: float) -> Dictionary:
-	if ResourceLoader.exists(CUT_COMPILER_PATH):
-		var compiler: GDScript = load(CUT_COMPILER_PATH)
-		return compiler.call("compile", stone.cut, stone.silhouette, n_d, cut_q, stone.seed)
-	# Fallback until the cut language lands: solved round brilliant.
-	return {"planes": _fallback_brilliant(n_d, cut_q, stone.seed), "outline": PackedVector2Array()}
+	assert(ResourceLoader.exists(CUT_COMPILER_PATH),
+		"LapidaryStoneCompiler: cut compiler missing at %s" % CUT_COMPILER_PATH)
+	var compiler: GDScript = load(CUT_COMPILER_PATH)
+	return compiler.call("compile", stone.cut, stone.silhouette, n_d, cut_q, stone.seed)
 
 
 ## Pavilion law v2 (re-derived from the prototype's solver):
@@ -97,50 +111,11 @@ static func solve_pavilion_deg(n_d: float, cut_q: float) -> float:
 	return lerpf(windowed, optimal, clampf(cut_q, 0.0, 1.0))
 
 
-static func _fallback_brilliant(n_d: float, cut_q: float, seed: int) -> PackedFloat32Array:
-	var planes := PackedFloat32Array()
-	var g := 0.03
-	var a_p := deg_to_rad(solve_pavilion_deg(n_d, cut_q))
-	var a_c := deg_to_rad(lerpf(19.0, 34.5, cut_q))
-	var table_ratio: float = clampf(0.56 * lerpf(1.25, 1.0, cut_q), 0.1, 0.9)
-	var jitter := (1.0 - cut_q) * 0.035
-	var state := [seed * 747796405 + 2891336453]
-
-	var z_table := g + (1.0 - table_ratio) * tan(a_c)
-	_plane(planes, Vector3(0, 0, 1), z_table, 0, 0.0)
-	for i in 8:
-		var phi := TAU * (float(i) + 0.5) / 8.0 + _rndf(state) * jitter
-		var a := a_c + (_rndf(state) - 0.5) * jitter * 2.0
-		_plane(planes, Vector3(sin(a) * cos(phi), sin(a) * sin(phi), cos(a)), sin(a) + cos(a) * g, 1, 0.0)
-	var a_b := a_c + deg_to_rad(8.0)
-	for i in 16:
-		var phi := TAU * float(i) / 16.0 + _rndf(state) * jitter
-		_plane(planes, Vector3(sin(a_b) * cos(phi), sin(a_b) * sin(phi), cos(a_b)), sin(a_b) + cos(a_b) * g, 2, 0.0)
-	for i in 16:
-		var phi := TAU * (float(i) + 0.5) / 16.0
-		_plane(planes, Vector3(cos(phi), sin(phi), 0.0), 1.0, 3, 0.0)
-	for i in 8:
-		var phi := TAU * float(i) / 8.0 + _rndf(state) * jitter
-		var a := a_p + (_rndf(state) - 0.5) * jitter * 2.0
-		_plane(planes, Vector3(sin(a) * cos(phi), sin(a) * sin(phi), -cos(a)), sin(a) + cos(a) * g, 4, 0.0)
-	var a_lb := a_p + deg_to_rad(6.0)
-	for i in 16:
-		var phi := TAU * (float(i) + 0.5) / 16.0 + _rndf(state) * jitter
-		_plane(planes, Vector3(sin(a_lb) * cos(phi), sin(a_lb) * sin(phi), -cos(a_lb)), sin(a_lb) + cos(a_lb) * g, 5, 0.0)
-	_plane(planes, Vector3(0, 0, -1), (tan(a_p) + g) * 0.96, 6, 0.0)
-	return planes
-
-
-static func _plane(arr: PackedFloat32Array, n: Vector3, d: float, zone: int, rough: float) -> void:
-	var un := n.normalized()
-	arr.append_array(PackedFloat32Array([un.x, un.y, un.z, d, float(zone), rough, 0.0, 0.0]))
-
-
 # ------------------------------------------------------------------ grade axes
 
 static func _crystal_to_scatter(species: GemSpecies, grade: GemGrade) -> Dictionary:
-	# Tuned so a T1 (crystal ~0.4) stays translucent-milky: mean free path a bit
-	# over the stone radius, 1-2 scatter events — windowing must stay legible.
+	# T1 crystal ~0.66: translucent, not milky-white. Mean free path stays
+	# longer than the stone; windowing remains legible.
 	var haze := pow(1.0 - grade.crystal, 1.6) * 0.40
 	return {
 		"sigma_per_mm": species.base_scatter_per_mm + haze,
@@ -157,26 +132,13 @@ static func _crystal_to_zoning(species: GemSpecies, grade: GemGrade, state: Arra
 	}
 
 
-## Hardness shapes wear statistics: soft minerals accumulate dense shallow
-## scratches; hard minerals keep polish but show sparse deeper pits.
-static func _surface_to_wear(species: GemSpecies, grade: GemGrade) -> Dictionary:
-	var s := 1.0 - grade.surface
-	var softness: float = clampf((9.0 - species.hardness_mohs) / 4.0, 0.0, 1.5)
-	return {
-		"roughness_boost": species.base_polish_roughness + pow(s, 1.6) * 0.12,
-		"scratch_density": pow(s, 1.15) * (5.0 + 9.0 * softness),
-		"scratch_aniso": 0.75,
-		"abrasion": pow(s, 1.4) * 0.6 * softness,
-		"dirt": maxf(0.0, s - 0.35) * 0.8,
-		"edge_round": lerpf(0.010, 0.05, s),
-	}
-
-
 # ------------------------------------------------------------------ inclusions
 
 static func _place_inclusions(species: GemSpecies, grade: GemGrade, planes: PackedFloat32Array,
 		size_mm: float, state: Array) -> PackedFloat32Array:
 	var prims := PackedFloat32Array()
+	if not INCLUSIONS_ENABLED:
+		return prims
 	if species.inclusions.is_empty() or grade.clarity >= 0.985:
 		return prims
 	var dirt := 1.0 - grade.clarity
@@ -227,21 +189,29 @@ static func _emit_primitives(prims: PackedFloat32Array, arch: GemInclusionArchet
 			# at 112px it must still read (scale-honest exaggeration, documented).
 			_prim(prims, pos, 0, axis, size, maxf(size / maxf(arch.aspect, 2.0), 0.012), arch)
 		GemInclusionArchetype.Form.PLATELET:
-			_prim(prims, pos, 1, axis, size, size / maxf(arch.aspect, 2.0), arch)
+			# Lily-pad disc: kernel draws an annulus. Cap so a 112px sprite
+			# does not grow table-facing coins. Olivine cleavage is not only +Z.
+			var pad := minf(size, 0.07)
+			_prim(prims, pos, 1, axis, pad, pad / maxf(arch.aspect, 2.0), arch, 0.0)
 		GemInclusionArchetype.Form.CLOUD:
-			_prim(prims, pos, 2, axis, size, size * 0.55, arch)
+			# Milk is the homogeneous σ_s field. Cloud prims are local wisps,
+			# not millimetre potatoes (those read as oval stickers at 112px).
+			var major := minf(size, 0.055)
+			_prim(prims, pos, 2, axis, major, major * 0.62, arch)
 		GemInclusionArchetype.Form.CRYSTAL:
-			_prim(prims, pos, 3, axis, size * 0.5, size * 0.5, arch)
+			# Pinpoint, not a resolved sphere. 0.016 stone-units ≈ 2px at 112.
+			var rad := minf(size * 0.5, 0.016)
+			_prim(prims, pos, 3, axis, rad, rad, arch)
 		GemInclusionArchetype.Form.VEIL:
-			# A veil reads as a warped sheet: several thin discs along a plane.
-			var n := 4 + _rndi(state, 4)
+			# Healed-fracture sheet: a few irregular discs, kernel style=1.
+			var n := 2 + _rndi(state, 3)
 			var t1 := axis.cross(Vector3.UP if absf(axis.y) < 0.9 else Vector3.RIGHT).normalized()
 			var t2 := axis.cross(t1)
 			for i in n:
 				var off := t1 * (_rndf(state) - 0.5) * size * 2.2 + t2 * (_rndf(state) - 0.5) * size * 2.2 \
 					+ axis * (_rndf(state) - 0.5) * size * 0.35
 				var wob := (axis + Vector3(_rndf(state) - 0.5, _rndf(state) - 0.5, _rndf(state) - 0.5) * 0.35).normalized()
-				_prim(prims, pos + off, 1, wob, size * (0.35 + _rndf(state) * 0.4), size * 0.03, arch)
+				_prim(prims, pos + off, 1, wob, size * (0.40 + _rndf(state) * 0.45), size * 0.03, arch, 1.0)
 		GemInclusionArchetype.Form.FINGERPRINT:
 			var n := 8 + _rndi(state, 6)
 			var t1 := axis.cross(Vector3.UP if absf(axis.y) < 0.9 else Vector3.RIGHT).normalized()
@@ -249,16 +219,16 @@ static func _emit_primitives(prims: PackedFloat32Array, arch: GemInclusionArchet
 			for i in n:
 				var ang := TAU * float(i) / float(n) + _rndf(state) * 0.3
 				var ring_pos := pos + (t1 * cos(ang) + t2 * sin(ang)) * size
-				_prim(prims, ring_pos, 2, axis, size * 0.12, size * 0.08, arch)
+				_prim(prims, ring_pos, 2, axis, size * 0.07, size * 0.045, arch)
 
 
 static func _prim(prims: PackedFloat32Array, pos: Vector3, type: int, axis: Vector3,
-		r0: float, r1: float, arch: GemInclusionArchetype) -> void:
+		r0: float, r1: float, arch: GemInclusionArchetype, style := 0.0) -> void:
 	prims.append_array(PackedFloat32Array([
 		pos.x, pos.y, pos.z, float(type),
 		axis.x, axis.y, axis.z, r0,
 		r1, arch.scatter_density, arch.tint.r, arch.tint.g,
-		arch.tint.b, 0.0, 0.0, 0.0,
+		arch.tint.b, 0.0, style, 0.0,
 	]))
 
 

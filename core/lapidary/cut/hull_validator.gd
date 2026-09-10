@@ -52,6 +52,63 @@ static func find_dead_planes(planes: PackedFloat32Array) -> PackedInt32Array:
 
 
 static func _face_alive(planes: PackedFloat32Array, count: int, i: int) -> bool:
+	var poly := _face_polygon(planes, count, i, [])
+	return poly.size() >= 3 and _polygon_area(poly) > MIN_FACE_AREA
+
+
+## Facet adjacency for the kernel's light-cell coverage test (KERNEL_CONTRACT
+## binding 11). For each plane, the local indices of the planes that share an
+## edge with its face, padded with -1 to `stride`. A face is exactly the
+## intersection of its plane with its NEIGHBOURS' half-spaces, so an inside
+## test against neighbours only is exact for convex hulls. Faces with more
+## than `stride` neighbours store -2 first: the kernel then tests every plane.
+static func facet_adjacency(planes: PackedFloat32Array, stride := 16) -> PackedInt32Array:
+	var count := planes.size() / 8
+	var out := PackedInt32Array()
+	out.resize(count * stride)
+	out.fill(-1)
+	for i in count:
+		var frame := []
+		var poly := _face_polygon(planes, count, i, frame)
+		if poly.size() < 3:
+			continue
+		var t1: Vector3 = frame[0]
+		var t2: Vector3 = frame[1]
+		var p0: Vector3 = frame[2]
+		var n: Vector3 = frame[3]
+		var d: float = frame[4]
+		var written := 0
+		var overflow := false
+		for j in count:
+			if j == i:
+				continue
+			var nj := Vector3(planes[j * 8], planes[j * 8 + 1], planes[j * 8 + 2])
+			var dj := planes[j * 8 + 3]
+			if n.dot(nj) > DUP_NORMAL_COS and absf(d - dj) < DUP_OFFSET:
+				continue
+			var line := Vector2(nj.dot(t1), nj.dot(t2))
+			if line.length_squared() < 1.0e-18:
+				continue
+			var c := dj - nj.dot(p0) - FACE_MARGIN
+			var on_line := 0
+			for v in poly:
+				if absf(line.dot(v) - c) <= 1.0e-4:
+					on_line += 1
+			if on_line < 2:
+				continue
+			if written >= stride:
+				overflow = true
+				break
+			out[i * stride + written] = j
+			written += 1
+		if overflow:
+			out[i * stride] = -2
+	return out
+
+
+## Face polygon of plane i in its own 2D frame (clipped by every other live
+## half-space). `frame_out`, if given, receives [t1, t2, p0, n, d].
+static func _face_polygon(planes: PackedFloat32Array, count: int, i: int, frame_out: Array) -> PackedVector2Array:
 	var n := Vector3(planes[i * 8], planes[i * 8 + 1], planes[i * 8 + 2])
 	var d := planes[i * 8 + 3]
 	var t1 := n.cross(Vector3(0, 0, 1))
@@ -60,6 +117,8 @@ static func _face_alive(planes: PackedFloat32Array, count: int, i: int) -> bool:
 	t1 = t1.normalized()
 	var t2 := n.cross(t1)
 	var p0 := n * d
+	if frame_out != null:
+		frame_out.assign([t1, t2, p0, n, d])
 	var poly := PackedVector2Array([
 		Vector2(-SEED_EXTENT, -SEED_EXTENT), Vector2(SEED_EXTENT, -SEED_EXTENT),
 		Vector2(SEED_EXTENT, SEED_EXTENT), Vector2(-SEED_EXTENT, SEED_EXTENT),
@@ -77,12 +136,12 @@ static func _face_alive(planes: PackedFloat32Array, count: int, i: int) -> bool:
 		var c := dj - nj.dot(p0) - FACE_MARGIN
 		if Vector2(a, b).length_squared() < 1.0e-18:
 			if c < 0.0:
-				return false	# parallel plane fully covers this face
+				return PackedVector2Array()	# parallel plane fully covers this face
 			continue
 		poly = _clip(poly, Vector2(a, b), c)
 		if poly.size() < 3:
-			return false
-	return _polygon_area(poly) > MIN_FACE_AREA
+			return PackedVector2Array()
+	return poly
 
 
 ## Sutherland–Hodgman clip of a convex polygon by half-plane n2·p <= c.

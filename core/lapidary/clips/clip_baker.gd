@@ -10,8 +10,7 @@ extends RefCounted
 ##
 ## Requires a RenderingDevice (windowed run). bake() returns {} in --headless.
 
-## House print (mastering) — applied when the print workstream lands the
-## resource; until then finalize runs with neutral display-transform defaults.
+## House print (mastering) — required; hard-fails if the resource is absent.
 const HOUSE_PRINT_PATH := "res://data/lapidary/print/house_print.tres"
 ## Board framing: camera ortho half-width in stone units (girdle radius = 1).
 const ORTHO_HALF := 1.25
@@ -23,11 +22,11 @@ const ORTHO_HALF := 1.25
 ## `shared_tracer`: optional pre-created tracer whose size matches the rung's
 ## internal resolution; caller keeps ownership (amortizes shader compiles).
 static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat32Array,
-		background := Vector3(0.30, 0.16, 0.05), shared_tracer: GemTracer = null) -> Dictionary:
+		environment := {"bg": Vector4(0.30, 0.16, 0.05, 0.0), "white_kelvin": 0.0}, shared_tracer: GemTracer = null) -> Dictionary:
 	if stone == null or clip == null or stone.species == null or lights.is_empty():
 		return {}
 	var instance := LapidaryStoneCompiler.compile(stone)
-	var policy := GemRung.policy(rung, GemRung.scatter_noisy(instance))
+	var policy := GemRung.policy(rung)
 	var res: int = policy["res"]
 	var out: int = policy["out"]
 	var spp: int = policy["spp"]
@@ -44,7 +43,7 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat3
 	var t0 := Time.get_ticks_usec()
 	tracer.configure_stone(instance, lights, policy)
 	tracer.set_seed(int(instance["seed"]))
-	tracer.set_background(background)
+	tracer.set_environment(environment)
 
 	var print_res := load_house_print()
 	var frames: Array[Image] = []
@@ -84,7 +83,7 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat3
 			"spp": spp,
 			"frame_gpu_ms": frame_gpu_ms,
 			"wall_ms": float(Time.get_ticks_usec() - t0) / 1000.0,
-			"print": "house" if print_res != null else "neutral",
+			"print": "house",
 		},
 	}
 
@@ -136,48 +135,4 @@ static func frame_role_mult(clip: GemClip, t: float) -> Vector4:
 
 
 static func load_house_print() -> GemPrint:
-	if ResourceLoader.exists(HOUSE_PRINT_PATH):
-		return load(HOUSE_PRINT_PATH) as GemPrint
-	return null
-
-
-# ------------------------------------------------------------- rig packing
-
-## Packs a designed GemLightRig into the kernel light format
-## [dx,dy,dz,cos_outer, kelvin,power,cos_inner,role]. Disabled roles are skipped.
-static func pack_rig_lights(rig: GemLightRig) -> PackedFloat32Array:
-	var arr := PackedFloat32Array()
-	for l in rig.lights:
-		if l == null or not l.enabled:
-			continue
-		var d := l.direction()
-		var outer := deg_to_rad(maxf(l.angular_radius_deg, 0.1))
-		var inner := outer * clampf(l.inner_fraction, 0.0, 1.0)
-		var role := 1.0 if l.role == GemRigLight.Role.BLOCKER else 0.0
-		arr.append_array(PackedFloat32Array([
-			d.x, d.y, d.z, cos(outer),
-			l.kelvin, l.power, cos(inner), role]))
-	return arr
-
-
-## PLACEHOLDER light set (spike pattern) used until the lighting workstream
-## lands data/lapidary/rigs/*.tres. GemForge._active_rig_lights() prefers the
-## rig file and falls back here; tools/package_clips.gd does the same.
-static func placeholder_rig_lights() -> PackedFloat32Array:
-	var arr := PackedFloat32Array()
-	_placeholder_light(arr, Vector3(-0.5, 0.8, 0.6), 14.0, 8.0, 5500.0, 3.2) # key, warm, broad
-	_placeholder_light(arr, Vector3(0.65, 0.25, 0.72), 30.0, 18.0, 6500.0, 0.7) # fill, cool, soft
-	_placeholder_light(arr, Vector3(0.35, -0.62, -0.70), 5.0, 2.5, 7000.0, 2.4) # kicker under pavilion
-	return arr
-
-
-static func placeholder_rig_background() -> Vector3:
-	return Vector3(0.30, 0.16, 0.05)
-
-
-static func _placeholder_light(arr: PackedFloat32Array, dir: Vector3, outer_deg: float,
-		inner_deg: float, kelvin: float, power: float) -> void:
-	var d := dir.normalized()
-	arr.append_array(PackedFloat32Array([
-		d.x, d.y, d.z, cos(deg_to_rad(outer_deg)),
-		kelvin, power, cos(deg_to_rad(inner_deg)), 0.0]))
+	return GemPrint.load_house()

@@ -1,17 +1,21 @@
 extends SceneTree
-## SPP ladder + ruby ablation. Windowed only:
+## SPP ladder with two-seed RMSE noise metric. Windowed only:
 ##   godot --path . --script res://tools/noise_spp_check.gd
 ## Writes artifacts/lookdev/noise/: spp_ladder.png, ruby_ablation.png, metrics.json
+##
+## Noise = RMSE(seed_a, seed_b) / sqrt(2) at equal spp over covered pixels.
+## Target at CLIP_BAKE spp: < 0.5/255 ≈ 0.002 for every species.
 
 const SheetComposer := preload("res://core/lapidary/eval/sheet_composer.gd")
 
 const OUT_DIR := "res://artifacts/lookdev/noise"
 const STONES := ["quartz", "ruby", "sapphire", "diamond"]
-const SPP := [8, 32, 64, 160, 512, 2048]
-const CELL := 224
-const CHUNK := 32
+const SPP := [8, 32, 64, 96, 160, 512]
 const EXPOSURE := 1.6
 const ORTHO := 1.3
+const SEED_A_OFFSET := 0
+const SEED_B_OFFSET := 91711
+const NOISE_TARGET := 0.5 / 255.0
 
 
 func _initialize() -> void:
@@ -22,65 +26,73 @@ func _initialize() -> void:
 		quit(1)
 		return
 	var lights := GemRigCompiler.pack(rig)
-	var bg := GemRigCompiler.background(rig)
+	var bg := GemRigCompiler.environment(rig)
 	var policy: Dictionary = GemRung.policy(GemRung.CLIP_BAKE)
-	policy["res"] = CELL
-	policy["out"] = CELL
+	var res: int = policy["res"]
+	var out: int = policy["out"]
+	var bake_spp: int = policy["spp"]
 
-	var tracer := GemTracer.create(CELL, CELL)
+	var tracer := GemTracer.create(res, res)
 	if tracer == null:
 		print("NOISE_SPP FAILED: no RenderingDevice")
 		quit(1)
 		return
-	tracer.set_background(bg)
+	tracer.set_environment(bg)
 
-	var metrics := {"adapter": RenderingServer.get_video_adapter_name(), "cell_px": CELL, "stones": {}}
+	var metrics := {
+		"adapter": RenderingServer.get_video_adapter_name(),
+		"res": res, "out": out, "bake_spp": bake_spp,
+		"noise_target": NOISE_TARGET, "metric": "two_seed_rmse/sqrt(2)",
+		"stones": {},
+	}
 	var ladder_tiles: Array = []
+	var failures := 0
 	for tile_id in STONES:
 		var stone: GemStone = load("res://data/lapidary/stones/%s.tres" % tile_id)
 		var instance := LapidaryStoneCompiler.compile(stone)
 		metrics["stones"][tile_id] = _stone_stats(instance, stone)
 		print("== %s ==" % tile_id)
 		print("  %s" % JSON.stringify(metrics["stones"][tile_id], "", false))
-		var prev: Image = null
 		for spp in SPP:
-			var img := _render(tracer, instance, stone.seed, lights, policy, spp)
-			var grain := _grain(img)
-			var delta := _rmse(img, prev) if prev != null else -1.0
+			var img_a := _render(tracer, instance, stone.seed + SEED_A_OFFSET, lights, policy, spp)
+			var img_b := _render(tracer, instance, stone.seed + SEED_B_OFFSET, lights, policy, spp)
+			var noise := _two_seed_noise(img_a, img_b)
 			metrics["stones"][tile_id]["spp_%d" % spp] = {
-				"ms": img.get_meta("ms"),
-				"grain": grain,
-				"mean_luma": _mean_luma(img),
-				"delta_vs_prev": delta,
+				"ms": img_a.get_meta("ms") + img_b.get_meta("ms"),
+				"noise": noise,
+				"mean_luma": _mean_luma(img_a),
+				"pass": noise < NOISE_TARGET if spp >= bake_spp else null,
 			}
-			print("  spp %4d  %7.1f ms  grain %.4f  luma %.3f  dPrev %.4f" % [
-				spp, img.get_meta("ms"), grain, _mean_luma(img), delta])
-			ladder_tiles.append({"image": img, "label": "%s %d" % [tile_id, spp]})
-			prev = img
+			print("  spp %4d  %7.1f ms  noise %.5f  luma %.3f%s" % [
+				spp, img_a.get_meta("ms") + img_b.get_meta("ms"), noise, _mean_luma(img_a),
+				"  PASS" if spp >= bake_spp and noise < NOISE_TARGET \
+					else ("  FAIL" if spp >= bake_spp else "")])
+			if spp >= bake_spp and noise >= NOISE_TARGET:
+				failures += 1
+			ladder_tiles.append({"image": img_a, "label": "%s %d" % [tile_id, spp]})
 
 	var ladder: Image = SheetComposer.compose(ladder_tiles, SPP.size(), true,
-		"SPP LADDER - CLIP-BAKE POLICY - 224PX - PRINT", STONES, _spp_labels())
+		"SPP LADDER - CLIP-BAKE %d→%d - TWO-SEED NOISE" % [res, out], STONES, _spp_labels())
 	_save(ladder, "spp_ladder.png")
 
-	print("== ruby ablation @ 512 spp ==")
+	print("== ruby ablation @ bake spp ==")
 	var ruby_tiles: Array = []
 	var ruby_metrics := {}
 	for variant: Dictionary in _ruby_variants():
 		var inst: Dictionary = variant["instance"]
-		var img := _render(tracer, inst, int(inst["seed"]), lights, policy, 512)
+		var img := _render(tracer, inst, int(inst["seed"]), lights, policy, bake_spp)
 		var rec := {
 			"ms": img.get_meta("ms"),
-			"grain": _grain(img),
 			"mean_luma": _mean_luma(img),
 			"mean_rgb": _mean_rgb(img),
 		}
 		ruby_metrics[variant["name"]] = rec
-		print("  %-16s grain %.4f  luma %.3f  rgb %s  %.1f ms" % [
-			variant["name"], rec["grain"], rec["mean_luma"], str(rec["mean_rgb"]), rec["ms"]])
+		print("  %-16s luma %.3f  rgb %s  %.1f ms" % [
+			variant["name"], rec["mean_luma"], str(rec["mean_rgb"]), rec["ms"]])
 		ruby_tiles.append({"image": img, "label": variant["name"]})
 	metrics["ruby_ablation"] = ruby_metrics
 	var ablation: Image = SheetComposer.compose(ruby_tiles, 4, true,
-		"RUBY ABLATION - 512 SPP - 224PX - PRINT", [], [])
+		"RUBY ABLATION - %d SPP - %d→%d - PRINT" % [bake_spp, res, out], [], [])
 	_save(ablation, "ruby_ablation.png")
 
 	tracer.release()
@@ -88,8 +100,8 @@ func _initialize() -> void:
 	var f := FileAccess.open(ProjectSettings.globalize_path(OUT_DIR + "/metrics.json"), FileAccess.WRITE)
 	f.store_string(json)
 	f.close()
-	print("NOISE_SPP COMPLETE -> %s" % OUT_DIR)
-	quit(0)
+	print("NOISE_SPP COMPLETE -> %s  failures=%d" % [OUT_DIR, failures])
+	quit(1 if failures > 0 else 0)
 
 
 func _ruby_variants() -> Array:
@@ -137,11 +149,15 @@ func _render(tracer: GemTracer, instance: Dictionary, seed: int, lights: PackedF
 	tracer.set_clip_sample(Quaternion(Vector3(1, 0, 0), deg_to_rad(-12.0)), 0.0, Vector4.ONE, ORTHO)
 	var ms := 0.0
 	var left := spp
+	var chunk: int = policy["batch"]
 	while left > 0:
-		var n := mini(CHUNK, left)
+		var n := mini(chunk, left)
 		ms += tracer.accumulate(n)
 		left -= n
-	var img := tracer.finalize_print(GemPrint.new(), false, EXPOSURE)
+	var img := tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE)
+	var out: int = policy["out"]
+	if img.get_width() != out:
+		img.resize(out, out, Image.INTERPOLATE_LANCZOS)
 	img.set_meta("ms", ms)
 	return img
 
@@ -173,26 +189,9 @@ func _alpha_at(curve: PackedFloat32Array, nm: float) -> float:
 	return lerpf(a, b, f)
 
 
-func _grain(img: Image) -> float:
-	## High-frequency residual RMSE in luma over covered pixels. Proxy for visible grain.
-	var w := img.get_width()
-	var h := img.get_height()
-	var acc := 0.0
-	var n := 0
-	for y in range(1, h - 1):
-		for x in range(1, w - 1):
-			var c := img.get_pixel(x, y)
-			if c.a < 0.12:
-				continue
-			var blur := Color(0, 0, 0, 0)
-			for dy in range(-1, 2):
-				for dx in range(-1, 2):
-					blur += img.get_pixel(x + dx, y + dy)
-			blur /= 9.0
-			var d := _luma(c) - _luma(blur)
-			acc += d * d
-			n += 1
-	return sqrt(acc / float(maxi(n, 1)))
+## Unbiased MC noise estimate: RMSE between two independent seeds / sqrt(2).
+func _two_seed_noise(a: Image, b: Image) -> float:
+	return _rmse(a, b) / sqrt(2.0)
 
 
 func _mean_luma(img: Image) -> float:

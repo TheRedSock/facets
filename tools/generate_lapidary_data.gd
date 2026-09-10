@@ -68,6 +68,7 @@ func _build_species() -> Dictionary:
 	quartz.sellmeier_c_um2 = Vector3(0.0100585997, 100.0, 0.0)
 	quartz.birefringence = 0.009
 	quartz.uniaxial_positive = true
+	quartz.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	quartz.base_scatter_per_mm = 0.002
 	quartz.scatter_anisotropy_g = 0.55
 	quartz.hardness_mohs = 7.0
@@ -75,7 +76,7 @@ func _build_species() -> Dictionary:
 	quartz.zoning_frequency = 3.0
 	quartz.zoning_contrast = 0.35
 	quartz.inclusions.append(_archetype(&"quartz_milk_bank", ArchetypeScript.Form.CLOUD,
-		Vector2(0.3, 0.8), 1.0, [], 13.0, Color(1.0, 1.0, 1.0), 4.0, 0.0))
+		Vector2(0.08, 0.22), 1.0, [], 6.0, Color(1.0, 1.0, 1.0), 4.0, 0.0))
 	quartz.inclusions.append(_archetype(&"quartz_milky_veil", ArchetypeScript.Form.VEIL,
 		Vector2(0.3, 1.0), 24.0, [], 8.0, Color(1.0, 0.99, 0.97), 2.0, 0.15))
 	_save(quartz, DIR_SPECIES + "quartz.tres")
@@ -93,15 +94,21 @@ func _build_species() -> Dictionary:
 	olivine.sellmeier_c_um2 = olivine_fit["c"]
 	olivine.birefringence = 0.036
 	olivine.uniaxial_positive = true
+	olivine.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	olivine.base_scatter_per_mm = 0.002
 	olivine.hardness_mohs = 6.5
-	# Lily pads: disc-shaped stress halo around a tiny crystal. The compiler
-	# places archetypes independently, so the pad and its halo are two
-	# archetypes with matched size/bias rather than a bound pair.
+	# Lily pads: disc-shaped decrepitation halo around a tiny crystal
+	# (chromite / negative crystal). Kernel draws a thin ring, not a filled
+	# coin. Axes follow olivine's imperfect cleavages so they are not all
+	# table-facing (San Carlos: {010} common, {100} also; GIA G&G 17(4)).
 	olivine.inclusions.append(_archetype(&"olivine_lily_pad", ArchetypeScript.Form.PLATELET,
-		Vector2(0.25, 0.8), 20.0, [Vector3(0, 0, 1)], 12.0, Color(0.92, 0.98, 0.88), 3.0, 0.35))
+		Vector2(0.12, 0.32), 20.0,
+		[Vector3(0, 1, 0), Vector3(1, 0, 0), Vector3(0, 0, 1)],
+		6.0, Color(0.92, 0.98, 0.88), 2.0, 0.35))
 	olivine.inclusions.append(_archetype(&"olivine_lily_pad_halo", ArchetypeScript.Form.CLOUD,
-		Vector2(0.3, 0.8), 1.0, [Vector3(0, 0, 1)], 4.5, Color(0.94, 1.0, 0.92), 3.0, 0.35))
+		Vector2(0.08, 0.20), 1.0,
+		[Vector3(0, 1, 0), Vector3(1, 0, 0), Vector3(0, 0, 1)],
+		4.5, Color(0.94, 1.0, 0.92), 2.0, 0.35))
 	_save(olivine, DIR_SPECIES + "olivine.tres")
 	out[&"olivine"] = olivine
 
@@ -117,12 +124,13 @@ func _build_species() -> Dictionary:
 	topaz.sellmeier_c_um2 = topaz_fit["c"]
 	topaz.birefringence = 0.010
 	topaz.uniaxial_positive = true
+	topaz.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	topaz.base_scatter_per_mm = 0.001
 	topaz.hardness_mohs = 8.0
 	topaz.inclusions.append(_archetype(&"topaz_tear_feather", ArchetypeScript.Form.VEIL,
 		Vector2(0.3, 1.0), 26.0, [], 8.0, Color(1.0, 0.98, 0.94), 3.0, 0.2))
 	topaz.inclusions.append(_archetype(&"topaz_cloud", ArchetypeScript.Form.CLOUD,
-		Vector2(0.3, 0.7), 1.0, [], 5.5, Color(1.0, 1.0, 1.0), 1.5, 0.3))
+		Vector2(0.08, 0.22), 1.0, [], 5.5, Color(1.0, 1.0, 1.0), 1.5, 0.3))
 	_save(topaz, DIR_SPECIES + "topaz.tres")
 	out[&"topaz"] = topaz
 
@@ -136,6 +144,7 @@ func _build_species() -> Dictionary:
 	corundum.sellmeier_c_um2 = Vector3(0.0052799261, 0.0142382647, 325.017834)
 	corundum.birefringence = 0.008
 	corundum.uniaxial_positive = false
+	corundum.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	corundum.base_scatter_per_mm = 0.001
 	corundum.fluorescence_emission_nm = 693.0
 	corundum.fluorescence_strength = 0.5
@@ -165,6 +174,7 @@ func _build_species() -> Dictionary:
 	beryl.sellmeier_c_um2 = beryl_fit["c"]
 	beryl.birefringence = 0.006
 	beryl.uniaxial_positive = false
+	beryl.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	beryl.base_scatter_per_mm = 0.002
 	beryl.hardness_mohs = 7.75
 	# Jardin: healed-fracture veils, fingerprints and two-phase droplets.
@@ -187,6 +197,7 @@ func _build_species() -> Dictionary:
 	diamond.sellmeier_c_um2 = Vector3(0.011236, 0.030625, 0.0)
 	diamond.birefringence = 0.0
 	diamond.uniaxial_positive = true
+	diamond.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # cubic: unused
 	diamond.base_scatter_per_mm = 0.0005
 	diamond.fluorescence_emission_nm = 440.0
 	diamond.fluorescence_strength = 0.05
@@ -206,6 +217,7 @@ func _build_species() -> Dictionary:
 	fluorite.sellmeier_c_um2 = Vector3(0.0025262995, 0.0100783343, 1200.5559999)
 	fluorite.birefringence = 0.0
 	fluorite.uniaxial_positive = true
+	fluorite.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # cubic: unused
 	fluorite.base_scatter_per_mm = 0.003
 	# Blue fluorescence is real (Eu2+), but the kernel pumps emission from
 	# absorbed energy: with a green-window curve (strong 435 nm band) any
@@ -221,7 +233,7 @@ func _build_species() -> Dictionary:
 	fluorite.inclusions.append(_archetype(&"fluorite_cleavage_flag", ArchetypeScript.Form.VEIL,
 		Vector2(0.35, 1.0), 20.0, [], 10.0, Color(0.96, 0.94, 1.0), 3.0, 0.2))
 	fluorite.inclusions.append(_archetype(&"fluorite_droplet_cloud", ArchetypeScript.Form.CLOUD,
-		Vector2(0.1, 0.3), 1.0, [], 6.0, Color(0.98, 0.99, 1.0), 1.8, 0.35))
+		Vector2(0.05, 0.14), 1.0, [], 6.0, Color(0.98, 0.99, 1.0), 1.8, 0.35))
 	_save(fluorite, DIR_SPECIES + "fluorite.tres")
 	out[&"fluorite"] = fluorite
 
@@ -236,6 +248,7 @@ func _build_species() -> Dictionary:
 	chrysoberyl.sellmeier_c_um2 = chryso_fit["c"]
 	chrysoberyl.birefringence = 0.009
 	chrysoberyl.uniaxial_positive = true
+	chrysoberyl.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	chrysoberyl.base_scatter_per_mm = 0.001
 	chrysoberyl.hardness_mohs = 8.5
 	# Fine silk (oriented needle clouds -> cat's-eye in heavy cases) + fingerprints.
@@ -260,6 +273,7 @@ func _build_species() -> Dictionary:
 	garnet.sellmeier_c_um2 = garnet_fit["c"]
 	garnet.birefringence = 0.0
 	garnet.uniaxial_positive = true
+	garnet.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # cubic: unused
 	garnet.base_scatter_per_mm = 0.002
 	garnet.hardness_mohs = 7.25
 	# Rutile needle silk + small rounded crystals (apatite/zircon).
@@ -282,6 +296,7 @@ func _build_species() -> Dictionary:
 	elbaite.sellmeier_c_um2 = elbaite_fit["c"]
 	elbaite.birefringence = 0.018
 	elbaite.uniaxial_positive = false
+	elbaite.optic_axis_stone = Vector3(1.0, 0.0, 0.0) # table ∥ c
 	elbaite.base_scatter_per_mm = 0.002
 	elbaite.hardness_mohs = 7.5
 	elbaite.zoning_axis = Vector3(0, 0, 1)
@@ -308,6 +323,7 @@ func _build_species() -> Dictionary:
 	painite.sellmeier_c_um2 = painite_fit["c"]
 	painite.birefringence = 0.028
 	painite.uniaxial_positive = false
+	painite.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	painite.base_scatter_per_mm = 0.001
 	painite.hardness_mohs = 8.0
 	painite.inclusions.append(_archetype(&"painite_crystal", ArchetypeScript.Form.CRYSTAL,
@@ -333,15 +349,19 @@ func _build_chromophores() -> Dictionary:
 	# Cr3+ in corundum (o-ray): Y band ~410 nm, U band ~556 nm, window ~480 nm
 	# (slight blue leak -> purplish red), open > 620 nm, weak R-line 694 nm.
 	# e-ray: bands shift ~420 / ~552 and the U band weakens -> more orange-red.
-	# Concentration 0.55: curves were sized for a 2×size_mm path; a brilliant
-	# TIR path is ~4×size_mm, so 1.0 made pavilion return die and the stone
-	# read as opaque. Daylight fluorescence 0.05 (UV-lamp 0.5 lives on the
-	# species; the kernel no longer applies a 5.5× glow gain).
+	# Concentration 0.40: curves sized for a ~4×size_mm TIR path under the
+	# kernel's GIA polarisation mix (face-up ≈ pure o-ray when optic axis ≈ +Z).
+	# Was 0.55 against an inverted e-weight that under-used the strong o-ray
+	# U band. The 480 nm Cr³⁺ saddle is real (Fritsch & Rossman 1987) but was
+	# authored too empty: Y/U Gaussians did not overlap, so the stone leaked
+	# cyan and read rhodolite-magenta. B-lines ~468 nm plus a 478 nm fill raise
+	# the saddle without closing the >610 nm red window. Daylight fluorescence
+	# 0.05 (UV-lamp 0.5 lives on the species).
 	out[&"ruby_cr"] = _chromophore(&"ruby_cr", "Chromium (ruby, corundum)",
-		"Cr3+ in corundum. o-ray: Y band ~410 nm, U band ~556 nm (GIA G&G Spring 2020 Dubinsky et al.; Cr:Al2O3 405-408/550-558 nm), ~480 nm transmission window, R-line 694 nm. e-ray: ~420/~552 with weaker U band (modest pleochroism, o/e). Concentration 0.55 so a 5.4 mm stone keeps pavilion-returned red over a ~4×size TIR path. Daylight fluorescence override 0.05 @ 693 nm (not the UV-lamp 0.5 on the species).",
-		_curve(0.04, [[1.55, 410.0, 26.0], [1.65, 556.0, 34.0], [0.35, 380.0, 30.0], [0.05, 694.0, 6.0]]),
-		_curve(0.045, [[1.40, 420.0, 26.0], [1.30, 552.0, 31.0], [0.30, 380.0, 30.0], [0.05, 694.0, 6.0]]),
-		Color(0.88, 0.11, 0.25), 0.05, 693.0, 0.55)
+		"Cr3+ in corundum. o-ray (E⊥c): Y band ~410 nm, U band ~556 nm (GIA G&G Spring 2020 Dubinsky et al.), B-lines ~468-475 nm, ~480 nm transmission saddle, R-line 694 nm. e-ray (E∥c): ~420/~552 with weaker U band. Curves authored for the kernel's GIA polarisation mix. Concentration 0.40 for a 5.4 mm stone. Daylight fluorescence override 0.05 @ 693 nm.",
+		_curve(0.05, [[1.55, 410.0, 28.0], [1.72, 556.0, 38.0], [0.42, 478.0, 18.0], [0.22, 468.0, 8.0], [0.35, 380.0, 30.0], [0.05, 694.0, 6.0]]),
+		_curve(0.05, [[1.40, 420.0, 28.0], [1.35, 552.0, 34.0], [0.22, 478.0, 16.0], [0.30, 380.0, 30.0], [0.05, 694.0, 6.0]]),
+		Color(0.88, 0.11, 0.25), 0.05, 693.0, 0.40)
 
 	# Fe2+-Ti4+ IVCT: broad band ~580 nm reaching 700, blue window 440-480,
 	# weak Fe3+ features ~377/388/450.
@@ -453,20 +473,18 @@ func _build_chromophores() -> Dictionary:
 
 
 # ------------------------------------------------------------------ grades
-## Four axes, 1.0 = exceptional. Hand-authored convex ramp: humble tiers
-## cluster low (0.25-0.35) and the per-tier step widens toward T8 so late
-## upgrades read as dramatic. Crystal starts lowest (milky T1 quartz) and
-## clears slightly faster than clarity so mid-tier stones stop being hazy
-## before they stop being included.
+## Four axes, 1.0 = exceptional. Compressed floor: T1 sits near the old T5
+## (sapphire-class rounding / translucency / inclusion load) and the ramp
+## still widens toward T8, which stays pristine.
 
 const GRADE_TABLE := {
-	&"t1": [0.30, 0.25, 0.28, 0.25],
-	&"t2": [0.36, 0.31, 0.34, 0.34],
-	&"t3": [0.42, 0.38, 0.40, 0.43],
-	&"t4": [0.50, 0.46, 0.48, 0.53],
-	&"t5": [0.60, 0.55, 0.58, 0.64],
-	&"t6": [0.72, 0.66, 0.70, 0.76],
-	&"t7": [0.86, 0.80, 0.84, 0.89],
+	&"t1": [0.62, 0.58, 0.62, 0.66],
+	&"t2": [0.67, 0.64, 0.67, 0.71],
+	&"t3": [0.73, 0.70, 0.72, 0.76],
+	&"t4": [0.79, 0.76, 0.78, 0.81],
+	&"t5": [0.85, 0.82, 0.84, 0.86],
+	&"t6": [0.91, 0.88, 0.90, 0.91],
+	&"t7": [0.96, 0.94, 0.95, 0.96],
 	&"t8": [1.0, 1.0, 1.0, 1.0],
 }
 
@@ -650,7 +668,7 @@ func _print_species_table(species: Dictionary) -> void:
 
 ## Beer-Lambert audit at key wavelengths: T = exp(-alpha * 2 * size_mm).
 const BL_KEYS := {
-	&"ruby_cr": [480.0, 556.0, 650.0],
+	&"ruby_cr": [480.0, 556.0, 620.0, 650.0],
 	&"sapphire_fe_ti": [460.0, 580.0, 700.0],
 	&"emerald_cr": [430.0, 510.0, 615.0, 700.0],
 	&"amethyst_fe_quartz": [420.0, 545.0, 660.0],

@@ -12,7 +12,7 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	var rig: GemLightRig = load("res://data/lapidary/rigs/gameplay_studio.tres")
 	var lights := GemRigCompiler.pack(rig)
-	var bg := GemRigCompiler.background(rig)
+	var bg := GemRigCompiler.environment(rig)
 	var policy: Dictionary = GemRung.policy(GemRung.BOARD_LIVE)
 	var instances := _four_instances()
 	var failures := 0
@@ -24,7 +24,7 @@ func _initialize() -> void:
 		if tracer == null:
 			failures += 1
 			continue
-		tracer.set_background(bg)
+		tracer.set_environment(bg)
 		tracer.configure_stones(instances, lights, policy, grid)
 		var states: Array = []
 		for i in count:
@@ -44,7 +44,7 @@ func _initialize() -> void:
 		var med := frame_ms[2]
 		frame_ms.sort()
 		med = frame_ms[2]
-		var img := tracer.finalize_print(GemPrint.new(), false, 1.6)
+		var img := tracer.finalize_print(GemPrint.load_house(), false, 1.0)
 		img.save_png(ProjectSettings.globalize_path("%s/grid_%dx%d.png" % [OUT_DIR, grid_n, grid_n]))
 		print("  %d gems @%dpx spp=%d: median %.2f ms/frame (%.1f ms/gem) -> grid_%dx%d.png" % [
 			count, CELL, int(policy["spp"]), med, med / float(count), grid_n, grid_n])

@@ -34,6 +34,7 @@ sellmeier_b = Vector3(1.4313493, 0.65054715, 5.341402)
 sellmeier_c_um2 = Vector3(0.005279926, 0.014238264, 325.01782)
 birefringence = 0.008
 uniaxial_positive = false
+optic_axis_stone = Vector3(0, 0, 1)
 base_scatter_per_mm = 0.001
 fluorescence_emission_nm = 693.0
 fluorescence_strength = 0.5
