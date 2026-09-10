@@ -268,3 +268,16 @@ trace timings and raw 64px/16spp films under ignored `artifacts/scene-cache/NAME
 Use `python tools/compare_scene_setup.py BEFORE_DIR AFTER_DIR` to compare timings
 and numeric film differences; float32 accumulation grouping can change file hashes.
 The benchmark is a setup microbenchmark, not an end-to-end catalog throughput test.
+
+Continuous rounding development checks:
+- `test_rounded_solid.gd` validates the float64 construction against an independent
+  rounded-box ray/volume oracle, closest-feature distances, mesh tessellation,
+  all eight faceted outlines, scaling and invalid inputs.
+- `analytic_patch_gpu_check.gd -- --stress` compares candidate packed primitives
+  with CPU hits for camera rays, patch interiors/seams and secondary grazing rays
+  in float32 and float64. `check_engine.ps1 -Gpu` includes the stress option.
+  Reports remain ignored under `artifacts/rounded-solid/`.
+
+The continuous patches are not yet connected to production optical transport;
+these checks establish geometric admission evidence, not finished grading or
+rendered reflection convergence. Keep the existing rounding defaults inactive.

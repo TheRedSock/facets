@@ -468,3 +468,17 @@ their final packed bytes match. Release clears CPU retention and GPU resources.
 `test_packed_geometry_cache.gd` and `geometry_cache_gpu_check.gd` cover mutations,
 budgets, mixed batches and all transport backends. See the factory contract for
 benchmark scope and temporary-memory limits.
+
+### Continuous rounding reference
+`GemRoundedSolid`, `GemConvexCore` and `GemAnalyticPatch` construct a convex
+spherical opening as continuous planar, cylindrical and spherical patches.
+Retained geometry uses float64; `GemGeometry64` avoids Vector3 arithmetic loss.
+The volume report uses the convex Steiner formula, independent of tessellation.
+This is a development reference and GPU admission experiment: StoneCompiler and
+GemTracer still use the experimental triangulated rounding path. No automatic
+grade, catalog specimen or asset job enables the continuous backend yet.
+`test_rounded_solid.gd` covers independent distance/volume/ray checks;
+`analytic_patch_gpu_check.gd -- --stress` covers packed GPU camera, seam and
+secondary rays in both arithmetic precisions. See the factory contract for
+remaining integration and numerical limits; passing these probes is not optical
+image or grading acceptance.

@@ -32,7 +32,7 @@ static func from_hull(planes: PackedFloat32Array, identities := PackedInt32Array
 ## Scalar float64 clipping retains the support planes of each edge. Shared
 ## corners are computed from exactly the same plane triple on both faces,
 ## avoiding independent float32 frame projections and proximity-based guesses.
-static func _clip_face64(planes: PackedFloat32Array, face: int) -> Array[Dictionary]:
+static func _clip_face64(planes: Variant, face: int) -> Array[Dictionary]:
 	var offset := face * 8
 	var normal := Vector3(planes[offset], planes[offset + 1], planes[offset + 2])
 	var tangent := normal.cross(Vector3.BACK)
@@ -77,18 +77,18 @@ static func _clip_face64(planes: PackedFloat32Array, face: int) -> Array[Diction
 			return []
 	return polygon
 
-static func _distance64(planes: PackedFloat32Array, plane: int, point: Array) -> float:
+static func _distance64(planes: Variant, plane: int, point: Array) -> float:
 	var i := plane * 8
 	return planes[i] * point[0] + planes[i + 1] * point[1] + planes[i + 2] * point[2] - planes[i + 3]
 
-static func _triple64(planes: PackedFloat32Array, first: int, second: int, third: int) -> Array:
+static func _triple64(planes: Variant, first: int, second: int, third: int) -> Array:
 	var ids := [first, second, third]
 	ids.sort()
 	var a: int = ids[0] * 8
 	var b: int = ids[1] * 8
 	var c: int = ids[2] * 8
 	var bc := _cross64(planes, b, c)
-	var determinant := planes[a] * bc[0] + planes[a + 1] * bc[1] + planes[a + 2] * bc[2]
+	var determinant: float = planes[a] * bc[0] + planes[a + 1] * bc[1] + planes[a + 2] * bc[2]
 	if absf(determinant) < 1.0e-18:
 		return []
 	var ca := _cross64(planes, c, a)
@@ -98,7 +98,7 @@ static func _triple64(planes: PackedFloat32Array, first: int, second: int, third
 		point.append((planes[a + 3] * bc[axis] + planes[b + 3] * ca[axis] + planes[c + 3] * ab[axis]) / determinant)
 	return point
 
-static func _cross64(planes: PackedFloat32Array, a: int, b: int) -> Array[float]:
+static func _cross64(planes: Variant, a: int, b: int) -> Array[float]:
 	return [planes[a + 1] * planes[b + 2] - planes[a + 2] * planes[b + 1],
 		planes[a + 2] * planes[b] - planes[a] * planes[b + 2],
 		planes[a] * planes[b + 1] - planes[a + 1] * planes[b]]

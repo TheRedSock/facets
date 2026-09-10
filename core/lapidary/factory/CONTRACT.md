@@ -318,3 +318,47 @@ The saved 64px/16spp films differed by at most 4.8e-7 in linear channels, consis
 with adaptive float32 accumulation grouping. Cold/warm regression scenes have
 exact primary-geometry agreement across scalar, Mueller and crystal transport.
 No physical estimator or tessellation-convergence claim changes with this cache.
+
+## Continuous rounding development reference
+
+`GemRoundedSolid.compile` constructs the same convex spherical opening as the
+mesh experiment, using retained float64 vertices and continuous clipped planes,
+cylinders and spheres. `GemConvexCore` retains facet/edge/vertex incidence,
+checks support membership and closed edge topology, and computes area, volume
+and integrated mean curvature. The offset volume is
+`V(K) + r*A(K) + r*r*H(K) + 4*pi*r*r*r/3`, where
+`H(K) = sum(edge_length * exterior_angle)/2`. Small removed-volume differences
+that are below the reporting threshold are explicitly marked unresolved.
+The angular tessellation step is not used by the analytic construction.
+
+`GemAnalyticPatch.intersect` is a float64 CPU reference. A separate closest-feature
+query validates its surface against distance to the inset core. The quadratic
+solver uses closest approach, retaining small radii that would disappear in
+`dot(origin, origin) - radius*radius`. Clip tolerances and the minimum radius
+admission gate are numerical policies, not certified error intervals.
+
+`GemAnalyticPacking` and `gem_analytic_patch.glsl` define a candidate 64-byte
+primitive record and relative clipping planes. This representation is exercised
+by a standalone GPU probe in float32 and float64; it is not part of the v20
+production kernel contract. Cylinder direction must be stored independently:
+subtracting float32 endpoints of a very short edge caused false hits and large
+normal errors, even when the subsequent arithmetic used float64.
+
+The stress check covers 38,200 camera, feature-interior, seam and secondary rays
+per arithmetic precision over eight outlines and two physical radii. After the
+axis fix it found no missing or extra intersections; largest ray-parameter error
+was about 4e-6 stone units and normal difference about 0.028 degrees. Adversarial
+smooth-patch seam ties can choose different facet labels. These measurements use
+specific scales and a 1e-6 object-space clip tolerance; they do not certify all
+possible sizes, grazing conditions or semantic tie behavior.
+
+The production stone compiler, optical tracer and asset jobs do not select this
+backend yet. Integration still needs an accelerated primitive hierarchy, full
+region/finish semantics, scalar/Mueller/crystal transport and primary AOV support,
+condition composition, and image-level convergence/performance evaluation.
+Automatic grading remains disabled. Neither the continuous geometry nor the
+spherical-opening radius is a calibrated abrasion, polishing or hardness law.
+
+The volume construction follows the convex special case of the polyhedral
+[Steiner formula](https://cseweb.ucsd.edu/~alchern/teaching/DDG.pdf), section 4.7,
+and its [parallel-body decomposition](https://courses.cms.caltech.edu/cs177/notes_fa11/GeoMeasure.pdf).
