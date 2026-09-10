@@ -10,8 +10,8 @@ func _initialize() -> void:
 		return
 	var rig: GemLightRig = load("res://data/lapidary/rigs/gameplay_studio.tres")
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
-	stone.grade.cut = 1.0
-	stone.grade.crystal = 1.0
+	stone.material.scatter_per_mm = stone.material.species.base_scatter_per_mm
+	stone.condition.banding.contrast = 0.0
 	var clean := LapidaryStoneCompiler.compile(stone)
 	var chip := GemDefectCompiler.edge_chip(clean, stone.size_mm, 51, 0.5, 0.20)
 	var fracture := GemDefect.new()

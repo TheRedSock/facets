@@ -11,6 +11,9 @@ physical resources, optical source, packed lighting, canonical pose, framing,
 resolution, sample seed/count and estimator policy. Display identity also hashes
 print, exposure, output dimensions and spectral neutral. Scheduling batch size and
 worker hardware are not optical identity. Hardware/driver provenance is recorded.
+Catalog names and grade labels are also excluded from optical identity; editing
+them retains expensive masters. `GemStone.fingerprint()` still tracks the complete
+authored record. Physical input changes retire masters through `transport_inputs()`.
 Pose quantization is explicit and the renderer uses the same canonical pose.
 
 `GemArtifactStore` has a store.json marker, atomic recipe JSON and SHA256-addressed
@@ -25,8 +28,8 @@ binary resources, raw shaders, standard tables and source/job checksums. Renderi
 requires windowed Vulkan/RenderingDevice, including on a farm. Shards group jobs by
 master, so exposure variants stay together. Farm workers should use isolated output
 stores per attempt; shared stores permit independent jobs but do not deduplicate
-simultaneous executions of the same job. Linux farm deployment and a result-store
-merge service are not yet validated. Do not confuse a prepared ZIP with that work.
+simultaneous executions of the same job. Completed stores can be merged through
+the validated transfer protocol below. Linux farm deployment is not yet validated.
 
 ## Retention and concurrency
 

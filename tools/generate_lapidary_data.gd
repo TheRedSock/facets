@@ -72,9 +72,6 @@ func _build_species() -> Dictionary:
 	quartz.base_scatter_per_mm = 0.002
 	quartz.scatter_anisotropy_g = 0.55
 	quartz.hardness_mohs = 7.0
-	quartz.zoning_axis = Vector3(0.25, 0.1, 0.96)
-	quartz.zoning_frequency = 3.0
-	quartz.zoning_contrast = 0.35
 	quartz.inclusions.append(_archetype(&"quartz_milk_bank", ArchetypeScript.Form.CLOUD,
 		Vector2(0.08, 0.22), 1.0, [], 6.0, Color(1.0, 1.0, 1.0), 4.0, 0.0))
 	quartz.inclusions.append(_archetype(&"quartz_milky_veil", ArchetypeScript.Form.VEIL,
@@ -149,9 +146,6 @@ func _build_species() -> Dictionary:
 	corundum.fluorescence_emission_nm = 693.0
 	corundum.fluorescence_strength = 0.5
 	corundum.hardness_mohs = 9.0
-	corundum.zoning_axis = Vector3(0.85, 0.0, 0.53)
-	corundum.zoning_frequency = 6.0
-	corundum.zoning_contrast = 0.2
 	# Rutile silk: needle sets locked at 60 degrees in the girdle (basal) plane.
 	corundum.inclusions.append(_archetype(&"corundum_silk", ArchetypeScript.Form.NEEDLE,
 		Vector2(0.3, 1.2), 25.0,
@@ -226,9 +220,6 @@ func _build_species() -> Dictionary:
 	fluorite.fluorescence_emission_nm = 425.0
 	fluorite.fluorescence_strength = 0.0
 	fluorite.hardness_mohs = 4.0
-	fluorite.zoning_axis = Vector3(0.2, 0.0, 0.98)
-	fluorite.zoning_frequency = 5.0
-	fluorite.zoning_contrast = 0.5
 	# Cleavage flags (perfect octahedral cleavage) + two-phase droplets.
 	fluorite.inclusions.append(_archetype(&"fluorite_cleavage_flag", ArchetypeScript.Form.VEIL,
 		Vector2(0.35, 1.0), 20.0, [], 10.0, Color(0.96, 0.94, 1.0), 3.0, 0.2))
@@ -299,9 +290,6 @@ func _build_species() -> Dictionary:
 	elbaite.optic_axis_stone = Vector3(1.0, 0.0, 0.0) # table ∥ c
 	elbaite.base_scatter_per_mm = 0.002
 	elbaite.hardness_mohs = 7.5
-	elbaite.zoning_axis = Vector3(0, 0, 1)
-	elbaite.zoning_frequency = 2.5
-	elbaite.zoning_contrast = 0.45
 	# Trichites: threadlike gas-liquid growth tubes along c + healed cracks
 	# ("tear-shaped gas-liquid inclusions", Crystals 13:1461).
 	elbaite.inclusions.append(_archetype(&"elbaite_growth_tube", ArchetypeScript.Form.NEEDLE,
@@ -473,9 +461,8 @@ func _build_chromophores() -> Dictionary:
 
 
 # ------------------------------------------------------------------ grades
-## Four axes, 1.0 = exceptional. Compressed floor: T1 sits near the old T5
-## (sapphire-class rounding / translucency / inclusion load) and the ramp
-## still widens toward T8, which stays pristine.
+## Four game-facing quality labels, 1.0 = exceptional. These do not compile
+## into physical coefficients or geometry; specimen inputs are explicit below.
 
 const GRADE_TABLE := {
 	&"t1": [0.62, 0.58, 0.62, 0.66],
@@ -538,6 +525,28 @@ const STONE_TABLE := [
 ]
 
 
+## Explicit authored specimen coefficients, not a mineral-quality law.
+## Frozen from the earlier catalog look for comparison; no measured calibration.
+## sigma_s/mm, HG g, band period mm, contrast, phase radians, specimen axis.
+const CATALOG_VOLUME := {
+	&"alexandrite": [0.009488833324, 0.6, 1, 0, 0, Vector3.BACK],
+	&"amethyst": [0.05719462512, 0.55, 3.1, 0.1015, 6.06324482, Vector3(0.25, 0.1, 0.96)],
+	&"aquamarine": [0.01921332816, 0.6, 1, 0, 0, Vector3.BACK],
+	&"blue_garnet": [0.002, 0.6, 1, 0, 0, Vector3.BACK],
+	&"diamond": [0.0005, 0.6, 1, 0, 0, Vector3.BACK],
+	&"emerald": [0.01048883332, 0.6, 1, 0, 0, Vector3.BACK],
+	&"fluorite": [0.074191191, 0.6, 1.8, 0.17, 4.193178428, Vector3(0.2, 0, 0.98)],
+	&"painite": [0.003319294924, 0.6, 1, 0, 0, Vector3.BACK],
+	&"peridot": [0.04277537634, 0.6, 1, 0, 0, Vector3.BACK],
+	&"quartz": [0.073191191, 0.55, 3, 0.119, 4.599257897, Vector3(0.25, 0.1, 0.96)],
+	&"rhodolite": [0.03005858417, 0.6, 1, 0, 0, Vector3.BACK],
+	&"ruby": [0.003319294924, 0.6, 1.8, 0.008, 5.423874437, Vector3(0.85, 0, 0.53)],
+	&"sapphire": [0.01821332816, 0.6, 1.7, 0.028, 0.1249714973, Vector3(0.85, 0, 0.53)],
+	&"smoky_quartz": [0.05719462512, 0.55, 3.1, 0.1015, 2.929130322, Vector3(0.25, 0.1, 0.96)],
+	&"topaz": [0.02905858417, 0.6, 1, 0, 0, Vector3.BACK],
+	&"tourmaline": [0.04277537634, 0.6, 3.84, 0.108, 3.960870221, Vector3(0.0, 0.0, 1.0)],
+}
+
 func _build_stones(species: Dictionary, chromophores: Dictionary, grades: Dictionary) -> Array:
 	var cuts := {}
 	for cut_id: StringName in CUT_PATHS:
@@ -554,6 +563,17 @@ func _build_stones(species: Dictionary, chromophores: Dictionary, grades: Dictio
 		stone.cut = cuts[row[5]]
 		stone.seed = row[6]
 		stone.size_mm = row[7]
+		var volume: Array = CATALOG_VOLUME[stone.stone_id]
+		stone.material.scatter_per_mm = volume[0]
+		stone.material.scatter_g = volume[1]
+		stone.material.scattering_evidence.method = "Authored homogeneous HG coefficient"
+		stone.material.scattering_evidence.assumptions = "Catalog look-development value; not a measured scattering population or grade law."
+		stone.condition.banding.period_mm = volume[2]
+		stone.condition.banding.contrast = volume[3]
+		stone.condition.banding.phase_radians = volume[4]
+		stone.condition.banding.axis = volume[5]
+		stone.condition.banding.evidence.method = "Authored sinusoidal concentration field"
+		stone.condition.banding.evidence.assumptions = "Planar band approximation; not a growth-sector model or measured specimen."
 		_save(stone, DIR_STONES + String(row[0]) + ".tres")
 		out.append(stone)
 	return out

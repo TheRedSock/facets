@@ -1,12 +1,17 @@
 [gd_resource type="Resource" script_class="GemChromophore" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="1_ekaei"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_7ehab"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="2_yy1oc"]
+
+[sub_resource type="Resource" id="Resource_djwky"]
+script = ExtResource("1_7ehab")
 
 [resource]
-script = ExtResource("1_ekaei")
+script = ExtResource("2_yy1oc")
 chromophore_id = &"verdelite_fe"
 display_name = "Iron (verdelite, green tourmaline)"
 source_note = "Fe2+ in elbaite: broad Y/Z-octahedra band ~720 nm + 670 nm shoulder (Crystals 13:1461; BJGEO Serido elbaites 720-730 nm), weak 415/470 (Mn3+/Fe3+), weak 583 nm, UV edge 300-400. Green window 510-550 nm; red end closes -> deep bottle green."
+absorption_evidence = SubResource("Resource_djwky")
 absorption_mm = PackedFloat32Array(0.68536, 0.70926, 0.72118, 0.72069, 0.70785, 0.68326, 0.64815, 0.60449, 0.55493, 0.50265, 0.45107, 0.40333, 0.36188, 0.32807, 0.30195, 0.28237, 0.26729, 0.25428, 0.24104, 0.22586, 0.2079, 0.18724, 0.16472, 0.14162, 0.1194, 0.09936, 0.0825, 0.06943, 0.06043, 0.05556, 0.05472, 0.05775, 0.06446, 0.07456, 0.08764, 0.10304, 0.1199, 0.13714, 0.15359, 0.1682, 0.18025, 0.18949, 0.19636, 0.20192, 0.20781, 0.21603, 0.22868, 0.24771, 0.27467, 0.31046, 0.35524, 0.40835, 0.4683, 0.53291, 0.59943, 0.66485, 0.72616, 0.78071, 0.82642, 0.86205, 0.88724, 0.90245, 0.9088, 0.90777, 0.901, 0.88997, 0.87584, 0.85937, 0.84091, 0.82049, 0.79791, 0.77289, 0.7452, 0.71469, 0.6814, 0.64552, 0.60743, 0.56761, 0.52665, 0.48516, 0.44379)
 absorption_eray_mm = PackedFloat32Array()
 ui_color = Color(0.2, 0.65, 0.4, 1)

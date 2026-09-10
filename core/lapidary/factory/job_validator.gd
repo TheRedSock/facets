@@ -98,7 +98,7 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 	if polarized:
 		var bulk := GemMaterialCompiler.compile(stone.material)
 		bulk["volume_fields"] = condition.volume_fields if condition != null else []
-		bulk["zoning"] = {"contrast": stone.material.species.zoning_contrast}
+		bulk["zoning"] = condition.banding.normalized(stone.size_mm) if condition != null and condition.banding != null else {}
 		if stone.optic_axis_override != Vector3.ZERO:
 			bulk["optic_axis"] = stone.optic_axis_override
 		error = GemMaterialCompiler.polarization_error(bulk)

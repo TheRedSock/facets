@@ -18,8 +18,8 @@ static func master_key(job: GemFrameJob) -> String:
 	for key in ["res", "out", "spp", "batch", "device_memory_budget_mib"]:
 		policy.erase(key)
 	var lighting := GemRigCompiler.compile(job.rig)
-	return GemContentIdentity.digest(["linear-master-v1", GemRenderIdentity.optical_digest(),
-		job.stone, lighting.lights, lighting.spectra, lighting.background, policy,
+	return GemContentIdentity.digest(["linear-master-v2", GemRenderIdentity.optical_digest(),
+		job.stone.transport_inputs(), lighting.lights, lighting.spectra, lighting.background, policy,
 		job.resolution, job.samples, job.sample_seed, canonical_orientation(job.orientation),
 		canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half])
 

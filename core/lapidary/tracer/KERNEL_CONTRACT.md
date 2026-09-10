@@ -333,6 +333,12 @@ elimination to LAPACK. These validate the synthetic field solver, not catalog
 material measurements or a completed anisotropic gemstone renderer.
 
 
+Authoring note: `scatter_zone.z` remains the normalized angular frequency divided
+by PI. `GemBanding.period_mm` compiles to `2*size_mm/period_mm`; physical band
+spacing therefore stays fixed when the host's normalization changes. The phase
+is explicit specimen data. Grade labels and species metadata do not modulate
+scattering or band contrast.
+
 `gem_crystal.glsl` ports the mode and complex interface field solve to float32.
 `tools/crystal_gpu_check.gd` compares actual GPU outputs against float64 CPU fields
 for rotated boundaries, including evanescent output modes. It is currently an

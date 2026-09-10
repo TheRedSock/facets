@@ -1,9 +1,8 @@
 class_name GemGrade
 extends Resource
-## Legacy catalog quality recipes, not physical properties or a gemological
-## certificate. Cut is a label; explicit templates and workmanship own geometry.
-## Crystal still controls bulk haze/zoning. Clarity and surface remain disabled pending visual
-## validation. GemCondition holds explicit realized defects in millimeters.
+## Catalog quality labels, not physical properties or a gemological certificate.
+## None of these axes alter optics or geometry. A future accepted grade recipe
+## must first realize explicit material/condition/cut inputs for inspection.
 ## Hardness, toughness, clarity and aesthetic rank must not be conflated.
 
 @export var grade_id: StringName

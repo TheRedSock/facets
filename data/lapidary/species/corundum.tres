@@ -1,18 +1,11 @@
-[gd_resource type="Resource" script_class="GemSpecies" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="GemSpecies" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_37r2h"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_u6nro"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_u6nro"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_d55if"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="3_3j7tg"]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="refraction_evidence_script"]
-
-[sub_resource type="Resource" id="refraction_evidence"]
-script = ExtResource("refraction_evidence_script")
-kind = 1
-citation = "Sellmeier: I. H. Malitson & M. J. Dodge, JOSA 62, 1405 (1972), o-ray (refractiveindex.info Al2O3/Malitson-o); published pole wavelengths 0.0726631/0.1193242/18.028251 um SQUARED to um^2. n_D=1.7680. Birefringence 0.008 uniaxial(-), Mohs 9. Fluorescence: Cr3+ R-line ~693 nm (GIA G&G Spring 2020, Dubinsky et al.); carried by the species, so Fe-quenched sapphire inherits it — see limitations in docs/lapidary-spectra-sources.md."
-method = "Published Sellmeier coefficients"
-
-[sub_resource type="Resource" id="Resource_d55if"]
-script = ExtResource("1_37r2h")
+[sub_resource type="Resource" id="Resource_342en"]
+script = ExtResource("1_u6nro")
 archetype_id = &"corundum_silk"
 size_mm_range = Vector2(0.3, 1.2)
 aspect = 25.0
@@ -22,8 +15,8 @@ tint = Color(1, 0.96, 0.88, 1)
 weight = 4.0
 center_bias = 0.15
 
-[sub_resource type="Resource" id="Resource_3j7tg"]
-script = ExtResource("1_37r2h")
+[sub_resource type="Resource" id="Resource_tdq20"]
+script = ExtResource("1_u6nro")
 archetype_id = &"corundum_crystal"
 form = 4
 size_mm_range = Vector2(0.15, 0.45)
@@ -33,22 +26,24 @@ tint = Color(0.94, 0.94, 0.98, 1)
 weight = 0.6
 center_bias = 0.5
 
+[sub_resource type="Resource" id="Resource_mn171"]
+script = ExtResource("2_d55if")
+kind = 1
+citation = "Sellmeier: I. H. Malitson & M. J. Dodge, JOSA 62, 1405 (1972), o-ray (refractiveindex.info Al2O3/Malitson-o); published pole wavelengths 0.0726631/0.1193242/18.028251 um SQUARED to um^2. n_D=1.7680. Birefringence 0.008 uniaxial(-), Mohs 9. Fluorescence: Cr3+ R-line ~693 nm (GIA G&G Spring 2020, Dubinsky et al.); carried by the species, so Fe-quenched sapphire inherits it — see limitations in docs/lapidary-spectra-sources.md."
+method = "Published Sellmeier coefficients"
+
 [resource]
-script = ExtResource("2_u6nro")
-refraction_evidence = SubResource("refraction_evidence")
+script = ExtResource("3_3j7tg")
 species_id = &"corundum"
 display_name = "Corundum (Al2O3)"
 source_note = "Sellmeier: I. H. Malitson & M. J. Dodge, JOSA 62, 1405 (1972), o-ray (refractiveindex.info Al2O3/Malitson-o); published pole wavelengths 0.0726631/0.1193242/18.028251 um SQUARED to um^2. n_D=1.7680. Birefringence 0.008 uniaxial(-), Mohs 9. Fluorescence: Cr3+ R-line ~693 nm (GIA G&G Spring 2020, Dubinsky et al.); carried by the species, so Fe-quenched sapphire inherits it — see limitations in docs/lapidary-spectra-sources.md."
+refraction_evidence = SubResource("Resource_mn171")
 sellmeier_b = Vector3(1.4313493, 0.65054715, 5.341402)
 sellmeier_c_um2 = Vector3(0.005279926, 0.014238264, 325.01782)
 birefringence = 0.008
 uniaxial_positive = false
-optic_axis_stone = Vector3(0, 0, 1)
 base_scatter_per_mm = 0.001
 fluorescence_emission_nm = 693.0
 fluorescence_strength = 0.5
 hardness_mohs = 9.0
-inclusions = Array[ExtResource("1_37r2h")]([SubResource("Resource_d55if"), SubResource("Resource_3j7tg")])
-zoning_axis = Vector3(0.85, 0, 0.53)
-zoning_frequency = 6.0
-zoning_contrast = 0.2
+inclusions = Array[ExtResource("1_u6nro")]([SubResource("Resource_342en"), SubResource("Resource_tdq20")])

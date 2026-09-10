@@ -3,7 +3,7 @@ extends Control
 ##
 ## One persistent 512x512 GemTracer renders the selected authored stone
 ## progressively: a 4 spp first batch is shown immediately, then accumulation
-## continues toward TARGET_SPP while idle. Grade/seed/size edits mutate an
+## continues toward TARGET_SPP while idle. Material/condition edits mutate an
 ## in-memory duplicate of the stone — authored .tres files are never written.
 ## Clip scrubbing reuses GemClipBaker's sample math, so the preview matches
 ## baked frames exactly. Requires a windowed run; in --headless the preview
@@ -128,8 +128,8 @@ func _populate_pickers() -> void:
 
 func _connect_signals() -> void:
 	(_c["stones"] as OptionButton).item_selected.connect(_on_stone_selected)
-	for axis in ["cut", "clarity", "surface", "crystal"]:
-		(_c["grade_" + axis] as HSlider).value_changed.connect(_on_grade_changed.bind(axis))
+	for key in ["scatter", "anisotropy", "band_period", "band_contrast"]:
+		(_c[key] as HSlider).value_changed.connect(_on_volume_changed.bind(key))
 	(_c["reset"] as Button).pressed.connect(_on_reset_pressed)
 	(_c["seed"] as SpinBox).value_changed.connect(_on_seed_changed)
 	(_c["size"] as SpinBox).value_changed.connect(_on_size_changed)
@@ -159,24 +159,41 @@ func _on_stone_selected(idx: int) -> void:
 ## Working copy: never mutate authored resources (load() returns the cached
 ## instance shared with the rest of the project).
 func _duplicate_stone(authored: GemStone) -> GemStone:
-	var copy: GemStone = authored.duplicate()
-	copy.grade = authored.grade.duplicate() if authored.grade != null else GemGrade.new()
+	var copy: GemStone = authored.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
+	if copy.condition == null:
+		copy.condition = GemCondition.new()
+	if copy.condition.banding == null:
+		copy.condition.banding = GemBanding.new()
 	return copy
 
 
 func _sync_stone_ui() -> void:
 	_syncing = true
-	for axis in ["cut", "clarity", "surface", "crystal"]:
-		(_c["grade_" + axis] as HSlider).value = _stone.grade.get(axis)
+	var scattering: Dictionary = GemMaterialCompiler.compile(_stone.material).scatter
+	(_c["scatter"] as HSlider).value = scattering.sigma_per_mm
+	(_c["anisotropy"] as HSlider).value = scattering.g
+	(_c["band_period"] as HSlider).value = _stone.condition.banding.period_mm
+	(_c["band_contrast"] as HSlider).value = _stone.condition.banding.contrast
 	(_c["seed"] as SpinBox).value = _stone.seed
 	(_c["size"] as SpinBox).value = _stone.size_mm
 	_syncing = false
 
 
-func _on_grade_changed(value: float, axis: String) -> void:
+func _on_volume_changed(value: float, key: String) -> void:
 	if _syncing or _stone == null:
 		return
-	_stone.grade.set(axis, value)
+	match key:
+		"scatter":
+			# Resolve inherited g before switching to explicit scattering.
+			_stone.material.scatter_g = GemMaterialCompiler.compile(_stone.material).scatter.g
+			_stone.material.scatter_per_mm = value
+		"anisotropy":
+			_stone.material.scatter_per_mm = GemMaterialCompiler.compile(_stone.material).scatter.sigma_per_mm
+			_stone.material.scatter_g = value
+		"band_period":
+			_stone.condition.banding.period_mm = value
+		"band_contrast":
+			_stone.condition.banding.contrast = value
 	_queue_rebuild()
 
 
@@ -231,7 +248,8 @@ func _process(_delta: float) -> void:
 		return
 	var stepped := false
 	if _tracer.samples_accumulated < TARGET_SPP:
-		_tracer.accumulate(FIRST_BATCH_SPP if _tracer.samples_accumulated == 0 else STEP_SPP)
+		var batch := FIRST_BATCH_SPP if _tracer.samples_accumulated == 0 else STEP_SPP
+		_tracer.accumulate(mini(batch, TARGET_SPP - _tracer.samples_accumulated))
 		stepped = true
 	if stepped or _present_dirty:
 		_present_dirty = false
@@ -341,8 +359,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 # ------------------------------------------------------------------ debug API (harness)
 
-func debug_set_grade(axis: String, value: float) -> void:
-	var slider := _c.get("grade_" + axis) as HSlider
+func debug_set_volume(key: String, value: float) -> void:
+	var slider := _c.get(key) as HSlider
 	if slider != null:
 		slider.value = value
 

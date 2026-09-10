@@ -9,7 +9,7 @@ extends SceneTree
 ##      legacy autoload startup, so wall-clock waits alone are unreliable;
 ##   2. gives the loop a ~3 s accumulation window, captures a full-window
 ##      screenshot, and checks the preview is not black/empty;
-##   3. sets clarity to 0.1 through the scene's debug API, waits for the
+##   3. sets scattering to 0.2/mm through the scene's debug API, waits for the
 ##      debounced rebuild to land, and checks the render visibly changed.
 ## Prints PASS/FAIL.
 
@@ -62,23 +62,23 @@ func _run() -> void:
 		return
 
 	var fp_a := str(status.get("fingerprint", ""))
-	atelier.call("debug_set_grade", "clarity", 0.1)
-	var regraded := await _wait_until(func() -> bool:
+	atelier.call("debug_set_volume", "scatter", 0.2)
+	var modified := await _wait_until(func() -> bool:
 		var s: Dictionary = atelier.call("debug_status")
 		return str(s.get("fingerprint", "")) != fp_a and int(s.get("spp", 0)) >= MIN_COMPARE_SPP,
 		BOOT_FRAME_CAP)
-	if not regraded:
-		_finish(false, "clarity rebuild never landed: %s" % str(atelier.call("debug_status")))
+	if not modified:
+		_finish(false, "volume rebuild never landed: %s" % str(atelier.call("debug_status")))
 		return
 	var preview_b: Image = atelier.call("debug_get_preview_image")
-	var shot_b_path := ProjectSettings.globalize_path(OUT_DIR + "/atelier_screenshot_clarity01.png")
+	var shot_b_path := ProjectSettings.globalize_path(OUT_DIR + "/atelier_screenshot_scatter02.png")
 	get_root().get_texture().get_image().save_png(shot_b_path)
-	print("  clarity 0.1 screenshot: %s" % shot_b_path)
-	print("  regraded: %s" % str(atelier.call("debug_status")))
+	print("  scatter 0.2/mm screenshot: %s" % shot_b_path)
+	print("  modified: %s" % str(atelier.call("debug_status")))
 	var diff := _mean_abs_diff(preview_a, preview_b)
-	print("  preview mean abs diff after clarity 0.1: %.4f" % diff)
+	print("  preview mean abs diff after scatter 0.2/mm: %.4f" % diff)
 	if diff < 0.002:
-		_finish(false, "clarity change did not alter the render")
+		_finish(false, "volume change did not alter the render")
 		return
 	_finish(true, "spp %d in %.1f s window, last dispatch %.1f ms" % [
 		int(status.get("spp", 0)), SETTLE_MS / 1000.0, float(status.get("last_ms", 0.0))])

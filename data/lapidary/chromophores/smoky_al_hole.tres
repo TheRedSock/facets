@@ -1,12 +1,17 @@
 [gd_resource type="Resource" script_class="GemChromophore" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="1_li7kp"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_lfd8h"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="2_o2niy"]
+
+[sub_resource type="Resource" id="Resource_7b63y"]
+script = ExtResource("1_lfd8h")
 
 [resource]
-script = ExtResource("1_li7kp")
+script = ExtResource("2_o2niy")
 chromophore_id = &"smoky_al_hole"
 display_name = "Smoky quartz (Al hole centre)"
 source_note = "Al-O- hole colour centre in irradiated quartz (minsocam.org Color in Minerals: substitutional Al3+ + ionizing radiation; heat-bleachable). Smooth featureless absorption strongest toward violet/UV -> smoky brown-grey. No sharp visible bands."
+absorption_evidence = SubResource("Resource_7b63y")
 absorption_mm = PackedFloat32Array(0.5569, 0.56213, 0.5639, 0.5623, 0.5575, 0.54975, 0.53937, 0.5267, 0.51213, 0.49606, 0.4789, 0.46105, 0.44287, 0.42471, 0.40684, 0.38952, 0.37295, 0.35725, 0.34254, 0.32885, 0.3162, 0.30455, 0.29386, 0.28406, 0.27504, 0.26673, 0.25901, 0.2518, 0.245, 0.23854, 0.23234, 0.22634, 0.2205, 0.21478, 0.20916, 0.20361, 0.19812, 0.1927, 0.18735, 0.18207, 0.17686, 0.17175, 0.16673, 0.16181, 0.157, 0.15231, 0.14774, 0.14329, 0.13896, 0.13475, 0.13065, 0.12666, 0.12278, 0.119, 0.11531, 0.1117, 0.10817, 0.10472, 0.10133, 0.098, 0.09473, 0.09152, 0.08836, 0.08525, 0.08219, 0.07919, 0.07624, 0.07335, 0.07052, 0.06775, 0.06505, 0.06242, 0.05986, 0.05737, 0.05497, 0.05265, 0.05042, 0.04828, 0.04622, 0.04427, 0.0424)
 absorption_eray_mm = PackedFloat32Array()
 ui_color = Color(0.45, 0.38, 0.32, 1)

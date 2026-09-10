@@ -16,6 +16,7 @@ foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test
     $stages += @{ Name = $name; Args = @('--headless', '--quit-after', '600', '--script', "res://tests/lapidary/$name.gd") }
 }
 $stages += @{ Name = 'test_fracture'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_fracture.gd') }
+$stages += @{ Name = 'test_volume_authoring'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_volume_authoring.gd') }
 if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }

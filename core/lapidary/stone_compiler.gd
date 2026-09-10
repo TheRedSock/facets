@@ -1,13 +1,9 @@
 class_name LapidaryStoneCompiler
 extends RefCounted
-## Compiles a GemStone (species + chromophore + cut + grade + seed) into the
+## Compiles a GemStone's explicit physical inputs into the
 ## StoneInstance dictionary consumed by the GPU kernel (see KERNEL_CONTRACT.md).
-## This file owns the GRADE -> PHYSICS mapping. All randomness is a private
-## deterministic hash sequence from the stone seed (never gameplay SeededRng).
-##
-## Crystal still uses a legacy catalog recipe. Cut proportions are explicit. Explicit GemCondition boundaries
-## and GemSurface finishes provide physical condition. Automatic clarity and
-## surface grade mappings remain unaccepted; the old primitive placer is removed.
+## Grade labels never alter transport. Materials own homogeneous coefficients;
+## condition owns realized banding, fields, boundaries and surface finish.
 
 const CUT_COMPILER_PATH := "res://core/lapidary/cut/cut_compiler.gd"
 
@@ -21,12 +17,8 @@ static func compile(stone: GemStone) -> Dictionary:
 	assert(stone.condition == null or stone.condition.validate_volume_fields().is_empty(), "Invalid spatial material condition")
 	var bulk := GemMaterialCompiler.compile(stone.material)
 	var species := stone.material.species
-	var grade := stone.grade if stone.grade != null else GemGrade.new()
 
 	var geometry := _compile_cut(stone)
-
-	var rng_state := [int(stone.seed) * 2654435761 + 1013904223]
-	
 	var compiled := {
 		"planes": geometry["planes"],
 		"facet_ids": geometry.get("facet_ids", PackedInt32Array()),
@@ -37,8 +29,8 @@ static func compile(stone: GemStone) -> Dictionary:
 		"sellmeier_c": species.sellmeier_c_um2,
 		"size_mm": stone.size_mm,
 		"seed": stone.seed,
-		"scatter": bulk["scatter"] if stone.material.scatter_per_mm >= 0.0 else _crystal_to_scatter(species, grade),
-		"zoning": _crystal_to_zoning(species, grade, rng_state),
+		"scatter": bulk["scatter"],
+		"zoning": stone.condition.banding.normalized(stone.size_mm) if stone.condition != null and stone.condition.banding != null else {},
 		"birefringence": bulk["birefringence"],
 		"optic_axis": _resolve_optic_axis(stone).normalized(),
 		"fluorescence": _resolve_fluorescence(species, stone.material.chromophore),
@@ -95,31 +87,3 @@ static func _compile_cut(stone: GemStone) -> Dictionary:
 	if stone.condition != null and stone.condition.workmanship != null:
 		tolerances = stone.condition.workmanship.normalized_tolerances(stone.size_mm)
 	return compiler.call("compile", stone.cut, stone.shape, stone.seed, tolerances)
-
-
-static func _crystal_to_scatter(species: GemSpecies, grade: GemGrade) -> Dictionary:
-	# T1 crystal ~0.66: translucent, not milky-white. Mean free path stays
-	# longer than the stone; windowing remains legible.
-	var haze := pow(1.0 - grade.crystal, 1.6) * 0.40
-	return {
-		"sigma_per_mm": species.base_scatter_per_mm + haze,
-		"g": species.scatter_anisotropy_g,
-	}
-
-
-static func _crystal_to_zoning(species: GemSpecies, grade: GemGrade, state: Array) -> Dictionary:
-	return {
-		"axis": species.zoning_axis.normalized(),
-		"frequency": species.zoning_frequency,
-		"contrast": species.zoning_contrast * (1.0 - grade.crystal),
-		"phase": _rndf(state) * TAU,
-	}
-
-
-# ------------------------------------------------------------------ deterministic hash RNG
-
-static func _rndf(state: Array) -> float:
-	var s: int = (int(state[0]) * 747796405 + 2891336453) & 0xFFFFFFFF
-	state[0] = s
-	var word: int = (((s >> ((s >> 28) + 4)) ^ s) * 277803737) & 0xFFFFFFFF
-	return float(((word >> 22) ^ word) & 0xFFFFF) / 1048576.0

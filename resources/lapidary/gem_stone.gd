@@ -23,3 +23,9 @@ extends Resource
 ## Stable identity for cache keys. Any visual-affecting change lands here.
 func fingerprint() -> String:
 	return preload("res://resources/lapidary/content_identity.gd").digest(self)
+
+## Grade labels and catalog names do not require new optical masters. Full
+## fingerprint() still tracks the authored record for editing/provenance.
+func transport_inputs() -> Dictionary:
+	return {"material": material, "condition": condition, "cut": cut, "shape": shape,
+		"seed": seed, "size_mm": size_mm, "optic_axis_override": optic_axis_override}

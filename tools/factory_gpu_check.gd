@@ -7,7 +7,7 @@ func check(value: bool, label: String) -> void:
 
 func _initialize() -> void:
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
-	stone.grade.crystal = 0.4
+	stone.material.scatter_per_mm = 0.18
 	var clip: GemClip = load("res://data/lapidary/clips/idle.tres")
 	var jobs := GemFramePlan.animation(stone, clip, load("res://data/lapidary/rigs/gameplay_studio.tres"), GemPrint.load_house(), GemRung.PREVIEW)
 	var job := jobs[0]

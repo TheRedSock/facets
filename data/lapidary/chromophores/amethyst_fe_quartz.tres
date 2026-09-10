@@ -1,12 +1,17 @@
 [gd_resource type="Resource" script_class="GemChromophore" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="1_pxwwh"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_2c1nn"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="2_ypsm1"]
+
+[sub_resource type="Resource" id="Resource_8gpl5"]
+script = ExtResource("1_2c1nn")
 
 [resource]
-script = ExtResource("1_pxwwh")
+script = ExtResource("2_ypsm1")
 chromophore_id = &"amethyst_fe_quartz"
 display_name = "Iron colour centre (amethyst)"
 source_note = "O2- -> Fe4+ charge transfer in irradiated quartz, centred in the yellow-green ~545 nm (GIA G&G 24(1) Fritsch & Rossman part 2; Cox 1977). Transmits violet-blue and some red -> purple. UV shoulder toward the ~357 nm band."
+absorption_evidence = SubResource("Resource_8gpl5")
 absorption_mm = PackedFloat32Array(0.34367, 0.34033, 0.32843, 0.30934, 0.28513, 0.25824, 0.23119, 0.20629, 0.18548, 0.17018, 0.16126, 0.15916, 0.16391, 0.17531, 0.19298, 0.21652, 0.24545, 0.27932, 0.31767, 0.35996, 0.40563, 0.454, 0.5043, 0.55562, 0.60696, 0.65724, 0.70531, 0.74998, 0.79012, 0.82465, 0.8526, 0.87317, 0.88576, 0.89, 0.88576, 0.87317, 0.8526, 0.82465, 0.79012, 0.74998, 0.7053, 0.65723, 0.60693, 0.55555, 0.50416, 0.45374, 0.40512, 0.35901, 0.31595, 0.27633, 0.24038, 0.20821, 0.1798, 0.15503, 0.13371, 0.11558, 0.10035, 0.08771, 0.07735, 0.06894, 0.0622, 0.05686, 0.05268, 0.04944, 0.04696, 0.04508, 0.04367, 0.04263, 0.04186, 0.0413, 0.04091, 0.04062, 0.04042, 0.04029, 0.04019, 0.04013, 0.04008, 0.04005, 0.04003, 0.04002, 0.04001)
 absorption_eray_mm = PackedFloat32Array()
 ui_color = Color(0.62, 0.35, 0.92, 1)

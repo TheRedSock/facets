@@ -7,9 +7,12 @@ extends Resource
 @export var workmanship: GemWorkmanship = GemWorkmanship.new()
 ## Spatial coefficient fields use physical millimeters in the host coordinate frame.
 @export var volume_fields: Array[GemVolumeField] = []
+@export var banding: GemBanding = GemBanding.new()
 
 func validate_volume_fields() -> PackedStringArray:
 	var errors := PackedStringArray()
+	if banding != null:
+		errors.append_array(banding.validate())
 	if volume_fields.size() > 16:
 		errors.append("At most 16 spatial fields are supported per host")
 	for field in volume_fields:

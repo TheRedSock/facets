@@ -1,18 +1,11 @@
-[gd_resource type="Resource" script_class="GemSpecies" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="GemSpecies" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_6ugde"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_6u52p"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_6u52p"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_6nt8i"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="3_1v8gg"]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="refraction_evidence_script"]
-
-[sub_resource type="Resource" id="refraction_evidence"]
-script = ExtResource("refraction_evidence_script")
-kind = 1
-citation = "Sellmeier: F. Peter, Z. Phys. 15, 358-368 (1923) (refractiveindex.info C/Peter); published poles 0.1060/0.1750 um SQUARED to 0.011236/0.030625 um^2. n_D=2.4173 (lit. 2.41726, JHU/APL Tech. Digest 14-1). Cubic: birefringence 0. Mohs 10. Faint blue fluorescence ~440 nm (N3 centers)."
-method = "Published Sellmeier coefficients"
-
-[sub_resource type="Resource" id="Resource_6nt8i"]
-script = ExtResource("1_6ugde")
+[sub_resource type="Resource" id="Resource_1kvqp"]
+script = ExtResource("1_6u52p")
 archetype_id = &"diamond_pinpoint"
 form = 4
 size_mm_range = Vector2(0.03, 0.12)
@@ -20,17 +13,22 @@ aspect = 1.0
 scatter_density = 16.0
 center_bias = 0.5
 
+[sub_resource type="Resource" id="Resource_7c1vl"]
+script = ExtResource("2_6nt8i")
+kind = 1
+citation = "Sellmeier: F. Peter, Z. Phys. 15, 358-368 (1923) (refractiveindex.info C/Peter); published poles 0.1060/0.1750 um SQUARED to 0.011236/0.030625 um^2. n_D=2.4173 (lit. 2.41726, JHU/APL Tech. Digest 14-1). Cubic: birefringence 0. Mohs 10. Faint blue fluorescence ~440 nm (N3 centers)."
+method = "Published Sellmeier coefficients"
+
 [resource]
-script = ExtResource("2_6u52p")
-refraction_evidence = SubResource("refraction_evidence")
+script = ExtResource("3_1v8gg")
 species_id = &"diamond"
 display_name = "Diamond (C)"
 source_note = "Sellmeier: F. Peter, Z. Phys. 15, 358-368 (1923) (refractiveindex.info C/Peter); published poles 0.1060/0.1750 um SQUARED to 0.011236/0.030625 um^2. n_D=2.4173 (lit. 2.41726, JHU/APL Tech. Digest 14-1). Cubic: birefringence 0. Mohs 10. Faint blue fluorescence ~440 nm (N3 centers)."
+refraction_evidence = SubResource("Resource_7c1vl")
 sellmeier_b = Vector3(4.3356, 0.3306, 0)
 sellmeier_c_um2 = Vector3(0.011236, 0.030625, 0)
-optic_axis_stone = Vector3(0, 0, 1)
 base_scatter_per_mm = 0.0005
 fluorescence_emission_nm = 440.0
 fluorescence_strength = 0.05
 hardness_mohs = 10.0
-inclusions = Array[ExtResource("1_6ugde")]([SubResource("Resource_6nt8i")])
+inclusions = Array[ExtResource("1_6u52p")]([SubResource("Resource_1kvqp")])

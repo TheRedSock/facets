@@ -1,31 +1,65 @@
 [gd_resource type="Resource" script_class="GemStone" format=3]
 
-[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="1_6dlck"]
-[ext_resource type="Resource" path="res://data/lapidary/grades/t8.tres" id="2_gad6n"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="3_ki6k4"]
-[ext_resource type="Resource" path="res://data/lapidary/species/diamond.tres" id="4_cjwxc"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_hie0a"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_banding.gd" id="2_o4sb5"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_defect.gd" id="3_mxlik"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_surface.gd" id="4_ddd32"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_condition.gd" id="5_abys6"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="6_6n3bh"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_workmanship.gd" id="7_80i72"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="8_ai8nw"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t8.tres" id="9_3po5n"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="10_jp677"]
+[ext_resource type="Resource" path="res://data/lapidary/species/diamond.tres" id="11_rx0n8"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="12_f076v"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="13_5c034"]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+[sub_resource type="Resource" id="Resource_iok2s"]
+script = ExtResource("1_hie0a")
+method = "Authored sinusoidal concentration field"
+assumptions = "Planar band approximation; not a growth-sector model or measured specimen."
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="material_script"]
+[sub_resource type="Resource" id="Resource_8jqxv"]
+script = ExtResource("2_o4sb5")
+evidence = SubResource("Resource_iok2s")
 
-[sub_resource type="Resource" id="Material"]
-script = ExtResource("material_script")
-species = ExtResource("4_cjwxc")
+[sub_resource type="Resource" id="Resource_plh76"]
+script = ExtResource("4_ddd32")
 
-[sub_resource type="Resource" id="Shape"]
-script = ExtResource("shape_script")
+[sub_resource type="Resource" id="Resource_0cw5v"]
+script = ExtResource("7_80i72")
+
+[sub_resource type="Resource" id="Resource_0043j"]
+script = ExtResource("5_abys6")
+finish = SubResource("Resource_plh76")
+workmanship = SubResource("Resource_0cw5v")
+banding = SubResource("Resource_8jqxv")
+
+[sub_resource type="Resource" id="Resource_khd4w"]
+script = ExtResource("1_hie0a")
+method = "Authored homogeneous HG coefficient"
+assumptions = "Catalog look-development value; not a measured scattering population or grade law."
+
+[sub_resource type="Resource" id="Resource_hrqmb"]
+script = ExtResource("10_jp677")
+species = ExtResource("11_rx0n8")
+scatter_per_mm = 0.0005
+scattering_evidence = SubResource("Resource_khd4w")
+
+[sub_resource type="Resource" id="Resource_m373c"]
+script = ExtResource("13_5c034")
 outline = &"pear"
 aspect_ratio = 1.4
-corner_radius = 0.1
-sectors = 8
+outline_points = PackedVector2Array()
+loft_sections = PackedVector2Array(-0.65, 0.05, -0.04, 1, 0.04, 1, 0.35, 0.55)
 
 [resource]
-script = ExtResource("3_ki6k4")
-shape = SubResource("Shape")
-material = SubResource("Material")
+script = ExtResource("12_f076v")
 stone_id = &"diamond"
-cut = ExtResource("1_6dlck")
-grade = ExtResource("2_gad6n")
+material = SubResource("Resource_hrqmb")
+condition = SubResource("Resource_0043j")
+cut = ExtResource("8_ai8nw")
+shape = SubResource("Resource_m373c")
+grade = ExtResource("9_3po5n")
 seed = 37
 size_mm = 5.5

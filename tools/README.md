@@ -58,6 +58,14 @@ Automatic fracture grading remains disabled: topology validation alone does not
 establish convincing appearance or acceptable render cost. Meshing regularizes
 near-node sliver contours; admission rejects unresolved degenerate geometry.
 
+`GemGrade` is metadata: changing a label cannot alter transport. Author bulk
+scattering with `GemMaterial.scatter_per_mm` and `scatter_g`; use
+`GemCondition.banding` for physical band period, direction, phase and contrast,
+and `volume_fields` for localized coefficient variations. Catalog coefficients
+are explicitly labeled authored approximations. The Atelier volume controls
+edit a deep working copy. Evaluation sheets vary physical coefficients rather
+than promising that grade sliders simulate degradation.
+
 Completed farm output stores can be consolidated headlessly with
 `merge_gem_results.gd -- --source=... --destination=... --manifest=...` (repeat
 source for multiple shards). Inspect its dry-run report before `--apply=true`.

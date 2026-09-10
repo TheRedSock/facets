@@ -54,7 +54,7 @@ static func build(root: Control) -> Dictionary:
 static func set_enabled(c: Dictionary, on: bool) -> void:
 	for key in ["stones", "rigs", "clips", "reset", "export", "print_toggle"]:
 		(c[key] as BaseButton).disabled = not on
-	for key in ["grade_cut", "grade_clarity", "grade_surface", "grade_crystal",
+	for key in ["scatter", "anisotropy", "band_period", "band_contrast",
 			"yaw", "exposure", "tilt", "turn", "scrub"]:
 		(c[key] as Slider).editable = on
 	for key in ["seed", "size"]:
@@ -128,10 +128,10 @@ static func _build_control_panel(parent: Control, c: Dictionary) -> void:
 
 	_section(box, "STONE", true)
 	c["stones"] = _picker_row(box, "Stone")
-	c["grade_cut"] = _slider_row(box, "Cut", 0.0, 1.0, 0.01, 1.0, "%.2f")
-	c["grade_clarity"] = _slider_row(box, "Clarity", 0.0, 1.0, 0.01, 1.0, "%.2f")
-	c["grade_surface"] = _slider_row(box, "Surface", 0.0, 1.0, 0.01, 1.0, "%.2f")
-	c["grade_crystal"] = _slider_row(box, "Crystal", 0.0, 1.0, 0.01, 1.0, "%.2f")
+	c["scatter"] = _slider_row(box, "Scatter /mm", 0.0, 2.0, 0.001, 0.0, "%.3f")
+	c["anisotropy"] = _slider_row(box, "Scatter g", -0.95, 0.95, 0.01, 0.6, "%.2f")
+	c["band_period"] = _slider_row(box, "Bands mm", 0.05, 10.0, 0.01, 1.0, "%.2f")
+	c["band_contrast"] = _slider_row(box, "Band contrast", 0.0, 1.0, 0.01, 0.0, "%.2f")
 	c["seed"] = _spin_row(box, "Seed", 0, 1 << 30, 1, 1, true)
 	c["size"] = _spin_row(box, "Size mm", 2.0, 8.0, 0.1, 4.0, false)
 	c["reset"] = _button(box, "Reset to authored")

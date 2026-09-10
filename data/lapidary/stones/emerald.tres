@@ -1,33 +1,67 @@
 [gd_resource type="Resource" script_class="GemStone" format=3]
 
-[ext_resource type="Resource" path="res://data/lapidary/chromophores/emerald_cr.tres" id="1_l3ky1"]
-[ext_resource type="Resource" path="res://data/lapidary/cuts/step.tres" id="2_ivlth"]
-[ext_resource type="Resource" path="res://data/lapidary/grades/t6.tres" id="3_8dukx"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_83wxx"]
-[ext_resource type="Resource" path="res://data/lapidary/species/beryl.tres" id="5_d67f1"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_wo82f"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_banding.gd" id="2_i2mid"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_defect.gd" id="3_jde71"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_surface.gd" id="4_t1c4e"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_condition.gd" id="5_xvec5"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="6_kry7d"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_workmanship.gd" id="7_nixme"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/step.tres" id="8_v6ppo"]
+[ext_resource type="Resource" path="res://data/lapidary/grades/t6.tres" id="9_oluep"]
+[ext_resource type="Resource" path="res://data/lapidary/chromophores/emerald_cr.tres" id="10_ecdpp"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="11_orbf0"]
+[ext_resource type="Resource" path="res://data/lapidary/species/beryl.tres" id="12_3sf1r"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="13_3a05m"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="14_g0ayr"]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+[sub_resource type="Resource" id="Resource_4k8ea"]
+script = ExtResource("1_wo82f")
+method = "Authored sinusoidal concentration field"
+assumptions = "Planar band approximation; not a growth-sector model or measured specimen."
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="material_script"]
+[sub_resource type="Resource" id="Resource_0p2eo"]
+script = ExtResource("2_i2mid")
+evidence = SubResource("Resource_4k8ea")
 
-[sub_resource type="Resource" id="Material"]
-script = ExtResource("material_script")
-species = ExtResource("5_d67f1")
-chromophore = ExtResource("1_l3ky1")
+[sub_resource type="Resource" id="Resource_2dgeg"]
+script = ExtResource("4_t1c4e")
 
-[sub_resource type="Resource" id="Shape"]
-script = ExtResource("shape_script")
+[sub_resource type="Resource" id="Resource_vurpm"]
+script = ExtResource("7_nixme")
+
+[sub_resource type="Resource" id="Resource_5w7ba"]
+script = ExtResource("5_xvec5")
+finish = SubResource("Resource_2dgeg")
+workmanship = SubResource("Resource_vurpm")
+banding = SubResource("Resource_0p2eo")
+
+[sub_resource type="Resource" id="Resource_ltmnp"]
+script = ExtResource("1_wo82f")
+method = "Authored homogeneous HG coefficient"
+assumptions = "Catalog look-development value; not a measured scattering population or grade law."
+
+[sub_resource type="Resource" id="Resource_q0j0w"]
+script = ExtResource("11_orbf0")
+species = ExtResource("12_3sf1r")
+chromophore = ExtResource("10_ecdpp")
+scatter_per_mm = 0.01048883332
+scattering_evidence = SubResource("Resource_ltmnp")
+
+[sub_resource type="Resource" id="Resource_d5wwh"]
+script = ExtResource("14_g0ayr")
 outline = &"rectangle"
 aspect_ratio = 1.35
-corner_radius = 0.1
-sectors = 8
+outline_points = PackedVector2Array()
+loft_sections = PackedVector2Array(-0.65, 0.05, -0.04, 1, 0.04, 1, 0.35, 0.55)
 
 [resource]
-script = ExtResource("4_83wxx")
-shape = SubResource("Shape")
-material = SubResource("Material")
+script = ExtResource("13_3a05m")
 stone_id = &"emerald"
-cut = ExtResource("2_ivlth")
-grade = ExtResource("3_8dukx")
+material = SubResource("Resource_q0j0w")
+condition = SubResource("Resource_5w7ba")
+cut = ExtResource("8_v6ppo")
+shape = SubResource("Resource_d5wwh")
+grade = ExtResource("9_oluep")
 seed = 29
 size_mm = 5.25

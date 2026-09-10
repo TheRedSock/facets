@@ -3,7 +3,7 @@ extends SceneTree
 ## GPU gem pipeline's look and performance, plus measured timings.
 ## Requires a RenderingDevice, so run WINDOWED (never --headless):
 ##   godot --path . --script res://tools/eval_sheets.gd
-## Outputs into artifacts/eval/: contact_sheet.png, grade_sheet.png,
+## Outputs into artifacts/eval/: contact_sheet.png, condition_sheet.png,
 ## lighting_sheet.png, rung_sheet.png, timings.json, EVAL_NOTES.md.
 ## Exit code 0 on success, 1 if any sheet failed.
 
@@ -51,7 +51,7 @@ func _initialize() -> void:
 		_warn("reference rig missing (%s) - reference columns skipped" % RIG_REFERENCE_PATH)
 
 	_sheet_contact()
-	_sheet_grade()
+	_sheet_condition()
 	_sheet_lighting()
 	_sheet_rungs()
 	_measure_timings()
@@ -94,40 +94,34 @@ func _sheet_contact() -> void:
 	_save(sheet, "contact_sheet.png")
 
 
-## b) One species (in-code corundum ruby maker): 5 grade stops x 5 axis rows.
-##    Answers: does each grade axis read as a distinct physical mechanism?
-func _sheet_grade() -> void:
-	print("== grade sheet ==")
-	var stops: Array = [0.15, 0.35, 0.55, 0.8, 1.0]
-	var axes: Array = ["ALL", "CUT", "CLARITY", "SURFACE", "CRYSTAL"]
+## Explicit physical volume sweeps. These coefficients are not grade laws.
+func _sheet_condition() -> void:
+	print("== physical condition sheet ==")
+	var stops := [0.0, 0.05, 0.1, 0.2, 0.4]
+	var axes := ["SCATTER /mm", "BAND CONTRAST"]
 	var tracer := GemTracer.create(176, 176)
 	if tracer == null:
-		_fail("grade: no RenderingDevice")
+		_fail("condition: no RenderingDevice")
 		return
-	var policy: Dictionary = GemRung.policy(GemRung.PREVIEW)
-	policy["spp"] = 48
-	# The AUTHORED ruby: its corundum species carries the silk inclusion
-	# vocabulary, so the CLARITY axis has something to place. The in-code
-	# maker has no inclusions and renders the clarity row inert.
+	var policy := GemRung.policy(GemRung.PREVIEW)
 	var base_stone: GemStone = load("res://data/lapidary/stones/ruby.tres")
 	var tiles: Array = []
 	for axis: String in axes:
-		var row_ms := 0.0
 		for stop: float in stops:
-			var stone: GemStone = base_stone.duplicate() if base_stone != null else _ruby_fine()
-			stone.grade = _axis_grade(axis, stop)
+			var stone: GemStone = base_stone.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
+			if axis == "SCATTER /mm":
+				stone.material.scatter_per_mm = stop
+			else:
+				stone.condition.banding.contrast = stop
 			var instance := LapidaryStoneCompiler.compile(stone)
-			row_ms += _render(tracer, instance, stone.seed, _rig_gameplay, policy, 48, int(policy["batch"]))
-			tiles.append({"image": tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE),
-				"label": "%s %.2f" % [axis, stop]})
-		print("  grade row %-8s %7.1f ms" % [axis, row_ms])
+			_render(tracer, instance, stone.seed, _rig_gameplay, policy, 128, int(policy["batch"]))
+			tiles.append({"image": tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE), "label": "%s %.2f" % [axis, stop]})
 	tracer.release()
 	var cols: Array = []
 	for stop: float in stops:
 		cols.append("%.2f" % stop)
-	var sheet: Image = SheetComposer.compose(tiles, stops.size(), true,
-		"GRADE AXES - CORUNDUM RUBY MAKER - GAMEPLAY RIG - PRINT SPP 48 - 176PX", axes, cols)
-	_save(sheet, "grade_sheet.png")
+	_save(SheetComposer.compose(tiles, stops.size(), true,
+		"EXPLICIT CONDITION - RUBY - GAMEPLAY RIG - SPP128 - 176PX", axes, cols), "condition_sheet.png")
 
 
 ## c) Ruby / diamond / sapphire makers x [gameplay raw, gameplay print,
@@ -327,7 +321,7 @@ func _write_outputs() -> void:
 	var notes := "# Lapidary Evaluation Notes\n\n"
 	notes += "Generated %s on %s by `tools/eval_sheets.gd` (windowed CLI).\n\n" % [
 		_timings.get("generated", "?"), _timings.get("adapter", "?")]
-	notes += "Sheets: `contact_sheet.png`, `grade_sheet.png`, `lighting_sheet.png`, `rung_sheet.png`.\n\n"
+	notes += "Sheets: `contact_sheet.png`, `condition_sheet.png`, `lighting_sheet.png`, `rung_sheet.png`.\n\n"
 	notes += "## Timings\n\n```\n%s```\n\n## Summary\n\n" % table
 	for line in _summary_lines():
 		notes += "- %s\n" % line
@@ -362,18 +356,16 @@ func _timing_table() -> String:
 
 func _summary_lines() -> PackedStringArray:
 	var lines := PackedStringArray()
-	lines.append("Contact sheet: %d stones (%d authored .tres + 4 in-code makers) all render non-empty with distinct silhouettes and body color under the gameplay rig; the print row darkens mids and reins in chroma relative to raw." % [
-		_contact_count, _tres_count])
-	lines.append("Grade sheet: only the legacy crystal haze/zoning recipe is active. Cut, clarity and surface labels do not create degradation; explicit cut, workmanship and condition resources own those properties.")
-	lines.append("Lighting sheet: gameplay rig reads warm with dark-field facet contrast; reference daylight is neutral and flatter; raw-vs-print deltas are visible but small at 64 spp; diamond fire barely reads at 224 px.")
+	lines.append("Contact sheet contains %d stones (%d authored and four diagnostic makers). Inspect images before judging appearance." % [_contact_count, _tres_count])
+	lines.append("Condition sheet varies explicit scattering and band contrast. Grade labels do not change transport. These are authored approximations, not measured specimens.")
 	if _timings.has("single_stone_ms_by_rung"):
 		var r: Dictionary = _timings["single_stone_ms_by_rung"]
-		lines.append("Rung frame cost (ruby maker): interact %.2f ms, preview %.2f ms, board_live %.2f ms, clip_bake %.2f ms, hero %.2f ms at %d spp; low-grade quartz scatter noise only clears at clip_bake and above." % [
+		lines.append("Rung frame cost (ruby maker): interact %.2f ms, preview %.2f ms, board_live %.2f ms, clip_bake %.2f ms, hero %.2f ms at %d spp." % [
 			r["interact"]["frame_ms"], r["preview"]["frame_ms"], r["board_live"]["frame_ms"],
 			r["clip_bake"]["frame_ms"], r["hero"]["frame_ms"], _hero_spp])
 	if _timings.has("batch_board_live"):
 		var b: Dictionary = _timings["batch_board_live"]
-		lines.append("BOARD_LIVE batch scales sublinearly: 1 gem %.2f ms/frame, 16 gems %.2f ms, 64 gems %.2f ms (%.3f ms/gem at 64)." % [
+		lines.append("Measured BOARD_LIVE batch costs: 1 gem %.2f ms/frame, 16 gems %.2f ms, 64 gems %.2f ms (%.3f ms/gem at 64)." % [
 			b["gems_1"]["ms_per_frame_median"], b["gems_16"]["ms_per_frame_median"],
 			b["gems_64"]["ms_per_frame_median"], b["gems_64"]["ms_per_gem"]])
 	return lines
@@ -442,25 +434,6 @@ static func _stone_invalid_reason(stone: GemStone) -> String:
 	if stone.material.species == null:
 		return "no species"
 	return "; ".join(stone.material.validate())
-
-
-static func _axis_grade(axis: String, stop: float) -> GemGrade:
-	var g := GemGrade.new() # all four axes default 1.0
-	match axis:
-		"ALL":
-			g.cut = stop
-			g.clarity = stop
-			g.surface = stop
-			g.crystal = stop
-		"CUT":
-			g.cut = stop
-		"CLARITY":
-			g.clarity = stop
-		"SURFACE":
-			g.surface = stop
-		"CRYSTAL":
-			g.crystal = stop
-	return g
 
 
 static func _fmt_ms(ms: float) -> String:

@@ -1,12 +1,17 @@
 [gd_resource type="Resource" script_class="GemChromophore" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="1_jyhb4"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_nprbh"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="2_yegdd"]
+
+[sub_resource type="Resource" id="Resource_xgwmb"]
+script = ExtResource("1_nprbh")
 
 [resource]
-script = ExtResource("1_jyhb4")
+script = ExtResource("2_yegdd")
 chromophore_id = &"alexandrite_cr"
 display_name = "Chromium (alexandrite)"
 source_note = "Cr3+ in chrysoberyl: bands ~415 nm (blue-violet 410-450) and ~580 nm yellow-green (GIA alexandrite page: 580 nm band drives the colour change; cigem.ca), transmission windows ~520 green and >640 red. Pleochroic: e-ray band shifted/weakened (green vs red axes). Weak Cr red fluorescence ~680 nm."
+absorption_evidence = SubResource("Resource_xgwmb")
 absorption_mm = PackedFloat32Array(0.63943, 0.70462, 0.76043, 0.80433, 0.83429, 0.8488, 0.84703, 0.82883, 0.79485, 0.74665, 0.68658, 0.61775, 0.5437, 0.46811, 0.39445, 0.32567, 0.26397, 0.21074, 0.16656, 0.13134, 0.10454, 0.08537, 0.07299, 0.06674, 0.06621, 0.07134, 0.08238, 0.09987, 0.1245, 0.15692, 0.19753, 0.24626, 0.30234, 0.36418, 0.42927, 0.49433, 0.55549, 0.60863, 0.64987, 0.67604, 0.685, 0.67603, 0.64987, 0.60862, 0.55548, 0.49432, 0.42924, 0.36412, 0.30222, 0.24602, 0.19708, 0.15608, 0.12297, 0.09716, 0.07772, 0.06356, 0.05357, 0.04674, 0.04222, 0.03932, 0.03751, 0.03642, 0.03578, 0.03542, 0.03522, 0.03511, 0.03505, 0.03503, 0.03501, 0.03501, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035)
 absorption_eray_mm = PackedFloat32Array(0.48628, 0.53494, 0.57971, 0.61987, 0.65466, 0.68309, 0.70384, 0.71534, 0.71599, 0.70454, 0.68041, 0.64396, 0.59661, 0.54072, 0.47939, 0.41603, 0.35406, 0.29652, 0.24586, 0.20388, 0.17166, 0.14974, 0.13818, 0.13675, 0.14501, 0.1623, 0.18781, 0.22046, 0.25888, 0.30132, 0.34566, 0.3895, 0.43024, 0.46527, 0.49223, 0.50923, 0.51502, 0.50919, 0.49213, 0.46506, 0.42984, 0.38876, 0.34431, 0.29892, 0.25476, 0.21358, 0.17661, 0.14459, 0.11776, 0.096, 0.07887, 0.06579, 0.05609, 0.0491, 0.0442, 0.04085, 0.03864, 0.0372, 0.0363, 0.03575, 0.03542, 0.03523, 0.03513, 0.03507, 0.03503, 0.03502, 0.03501, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035, 0.035)
 fluorescence_strength_override = 0.12
