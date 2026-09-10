@@ -44,7 +44,15 @@ comparison JSON and rendered reference images under ignored `artifacts/`.
 it is a diagnostic, not a passing production acceptance profile. Add `--fp64`
 for the double-precision mathematical reference (requires GPU shaderFloat64).
 `check_engine.ps1 -CrystalPrecision` includes that explicit reference check.
-Crystal modes and coherent packets are still isolated from the production tracer.
+Explicit `GemFrameJob.quality["crystal_transport"] = true` now connects float64
+Maxwell modes and coherent packets to the renderer. It requires shaderFloat64,
+smooth boundaries, no volume scattering, and weak loss. Defaults remain unchanged.
+`crystal_transport_check.gd` checks actual slabs, procedural shapes, nested media,
+resume equivalence and the isotropic limit against the Mueller renderer.
+`crystal_lookdev.gd` renders clear quartz/ruby diagnostics under artifacts/ and
+records whole-job wall time separately from the last accumulation batch profile.
+This backend is expensive and still needs broader anisotropic image comparisons;
+it is not the fast default or a complete biaxial/scattering implementation.
 The isotropic-real-index polarized variant does support persistent axial weak-loss
 absorption. `polarization_lookdev.gd -- --dichroic` renders a labeled synthetic
 two-band diagnostic under `artifacts/polarization/dichroic/`; its coefficients
@@ -85,7 +93,8 @@ Principal refraction inputs use `GemIndexCurve` independently for ordinary and
 extraordinary axes. Null extraordinary means isotropic. Published quartz and
 sapphire curves retain per-axis source equations/evidence; constant index offsets
 in the other catalog models are labeled approximations. The GPU transport model
-is still approximate for anisotropy. `test_principal_indices.gd` verifies published
+remains approximate for anisotropy in default policies. The explicit crystal
+backend follows the admitted uniaxial model. `test_principal_indices.gd` verifies published
 numbers, crossing-spectrum admission and binary job identity;
 `principal_indices_gpu_check.gd` checks the actual 160B Stone wire format and
 GLSL at 0.25 nm intervals. Authoring rejects coefficient quantization exceeding

@@ -260,6 +260,10 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 	return radiance;
 }
 
+#ifdef CRYSTAL_TRANSPORT
+#include "gem_crystal_path.glsl"
+#endif
+
 // ================================================================= main
 void main() {
 	ivec2 pix = ivec2(gl_GlobalInvocationID.xy) + ivec2(0, pc.row_origin);
@@ -334,6 +338,12 @@ void main() {
 		float cos_i = clamp(-dot(rd, n_entry), 0.0, 1.0);
 
 		vec4 radiance = vec4(0.0);
+#ifdef CRYSTAL_TRANSPORT
+		for(int channel=0;channel<4;channel++) {
+			for(int pol=0;pol<2;pol++) radiance[channel]+=0.5*trace_crystal_probe(st,ro,rd,wl[channel],pol,q,rig_yaw,role_mult,rng);
+		}
+		vec4 ballistic=radiance;
+#else
 
 		vec4 r_surf = vec4(
 			fresnel_diel(cos_i, 1.0 / n_wl.x), fresnel_diel(cos_i, 1.0 / n_wl.y),
@@ -419,6 +429,7 @@ void main() {
 
 		}
 
+#endif
 		radiance = min(radiance, vec4(pc.rad_clamp));
 		vec3 xyz = (radiance.x * cie_xyz(wl.x) + radiance.y * cie_xyz(wl.y)
 			+ radiance.z * cie_xyz(wl.z) + radiance.w * cie_xyz(wl.w)) * pc.spectral_norm;

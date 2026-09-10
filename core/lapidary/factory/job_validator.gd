@@ -8,7 +8,7 @@ const INTEGER_POLICY := {"res": Vector2(1, 8192), "out": Vector2(1, 8192), "spp"
 	"batch": Vector2(1, 65536), "max_bounces": Vector2(1, 4096), "denoise_passes": Vector2(0, 5),
 	"device_memory_budget_mib": Vector2(1, 1048576)}
 const NUMBER_POLICY := {"denoise_phi": Vector2(0.1, 8), "throughput_epsilon": Vector2(1e-8, 0.01), "rad_clamp": Vector2(1e-12, 1e30)}
-const BOOLEAN_POLICY := ["dispersion", "birefringence", "volume", "polarization"]
+const BOOLEAN_POLICY := ["dispersion", "birefringence", "volume", "polarization", "crystal_transport"]
 
 static func validate(job: GemFrameJob) -> String:
 	if job == null:
@@ -49,6 +49,12 @@ static func validate(job: GemFrameJob) -> String:
 	var error := _stone(job.stone, job.quality.get("polarization", false))
 	if not error.is_empty():
 		return "Stone: " + error
+	if job.quality.get("crystal_transport", false):
+		if job.quality.get("polarization", false):
+			return "Choose crystal transport or isotropic polarized transport"
+		var why := GemCrystalAdmission.stone_error(job.stone)
+		if not why.is_empty():
+			return why
 	error = _rig(job.rig)
 	if not error.is_empty():
 		return "Rig: " + error

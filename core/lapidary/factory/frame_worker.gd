@@ -47,7 +47,8 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 		tracer = GemTracer.create(job.resolution.x, job.resolution.y)
 	if tracer == null:
 		return _fail("RenderingDevice unavailable; GPU workers need a supported display/Vulkan environment")
-	tracer.configure_stone(compiled, GemRigCompiler.compile(job.rig), job.quality)
+	if not tracer.configure_stone(compiled, GemRigCompiler.compile(job.rig), job.quality):
+		return _fail(tracer.configuration_error)
 	tracer.set_seed(job.sample_seed)
 	tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), GemFramePlan.canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half)
 	var master_record := store.read(master_key)
@@ -70,6 +71,9 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 		var last_checkpoint := Time.get_ticks_msec()
 		while tracer.samples_accumulated < target:
 			tracer.accumulate(mini(batch, target - tracer.samples_accumulated))
+			var transport_error := tracer.transport_error()
+			if not transport_error.is_empty():
+				return _fail(transport_error)
 			if Time.get_ticks_msec() - last_checkpoint >= 5000:
 				if not _checkpoint(checkpoint_key):
 					return _fail("Cannot publish render checkpoint")
@@ -82,7 +86,7 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 		var metadata := {"kind": "linear_master", "width": master.get_width(), "height": master.get_height(), "samples": job.samples,
 			"space": "associated_XYZ_CIE1931_2deg", "reconstruction": job.quality.get("denoise_passes", 0),
 			"engine": GemRenderIdentity.optical_digest(), "producer": {"godot": Engine.get_version_info(), "adapter": RenderingServer.get_video_adapter_name()},
-			"profile": tracer.profile()}
+			"profile": tracer.profile(), "crystal_transport": tracer.crystal_diagnostics()}
 		if not store.publish(master_key, GemArtifactStore.encode_linear(master), metadata):
 			return _fail("Cannot publish linear master")
 		counters["rendered"] += 1

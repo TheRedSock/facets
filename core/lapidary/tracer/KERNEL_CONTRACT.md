@@ -1,8 +1,9 @@
 # Lapidary kernel contract (v15)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
-loads prebuilt assets and does not instantiate the optical renderer. All floats
-are float32, std430. Stone space has the girdle at z=0, crown toward +Z, and unit
+loads prebuilt assets and does not instantiate the optical renderer. Wire floats
+are float32, std430; the optional crystal kernel computes fields and intersections
+in float64. Stone space has the girdle at z=0, crown toward +Z, and unit
 girdle radius. `size_mm` converts one stone-space unit into millimeters. The
 orthographic camera looks down world −Z; instance quaternions rotate stone→world.
 
@@ -40,8 +41,8 @@ Decode bounds dimensions/payload and rejects nonfinite geometry or invalid
 coverage/normal/visibility state. These are optional authoring companions, **not
 automatically shipped game textures**. They describe the first visible boundary,
 not refracted inclusions, internal optical contributions or a simulated grade.
-The portable frame store/pack builder does not yet schedule these companions;
-`tools/export_gem_aov.gd` exports them independently for evaluation/stylizer work.
+The portable frame factory optionally schedules and caches these companions;
+`tools/export_gem_aov.gd` also exports them independently for evaluation/stylizer work.
 
 A Triangle is four vec4s (64B): a/b/c vertices (w reserved), then ivec4
 (facet ID, reserved, reserved, local region ID). BVH Node (48B): vec4 low/high,
@@ -323,7 +324,7 @@ This validates isotropic polarization operations; it does not validate anisotrop
 ray direction, birefringent retardation, biaxial materials or mineral measurements.
 
 
-## Uniaxial Maxwell reference (CPU only)
+## Uniaxial Maxwell model and optional transport
 
 `GemCrystalModes` solves ordinary/extraordinary wavevectors at a boundary from
 conserved tangential phase and the uniaxial dispersion metric. It stores complex
@@ -331,7 +332,8 @@ E/H fields, wave-normal direction and Poynting energy direction separately.
 Evanescent modes decay into the selected half-space and carry no normal flux.
 `GemCrystalInterface` solves four tangential field-continuity equations for two
 reflected and two transmitted amplitudes. It is a forward flux operator for
-lossless smooth media, **not an enabled GPU/adjoint rendering BSDF**.
+lossless smooth media. The explicit GPU backend below composes these operators
+for reciprocal camera paths with unpolarized illumination and air endpoints.
 `GemCrystalPacket` recombines coincident isotropic modes as complex fields and
 keeps separated crystal modes distinct. Its field amplitudes and normal-flux
 probabilities are different quantities; a renderer must normalize its state and
@@ -342,10 +344,9 @@ The camera factor reduces to `(n_current/n_next)^2` in isotropic media.
 `GemCrystalLoss` derives weak-loss eigenmode attenuation from Poynting dissipation
 and the principal imaginary permittivity tensor. An independent full complex
 4x4 Maxwell eigenproblem checks its rate, including decreasing-loss convergence.
-General birefringent absorption/scattering and GPU transport integration remain
-separate work; these mathematical components do not constitute a completed
-anisotropic adjoint BSDF. Only the isotropic-real-index dichroic subset above is
-connected to production transport.
+General biaxial media, anisotropic scattering and strong-loss interfaces remain
+unsupported. These mathematical components alone do not establish full rendering
+accuracy; the backend's restricted admission and validation are described below.
 
 The modal construction is grounded in Thomson, Wilen & Wettlaufer (2009),
 [Light scattering from an isotropic layer between uniaxial crystals](https://arxiv.org/abs/0901.2558),
@@ -366,18 +367,19 @@ scattering or band contrast.
 
 `gem_crystal.glsl` ports the mode and complex interface field solve to float32.
 `tools/crystal_gpu_check.gd` compares actual GPU outputs against float64 CPU fields
-for rotated boundaries, including evanescent output modes. It is currently an
-isolated mathematical module, not called by the production path tracer. Input
+for rotated boundaries, including evanescent output modes. `GemCrystalShader`
+compiles the same source as float64 for the explicit crystal backend. Input
 stress cases now include near-critical and optic-axis degeneracy. Comparing
 arbitrary basis amplitudes there is insufficient: the probe supplies the same
 incident complex field to both solvers and also checks summed boundary fields
 and reflected/transmitted power. The float32 variant **fails** the current stress
 gate (up to about 0.0015 side-power error and 0.0028 field-component error on the
 tested device). `--stress --fp64` runs a diagnostic double-precision variant of
-the same source, retaining float32 wire inputs/outputs; it passes all 616 cases.
-This is an explicit test requiring shaderFloat64, not a new game requirement or
-an enabled production renderer. Selective precision and full transport validation
-must precede promotion. Near-axis basis labels alone are not accuracy metrics.
+the same source, retaining float32 wire inputs/outputs. The expanded 676-case gate
+includes published principal curves. Both this diagnostic and crystal rendering
+require shaderFloat64; prebuilt game assets do not. Selective precision and broader
+transport validation must precede default promotion. Near-axis basis labels alone
+are not accuracy metrics.
 
 CPU packet tests independently differentiate the ray solid-angle map, check
 modal reciprocity, and export 64 five-interface chains with elliptical input and
@@ -387,3 +389,42 @@ normal-flux normalization. The export's circular-polarization convention is
 `V=2*Im(Eu*conj(Ev))`. This catches phase loss during coherent recombination; it
 does not validate a complete birefringent render or coherent interference of
 spatially separated paths that later overlap.
+
+### Explicit `crystal_transport=true` quality policy
+
+`gem_crystal_path.glsl` launches two orthogonal Jones probes per wavelength.
+Uniaxial interfaces conserve tangential wavevector, solve complex tangential E/H
+continuity, and propagate along Poynting directions. Coincident isotropic modes
+retain coherent complex fields; separated eigenmodes are distinct geometric paths.
+All branches proven to escape into the analytic rig are evaluated immediately;
+one remaining branch is sampled by its normal-flux power. No intensity or phase
+is duplicated when recombining a packet. The reciprocal air-to-air construction
+uses telescoping ray-measure factors; it is not an emitter-inside-crystal API.
+
+Admission rejects homogeneous/spatial scattering, rough boundaries and peak
+imaginary/real index ratios above 0.001. Weak-loss eigenmode absorption and
+coherent isotropic dichroism integrate authored banding and concentration columns.
+Biaxial refraction, spatially separated interference, rough microfacets and
+anisotropic particle scattering are not supported. Catalog effective-uniaxial
+approximations remain approximations even in this backend. Defaults remain scalar;
+`polarization=true` and `crystal_transport=true` are mutually exclusive.
+
+Wire geometry remains float32. Persistent crystal ray positions, intersections,
+fields and interface elimination use float64. The geometry source is generated
+from the shared mesh/analytic/region algorithms with a 1e-10 normalized intersection
+epsilon and 4e-10 offsets. Primary silhouette sampling still uses the common
+float32 coverage path. This fixed epsilon does not certify arbitrarily small or
+coincident features. Do not silently fall back to float32 on unsupported devices.
+
+Binding18 is a 16-byte uint diagnostics buffer: invalid-path count, bounce-limit
+count, failure bits (1 missing interior boundary; 2 invalid Maxwell solve/residual;
+4 interface power imbalance), and float32 bits of the largest **failed** power
+imbalance. Healthy-interface maxima are not collected. Invalid paths prevent
+factory publication; finite-bounce truncations are reported in master metadata.
+Checkpoints retain diagnostics, and failed checkpoints cannot be resumed.
+
+`crystal_transport_check.gd` covers lossless isotropic/uniaxial slabs, analytic
+absorbing o/e slabs, faceted/analytic/mesh/nested-region furnace renders, checkpoint
+restoration and a complete isotropic comparison with the Mueller renderer under
+directional studio lighting. This is reference-quality, currently expensive work;
+it is not a claim of general anisotropic convergence or measured catalog realism.

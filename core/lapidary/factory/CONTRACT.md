@@ -157,3 +157,17 @@ IDs for the primary visible physical boundary. They do not describe refracted
 inclusion visibility or separate optical contributions. A future stylizer must use
 the optical master for those appearances rather than painting internal defects from
 primary-surface IDs. Companions are authoring data and never automatically ship.
+
+## Optional crystal transport jobs
+
+Quality policy `crystal_transport=true` selects the float64 uniaxial Maxwell
+backend and therefore changes optical master identity. It is mutually exclusive
+with the isotropic `polarization` policy. CPU admission requires smooth host and
+defect boundaries, zero homogeneous/spatial scattering, and weak absorption.
+Workers report device/shader configuration failures rather than silently changing
+the requested model. Invalid interface diagnostics stop publication. Masters retain
+precision, failure and bounce-limit counts; checkpoints retain the same counters
+and reject failed state. A bounce-limit count reports finite-depth truncation,
+not necessarily an invalid interface. Reference convergence remains the caller's
+responsibility. The source bundle includes the shader generator and both shared
+GLSL modules; game delivery still contains only the selected baked asset pages.

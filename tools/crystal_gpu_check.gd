@@ -66,14 +66,7 @@ func _initialize() -> void:
 		references.append(result)
 		data.append_array(input)
 	var source := RDShaderSource.new()
-	var module := FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_crystal.glsl")
-	if fp64:
-		# Diagnostic reference variant, not a production capability requirement.
-		var pattern := RegEx.new()
-		for pair in [["float", "double"], ["vec2", "dvec2"], ["vec3", "dvec3"], ["vec4", "dvec4"]]:
-			pattern.compile("\\b" + pair[0] + "\\b")
-			module = pattern.sub(module, pair[1], true)
-		module = module.replace("<1e-12", "<1e-22")
+	var module := GemCrystalShader.module(fp64)
 	source.source_compute = "#version 450\n" + module + """
 layout(local_size_x=32) in;
 layout(set=0,binding=0,std430) readonly buffer Inputs { vec4 inputs[]; };

@@ -68,6 +68,8 @@ var _max_bounces := 32
 var _throughput_epsilon := 0.0001
 var _flags := 0
 var _polarized := false
+var _crystal := false
+var configuration_error := ""
 var _grid := Vector2i.ONE
 var _cell := Vector2i.ZERO
 var _bg := Vector4(0.30, 0.16, 0.05, 0.0)  # zenith, horizon, below, spectrum offset
@@ -100,6 +102,7 @@ static func create(p_width: int, p_height: int) -> GemTracer:
 		return null
 	var zeros := PackedByteArray()
 	zeros.resize(p_width * p_height * 16)
+	t._bufs["crystal_stats"] = t._rd.storage_buffer_create(16)
 	t._bufs["accum"] = t._rd.storage_buffer_create(zeros.size(), zeros)
 	t._bufs["filter_a"] = t._rd.storage_buffer_create(zeros.size(), zeros)
 	t._bufs["filter_b"] = t._rd.storage_buffer_create(zeros.size(), zeros)
@@ -128,6 +131,11 @@ func _compile_shader(path: String, name: String) -> bool:
 		return false
 	for include in ["gem_common.glsl", "gem_mesh.glsl", "gem_surface.glsl", "gem_volume.glsl", "gem_polarization.glsl"]:
 		source = source.replace('#include "%s"' % include, FileAccess.get_file_as_string(SHADER_DIR + include))
+	if name == "trace_crystal":
+		source = source.replace("#version 450", "#version 450\n#define CRYSTAL_TRANSPORT 1\n" + GemCrystalShader.module())
+		source = source.replace('#include "gem_crystal_path.glsl"', GemCrystalShader.geometry() + FileAccess.get_file_as_string(SHADER_DIR + "gem_crystal_path.glsl"))
+	else:
+		source = source.replace('#include "gem_crystal_path.glsl"', "")
 	if name == "trace_polarized":
 		source = source.replace("#version 450", "#version 450\n#define POLARIZED_TRANSPORT 1")
 	var src := RDShaderSource.new()
@@ -137,8 +145,14 @@ func _compile_shader(path: String, name: String) -> bool:
 		push_error("GemTracer %s shader compile error:\n%s" % [name, spirv.compile_error_compute])
 		return false
 	var shader := _rd.shader_create_from_spirv(spirv)
+	if not shader.is_valid():
+		return false
+	var pipeline := _rd.compute_pipeline_create(shader)
+	if not pipeline.is_valid():
+		_rd.free_rid(shader)
+		return false
 	_shaders[name] = shader
-	_pipelines[name] = _rd.compute_pipeline_create(shader)
+	_pipelines[name] = pipeline
 	return true
 
 
@@ -148,14 +162,15 @@ func _compile_shader(path: String, name: String) -> bool:
 ## policy keys (see GemRung.TABLE): max_bounces, dispersion, birefringence, volume,
 ## rad_clamp and reconstruction settings. Ingests the instance's own
 ## seed; compiled lighting supplies all spectra, background and print neutral.
-func configure_stone(instance: Dictionary, lighting: GemLighting, policy: Dictionary) -> void:
+func configure_stone(instance: Dictionary, lighting: GemLighting, policy: Dictionary) -> bool:
 	if instance.has("seed"):
 		_seed = int(instance["seed"])
-	configure_stones([instance], lighting, policy, Vector2i.ONE)
+	return configure_stones([instance], lighting, policy, Vector2i.ONE)
 
 
 ## Multi-stone batch: instances laid out on a grid of equal cells (board atlas).
-func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionary, grid: Vector2i) -> void:
+func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionary, grid: Vector2i) -> bool:
+	configuration_error = ""
 	assert(lighting != null)
 	assert(lighting.validate().is_empty(), lighting.validate())
 	var lights := lighting.lights
@@ -176,12 +191,32 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	_throughput_epsilon = clampf(policy.get("throughput_epsilon", 0.0001), 1.0e-8, 0.01)
 	_flags = 0
 	_polarized = policy.get("polarization", false)
+	_crystal = policy.get("crystal_transport", false)
+	if _polarized and _crystal:
+		configuration_error = "Choose one polarization transport backend"
+		return false
+	if _crystal:
+		for instance: Dictionary in instances:
+			configuration_error = GemCrystalAdmission.compiled_error(instance)
+			if not configuration_error.is_empty():
+				return false
+			for material: Dictionary in instance.get("region_materials", []):
+				configuration_error = GemCrystalAdmission.compiled_error(material)
+				if not configuration_error.is_empty():
+					return false
+	if _crystal and not _pipelines.has("trace_crystal"):
+		var compiled_ok := _compile_shader(SHADER_PATH, "trace_crystal")
+		if not compiled_ok:
+			configuration_error = "Crystal shader compilation failed; requires shaderFloat64"
+			return false
 	if _polarized and not _pipelines.has("trace_polarized"):
 		var compiled_ok := _compile_shader(SHADER_PATH, "trace_polarized")
-		assert(compiled_ok, "Polarized shader failed to compile")
+		if not compiled_ok:
+			configuration_error = "Polarized shader compilation failed"
+			return false
 	if policy.get("dispersion", false):
 		_flags |= FLAG_DISPERSION
-	if policy.get("spectral_geometry", "selective") == "full" or _polarized:
+	if policy.get("spectral_geometry", "selective") == "full" or _polarized or _crystal:
 		_flags |= FLAG_DISPERSION | FLAG_FULL_SPECTRUM
 	if policy.get("birefringence", false):
 		_flags |= FLAG_BIREF
@@ -313,6 +348,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 
 	_build_uniform_sets()
 	reset_accumulation()
+	return true
 
 
 ## Camera origins must be outside every region, including cavity geometry
@@ -358,6 +394,8 @@ static func _pack_volume_fields(instance: Dictionary, packed: PackedFloat32Array
 
 func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 		a_off: int, stone_flags: int) -> void:
+	if _crystal:
+		assert(GemCrystalAdmission.compiled_error(inst).is_empty(), GemCrystalAdmission.compiled_error(inst))
 	if _polarized:
 		assert(GemMaterialCompiler.polarization_error(inst).is_empty(), GemMaterialCompiler.polarization_error(inst))
 	var sb: Vector3 = inst["sellmeier_b"]
@@ -406,6 +444,13 @@ func _build_uniform_sets() -> void:
 		uniform.add_id(_bufs[names[binding]])
 		uniforms.append(uniform)
 	_sets["trace"] = _rd.uniform_set_create(uniforms, _shaders["trace"], 0)
+	if _crystal:
+		var uniform := RDUniform.new()
+		uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+		uniform.binding = 18
+		uniform.add_id(_bufs["crystal_stats"])
+		uniforms.append(uniform)
+		_sets["trace_crystal"] = _rd.uniform_set_create(uniforms, _shaders["trace_crystal"], 0)
 	_create_print_target(Vector2i(width, height))
 
 
@@ -520,6 +565,10 @@ func _upload_lighting_buffers() -> void:
 
 
 func reset_accumulation() -> void:
+	if _bufs.has("crystal_stats"):
+		var stats := PackedByteArray()
+		stats.resize(16)
+		_rd.buffer_update(_bufs["crystal_stats"], 0, 16, stats)
 	var zeros := PackedByteArray()
 	zeros.resize(width * height * 16)
 	for name in ["accum", "ballistic", "residual"]:
@@ -535,6 +584,9 @@ func reset_accumulation() -> void:
 ## cost (dense milk and inclusions make a path many times dearer than clean
 ## optics), so no single dispatch approaches the OS GPU watchdog. Returns ms.
 func accumulate(spp: int) -> float:
+	if not configuration_error.is_empty():
+		push_error(configuration_error)
+		return 0.0
 	assert(spp > 0)
 	var start := Time.get_ticks_usec()
 	var t0 := Time.get_ticks_usec()
@@ -591,8 +643,8 @@ func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
 
 	var t0 := Time.get_ticks_usec()
 	var cl := _rd.compute_list_begin()
-	_rd.compute_list_bind_compute_pipeline(cl, _pipelines["trace_polarized" if _polarized else "trace"])
-	_rd.compute_list_bind_uniform_set(cl, _sets["trace"], 0)
+	_rd.compute_list_bind_compute_pipeline(cl, _pipelines["trace_crystal" if _crystal else ("trace_polarized" if _polarized else "trace")])
+	_rd.compute_list_bind_uniform_set(cl, _sets["trace_crystal" if _crystal else "trace"], 0)
 	_rd.compute_list_set_push_constant(cl, pcb.data_array, PUSH_SIZE)
 	@warning_ignore("integer_division")
 	_rd.compute_list_dispatch(cl, (width + 7) / 8, (rows + 7) / 8, 1)
@@ -767,12 +819,17 @@ func checkpoint() -> Dictionary:
 	var buffers := {}
 	for key in ["accum", "guides", "ballistic", "residual"]:
 		buffers[key] = _rd.buffer_get_data(_bufs[key])
-	return {"version": 1, "width": width, "height": height, "samples": samples_accumulated, "buffers": buffers}
+	return {"version": 1, "width": width, "height": height, "samples": samples_accumulated, "buffers": buffers, "crystal_stats": _rd.buffer_get_data(_bufs["crystal_stats"])}
 
 
 func restore_checkpoint(state: Dictionary) -> bool:
 	if state.get("version") != 1 or state.get("width") != width or state.get("height") != height or int(state.get("samples", -1)) < 0:
 		return false
+	var crystal_stats: Variant = state.get("crystal_stats", PackedByteArray())
+	if not crystal_stats is PackedByteArray or (not crystal_stats.is_empty() and crystal_stats.size() != 16):
+		return false
+	if not crystal_stats.is_empty() and crystal_stats.decode_u32(0) != 0:
+		return false # Never resume a checkpoint with failed interfaces.
 	var buffers: Dictionary = state.get("buffers", {})
 	for key in ["accum", "guides", "ballistic", "residual"]:
 		if not buffers.get(key) is PackedByteArray or buffers[key].size() != width * height * (32 if key == "guides" else 16):
@@ -781,6 +838,8 @@ func restore_checkpoint(state: Dictionary) -> bool:
 	for key: String in buffers:
 		if key in ["accum", "guides", "ballistic", "residual"]:
 			_rd.buffer_update(_bufs[key], 0, buffers[key].size(), buffers[key])
+	if not crystal_stats.is_empty():
+		_rd.buffer_update(_bufs["crystal_stats"], 0, 16, crystal_stats)
 	samples_accumulated = int(state["samples"])
 	_filtered_samples = -1
 	return true
@@ -815,7 +874,7 @@ func _free_scene_buffers() -> void:
 
 func release() -> void:
 	_free_scene_buffers()
-	var rids: Array = [_bufs.get("standards", RID()), _bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex]
+	var rids: Array = [_bufs.get("crystal_stats", RID()), _bufs.get("standards", RID()), _bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex]
 	rids.append_array(_pipelines.values())
 	rids.append_array(_shaders.values())
 	for rid in rids:
@@ -827,3 +886,17 @@ func release() -> void:
 	if _owns_rd and _rd != null:
 		_rd.free()
 		_rd = null
+
+
+func crystal_diagnostics() -> Dictionary:
+	if not _crystal:
+		return {}
+	var bytes := _rd.buffer_get_data(_bufs["crystal_stats"])
+	var values := bytes.to_int32_array()
+	return {"invalid_interfaces": values[0], "bounce_limit_paths": values[1], "precision": "float64", "failure_flags": values[2], "maximum_failed_energy_error": bytes.decode_float(12)}
+
+func transport_error() -> String:
+	if not configuration_error.is_empty():
+		return configuration_error
+	var diagnostics := crystal_diagnostics()
+	return "Crystal transport encountered an invalid interface: " + JSON.stringify(diagnostics) if diagnostics.get("invalid_interfaces", 0) != 0 else ""
