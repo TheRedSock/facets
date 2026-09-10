@@ -10,6 +10,14 @@
 #include "gem_surface.glsl"
 #include "gem_volume.glsl"
 #include "gem_polarization.glsl"
+#include "../../microsurface/smith_walk.glsl"
+
+// Two uint64 counters as low/high uint pairs, then invalid/limited walks.
+layout(set=0,binding=19,std430) buffer SurfaceDiagnostics { uint surface_stats[]; };
+void surface_count(uint offset) {
+    uint previous = atomicAdd(surface_stats[offset], 1u);
+    if (previous == 0xffffffffu) { atomicAdd(surface_stats[offset+1u], 1u); }
+}
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
@@ -167,6 +175,45 @@ float geometry_index(int material, vec4 indices, vec4 wl, int wavelength, bool e
 	return n_e_phi(ordinary, ne, abs(dot(direction, m.optic_fluor.xyz)));
 }
 
+bool trace_smith_interface(inout vec3 dir, mat3 frame, vec2 alpha, float eta,
+        vec4 index_before, vec4 index_after, inout PathWeight weight,
+        inout uint rng, out bool transmitted) {
+    surface_count(0u);
+    transmitted = false;
+    float cdf = 1.0;
+    for (int event = 0; event <= 256; event++) {
+        float side = transmitted ? -1.0 : 1.0;
+        vec3 local = transpose(frame) * dir;
+        if (!smith_height(side * local, alpha, smith_random(rng), cdf)) {
+            if (side * local.z > 0.0) { return true; }
+            atomicAdd(surface_stats[4], 1u); return false;
+        }
+        if (event == 256) { atomicAdd(surface_stats[5], 1u); return false; }
+        vec3 normal = frame * (side * smith_normal(-side * local, alpha,
+            vec2(smith_random(rng), smith_random(rng))));
+        float ratio = transmitted ? 1.0 / eta : eta;
+        vec4 ni = transmitted ? index_after : index_before;
+        vec4 nt = transmitted ? index_before : index_after;
+        float ci = clamp(-dot(dir, normal), 0.0, 1.0);
+        float probability = fresnel_diel(ci, ratio);
+        bool transmit_event = smith_random(rng) >= probability;
+        vec3 next_dir = normalize(transmit_event ? refract(dir, normal, ratio) : reflect(dir, normal));
+        if (any(isnan(next_dir)) || any(isinf(next_dir))) {
+            atomicAdd(surface_stats[4], 1u); return false;
+        }
+        vec4 R;
+        for (int c = 0; c < 4; c++) { R[c] = fresnel_diel(ci, ni[c] / nt[c]); }
+        vec4 radiance_ratio = ni / nt;
+        vec4 scalar = transmit_event ? (vec4(1.0)-R)*radiance_ratio*radiance_ratio : R;
+        weight = interface_weight(weight, dir, next_dir, normal, ni, nt, transmit_event, 1.0, scalar);
+        weight_scale(weight, vec4(1.0 / (transmit_event ? 1.0-probability : probability)));
+        dir = next_dir;
+        if (transmit_event) { transmitted = !transmitted; cdf = 1.0-cdf; }
+        surface_count(2u);
+    }
+    return false;
+}
+
 vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool extraordinary,
 		vec4 q, float rig_yaw, vec4 roles, int pol_mode, bool use_volume, inout uint rng) {
 	PathWeight throughput = weight_initial(dir);
@@ -213,6 +260,14 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 		mat3 frame = surface_frame(facing, finish.direction.xyz);
 		vec3 outgoing = transpose(frame) * -dir;
 		vec2 alpha = max(finish.slopes.xy, vec2(0.0001));
+		if (rough && finish.slopes.z > 0.5) {
+			bool transmitted;
+			if (!trace_smith_interface(dir, frame, alpha, eta, index_before, index_after, throughput, rng, transmitted)) { break; }
+			if (transmitted) { region_state = after; }
+			pos += dir * T_EPS * 4.0;
+			if (max(max(throughput.I.x, throughput.I.y), max(throughput.I.z, throughput.I.w)) < THROUGHPUT_EPS) { break; }
+			continue;
+		}
 		vec3 micro_normal = rough ? frame * visible_ggx(outgoing, alpha, vec2(rnd(rng), rnd(rng))) : facing;
 		float ci = clamp(-dot(dir, micro_normal), 0.0, 1.0);
 		float reflectance = fresnel_diel(ci, eta);

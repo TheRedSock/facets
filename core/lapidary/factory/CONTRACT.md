@@ -200,3 +200,11 @@ and reject failed state. A bounce-limit count reports finite-depth truncation,
 not necessarily an invalid interface. Reference convergence remains the caller's
 responsibility. The source bundle includes the shader generator and both shared
 GLSL modules; game delivery still contains only the selected baked asset pages.
+
+Explicit `GemSurface.multiple_scattering` belongs to physical specimen identity.
+Its Smith walk forces independent wavelength paths and is supported by scalar
+and Mueller transport; crystal admission remains smooth-only. Masters retain
+`surface_transport` counters. Invalid walks or a256-event micro-walk truncation
+block publication. Checkpoint version2 retains48B of surface/crystal diagnostics
+in addition to80B/pixel estimator buffers; failed or old-version state is rejected.
+Reprints do not rerun the surface model. No grade label enables this option.

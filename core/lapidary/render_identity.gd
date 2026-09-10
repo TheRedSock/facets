@@ -8,7 +8,7 @@ const EXCLUSIVE := {
 	"print": ["core/lapidary/tracer/shaders/gem_print.glsl", "resources/lapidary/gem_print.gd"],
 	"geometry": ["core/lapidary/tracer/geometry_aov.gd", "core/lapidary/tracer/shaders/gem_geometry_aov.glsl"],
 	"transport": ["core/lapidary/tracer/shaders/gem_pathtrace.glsl", "core/lapidary/tracer/shaders/gem_surface.glsl",
-		"core/lapidary/tracer/shaders/gem_volume.glsl", "core/lapidary/tracer/shaders/gem_polarization.glsl", "core/lapidary/tracer/shaders/gem_denoise.glsl"]
+		"core/lapidary/tracer/shaders/gem_volume.glsl", "core/lapidary/tracer/shaders/gem_polarization.glsl", "core/lapidary/tracer/shaders/gem_denoise.glsl", "core/lapidary/microsurface/smith_walk.glsl"]
 }
 const DOMAINS := ["worker", "scalar", "polarized", "crystal", "print", "geometry"]
 static var _inventory: Dictionary = {}
@@ -33,7 +33,7 @@ static func inventory() -> Dictionary:
 			_collect(root, files)
 		files.append_array(["res://core/lapidary/stone_compiler.gd", "res://core/lapidary/material_compiler.gd",
 			"res://core/lapidary/render_identity.gd", "res://core/lapidary/factory/frame_worker.gd",
-			"res://core/lapidary/factory/frame_plan.gd", GemStandardSpectra.CMF_FILE, GemStandardSpectra.D65_FILE])
+			"res://core/lapidary/factory/frame_plan.gd", "res://core/lapidary/microsurface/smith_walk.glsl", GemStandardSpectra.CMF_FILE, GemStandardSpectra.D65_FILE])
 		for path in files:
 			_inventory[path.trim_prefix("res://")] = FileAccess.get_sha256(path)
 	return _inventory.duplicate()

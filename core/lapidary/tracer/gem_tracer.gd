@@ -109,6 +109,7 @@ static func create(p_width: int, p_height: int, print_only := false) -> GemTrace
 		t._cell = Vector2i(p_width, p_height)
 		return t
 	t._bufs["crystal_stats"] = t._rd.storage_buffer_create(16)
+	t._bufs["surface_stats"] = t._rd.storage_buffer_create(32)
 	t._bufs["filter_a"] = t._rd.storage_buffer_create(zeros.size(), zeros)
 	t._bufs["filter_b"] = t._rd.storage_buffer_create(zeros.size(), zeros)
 	for name in ["ballistic", "residual", "reconstructed"]:
@@ -138,6 +139,7 @@ func _compile_shader(path: String, name: String) -> bool:
 		return false
 	for include in ["gem_common.glsl", "gem_mesh.glsl", "gem_surface.glsl", "gem_volume.glsl", "gem_polarization.glsl"]:
 		source = source.replace('#include "%s"' % include, FileAccess.get_file_as_string(SHADER_DIR + include))
+	source = source.replace('#include "../../microsurface/smith_walk.glsl"', FileAccess.get_file_as_string("res://core/lapidary/microsurface/smith_walk.glsl"))
 	if name == "trace_crystal":
 		source = source.replace("#version 450", "#version 450\n#define CRYSTAL_TRANSPORT 1\n" + GemCrystalShader.module())
 		source = source.replace('#include "gem_crystal_path.glsl"', GemCrystalShader.geometry() + FileAccess.get_file_as_string(SHADER_DIR + "gem_crystal_path.glsl"))
@@ -282,6 +284,8 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			surface_data.append_array(finish.packed())
 			if maxf(finish.alpha_u, finish.alpha_v) >= 0.0001:
 				inst["rough_present"] = 1.0
+				if finish.multiple_scattering:
+					_flags |= FLAG_DISPERSION | FLAG_FULL_SPECTRUM
 		if inst.has("mesh"):
 			var mesh: GemMesh = inst["mesh"]
 			assert(mesh.validate().is_empty(), "Cannot render an invalid mesh: %s" % mesh.validate())
@@ -445,7 +449,7 @@ func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_hal
 func _build_uniform_sets() -> void:
 	var names := {0: "planes", 1: "lights", 2: "absorb", 3: "accum", 4: "standards",
 		5: "stones", 6: "insts", 7: "volume_fields", 8: "guides", 9: "ballistic", 10: "residual",
-		11: "triangles", 12: "nodes", 13: "regions", 14: "surfaces", 15: "spectra"}
+		11: "triangles", 12: "nodes", 13: "regions", 14: "surfaces", 15: "spectra", 19: "surface_stats"}
 	var uniforms: Array[RDUniform] = []
 	for binding: int in names:
 		var uniform := RDUniform.new()
@@ -575,6 +579,10 @@ func _upload_lighting_buffers() -> void:
 
 
 func reset_accumulation() -> void:
+	if _bufs.has("surface_stats"):
+		var surface_zeros := PackedByteArray()
+		surface_zeros.resize(32)
+		_rd.buffer_update(_bufs["surface_stats"], 0, 32, surface_zeros)
 	if _bufs.has("crystal_stats"):
 		var stats := PackedByteArray()
 		stats.resize(16)
@@ -834,11 +842,14 @@ func checkpoint() -> Dictionary:
 	var buffers := {}
 	for key in ["accum", "guides", "ballistic", "residual"]:
 		buffers[key] = _rd.buffer_get_data(_bufs[key])
-	return {"version": 1, "width": width, "height": height, "samples": samples_accumulated, "buffers": buffers, "crystal_stats": _rd.buffer_get_data(_bufs["crystal_stats"])}
+	return {"version": 2, "width": width, "height": height, "samples": samples_accumulated, "buffers": buffers, "crystal_stats": _rd.buffer_get_data(_bufs["crystal_stats"]), "surface_stats": _rd.buffer_get_data(_bufs["surface_stats"])}
 
 
 func restore_checkpoint(state: Dictionary) -> bool:
-	if state.get("version") != 1 or state.get("width") != width or state.get("height") != height or int(state.get("samples", -1)) < 0:
+	if state.get("version") != 2 or state.get("width") != width or state.get("height") != height or int(state.get("samples", -1)) < 0:
+		return false
+	var surface_stats: Variant = state.get("surface_stats")
+	if not surface_stats is PackedByteArray or surface_stats.size() != 32 or surface_stats.decode_u32(16) != 0 or surface_stats.decode_u32(20) != 0:
 		return false
 	var crystal_stats: Variant = state.get("crystal_stats", PackedByteArray())
 	if not crystal_stats is PackedByteArray or (not crystal_stats.is_empty() and crystal_stats.size() != 16):
@@ -855,6 +866,7 @@ func restore_checkpoint(state: Dictionary) -> bool:
 			_rd.buffer_update(_bufs[key], 0, buffers[key].size(), buffers[key])
 	if not crystal_stats.is_empty():
 		_rd.buffer_update(_bufs["crystal_stats"], 0, 16, crystal_stats)
+	_rd.buffer_update(_bufs["surface_stats"], 0, 32, surface_stats)
 	samples_accumulated = int(state["samples"])
 	_filtered_samples = -1
 	return true
@@ -891,6 +903,7 @@ func release() -> void:
 	_free_scene_buffers()
 	var rids: Array = [_bufs.get("crystal_stats", RID()), _bufs.get("standards", RID()), _bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex]
 	rids.append_array(_pipelines.values())
+	rids.append(_bufs.get("surface_stats", RID()))
 	rids.append_array(_shaders.values())
 	for rid in rids:
 		if rid is RID and rid.is_valid():
@@ -910,8 +923,19 @@ func crystal_diagnostics() -> Dictionary:
 	var values := bytes.to_int32_array()
 	return {"invalid_interfaces": values[0], "bounce_limit_paths": values[1], "precision": "float64", "failure_flags": values[2], "maximum_failed_energy_error": bytes.decode_float(12)}
 
+func surface_diagnostics() -> Dictionary:
+	if not _bufs.has("surface_stats"):
+		return {}
+	var bytes := _rd.buffer_get_data(_bufs["surface_stats"])
+	return {"walks": bytes.decode_u32(0) + 4294967296 * bytes.decode_u32(4),
+		"micro_events": bytes.decode_u32(8) + 4294967296 * bytes.decode_u32(12),
+		"invalid_walks": bytes.decode_u32(16), "limit_walks": bytes.decode_u32(20)}
+
 func transport_error() -> String:
 	if not configuration_error.is_empty():
 		return configuration_error
+	var surface := surface_diagnostics()
+	if surface.get("invalid_walks", 0) != 0 or surface.get("limit_walks", 0) != 0:
+		return "Rough surface transport failed: " + JSON.stringify(surface)
 	var diagnostics := crystal_diagnostics()
 	return "Crystal transport encountered an invalid interface: " + JSON.stringify(diagnostics) if diagnostics.get("invalid_interfaces", 0) != 0 else ""

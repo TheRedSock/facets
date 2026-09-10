@@ -55,6 +55,7 @@ func _initialize() -> void:
 	tracer.accumulate(8)
 	check(mean_y(tracer.read_xyz()) == 0.0, "rough boundary cannot emit in darkness")
 	_anisotropy(tracer, base, policy)
+	_multiple_scattering(tracer, base, policy, out)
 	tracer.release()
 	GemArtifactStore.atomic_write(out + "/furnace.json", JSON.stringify(measurements, "\t").to_utf8_buffer())
 	print(JSON.stringify(measurements))
@@ -62,6 +63,46 @@ func _initialize() -> void:
 		_showcase(stone, out)
 	print("Surface: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)
+
+func _multiple_scattering(tracer: GemTracer, input: Dictionary, policy: Dictionary, out: String) -> void:
+	var specimen := input.duplicate(true)
+	specimen["sellmeier_c"] = Vector3.ZERO
+	var finish := GemSurface.new()
+	finish.multiple_scattering = true
+	specimen["surfaces"] = [finish]
+	var furnace := GemLighting.analytic(PackedFloat32Array([0, 0, 1, 0.5, 5600, 0, 0.9, 0]), Vector4(1, 1, 1, 0))
+	var measurements := []
+	for polarized in [false, true]:
+		var quality := policy.duplicate()
+		quality["polarization"] = polarized
+		for index in [1.5, 2.4]:
+			for alpha in [0.02, 0.3, 1.0]:
+				finish.alpha_u = alpha
+				finish.alpha_v = alpha
+				specimen["sellmeier_b"] = Vector3(index*index-1, 0, 0)
+				check(tracer.configure_stone(specimen, furnace, quality), "configure Smith transport")
+				var ms := tracer.accumulate(512)
+				var y := mean_y(tracer.read_xyz())
+				var stats := tracer.surface_diagnostics()
+				check(absf(y-1) < (0.02 if polarized else 0.005), "multiple-scattering furnace index=%s alpha=%s polarized=%s Y=%s" % [index, alpha, polarized, y])
+				check(stats.walks > 0 and stats.micro_events >= stats.walks and tracer.transport_error().is_empty(), "Smith events complete without invalid/limited walks: %s" % stats)
+				measurements.append({"index": index, "alpha": alpha, "polarized": polarized, "Y": y, "ms": ms, "diagnostics": stats})
+	# Checkpoint rejection includes micro-walk errors, not only Maxwell failures.
+	var checkpoint := tracer.checkpoint()
+	check(tracer.restore_checkpoint(checkpoint), "Smith checkpoint roundtrip")
+	check(tracer.surface_diagnostics() == measurements[-1].diagnostics, "Smith diagnostics preserved in checkpoint")
+	checkpoint.surface_stats.encode_u32(20, 1)
+	check(not tracer.restore_checkpoint(checkpoint), "reject checkpoint containing a truncated micro-walk")
+	checkpoint.surface_stats.encode_u32(20, 0)
+	checkpoint.surface_stats.encode_u32(0, 4294967290)
+	checkpoint.surface_stats.encode_u32(4, 0)
+	checkpoint.surface_stats.encode_u32(8, 4294967290)
+	checkpoint.surface_stats.encode_u32(12, 0)
+	check(tracer.restore_checkpoint(checkpoint), "restore near-carry diagnostic counters")
+	tracer.accumulate(1)
+	check(tracer.surface_diagnostics().walks > 4294967296 and tracer.surface_diagnostics().micro_events > 4294967296, "diagnostic counters carry beyond uint32 without wrapping")
+	GemArtifactStore.atomic_write(out.path_join("multiple_furnace.json"), JSON.stringify(measurements, "\t").to_utf8_buffer())
+	print("Smith furnace: ", JSON.stringify(measurements))
 
 func _anisotropy(tracer: GemTracer, input: Dictionary, policy: Dictionary) -> void:
 	var specimen := input.duplicate(true)

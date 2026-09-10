@@ -23,6 +23,7 @@ if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'microsurface_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/microsurface_gpu_check.gd') }
 	$stages += @{ Name = 'pipeline_cache_check'; Args = @('--quit-after', '600', '--script', 'res://tools/pipeline_cache_check.gd') }
     $stages += @{ Name = 'geometry_factory_check'; Args = @('--quit-after', '600', '--script', 'res://tools/geometry_factory_check.gd') }
     foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'farm_gpu_check', 'library_gpu_check', 'surface_check', 'spectra_gpu_check', 'principal_indices_gpu_check', 'volume_gpu_check', 'polarization_gpu_check', 'crystal_gpu_check', 'crystal_transport_check', 'geometry_aov_check')) {
@@ -50,7 +51,7 @@ foreach ($stage in $stages) {
 }
 if ($ReferencePython -and $failed.Count -eq 0) {
     $referenceChecks = @('check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')
-    if ($Gpu) { $referenceChecks += 'check_gpu_polarization_reference' }
+    if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference') }
     foreach ($name in $referenceChecks) {
         $output = & $ReferencePython (Join-Path $projectRoot "tools/$name.py") 2>&1
         $code = $LASTEXITCODE

@@ -119,3 +119,14 @@ and launches fresh processes. It checks headless scalar/geometry reuse after a
 crystal edit, reprinting after a print edit, invalidation after a shared mesh edit,
 cross-worker result transfer, and rejection of a stale worker source manifest.
 Logs and copied projects stay under ignored `artifacts/pipeline-cache/`.
+
+Explicit rough-surface multiple scattering uses `GemSurface.multiple_scattering`.
+`microsurface_gpu_check.gd` exports directional samples under ignored
+`artifacts/microsurface/`; `check_microsurface_reference.py` independently compares
+them with float64 slope-CDF inversion, angular histograms and hemispherical
+reciprocity. The full check runner includes both when GPU and reference Python
+are supplied. `surface_check.gd` also exercises the integrated scalar/Mueller
+renderer, checkpoint failures and uint32 counter carry. `microsurface_lookdev.gd`
+renders a256px polished/single/multiple/multiple-plus-milk sheet:128-sample
+reconstructed images above independent2048-sample raw references. Results are
+numerical/model evidence; automatic surface grading remains disabled.

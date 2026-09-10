@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v15)
+# Lapidary kernel contract (v16)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. Wire floats
@@ -100,7 +100,7 @@ these limitations. Fluorescence has no enabled transport implementation.
 
 ## Boundary finish (32B, binding14)
 
-One record per region, same offset as binding13: vec4(alpha_u,alpha_v,0,0),
+One record per region, same offset as binding13: vec4(alpha_u,alpha_v,multiple_scattering,0),
 vec4(object-space polish direction.xyz,0). Direction projects onto the tangent
 plane at each hit. Zero slopes select an exact specular dielectric interface.
 
@@ -112,6 +112,35 @@ strong roughness: only light polish has passed acceptance. Strong frosting and
 automatic grade.surface recipes remain disabled. `tools/surface_check.gd` checks
 furnace response and directional polish. The old fake inclusion primitives are
 removed; explicit closed geometry and material regions are the defect backend.
+
+`GemSurface.multiple_scattering=true` explicitly selects a height-correlated
+Smith microsurface walk (Heitz et al. 2016, DOI10.1145/2897824.2925943). Microfacet
+reflection and refraction continue until escape, with the height CDF complemented
+on each transmission. No geometry-side rejection or G2 attenuation is applied
+inside this walk. GGX normals use the spherical-cap construction of Dupuy/Benyoub
+2023 (DOI10.1111/cgf.14867), with stable below-horizon arithmetic. A scalar Fresnel
+proposal samples each branch; scalar or persistent Mueller weights compose each
+micro-event, including radiance index-squared factors. Four independent wavelength
+paths are forced for this option. Crystal transport still rejects rough boundaries.
+
+Binding19 is a 32B diagnostics buffer: uint32 low/high pairs for walk and
+micro-event counts at offsets0/8, invalid and capped-walk counts at16/20, reserved
+zeros at24/28. The walk cap is256; either error counter prevents factory publication.
+64-bit counts use paired uint32 atomics without requiring shaderInt64. Checkpoint
+version2 retains this buffer plus the16B crystal diagnostics, rejects failed walks,
+and rejects old checkpoint versions. The film buffers still total128B/pixel;
+checkpoint film data80B/pixel plus48B diagnostics (before serialization overhead).
+
+`microsurface_gpu_check.gd` tests6.29million samples across96 distributions.
+`check_microsurface_reference.py` independently inverts float64 projected slope
+CDFs and physical-height free paths, checks angular histograms/moments and twelve
+hemispherical reciprocity pairs. `surface_check.gd` checks the actual scalar and
+Mueller renderer in lossless furnaces, including roughness1 and index2.4, and
+checkpoint/counter behavior. These are model/numerical checks, not calibration
+against real ground gemstones. `microsurface_lookdev.gd` measures128-sample
+reconstructed images against independent2048-sample raw images. Automatic surface
+grading remains disabled; explicit uniform frosting does not model wear history,
+spatial scratches, subsurface damage, or measured roughness correlations.
 
 ## Compiled lighting and colorimetry
 

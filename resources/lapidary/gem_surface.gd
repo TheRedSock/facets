@@ -2,10 +2,13 @@ class_name GemSurface
 extends Resource
 ## Physical boundary finish, independent of bulk absorption and geometry.
 ## GGX alpha values describe the slope distribution, not a perceptual slider.
-## The current single-scattering model is intended for polished surfaces;
-## strong frosting needs multiple microfacet scattering before grade automation.
+## Single scattering is intended for polished surfaces. The explicit Smith walk
+## includes higher orders; appearance calibration is still needed for grading.
 @export_range(0.0, 1.0) var alpha_u := 0.0
 @export_range(0.0, 1.0) var alpha_v := 0.0
+## Experimental height-correlated Smith random walk, including inter-facet
+## reflection/refraction. More expensive/noisy; never selected by grade labels.
+@export var multiple_scattering := false
 ## Object-space polish direction, projected into each boundary's tangent plane.
 @export var direction := Vector3.RIGHT
 @export_multiline var source_note := "Authored finish; not a measured roughness distribution."
@@ -21,4 +24,4 @@ func validate() -> PackedStringArray:
 func packed() -> PackedFloat32Array:
 	assert(validate().is_empty(), "Invalid boundary finish: %s" % validate())
 	var axis := direction.normalized()
-	return PackedFloat32Array([alpha_u, alpha_v, 0, 0, axis.x, axis.y, axis.z, 0])
+	return PackedFloat32Array([alpha_u, alpha_v, 1 if multiple_scattering else 0, 0, axis.x, axis.y, axis.z, 0])
