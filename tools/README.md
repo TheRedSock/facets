@@ -31,3 +31,9 @@ angular/millimeter tolerances. Run windowed `tools/optimize_cut.gd -- --stone=qu
 (or `--quick`) for a bounded pavilion/table/crown search. It writes exact candidate
 resources, training and held-out metrics, and comparison images under artifacts/.
 The brightness objective is not a cut grade; no candidate is promoted automatically.
+
+Completed farm output stores can be consolidated headlessly with
+`merge_gem_results.gd -- --source=... --destination=... --manifest=...` (repeat
+source for multiple shards). Inspect its dry-run report before `--apply=true`.
+Use `--initialize-destination=true` for a new empty store. Conflicting payloads
+are refused by default; source precedence must be chosen explicitly.

@@ -87,3 +87,31 @@ TileView uses frame metadata and never invokes the optical renderer.
 generated/gem-assets.pck. Copy that pack beside an exported game executable, or set
 the explicit delivery path. Build artifacts, evaluation bakes and reports are
 ignored by source control; contracts, generation tools and authored inputs remain.
+
+
+## Farm result consolidation
+
+Give each farm attempt an isolated output store. After its worker exits, run
+`tools/merge_gem_results.gd` headlessly with repeated `--source=...`, a local
+`--destination=...`, and the original `--manifest=...`. The default is dry-run;
+`--apply=true` publishes validated recipes. For a new empty destination, explicitly
+pass `--initialize-destination=true`. Initialization refuses existing unrelated files.
+
+Consolidation takes nonblocking exclusive locks on all stores, verifies marked
+unlinked paths, checks every requested checksum and decoded image format/dimension,
+and admits only manifest-listed completed displays and their optical masters.
+Source JSON cannot supply executable resources or arbitrary destination paths.
+Missing results are reported so incomplete shards can be retried. Checkpoints and
+unrequested recipes remain in their original attempt store.
+
+The entire inventory is validated before importing. Different payloads for the
+same recipe fail by default, with hashes and source paths in the transfer report.
+Floating-point differences across hardware can legitimately create such conflicts;
+checksums establish integrity, not cross-device bit identity or trusted provenance.
+`--conflict=keep_existing` explicitly prefers the destination, then source argument
+order. Review conflicts before choosing that policy. Imports are atomic per recipe,
+not one filesystem transaction: an I/O failure may leave a valid partial import,
+and retry is idempotent. Only one payload is loaded at a time during copying.
+
+Distributed duplicate-work scheduling and expiring leases require an external
+coordinator; the local protocol never steals a slow or interrupted process's lock.

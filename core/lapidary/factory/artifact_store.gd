@@ -8,6 +8,21 @@ const MAX_BLOB_BYTES := 512 * 1024 * 1024
 func _init(path := "res://generated/gemfactory") -> void:
 	root = path
 
+func initialize() -> bool:
+	var base := ProjectSettings.globalize_path(root).replace("\\", "/").simplify_path().trim_suffix("/")
+	if DirAccess.make_dir_recursive_absolute(base) != OK or not GemStorePath.unlinked_root(base):
+		return false
+	if FileAccess.file_exists(base.path_join("store.json")):
+		return GemStorePath.owned_root(base)
+	# Never claim another directory's files. A publisher may already hold its
+	# activity token when it initializes a new empty store.
+	if not DirAccess.get_files_at(base).is_empty():
+		return false
+	for directory in DirAccess.get_directories_at(base):
+		if directory != ".active":
+			return false
+	return atomic_write(base.path_join("store.json"), '{"kind":"lapidary_artifact_store","schema":1}'.to_utf8_buffer())
+
 static func valid_key(key: String) -> bool:
 	if key.length() != 64:
 		return false
@@ -29,7 +44,7 @@ func _publish_active(key: String, payload: PackedByteArray, metadata: Dictionary
 		return false
 	var marker_path := root.path_join("store.json")
 	if not FileAccess.file_exists(marker_path):
-		if not atomic_write(marker_path, '{"kind":"lapidary_artifact_store","schema":1}'.to_utf8_buffer()):
+		if not initialize():
 			return false
 	var marker: Variant = JSON.parse_string(FileAccess.get_file_as_string(marker_path))
 	if not marker is Dictionary or marker.get("kind") != "lapidary_artifact_store" or marker.get("schema") != 1:

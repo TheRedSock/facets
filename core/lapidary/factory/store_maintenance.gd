@@ -8,7 +8,7 @@ var last_error := ""
 func collect(root: String, manifests: Array, budget_bytes: int, apply := false) -> Dictionary:
 	last_error = ""
 	var base := ProjectSettings.globalize_path(root).simplify_path().trim_suffix("/")
-	if not _owned_root(base):
+	if not GemStorePath.owned_root(base):
 		return _fail("Not a marked gemstone artifact store, or store path is linked")
 	var guard := GemStoreGuard.exclusive(base)
 	if guard == null:
@@ -28,7 +28,7 @@ func _collect_locked(base: String, manifests: Array, budget: int, apply: bool) -
 		if name.get_extension() != "json" or not GemArtifactStore.valid_key(name.get_basename()):
 			continue
 		var relative := "recipes/" + name
-		if not _regular_path(base, relative):
+		if not GemStorePath.regular_path(base, relative):
 			continue
 		var file := FileAccess.open(base.path_join(relative), FileAccess.READ)
 		if file == null or file.get_length() > 1024 * 1024:
@@ -44,7 +44,7 @@ func _collect_locked(base: String, manifests: Array, budget: int, apply: bool) -
 		record["mtime"] = FileAccess.get_modified_time(base.path_join(relative))
 		records[name.get_basename()] = record
 	for directory in DirAccess.get_directories_at(base.path_join("objects")):
-		if directory.length() != 2 or not directory.is_valid_hex_number() or not _regular_path(base, "objects/" + directory):
+		if directory.length() != 2 or not directory.is_valid_hex_number() or not GemStorePath.regular_path(base, "objects/" + directory):
 			continue
 		for name in DirAccess.get_files_at(base.path_join("objects/" + directory)):
 			if _owned_temporary(name, "blob") and name.left(2) == directory:
@@ -54,7 +54,7 @@ func _collect_locked(base: String, manifests: Array, budget: int, apply: bool) -
 			if name.get_extension() != "blob" or not GemArtifactStore.valid_key(digest) or digest.left(2) != directory:
 				continue
 			var relative := "objects/" + directory + "/" + name
-			if not _regular_path(base, relative):
+			if not GemStorePath.regular_path(base, relative):
 				continue
 			var file := FileAccess.open(base.path_join(relative), FileAccess.READ)
 			if file != null:
@@ -118,7 +118,7 @@ func _collect_locked(base: String, manifests: Array, budget: int, apply: bool) -
 	# but cannot strand a retained recipe by deleting its dependency.
 	if apply:
 		for relative in remove:
-			if not _regular_path(base, relative) or DirAccess.remove_absolute(base.path_join(relative)) != OK:
+			if not GemStorePath.regular_path(base, relative) or DirAccess.remove_absolute(base.path_join(relative)) != OK:
 				return _fail("Cannot remove cache entry: " + relative)
 	return {"applied": apply, "files_to_remove": remove.size(), "removed_bytes": removed_bytes,
 		"retained_bytes": kept_bytes, "pinned_bytes": pinned_bytes, "budget_bytes": budget,
@@ -130,7 +130,7 @@ static func _owned_temporary(name: String, extension: String) -> bool:
 	return parts.size() == 5 and GemArtifactStore.valid_key(parts[0]) and parts[1] == extension and parts[2].is_valid_int() and parts[3].is_valid_int() and parts[4] == "tmp"
 
 static func _inventory_temporary(base: String, relative: String, inventory: Dictionary) -> void:
-	if _regular_path(base, relative):
+	if GemStorePath.regular_path(base, relative):
 		var file := FileAccess.open(base.path_join(relative), FileAccess.READ)
 		if file != null:
 			inventory[relative] = file.get_length()
@@ -151,35 +151,6 @@ static func _retain(key: String, records: Dictionary, objects: Dictionary, keep:
 		cost += int(objects[digest]["bytes"])
 	return cost
 
-static func _regular_path(base: String, relative: String) -> bool:
-	var path := base
-	for component in relative.split("/"):
-		if component in ["", ".", ".."]:
-			return false
-		var parent := DirAccess.open(path)
-		if parent == null or parent.is_link(component):
-			return false
-		path = path.path_join(component)
-	return path.simplify_path().begins_with(base + "/")
-
-static func _owned_root(base: String) -> bool:
-	if base == base.get_base_dir() or base.get_file().is_empty():
-		return false
-	var cursor := base
-	while not cursor.get_file().is_empty():
-		var parent_path := cursor.get_base_dir()
-		if parent_path == cursor or parent_path.is_empty():
-			break
-		if parent_path.ends_with(":"):
-			parent_path += "/"
-		var parent := DirAccess.open(parent_path)
-		if parent == null or parent.is_link(cursor.get_file()):
-			return false
-		cursor = parent_path
-	if not FileAccess.file_exists(base.path_join("store.json")):
-		return false
-	var marker: Variant = JSON.parse_string(FileAccess.get_file_as_string(base.path_join("store.json")))
-	return marker is Dictionary and marker.get("kind") == "lapidary_artifact_store" and marker.get("schema") == 1
 
 func _fail(message: String) -> Dictionary:
 	last_error = message
