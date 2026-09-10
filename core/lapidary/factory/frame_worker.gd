@@ -18,18 +18,17 @@ func release() -> void:
 		tracer = null
 
 func run(job: GemFrameJob, sample_limit := 0) -> Dictionary:
-	var guard := GemStoreGuard.enter(store.root, "render")
-	if guard == null:
-		return _fail("Artifact store is undergoing maintenance")
+	last_error = GemJobValidator.validate(job)
+	if not last_error.is_empty():return _fail(last_error)
+	var ownership:=GemWorkClaim.acquire(store.root,GemFramePlan.master_key(job),"render")
+	if ownership.has("error"):return _fail(ownership.error)
+	if ownership.status=="busy":return ownership
+	var claim:GemWorkClaim=ownership.claim
 	var result := _run_active(job, sample_limit)
-	guard.release()
+	claim.release()
 	return result
 
 func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
-	last_error = ""
-	var admission_error := GemJobValidator.validate(job)
-	if not admission_error.is_empty():
-		return _fail(admission_error)
 	var display_key := GemFramePlan.display_key(job)
 	var master_key := GemFramePlan.master_key(job)
 	var existing := store.read(display_key)

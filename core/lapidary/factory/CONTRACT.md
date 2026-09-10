@@ -64,9 +64,12 @@ physical request and conservatively applies its declared full-render memory budg
 `GemJobBundle` creates a minimal independent Godot project and ZIP, with bundled
 binary resources, raw shaders, standard tables and source/job checksums. Rendering
 requires windowed Vulkan/RenderingDevice, including on a farm. Shards group jobs by
-master, so exposure variants stay together. Farm workers should use isolated output
-stores per attempt; shared stores permit independent jobs but do not deduplicate
-simultaneous executions of the same job. Completed stores can be merged through
+master, so exposure variants stay together. Isolated output stores remain suitable
+for separate farm machines. Cooperative workers may also share a filesystem store:
+initialize it once with the worker's `--initialize-only=true` before parallel
+dispatch. Per-master claims prevent simultaneous rendering/checkpoint writes for
+the same master, including its exposure variants. Geometry has independent claims.
+Completed stores can be merged through
 the validated transfer protocol below. Linux farm deployment is not yet validated.
 
 ## Retention and concurrency
@@ -100,10 +103,31 @@ resource references and can mutate the original specimen through nested data.
 and checks activity; workers register then recheck the maintenance directory before
 touching data. Maintenance cannot race cooperative workers or packaging. The marker
 is released explicitly and on normal RefCounted destruction. A process killed
-mid-operation may leave a token: inspect `.active/` or `.maintenance/owner.json`,
-confirm its worker is stopped, then remove that token before collection. No timer
-steals a slow worker's ownership. This protocol assumes normal local filesystem
+mid-operation may leave a token. Use the stopped-store recovery protocol below
+for activity/claim tokens; an existing `.maintenance/owner.json` requires separate
+stopped-owner inspection. No timer steals a slow worker's ownership. This protocol assumes normal local filesystem
 atomic creation/rename semantics; distributed object storage needs a coordinator.
+
+`GemWorkClaim` combines an activity guard with atomic `.claims/<work-key>`
+directory creation. A busy worker returns `status: busy` without a GPU, checkpoint
+write or publication. The command-line worker continues unrelated jobs, then exits
+2 if any claimed work remains (1 is failure, 0 is success). Retry busy jobs after
+their owners finish; there is no polling loop or timeout-based ownership theft.
+Claims cover the complete optical/checkpoint/print operation. This is cooperative
+execution exclusion, not a transactional database or a distributed lease service.
+
+After a crash, use `recover_gem_store.gd --store=...` to inspect a content-hashed
+snapshot of coordination files. Stop every worker and publisher using that store,
+then supply `--snapshot=<reported hash> --workers-stopped=true`. Recovery takes the
+maintenance gate, checks that exact snapshot and moves only recognized activity
+tokens and claim directories into `.recovered/`, preserving an inventory. Rendered
+artifacts/checkpoints are untouched. Changed snapshots, links and unknown token
+layouts are refused. Recovery is resumable by inspecting remaining state after
+an interrupted move; it is not an all-or-nothing transaction. An existing
+maintenance lock is never stolen and requires separate stopped-owner inspection.
+The assertion that all workers stopped is operational: a PID on a different farm
+machine cannot establish that fact. Shared network filesystem semantics and Linux
+deployment still require environment-specific validation.
 
 `tools/maintain_gem_store.gd` defaults to dry-run and the current job manifest.
 Repeat `--manifest=...` to retain multiple catalogs. Required display/master recipes

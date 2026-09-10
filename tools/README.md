@@ -224,3 +224,18 @@ full Mueller and crystal backends retain their separate capability gates.
 `composition_portable_check.gd` exercises the measured spatial example through
 an isolated binary job bundle, partial render, resumed render, geometry output
 and headless cache reuse. It is also included in the GPU check suite.
+
+Shared worker stores: initialize once with the portable worker's
+`--initialize-only=true --output=...` before dispatching parallel processes.
+Optical masters and geometry companions have separate work claims. The worker
+continues other jobs on contention, then exits 2 for retryable busy work (1 for
+failure). `test_work_claims.gd` tests eight competing processes and a killed child;
+`work_claims_gpu_check.gd` verifies real portable partial/resume/contention/cache
+behavior. Both are registered in the engine check runner.
+
+For crash recovery, inspect `recover_gem_store.gd -- --store=...`, stop all workers
+and publishers, then rerun with the exact `--snapshot=... --workers-stopped=true`.
+It archives recognized abandoned coordination records without touching bakes or
+checkpoints. No expiry timer or cross-machine PID guess releases a work claim.
+An existing maintenance lock is not recovered automatically. See the factory
+contract for filesystem assumptions and partial-recovery behavior.

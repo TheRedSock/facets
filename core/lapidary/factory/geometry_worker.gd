@@ -20,12 +20,13 @@ func run(job: GemFrameJob, coverage_side := 4) -> Dictionary:
 	last_error = GemGeometryPlan.validate(job, coverage_side)
 	if not last_error.is_empty():
 		return {}
-	var guard := GemStoreGuard.enter(store.root, "geometry")
-	if guard == null:
-		last_error = "Artifact store is undergoing maintenance"
-		return {}
+	var ownership:=GemWorkClaim.acquire(store.root,GemGeometryPlan.key(job,coverage_side),"geometry")
+	if ownership.has("error"):
+		last_error=ownership.error;return {}
+	if ownership.status=="busy":return ownership
+	var claim:GemWorkClaim=ownership.claim
 	var result := _run_active(job, coverage_side)
-	guard.release()
+	claim.release()
 	return result
 
 func _run_active(job: GemFrameJob, coverage_side: int) -> Dictionary:

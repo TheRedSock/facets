@@ -2,6 +2,9 @@ extends SceneTree
 ## Windowed worker, including inside a generated standalone job bundle.
 ## --manifest=... --output=... --shard=0 --shards=1 --sample-limit=0
 ## --outputs=all|optical|geometry (geometry companions must be requested in bundle)
+## Exit 2 means retryable claimed work remains; exit 1 means an actual failure.
+## --initialize-only=true creates the shared store once before parallel dispatch.
+var _busy := 0
 func _initialize() -> void:
 	var args := {}
 	for argument in OS.get_cmdline_user_args():
@@ -25,6 +28,10 @@ func _initialize() -> void:
 		quit(1)
 		return
 	var shard := int(args.get("shard", 0))
+	if args.get("initialize-only","")=="true":
+		var store:=GemArtifactStore.new(args.get("output","res://output"))
+		if not store.initialize():printerr("Cannot initialize artifact store");quit(1);return
+		print("Artifact store initialized: "+store.root);quit();return
 	var shards := int(args.get("shards", 1))
 	var outputs: String = args.get("outputs", "all")
 	var geometry: Variant = manifest.get("geometry", {})
@@ -75,11 +82,12 @@ func _initialize() -> void:
 		if result.is_empty():
 			failures += 1
 		else:
+			if result.get("status")=="busy":_busy+=1
 			print(JSON.stringify({"job": key, "status": result.get("status", "complete"), "counters": worker.counters}))
 	worker.release()
 	if outputs != "optical":
 		failures += _geometry(geometry, base, args.get("output", "res://output"), shard, shards)
-	quit(1 if failures else 0)
+	quit(1 if failures else (2 if _busy else 0))
 
 func _geometry(records: Dictionary, base: String, output: String, shard: int, shards: int) -> int:
 	var worker := GemGeometryWorker.new(output)
@@ -111,6 +119,7 @@ func _geometry(records: Dictionary, base: String, output: String, shard: int, sh
 			printerr(worker.last_error)
 			failures += 1
 		else:
+			if result.get("status")=="busy":_busy+=1
 			print(JSON.stringify({"geometry": key, "status": result.status, "counters": worker.counters}))
 	worker.release()
 	return failures
