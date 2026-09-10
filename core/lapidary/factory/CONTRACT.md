@@ -286,3 +286,35 @@ bias bound. Subpixel positional agreement does not establish specular convergenc
 Dense triangulation also incurs CPU construction/admission, BVH packing/upload
 and trace cost. Continuous analytic patches are a prospective production backend;
 the current mesh remains available as explicit geometry and reference evidence.
+
+## Geometry setup reuse
+
+Each `GemTracer` retains up to 64 MiB of canonical packed BVH payloads in a 16-entry
+LRU. `GemPackedGeometryCache` hashes the actual mesh buffers, including semantic
+facet and region IDs, rather than trusting a compiled specimen fingerprint.
+Detached copies cannot poison the cache; invalid mesh mutations fail admission.
+The node array is relocated for its position in each batch without rebuilding the
+BVH. Triangle region IDs remain local to each specimen's material table.
+
+The tracer also retains the currently resident GPU node and triangle buffers.
+Their final packed-byte SHA256 values include batch relocation and order. A
+matching buffer is reused; changed data is uploaded. Other optical inputs are
+still packed and configured normally, and every configuration resets the film.
+Pose-only updates through `set_clip_sample` already avoid full configuration.
+No cached geometry suppresses a material, lighting, finish or field edit.
+
+The 64 MiB bound counts retained CPU payload bytes. Temporary BVH construction,
+returned detached buffers and the currently configured GPU scene are additional
+memory. This is an in-process optimization, not a persistent geometry-object
+format or a complete device-memory admission policy. Job CPU shape generation
+and validation still run where required, including first-time cache admission.
+
+`geometry_cache_statistics()` and `profile().geometry_cache` report cumulative
+builds/hits, retained bytes, entry count and resident buffer uploads/reuses.
+A 25,696-triangle procedural benchmark reduced warm configuration from roughly
+3 seconds to 14–15 milliseconds (about 208x median); first configuration remained
+about 2.9 seconds. This measures setup, not tracing or first-time mesh compilation.
+The saved 64px/16spp films differed by at most 4.8e-7 in linear channels, consistent
+with adaptive float32 accumulation grouping. Cold/warm regression scenes have
+exact primary-geometry agreement across scalar, Mueller and crystal transport.
+No physical estimator or tessellation-convergence claim changes with this cache.

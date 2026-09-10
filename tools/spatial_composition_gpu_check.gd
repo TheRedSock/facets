@@ -1,4 +1,5 @@
 extends SceneTree
+## Slab fixtures use distinct nested side walls; central rays never reach them.
 var checks:=0
 var failures:=0
 func check(ok:bool,label:String)->void:
@@ -20,7 +21,7 @@ func _initialize()->void:
 				var boxes:=load("res://tests/lapidary/test_boundaries.gd")
 				var boundaries:=GemBoundarySet.new()
 				boundaries.add(boxes.box(Vector3(-100,-100,-1),Vector3(100,100,1)),0)
-				boundaries.add(boxes.box(Vector3(-100,-100,-.2),Vector3(100,100,.2)),-1)
+				boundaries.add(boxes.box(Vector3(-99,-99,-.2),Vector3(99,99,.2)),-1)
 				instance.boundaries=boundaries
 			check(tracer.configure_stone(instance,lighting,policy),"configure "+mode)
 			if not tracer.configuration_error.is_empty():printerr(tracer.configuration_error);continue
@@ -67,7 +68,7 @@ func _nested_axes()->void:
 	var boxes:=load("res://tests/lapidary/test_boundaries.gd")
 	var boundaries:=GemBoundarySet.new()
 	boundaries.add(boxes.box(Vector3(-100,-100,-1),Vector3(100,100,1)),0)
-	boundaries.add(boxes.box(Vector3(-100,-100,-.2),Vector3(100,100,.2)),1)
+	boundaries.add(boxes.box(Vector3(-99,-99,-.2),Vector3(99,99,.2)),1)
 	instance.boundaries=boundaries
 	var lighting:=GemLighting.analytic(PackedFloat32Array(),Vector4(1,1,1,0))
 	for host_dichroic in [false,true]:

@@ -24,10 +24,12 @@ $stages += @{ Name = 'test_absorption_mixtures'; Args = @('--headless', '--quit-
 $stages += @{ Name = 'test_spatial_composition'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_spatial_composition.gd') }
 $stages += @{ Name = 'test_work_claims'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_work_claims.gd') }
 $stages += @{ Name = 'test_rounding'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_rounding.gd') }
+$stages += @{ Name = 'test_packed_geometry_cache'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_packed_geometry_cache.gd') }
 if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'geometry_cache_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/geometry_cache_gpu_check.gd') }
 	$stages += @{ Name = 'rounding_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/rounding_gpu_check.gd') }
 	$stages += @{ Name = 'rounding_portable_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/rounding_portable_check.gd') }
 	$stages += @{ Name = 'work_claims_gpu_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/work_claims_gpu_check.gd') }

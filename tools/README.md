@@ -256,3 +256,15 @@ for sharp/120um/600um, or `--macro --fine` to halve the angular tessellation ste
 Generated comparisons remain under ignored `artifacts/rounding/`. This is an
 explicit geometry model, not a universal abrasion or grade simulator; mesh cost
 and specular convergence must be considered before using it in a large catalog.
+
+Geometry setup reuse: `test_packed_geometry_cache.gd` checks byte-exact canonical
+packing/relocation, mutation invalidation and bounded LRU retention.
+`geometry_cache_gpu_check.gd` compares cold and reused geometry across all three
+transport backends, mixed batches, nested media and material/geometry edits.
+Both run through `check_engine.ps1` (the latter with `-Gpu`).
+
+`scene_setup_benchmark.gd -- --label=NAME` records compilation, repeated setup,
+trace timings and raw 64px/16spp films under ignored `artifacts/scene-cache/NAME`.
+Use `python tools/compare_scene_setup.py BEFORE_DIR AFTER_DIR` to compare timings
+and numeric film differences; float32 accumulation grouping can change file hashes.
+The benchmark is a setup microbenchmark, not an end-to-end catalog throughput test.

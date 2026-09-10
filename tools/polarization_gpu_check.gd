@@ -199,7 +199,9 @@ func _dichroic_slabs(tracer: GemTracer, original: Dictionary, lighting: GemLight
 	var boundaries := GemBoundarySet.new()
 	var box_tool := load("res://tests/lapidary/test_boundaries.gd")
 	boundaries.add(box_tool.box(Vector3(-2, -2, -1), Vector3(2, 2, 1)), 0)
-	boundaries.add(box_tool.box(Vector3(-2, -2, -0.3), Vector3(2, 2, 0.4)), 0)
+	# Distinct side walls avoid coincident region interfaces; the central ray
+	# still encounters the same two extra axial boundaries.
+	boundaries.add(box_tool.box(Vector3(-1.8, -1.8, -0.3), Vector3(1.8, 1.8, 0.4)), 0)
 	inst["boundaries"] = boundaries
 	tracer.configure_stone(inst, lighting, policy)
 	tracer.set_stone_orientation(Quaternion.IDENTITY)

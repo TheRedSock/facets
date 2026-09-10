@@ -457,3 +457,14 @@ and participates in optical/geometry/portable identities. Default radius is zero
 the authored rounded-polish example is not applied to catalog grades. Radius is
 not a hardness/time wear law or a substitute for abrasion pits and roughness.
 See the factory contract for tessellation, removed-volume and performance limits.
+
+### Reusable geometry setup
+`GemPackedGeometryCache` retains canonical packed BVHs per tracer, with a 64 MiB
+payload budget and 16-entry LRU. Keys hash the actual vertices, indices, facet IDs
+and region IDs. Batch relocation patches a detached node buffer. Materials,
+lighting and poses do not invalidate this geometry; editing any geometry buffer
+does. The tracer separately reuses resident node/triangle GPU buffers only when
+their final packed bytes match. Release clears CPU retention and GPU resources.
+`test_packed_geometry_cache.gd` and `geometry_cache_gpu_check.gd` cover mutations,
+budgets, mixed batches and all transport backends. See the factory contract for
+benchmark scope and temporary-memory limits.

@@ -55,6 +55,10 @@ var _owns_rd := false
 var _shaders: Dictionary = {}    # name -> RID
 var _pipelines: Dictionary = {}  # name -> RID
 var _bufs: Dictionary = {}
+var _geometry_cache := GemPackedGeometryCache.new()
+var _geometry_buffer_keys: Dictionary = {}
+var _geometry_uploads := 0
+var _geometry_reuses := 0
 var _sets: Dictionary = {}       # name -> uniform set RID
 var _print_tex: RID
 var _print_size := Vector2i.ZERO
@@ -329,12 +333,15 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 					_flags |= FLAG_DISPERSION | FLAG_FULL_SPECTRUM
 		if inst.has("mesh"):
 			var mesh: GemMesh = inst["mesh"]
-			var bvh := GemBvh.build(mesh)
+			var packed := _geometry_cache.packed(mesh)
+			if not packed.error.is_empty():
+				configuration_error = packed.error
+				return false
 			@warning_ignore("integer_division")
 			inst["bvh_root"] = node_data.size() / 48 + 1
 			@warning_ignore("integer_division")
-			node_data.append_array(bvh.pack_nodes(node_data.size() / 48, triangle_data.size() / 64))
-			triangle_data.append_array(bvh.pack_triangles())
+			node_data.append_array(GemPackedGeometryCache.relocate_nodes(packed.nodes, node_data.size() / 48, triangle_data.size() / 64))
+			triangle_data.append_array(packed.triangles)
 		var p: PackedFloat32Array = inst["planes"]
 		if inst.has("analytic_shape"):
 			var shape: Vector4 = inst["analytic_shape"]
@@ -383,7 +390,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 
 	if volume_data.is_empty():
 		volume_data.resize(64)
-	_free_scene_buffers()
+	_free_scene_buffers(true)
 	_bufs["volume_fields"] = _rd.storage_buffer_create(volume_data.size(), volume_data)
 	var plane_bytes := planes.to_byte_array()
 	for face in plane_facet_ids.size():
@@ -394,8 +401,8 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	_upload_lighting_buffers()
 	_bufs["absorb"] = _rd.storage_buffer_create(absorb.to_byte_array().size(), absorb.to_byte_array())
 	_bufs["stones"] = _rd.storage_buffer_create(stones.data_array.size(), stones.data_array)
-	_bufs["triangles"] = _rd.storage_buffer_create(triangle_data.size(), triangle_data)
-	_bufs["nodes"] = _rd.storage_buffer_create(node_data.size(), node_data)
+	_upload_geometry_buffer("triangles", triangle_data)
+	_upload_geometry_buffer("nodes", node_data)
 	_bufs["regions"] = _rd.storage_buffer_create(region_data.to_byte_array().size(), region_data.to_byte_array())
 	_bufs["surfaces"] = _rd.storage_buffer_create(surface_data.to_byte_array().size(), surface_data.to_byte_array())
 	if finish_data.is_empty():
@@ -952,20 +959,47 @@ func load_linear_master(master: Image) -> bool:
 func profile() -> Dictionary:
 	return {"accumulate_wall_ms": last_accumulate_ms, "trace_wall_ms": last_dispatch_ms,
 		"print_readback_wall_ms": last_print_ms, "denoise_wall_ms": last_denoise_ms,
-		"samples": samples_accumulated}
+		"samples": samples_accumulated, "geometry_cache": geometry_cache_statistics()}
+
+
+func geometry_cache_statistics() -> Dictionary:
+	var stats := _geometry_cache.statistics()
+	stats["buffer_uploads"] = _geometry_uploads
+	stats["buffer_reuses"] = _geometry_reuses
+	return stats
+
+
+func _upload_geometry_buffer(name: String, bytes: PackedByteArray) -> void:
+	var hash := HashingContext.new()
+	hash.start(HashingContext.HASH_SHA256)
+	hash.update(bytes)
+	var key := hash.finish().hex_encode()
+	if _geometry_buffer_keys.get(name, "") == key and _bufs.has(name):
+		_geometry_reuses += 1
+		return
+	if _bufs.has(name):
+		_rd.free_rid(_bufs[name])
+	_bufs[name] = _rd.storage_buffer_create(bytes.size(), bytes)
+	_geometry_buffer_keys[name] = key
+	_geometry_uploads += 1
 
 
 # ------------------------------------------------------------------ cleanup
 
-func _free_scene_buffers() -> void:
+func _free_scene_buffers(keep_geometry := false) -> void:
 	for key in ["volume_fields", "planes", "lights", "spectra", "absorb", "stones", "insts", "triangles", "nodes", "regions", "surfaces", "finish_fields"]:
+		if keep_geometry and key in ["triangles", "nodes"]:
+			continue
 		if _bufs.has(key) and _bufs[key].is_valid():
 			_rd.free_rid(_bufs[key])
 			_bufs.erase(key)
+	if not keep_geometry:
+		_geometry_buffer_keys.clear()
 
 
 func release() -> void:
 	_free_scene_buffers()
+	_geometry_cache.clear()
 	var rids: Array = [_bufs.get("crystal_stats", RID()), _bufs.get("standards", RID()), _bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex]
 	rids.append_array(_pipelines.values())
 	rids.append(_bufs.get("surface_stats", RID()))

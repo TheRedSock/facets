@@ -612,3 +612,11 @@ Polarized host and nested-material capability checks run before shader/buffer
 allocation. Unsupported anisotropic real indices return `configuration_error`
 rather than relying on a late packing assertion. Diagnostic tests that replace
 quartz refraction with its ordinary curve are explicitly isotropic fixtures.
+
+Packed geometry reuse does not alter v20 layouts. Canonical BVH nodes and
+triangles may be retained in a bounded per-tracer CPU cache. Batch relocation
+adds node/triangle offsets only to their index fields; semantic IDs stay local.
+The final node/triangle byte digests govern resident GPU buffer reuse. Combined
+boundary meshes are validated before packing, including boundary-only caller
+inputs. Coincident region patches remain invalid; a cache miss cannot bypass
+admission. Other optical buffers and film-reset semantics are unchanged.
