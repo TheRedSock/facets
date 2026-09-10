@@ -17,6 +17,9 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $logRoot = Join-Path $projectRoot 'artifacts/build-assets'
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+$generatedRoot = Join-Path $projectRoot 'generated'
+New-Item -ItemType Directory -Force -Path $generatedRoot | Out-Null
+New-Item -ItemType File -Force -Path (Join-Path $generatedRoot '.gdignore') | Out-Null
 function Invoke-GemStage([string]$Name, [string[]]$Arguments) {
     $log = Join-Path $logRoot "$Name.log"
     & $Godot @Arguments 2>&1 | Tee-Object -FilePath $log

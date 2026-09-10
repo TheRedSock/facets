@@ -109,34 +109,20 @@ func _ruby_variants() -> Array:
 	var out: Array = []
 	out.append({"name": "default", "instance": LapidaryStoneCompiler.compile(stone)})
 
-	var no_fluor := LapidaryStoneCompiler.compile(stone)
-	no_fluor["fluorescence"] = {"nm": 693.0, "strength": 0.0}
-	out.append({"name": "no-fluor", "instance": no_fluor})
-
 	var no_scat := LapidaryStoneCompiler.compile(stone)
 	no_scat["scatter"] = {"sigma_per_mm": 0.0, "g": 0.6}
 	out.append({"name": "no-scatter", "instance": no_scat})
-
-	var no_silk := LapidaryStoneCompiler.compile(stone)
-	no_silk["inclusions"] = PackedFloat32Array()
-	out.append({"name": "no-silk", "instance": no_silk})
-
-	var clean := LapidaryStoneCompiler.compile(stone)
-	clean["fluorescence"] = {"nm": 693.0, "strength": 0.0}
-	clean["scatter"] = {"sigma_per_mm": 0.0, "g": 0.6}
-	clean["inclusions"] = PackedFloat32Array()
-	out.append({"name": "clean-optics", "instance": clean})
 
 	var thin := LapidaryStoneCompiler.compile(stone)
 	thin["absorb_scale"] = 0.35
 	thin["fluorescence"] = {"nm": 693.0, "strength": 0.0}
 	out.append({"name": "thin-body", "instance": thin})
 
-	var round_stone: GemStone = stone.duplicate()
-	round_stone.silhouette = &"round"
+	var round_stone: GemStone = stone.duplicate(true)
+	round_stone.shape.outline = &"round"
 	out.append({"name": "round-cut", "instance": LapidaryStoneCompiler.compile(round_stone)})
 
-	var t8_stone: GemStone = stone.duplicate()
+	var t8_stone: GemStone = stone.duplicate(true)
 	t8_stone.grade = load("res://data/lapidary/grades/t8.tres")
 	out.append({"name": "t8-grade", "instance": LapidaryStoneCompiler.compile(t8_stone)})
 	return out
@@ -154,10 +140,8 @@ func _render(tracer: GemTracer, instance: Dictionary, seed: int, lights: PackedF
 		var n := mini(chunk, left)
 		ms += tracer.accumulate(n)
 		left -= n
-	var img := tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE)
 	var out: int = policy["out"]
-	if img.get_width() != out:
-		img.resize(out, out, Image.INTERPOLATE_LANCZOS)
+	var img := tracer.finalize_print(GemPrint.load_house(), false, EXPOSURE, Vector2i(out, out))
 	img.set_meta("ms", ms)
 	return img
 
@@ -166,7 +150,7 @@ func _stone_stats(instance: Dictionary, stone: GemStone) -> Dictionary:
 	var absb: PackedFloat32Array = instance["absorption"]
 	return {
 		"planes": instance["planes"].size() / 8,
-		"inclusions": instance["inclusions"].size() / 16,
+		"defects": maxi(instance.get("surfaces", []).size() - 1, 0),
 		"sigma_per_mm": instance["scatter"]["sigma_per_mm"],
 		"fluor": instance["fluorescence"]["strength"],
 		"size_mm": stone.size_mm,

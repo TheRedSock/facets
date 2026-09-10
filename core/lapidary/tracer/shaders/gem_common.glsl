@@ -8,20 +8,14 @@
 
 struct Plane { vec4 n_d; vec4 aux; };          // aux: zone, polish (unused by kernel v3), reserved
 struct Light { vec4 dir_cos; vec4 kel_pow; };  // kel_pow: kelvin, power, cos_inner, role(0key..3bounce,4blocker)
-struct Prim  { vec4 a; vec4 b; vec4 c; vec4 d; };
-// Prim: a = center.xyz, type (0 needle,1 disc,2 cloud,3 crystal)
-//       b = axis.xyz, r0 (half-length / radius)
-//       c = r1, scatter_density, tint.r, tint.g
-//       d = tint.b, ior_delta, style (0 platelet / 1 veil), reserved
-
 struct Stone {
 	vec4 sell_b_size;      // sellmeier B xyz, size_mm
 	vec4 sell_c_biref;     // sellmeier C xyz (um^2), signed birefringence dn
 	vec4 scatter_zone;     // sigma_per_mm, hg_g, zoning_freq, zoning_contrast
 	vec4 zone_axis_phase;  // zoning axis xyz, phase
 	vec4 optic_fluor;      // optic axis xyz, fluorescence strength
-	vec4 misc;             // fluor_nm, absorb_scale, pad, pad
-	ivec4 ranges0;         // plane_offset, plane_count, incl_offset, incl_count
+	vec4 misc;             // fluor_nm (disabled), absorb_scale, nested_volume_present, rough_present
+	ivec4 ranges0;         // plane_offset, plane_count, reserved, reserved
 	ivec4 ranges1;         // absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), pad, pad
 };
 
@@ -36,7 +30,6 @@ layout(set = 0, binding = 0, std430) restrict readonly buffer Planes  { Plane pl
 layout(set = 0, binding = 1, std430) restrict readonly buffer Lights  { Light lights[]; };
 layout(set = 0, binding = 2, std430) restrict readonly buffer Absorb  { float absorb_mm[]; };
 layout(set = 0, binding = 3, std430) restrict buffer Accum            { vec4 accum[]; };
-layout(set = 0, binding = 4, std430) restrict readonly buffer Prims   { Prim prims[]; };
 layout(set = 0, binding = 5, std430) restrict readonly buffer Stones  { Stone stones[]; };
 layout(set = 0, binding = 6, std430) restrict readonly buffer Insts   { Inst insts[]; };
 

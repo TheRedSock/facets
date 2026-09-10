@@ -98,6 +98,22 @@ bool cabochon_hit(vec4 shape, vec3 origin, vec3 direction, out float closest, ou
 
 bool boundary_hit(Stone stone, vec3 origin, vec3 direction, out float distance, out int surface) {
 	distance = INF; surface = -100;
+	if (stone.ranges1.z == 0) {
+		float enter = -INF, leave = INF; int enter_face = -1, leave_face = -1;
+		for (int i = 0; i < stone.ranges0.y; i++) {
+			int face = stone.ranges0.x + i;
+			vec4 plane = planes[face].n_d;
+			float projection = dot(plane.xyz, direction), gap = plane.w - dot(plane.xyz, origin);
+			if (abs(projection) < 1e-9) { if (gap < 0.0) { return false; } continue; }
+			float t = gap / projection;
+			if (projection < 0.0 && t > enter) { enter = t; enter_face = face; }
+			if (projection > 0.0 && t < leave) { leave = t; leave_face = face; }
+			if (enter > leave) { return false; }
+		}
+		if (enter > T_EPS) { distance = enter; surface = enter_face; }
+		else if (leave > T_EPS) { distance = leave; surface = leave_face; }
+		return surface >= 0 && distance < INF * 0.5;
+	}
 	bool hit = false;
 	if (stone.ranges0.y == -1) { hit = cabochon_hit(planes[stone.ranges0.x].n_d, origin, direction, distance, surface); }
 	if (stone.ranges1.z > 0) {
@@ -110,6 +126,7 @@ bool boundary_hit(Stone stone, vec3 origin, vec3 direction, out float distance, 
 }
 
 vec3 boundary_normal(Stone stone, int surface, vec3 position) {
+	if (stone.ranges1.z == 0) { return planes[surface].n_d.xyz; }
 	if (surface >= 0) { return mesh_normal(surface); }
 	if (surface == -3) { return vec3(0, 0, -1); }
 	vec3 axes = planes[stone.ranges0.x].n_d.xyz;
@@ -132,7 +149,7 @@ int region_medium(Stone stone, uvec4 region_state) {
 }
 
 uvec4 cross_region(Stone stone, uvec4 region_state, int triangle, vec3 position, vec3 direction) {
-	int region = triangle < 0 ? 0 : triangles[triangle].meta.w;
+	int region = triangle < 0 || stone.ranges1.z == 0 ? 0 : triangles[triangle].meta.w;
 	uint bit = 1u << uint(region % 32);
 	if (dot(direction, boundary_normal(stone, triangle, position)) < 0.0) { region_state[region / 32] |= bit; }
 	else { region_state[region / 32] &= ~bit; }

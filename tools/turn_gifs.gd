@@ -112,10 +112,10 @@ func _initialize() -> void:
 		else:
 			if not opts["keep_frames"]:
 				_remove_dir(frame_dir_abs)
-			print("  %-14s %3d frames  gpu %6.1fs  wall %6.1fs  sigma %.3f  incl %2d -> %s.gif" % [
+			print("  %-14s %3d frames  gpu %6.1fs  wall %6.1fs  sigma %.3f  defects %2d -> %s.gif" % [
 				tile_id, frames, accumulate_wall_ms / 1000.0,
 				float(Time.get_ticks_msec() - t0) / 1000.0,
-				instance["scatter"]["sigma_per_mm"], instance["inclusions"].size() / 16, tile_id])
+				instance["scatter"]["sigma_per_mm"], maxi(instance.get("surfaces", []).size() - 1, 0), tile_id])
 
 	tracer.release()
 	print("TURN_GIFS %s  %d stones  %.1f min -> %s" % [

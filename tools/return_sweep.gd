@@ -24,7 +24,6 @@ func _initialize() -> void:
 	for sid: String in ["quartz", "amethyst", "emerald", "ruby", "diamond"]:
 		var stone: GemStone = load("res://data/lapidary/stones/%s.tres" % sid)
 		var inst := LapidaryStoneCompiler.compile(stone)
-		inst["inclusions"] = PackedFloat32Array()
 		inst["scatter"] = {"sigma_per_mm": 0.0, "g": 0.55}
 		var line := "%-10s" % sid
 		for th: int in thetas:

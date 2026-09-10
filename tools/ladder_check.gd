@@ -26,8 +26,8 @@ func _initialize() -> void:
 			return
 		instances.append(LapidaryStoneCompiler.compile(stone))
 		var fluor: Dictionary = instances[-1]["fluorescence"]
-		print("  %s: %d planes, %d incl prims, sigma %.2f, fluor %.2f@%.0fnm, disp_strong %s" % [
-			tile_id, instances[-1]["planes"].size() / 8, instances[-1]["inclusions"].size() / 16,
+		print("  %s: %d planes, %d defect boundaries, sigma %.2f, fluor %.2f@%.0fnm, disp_strong %s" % [
+			tile_id, instances[-1]["planes"].size() / 8, maxi(instances[-1].get("surfaces", []).size() - 1, 0),
 			instances[-1]["scatter"]["sigma_per_mm"], fluor["strength"], fluor["nm"],
 			str(instances[-1]["dispersion_strong"])])
 

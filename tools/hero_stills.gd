@@ -69,9 +69,9 @@ func _initialize() -> void:
 		if sheet_tile.get_width() != SHEET_CELL:
 			sheet_tile.resize(SHEET_CELL, SHEET_CELL, Image.INTERPOLATE_LANCZOS)
 		tiles.append({"image": sheet_tile, "label": tile_id.replace("_", " ").to_upper()})
-		print("  %-14s %4dpx %4d spp  %7.1f ms  sigma %.3f  incl %d" % [
+		print("  %-14s %4dpx %4d spp  %7.1f ms  sigma %.3f  defects %d" % [
 			tile_id, res, spp, ms, instance["scatter"]["sigma_per_mm"],
-			instance["inclusions"].size() / 16])
+			maxi(instance.get("surfaces", []).size() - 1, 0)])
 
 	tracer.release()
 	var sheet: Image = SheetComposer.compose(tiles, 8, true,

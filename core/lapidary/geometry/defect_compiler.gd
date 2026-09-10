@@ -21,6 +21,7 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float)
 			host = GemShapeCompiler.from_hull(compiled["planes"], compiled.get("facet_ids", PackedInt32Array()))
 		assert(boundaries.add(host, 0), "Invalid host for defect boundaries")
 	var materials: Array[Dictionary] = []
+	var surfaces: Array = compiled.get("surfaces", [GemSurface.new()])
 	for defect in enabled:
 		var surface := compile(defect, size_mm)
 		var material_id := -1
@@ -28,8 +29,10 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float)
 			materials.append(GemMaterialCompiler.compile(defect.filling))
 			material_id = materials.size()
 		assert(boundaries.add(surface, material_id), "Invalid physical defect: %s" % surface.validate())
+		surfaces.append(defect.finish if defect.finish != null else GemSurface.new())
 	compiled["boundaries"] = boundaries
 	compiled["region_materials"] = materials
+	compiled["surfaces"] = surfaces
 	compiled["mesh"] = boundaries.mesh
 	compiled["planes"] = PackedFloat32Array()
 

@@ -85,11 +85,11 @@ func _initialize() -> void:
 		if not ok:
 			failures += 1
 		@warning_ignore("integer_division")
-		var incl_count: int = instance["inclusions"].size() / 16
+		var defect_count: int = maxi(instance.get("surfaces", []).size() - 1, 0)
 		metrics["stones"][tile_id] = {
 			"grain_lsb": grain, "mean_luma": stats["luma"], "field_ms": field_ms,
 			"trace_s": trace_ms / 1000.0, "sigma_per_mm": instance["scatter"]["sigma_per_mm"],
-			"inclusions": incl_count, "pass": ok,
+			"defects": defect_count, "pass": ok,
 		}
 		print("  %-14s %8.2f %8.0f %8.1f %8.3f  %s" % [tile_id, grain, field_ms, trace_ms / 1000.0,
 			stats["luma"], "PASS" if ok else "FAIL"])

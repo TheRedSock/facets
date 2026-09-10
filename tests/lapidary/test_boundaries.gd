@@ -53,6 +53,17 @@ func _initialize() -> void:
 	check(stone.fingerprint() != original, "physical condition participates in content identity")
 	var realized := LapidaryStoneCompiler.compile(stone)
 	check(realized.has("boundaries") and realized["boundaries"].materials.size() == 2, "condition compiles to finite medium boundaries")
+	stone.condition.finish.alpha_u = 0.005
+	defect.finish.alpha_u = 0.015
+	defect.finish.alpha_v = 0.002
+	original = stone.fingerprint()
+	defect.finish.direction = Vector3.UP
+	check(stone.fingerprint() != original, "boundary finish direction participates in identity")
+	realized = LapidaryStoneCompiler.compile(stone)
+	check(realized["surfaces"].size() == 2 and realized["surfaces"][0].alpha_u == 0.005 and realized["surfaces"][1].alpha_u == 0.015, "host and defect retain independent finishes")
+	var invalid_finish := GemSurface.new()
+	invalid_finish.alpha_u = NAN
+	check(not invalid_finish.validate().is_empty(), "nonfinite surface finish rejected")
 	var shape := Vector4(1.0, 0.8, 0.6, -0.04)
 	for x in [-0.7, -0.3, 0.0, 0.5]:
 		var hit := GemQuadric.intersect(shape, Vector3(x, 0, 3), Vector3.FORWARD)

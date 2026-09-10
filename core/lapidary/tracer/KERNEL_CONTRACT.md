@@ -1,4 +1,4 @@
-# Lapidary Kernel Contract (v7 — analytic curved hosts and nested material boundaries)
+# Lapidary Kernel Contract (v8 — physical surface finishes and nested material boundaries)
 
 The single interface between the data model and the GPU tracer. Everything that
 renders — designer preview, clip bake, live board draws, evaluation sheets —
@@ -13,7 +13,7 @@ down −Z; the stone quaternion rotates stone→world.
 |---|---|---|
 | 0–2 | outward unit normal (stone space) | |
 | 3 | d — plane offset (`dot(n,x) <= d` is inside) | |
-| 4 | zone id | 0 table, 1 crown main/star, 2 upper girdle, 3 girdle, 4 pavilion main, 5 lower girdle, 6 culet, 7 step row (compiler metadata; kernel v3 treats every facet as a perfect specular dielectric) |
+| 4 | zone id | 0 table, 1 crown main/star, 2 upper girdle, 3 girdle, 4 pavilion main, 5 lower girdle, 6 culet, 7 step row (compiler metadata; finish is a separate boundary property) |
 | 5–7 | reserved | |
 
 The hull MUST be bounded (compiler responsibility). Facet-meeting error may perturb the plane program. Faceted bodies may keep the
@@ -49,7 +49,7 @@ Deterministic Fresnel escape splitting is only used after visibility proves a
 branch reaches the environment; coupled branches use weighted roulette. Curved
 surfaces currently use geometric triangle normals; tessellation can be visible in
 sharp highlights. Nested absorption/scattering and relative-index dielectric interfaces are supported.
-Rough interfaces are subsequent work. Mathematical region boundaries that do not
+Rough interfaces use the surface model below. Mathematical region boundaries that do not
 change material are skipped for visibility and coverage. Transport still processes
 their segments to preserve optical length and scattering state.
 
@@ -66,23 +66,24 @@ their segments to preserve optical length and scattering state.
 `GemRigCompiler.pack()` is the only packer. The shader indexes per-role power
 multipliers by this role field (not by buffer index).
 
-## Inclusion primitive (16 floats) — analytic, inside the hull only
-| idx | field | notes |
-|---|---|---|
-| 0–2 | center (stone space) | compiler guarantees inside hull |
-| 3 | type | 0 needle (capsule), 1 disc (platelet or veil), 2 cloud (ellipsoid volume), 3 crystal (pinpoint) |
-| 4–6 | axis (unit) | needle direction / disc normal / ellipsoid major axis |
-| 7 | half-length or radius (stone units) | |
-| 8 | secondary radius | capsule radius / disc half-thickness / ellipsoid minor |
-| 9 | scatter density per mm | optical depth `tau = density * chord_mm`; `P = 1 - exp(-tau)` |
-| 10–12 | tint RGB | broad-band approximation: R→long-λ, G→mid, B→short (documented simplification) |
-| 13 | ior_delta (crystal type) | unused for v1 pinpoints |
-| 14 | style | 0 lily pad (annulus / decrepitation halo), 1 veil (irregular fracture band) |
-| 15 | reserved | |
+## Boundary surface finish (32 bytes, binding14)
+Each region has one record at the same offset as binding13. Two vec4s contain
+GGX alpha_u/alpha_v/reserved/reserved and object-space polish direction.xyz/reserved.
+The direction is projected onto the geometric tangent plane at the actual hit.
+`GemSurface` is independent of the bulk material: a cavity wall, a filled inclusion
+and the host can have different finishes. Zero slopes select a perfect interface.
 
-Clouds have no surface: the kernel samples optical depth along the ellipsoid chord
-and may HG-scatter inside it. Veil discs use a noisy outline and holey coverage.
-Crystals sparkle and continue; they do not resolve as spheres.
+Visible-normal GGX sampling and correlated Smith masking use consistent reflection
+and transmission weights (G2/G1 after proposal cancellation). Radiance transmission
+includes the squared incident/transmitted index ratio. Macroscopic hemisphere tests
+reject invalid sampled branches. Index-matched boundaries ignore finish entirely.
+The single-scattering microfacet model is accepted only as a light-polish foundation;
+strong frosting loses unresolved microfacet multiple scattering and is not enabled
+in automatic grade recipes. Furnace and directional checks: tools/surface_check.gd.
+
+The nonphysical inclusion primitive backend has been removed. Binding4 and Stone
+ranges0.zw are unassigned. Explicit geometry/material regions replace its fake discs,
+RGB-tinted clouds, and density-derived reflection probabilities.
 
 ## Stone struct (128 bytes, std430 — array `Stones`, one per distinct stone)
 | vec4 | contents |
@@ -92,12 +93,12 @@ Crystals sparkle and continue; they do not resolve as spheres.
 | 2 | scatter σ_s/mm, HG g, zoning frequency, zoning contrast |
 | 3 | zoning axis.xyz, zoning phase |
 | 4 | optic axis.xyz, fluorescence strength |
-| 5 | fluorescence nm, absorb_scale, nested_volume_present, 0 |
-| ivec4 6 | plane_offset, plane_count, incl_offset, incl_count |
+| 5 | fluorescence nm (disabled), absorb_scale, nested_volume_present, rough_present |
+| ivec4 6 | plane_offset, plane_count, reserved, reserved |
 | ivec4 7 | absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), bvh_root_plus_one, region_offset |
 
-There is no surface-condition (wear) model: the grade reaches the kernel only
-through geometry (cut), inclusions (clarity) and media (crystal).
+Explicit surface condition reaches the kernel through binding14. Automatic scalar
+clarity/surface grade mapping is still disabled; cut/crystal remain legacy recipes.
 
 Absorption buffer: concatenated 81-sample blocks (α/mm, 380–780 @ 5 nm, concentration
 applied). If `has_eray`, the e-ray block directly follows the o-ray block (offset+81).
@@ -119,11 +120,11 @@ Pixels map to instances via an equal-cell grid (push constants `grid`, `cell_px`
 grid 1×1 = single stone.
 
 ## Bindings (set 0)
-0 Planes, 1 Lights, 2 Absorb, 3 Accum (vec4 XYZ+coverage), 4 Prims, 5 Stones, 6 Insts,
+0 Planes, 1 Lights, 2 Absorb, 3 Accum (vec4 XYZ+coverage), 4 unassigned, 5 Stones, 6 Insts,
 7 legacy scatter field (`image3D` in pre-pass, `sampler3D` in trace; production policies disable it).
-Trace-only bindings: 8 guides (two vec4 per pixel: normal/depth sums, residual Y squared/Y sum/min-max facet IDs), 9 zero-scatter XYZ/coverage sums, 10 residual XYZ/coverage sums, 11 triangles, 12 BVH nodes, 13 region-to-material indices.
+Trace-only bindings: 8 guides (two vec4 per pixel: normal/depth sums, residual Y squared/Y sum/min-max facet IDs), 9 zero-scatter XYZ/coverage sums, 10 residual XYZ/coverage sums, 11 triangles, 12 BVH nodes, 13 region-to-material indices, 14 boundary finishes.
 
-Reconstruction (`gem_denoise.glsl`) uses bindings 0 input sums, 1 guides, 2 output sums, 3 zero-scatter sums. Push constants (32B): resolution ivec2, step int, sample count float, phi float, normal exponent float, vec2 padding. Step zero composites filtered residual with untouched zero-scatter light. Other steps run positive, variance/normal-guided a-trous filtering. Coverage is never filtered. This is a biased optional reconstruction; `read_xyz` and `read_linear_master` always expose the unchanged reference accumulation.
+Reconstruction (`gem_denoise.glsl`) uses bindings 0 input sums, 1 guides, 2 output sums, 3 zero-scatter sums. Push constants (32B): resolution ivec2, step int, sample count float, phi float, normal exponent float, vec2 padding. Step zero composites filtered residual with untouched zero-scatter light for smooth hosts. Rough boundaries instead reconstruct the entire stochastic signal; their ballistic buffer is zero. Other steps run positive, variance/normal-guided a-trous filtering. Coverage is never filtered. This is a biased optional reconstruction; `read_xyz` and `read_linear_master` always expose the unchanged reference accumulation.
 
 Kernel push constants (96 B): resolution, sample_base, spp, seed, max_bounces, flags
 (bit0 dispersion_split, bit1 birefringence approximation, bit2 volume, bit4 reserved, bit5 full wavelength geometry),
