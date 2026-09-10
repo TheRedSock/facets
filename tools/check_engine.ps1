@@ -24,6 +24,7 @@ if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'reconstruction_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/reconstruction_gpu_check.gd') }
 	$stages += @{ Name = 'convex_surface_check'; Args = @('--quit-after', '600', '--script', 'res://tools/convex_surface_check.gd') }
 	$stages += @{ Name = 'cleavage_backend_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_backend_check.gd') }
 	$stages += @{ Name = 'cleavage_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_gpu_check.gd') }

@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v18)
+# Lapidary kernel contract (v19)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. Wire floats
@@ -178,7 +178,7 @@ positive cross-product terms to retain narrow lobes at1:10000 anisotropy; a
 stable eigendecomposition supplies the actual local slope widths and direction.
 Empty/outside fields preserve the original finish exactly. Zero target widths
 can describe repolishing; nonzero fields on a smooth base enable boundary
-transport and full-signal reconstruction. Crystal admission conservatively
+transport and sharp/residual reconstruction. Crystal admission conservatively
 rejects any potentially rough field, even if its support may miss the specimen.
 
 Footprint dimensions and directions are specimen-space data. Fields do not
@@ -236,7 +236,7 @@ separate. An equal-cell grid maps pixels to instances; 1×1 is a single specimen
 Shared set0: 0 planes,1 lights,2 absorption,3 accumulated XYZ+coverage,4 standards,
 5 Stones,6 Instances,7 spatial volume fields,15 emission spectra.
 Trace also uses8 guides (normal/depth sums, residual Y²/Y sum/min/max facet IDs),
-9 zero-scatter sums,10 residual sums,11 triangles,12 BVH nodes,13 region materials,
+9 smooth zero-scatter sums,10 rough/scattered residual sums,11 triangles,12 BVH nodes,13 region materials,
 14 boundary finishes. Guide stride32B; other film buffers16B/pixel.
 
 Trace push80B: resolution, sample_base, spp, seed, max_bounces, flags, light_count,
@@ -261,11 +261,26 @@ Homogeneous volume uses repeated HG scattering and analytic free-flight distance
 Absorption integrates the sinusoidal concentration field analytically along each
 segment using its midpoint phase and sinc of its half-phase span. Subdividing a
 straight path preserves its optical depth, including the parallel-band limit.
-This does not fix the separate absence of persistent polarization.
+Persistent polarization is available through the admitted Mueller/crystal backends described below.
 
-Production volume reconstruction filters the stochastic residual with positive,
-variance/normal-guided à-trous weights, keeping smooth zero-scatter light intact.
-Rough interfaces reconstruct the whole stochastic signal. Coverage stays unchanged.
+Production reconstruction filters the rough/scattered residual with positive,
+variance/normal-guided à-trous weights. The sharp component contains escape
+contributions whose paths have encountered neither a rough interface nor a
+volume collision. In clear media those contributions are collected in the normal
+walk, ending sharp eligibility at the first rough interaction. In scattering
+media a separate walk integrates analytic no-collision survival and terminates
+before its first rough interface. Its detached RNG cannot alter physical samples.
+Index-matched boundaries remain invisible regardless of finish. The raw estimator
+is unchanged by component reconstruction; residual = raw − sharp, without clamping
+away negative residual samples. Only residuals are spatially filtered, then the
+unfiltered sharp component is added back. Coverage stays unchanged. A potentially
+rough field whose support misses the stone no longer causes global facet blur.
+Internal region roulette can still leave sampling noise in the sharp component;
+this is not a guarantee of noiseless complex-region transport. Wire strides and
+checkpoint v2 remain unchanged; pipeline source identities retire old factory
+outputs/checkpoints. Direct checkpoint callers must keep the same scene/policy
+and renderer, as before. `reconstruction_gpu_check.gd` checks component sums,
+inactive/uniform finish, scalar/Mueller cases, energy and progressive state.
 This is a biased optional filter. Raw accumulation and unfiltered REFERENCE remain
 available. No claim of independent physical calibration follows from self-tests.
 
@@ -571,3 +586,8 @@ includes cleavage geometry and its shared crystal frame, but excludes finish.
 `test_cleavage.gd` and `cleavage_gpu_check.gd` cover analytic cap/length checks,
 shared orientation, physical exposed-face AOVs, scalar/Mueller furnaces, binary
 jobs, checkpoint/resume, report retention and print-only reuse.
+
+Polarized host and nested-material capability checks run before shader/buffer
+allocation. Unsupported anisotropic real indices return `configuration_error`
+rather than relying on a late packing assertion. Diagnostic tests that replace
+quartz refraction with its ordinary curve are explicitly isotropic fixtures.

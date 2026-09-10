@@ -31,5 +31,12 @@ func _initialize() -> void:
 			check(output[0] + 1e-8 >= sqrt(output[1] * output[1] + output[2] * output[2] + output[3] * output[3]), "Mueller output remains a physical Stokes vector")
 	var tir := GemPolarization.apply(GemPolarization.dielectric(0.5, 1.5), PackedFloat64Array([1, 0, 1, 0]))
 	check(absf(tir[3]) > 0.6 and absf(tir[0] - 1.0) < 1e-12, "TIR retains flux and converts linear to elliptical polarization")
+	var quartz:=LapidaryStoneCompiler.compile(load("res://data/lapidary/stones/quartz.tres"))
+	var tracer:=GemTracer.new()
+	var lighting:=GemLighting.analytic(PackedFloat32Array(),Vector4(1,1,1,0))
+	check(not tracer.configure_stone(quartz,lighting,{"polarization":true}) and "isotropic real refraction" in tracer.configuration_error,"reject unsupported polarized host before device access")
+	var diamond:=LapidaryStoneCompiler.compile(load("res://data/lapidary/stones/diamond.tres"))
+	diamond["region_materials"]=[quartz]
+	check(not tracer.configure_stone(diamond,lighting,{"polarization":true}) and "isotropic real refraction" in tracer.configuration_error,"reject unsupported nested polarized material before device access")
 	print("Polarization: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)

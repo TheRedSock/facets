@@ -170,3 +170,13 @@ general boundary reference at two poses and two finishes, including optical
 images and primary geometry. `convex_surface_check.gd` checks mixed plane/mesh
 batches and rough scalar/Mueller furnace energy. Both run with `check_engine.ps1
 -Gpu`; comparison images/timings stay in ignored `artifacts/cleavage/backends/`.
+
+Localized reconstruction: `reconstruction_gpu_check.gd` is included in the GPU
+runner. It checks that raw = sharp + residual, inactive rough fields cannot
+soften facets, uniform rough first boundaries have no sharp contribution, and
+checkpoint restoration preserves the decomposition. Mueller fixtures explicitly
+use isotropic real refraction. For historical image/cost A/B, save the earlier
+`gem_pathtrace.glsl` under ignored `artifacts/reconstruction/baseline-pathtrace.glsl`
+and run `reconstruction_lookdev.gd` (or `-- --quick` for128px/512spp references).
+The normal comparison is256px/128spp against an independent2048spp raw reference;
+images, timings, errors and source hashes remain in that ignored directory.

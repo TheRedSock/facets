@@ -227,6 +227,15 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	if _polarized and _crystal:
 		configuration_error = "Choose one polarization transport backend"
 		return false
+	if _polarized:
+		for instance: Dictionary in instances:
+			configuration_error = GemMaterialCompiler.polarization_error(instance)
+			if not configuration_error.is_empty():
+				return false
+			for material: Dictionary in instance.get("region_materials", []):
+				configuration_error = GemMaterialCompiler.polarization_error(material)
+				if not configuration_error.is_empty():
+					return false
 	if _crystal:
 		for instance: Dictionary in instances:
 			configuration_error = GemCrystalAdmission.compiled_error(instance)

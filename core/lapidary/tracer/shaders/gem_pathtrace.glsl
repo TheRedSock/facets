@@ -2,7 +2,7 @@
 // Spectral transport over convex half-spaces or procedural closed meshes.
 // Four stratified wavelengths; quality policies select shared or independent
 // geometry. Repeated volume scattering is the production estimator. Optional
-// reconstruction filters only the volume residual against zero-scatter light.
+// reconstruction filters the rough/scattered residual, preserving smooth light.
 // See KERNEL_CONTRACT.md for layouts and physical limitations.
 
 #include "gem_common.glsl"
@@ -215,7 +215,9 @@ bool trace_smith_interface(inout vec3 dir, mat3 frame, vec2 alpha, float eta,
 }
 
 vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool extraordinary,
-		vec4 q, float rig_yaw, vec4 roles, int pol_mode, bool use_volume, inout uint rng) {
+		vec4 q, float rig_yaw, vec4 roles, int pol_mode, bool use_volume, bool smooth_only, inout uint rng, out vec4 sharp_radiance) {
+	sharp_radiance = vec4(0.0);
+	bool sharp_path = true;
 	PathWeight throughput = weight_initial(dir);
 	vec4 radiance = vec4(0.0);
 	uvec4 region_state = uvec4(0u);
@@ -223,7 +225,11 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 		float distance; int triangle;
 		int before_medium = region_medium(st, region_state);
 		if (!boundary_hit(st, pos, dir, distance, triangle)) {
-			if (before_medium < 0) { radiance += throughput.I * env_radiance(quat_rot(q, dir), wl, rig_yaw, roles, 0.0); }
+			if (before_medium < 0) {
+				vec4 escaped = throughput.I * env_radiance(quat_rot(q, dir), wl, rig_yaw, roles, 0.0);
+				radiance += escaped;
+				if (sharp_path) { sharp_radiance += escaped; }
+			}
 			break;
 		}
 		if (before_medium >= 0) {
@@ -232,6 +238,7 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 			float segment = min(free_flight, distance);
 			throughput=segment_weight(throughput,medium,pos,dir,segment,wl,pol_mode);
 			if (free_flight < distance) {
+				sharp_path = false;
 				pos += dir * free_flight;
 				dir = hg_sample_u(dir, medium.scatter_zone.y, vec2(rnd(rng), rnd(rng)));
 				weight_depolarize(throughput, dir);
@@ -258,6 +265,11 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 			/ geometry_index(after_medium, index_after, wl, wavelength, extraordinary, dir);
 		// An index-matched interface is invisible, regardless of its finish.
 		rough = rough && abs(eta - 1.0) > 1e-6;
+		// The sharp component contains only paths with no rough interface or
+		// volume collision. Survival through media is integrated above. Stop
+		// before sampling this interface; its entire contribution is residual.
+		if (smooth_only && rough) { break; }
+		if (rough) { sharp_path = false; }
 		mat3 frame = surface_frame(facing, finish.direction.xyz);
 		vec3 outgoing = transpose(frame) * -dir;
 		vec2 alpha = max(finish.slopes.xy, vec2(0.0001));
@@ -295,7 +307,9 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 			bool obstructed = !can_escape || physical_hit(st, pos + escape_direction * T_EPS * 4.0, escape_direction, escape_active, next_distance, next_triangle);
 			if (!obstructed) {
 				PathWeight escape_weight = escape_reflect ? reflected_weight : transmitted_weight;
-				radiance += escape_weight.I * env_radiance(quat_rot(q, escape_direction), wl, rig_yaw, roles, 0.0);
+				vec4 escaped = escape_weight.I * env_radiance(quat_rot(q, escape_direction), wl, rig_yaw, roles, 0.0);
+				radiance += escaped;
+				if (sharp_path) { sharp_radiance += escaped; }
 				throughput = escape_reflect ? transmitted_weight : reflected_weight;
 				dir = escape_reflect ? transmitted : reflected;
 				if (escape_reflect) { region_state = after; }
@@ -429,8 +443,19 @@ void main() {
 			int pol_mode = biref ? (eray ? POL_K : POL_O) : POL_UNPOL;
 
 			if (boundary_transport) {
-				radiance += mask * pass_w * trace_mesh_path(st, ro, rd, wl, wl_i, eray, q, rig_yaw, role_mult, pol_mode, FLAG_VOLUME, rng);
-				if (reconstruct_volume && !reconstruct_surface) { ballistic += mask * pass_w * trace_mesh_path(st, ro, rd, wl, wl_i, eray, q, rig_yaw, role_mult, pol_mode, false, rng); }
+				uint sharp_rng = rng;
+				vec4 sharp_path_radiance;
+				radiance += mask * pass_w * trace_mesh_path(st, ro, rd, wl, wl_i, eray, q, rig_yaw, role_mult, pol_mode, FLAG_VOLUME, false, rng, sharp_path_radiance);
+				if (reconstruct_volume) {
+					// Integrate no-collision survival instead of leaving its Bernoulli
+					// noise in the unfiltered component. Use a detached RNG stream.
+					vec4 unused_sharp;
+					ballistic += mask * pass_w * trace_mesh_path(st, ro, rd, wl, wl_i, eray, q, rig_yaw, role_mult, pol_mode, false, true, sharp_rng, unused_sharp);
+				} else if (reconstruct_surface) {
+					// Clear media need no second traversal: collect smooth escape
+					// contributions until the first rough interaction in this path.
+					ballistic += mask * pass_w * sharp_path_radiance;
+				}
 				continue;
 			}
 			float eta_in = 1.0 / n_geom;
