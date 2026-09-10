@@ -442,9 +442,9 @@ static func _ladder_key(file: String) -> String:
 
 
 static func _stone_invalid_reason(stone: GemStone) -> String:
-	if stone.species == null:
+	if stone.material.species == null:
 		return "no species"
-	var ch := stone.chromophore
+	var ch := stone.material.chromophore
 	if ch != null and not ch.absorption_mm.is_empty() and ch.absorption_mm.size() != 81:
 		return "absorption curve has %d samples - want 81" % ch.absorption_mm.size()
 	if ch != null and not ch.absorption_eray_mm.is_empty() and ch.absorption_eray_mm.size() != 81:
@@ -553,8 +553,8 @@ static func _stone(sp: GemSpecies, ch: GemChromophore, g: Array, stone_seed: int
 	grade.surface = g[2]
 	grade.crystal = g[3]
 	var st := GemStone.new()
-	st.species = sp
-	st.chromophore = ch
+	st.material.species = sp
+	st.material.chromophore = ch
 	st.grade = grade
 	st.seed = stone_seed
 	st.size_mm = size

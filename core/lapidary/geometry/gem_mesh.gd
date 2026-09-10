@@ -5,13 +5,22 @@ extends RefCounted
 var vertices := PackedVector3Array()
 var indices := PackedInt32Array()
 var facet_ids := PackedInt32Array()
+## Closed region identity. Zero is the host; positive IDs select nested media.
+var region_ids := PackedInt32Array()
 
 func triangle_count() -> int:
 	return indices.size() / 3
 
-func add_triangle(a: int, b: int, c: int, facet: int) -> void:
+func add_triangle(a: int, b: int, c: int, facet: int, region := 0) -> void:
 	indices.append_array(PackedInt32Array([a, b, c]))
 	facet_ids.append(facet)
+	region_ids.append(region)
+
+func append_region(source: GemMesh, region: int) -> void:
+	var offset := vertices.size()
+	vertices.append_array(source.vertices)
+	for triangle in source.triangle_count():
+		add_triangle(offset + source.indices[triangle * 3], offset + source.indices[triangle * 3 + 1], offset + source.indices[triangle * 3 + 2], source.facet_ids[triangle], region)
 
 func signed_volume() -> float:
 	var volume := 0.0
@@ -21,7 +30,7 @@ func signed_volume() -> float:
 
 func validate() -> PackedStringArray:
 	var errors := PackedStringArray()
-	if indices.size() % 3 != 0 or facet_ids.size() != triangle_count():
+	if indices.size() % 3 != 0 or facet_ids.size() != triangle_count() or region_ids.size() != triangle_count():
 		errors.append("Triangle/facet buffer sizes disagree")
 		return errors
 	if vertices.size() < 4 or triangle_count() < 4:
@@ -57,4 +66,4 @@ func validate() -> PackedStringArray:
 	return errors
 
 func fingerprint() -> String:
-	return GemContentIdentity.digest([vertices, indices, facet_ids])
+	return GemContentIdentity.digest([vertices, indices, facet_ids, region_ids])

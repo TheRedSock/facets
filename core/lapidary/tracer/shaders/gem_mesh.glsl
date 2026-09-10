@@ -64,10 +64,50 @@ vec3 mesh_normal(int index) {
 	return normalize(cross(triangle.b.xyz - triangle.a.xyz, triangle.c.xyz - triangle.a.xyz));
 }
 
+layout(set = 0, binding = 13, std430) readonly buffer Regions { int region_materials[]; };
+
+int region_medium(Stone stone, uvec4 region_state) {
+	if ((region_state.x & 1u) == 0u) { return -1; }
+	for (int word = 3; word >= 0; word--) {
+		if (region_state[word] != 0u) {
+			int region = word * 32 + findMSB(region_state[word]);
+			return region_materials[stone.ranges1.w + region];
+		}
+	}
+	return -1;
+}
+
+uvec4 cross_region(uvec4 region_state, int triangle, vec3 direction) {
+	int region = triangles[triangle].meta.w;
+	uint bit = 1u << uint(region % 32);
+	if (dot(direction, mesh_normal(triangle)) < 0.0) { region_state[region / 32] |= bit; }
+	else { region_state[region / 32] &= ~bit; }
+	return region_state;
+}
+
+// Skip mathematical boundaries that do not change the physical medium.
+// Used for primary coverage and visibility; transport processes each raw event
+// separately so a sampled volume collision preserves the correct region_state set.
+bool physical_hit(Stone stone, vec3 origin, vec3 direction, uvec4 region_state,
+		out float distance, out int triangle) {
+	distance = 0.0;
+	for (int event = 0; event < 4096; event++) {
+		float segment;
+		if (!mesh_hit(stone.ranges1.z - 1, origin, direction, segment, triangle)) { return false; }
+		uvec4 after = cross_region(region_state, triangle, direction);
+		distance += segment;
+		if (region_medium(stone, region_state) != region_medium(stone, after)) { return true; }
+		region_state = after;
+		origin += direction * (segment + T_EPS * 4.0);
+		distance += T_EPS * 4.0;
+	}
+	return false;
+}
+
 bool body_entry(Stone stone, vec3 origin, vec3 direction, out float distance, out int surface) {
 	if (stone.ranges1.z == 0) { return hull_entry(stone.ranges0.x, stone.ranges0.y, origin, direction, distance, surface); }
 	int triangle;
-	bool hit = mesh_hit(stone.ranges1.z - 1, origin, direction, distance, triangle);
+	bool hit = physical_hit(stone, origin, direction, uvec4(0u), distance, triangle);
 	surface = -1 - triangle;
 	return hit;
 }

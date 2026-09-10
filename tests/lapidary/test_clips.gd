@@ -45,7 +45,7 @@ func _make_stone(seed_val := 1, size_mm := 5.0) -> GemStone:
 	species.sellmeier_c_um2 = Vector3(0.0047, 0.0135, 97.93)
 	var stone := GemStone.new()
 	stone.stone_id = &"test_stone"
-	stone.species = species
+	stone.material.species = species
 	stone.seed = seed_val
 	stone.size_mm = size_mm
 	return stone

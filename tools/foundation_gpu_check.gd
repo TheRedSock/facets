@@ -67,6 +67,7 @@ func _initialize() -> void:
 	check(alpha_equal, "reconstruction preserves coverage exactly")
 	_analytic_interfaces(tracer, inst, lights, policy)
 	_mesh_checks(tracer, inst, lights, policy)
+	_boundary_checks(tracer, inst, lights, policy)
 	# Changes to framing or print white balance cannot invalidate volume light.
 	policy["field_exits"] = 4
 	policy["field_grid"] = 4
@@ -172,6 +173,61 @@ func _mesh_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFloat32
 			actual += xyz[(y * 32 + x) * 4 + 1] / 16.0
 	var expected := exp(-0.2 * (0.6 + 0.6))
 	check(absf(actual - expected) < 0.001, "concave reentry includes both absorbing chords: %.6f vs %.6f" % [actual, expected])
+
+func _boundary_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
+	var boxes := load("res://tests/lapidary/test_boundaries.gd")
+	var inst := instance.duplicate(true)
+	inst["planes"] = PackedFloat32Array()
+	inst["size_mm"] = 1.0
+	inst["sellmeier_b"] = Vector3.ZERO
+	inst["sellmeier_c"] = Vector3.ZERO
+	inst["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
+	inst["absorption"].fill(0.2)
+	var boundaries := GemBoundarySet.new()
+	check(boundaries.add(boxes.box(Vector3(-1, -1, -1), Vector3(1, 1, 1)), 0), "boundary host validates")
+	boundaries.add(boxes.box(Vector3(-0.8, -0.8, -0.5), Vector3(0.8, 0.8, 0.1)), -1)
+	boundaries.add(boxes.box(Vector3(-0.7, -0.7, -0.1), Vector3(0.7, 0.7, 0.5)), -1)
+	inst["boundaries"] = boundaries
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(1024)
+	check(absf(_center_y(tracer) - exp(-0.2)) < 0.001, "overlapping cavities subtract union, with true entry and exit")
+	boundaries.add(boxes.box(Vector3(-0.5, -0.5, -0.2), Vector3(0.5, 0.5, 0.2)), 1)
+	var filling := instance.duplicate(true)
+	filling["sellmeier_b"] = Vector3.ZERO
+	filling["sellmeier_c"] = Vector3.ZERO
+	filling["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
+	filling["absorption"].fill(0.4)
+	inst["region_materials"] = [filling]
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(1024)
+	check(absf(_center_y(tracer) - exp(-0.2 - 0.4 * 0.4)) < 0.001, "nested filling uses its own absorption and physical thickness")
+	# A through-void removes primary coverage. Its mathematical surface above
+	# the host is not a visible floating primitive.
+	boundaries.add(boxes.box(Vector3(-0.3, -0.3, -1.2), Vector3(0.3, 0.3, 1.2)), -1)
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(128)
+	var xyz := tracer.read_xyz()
+	var coverage := 0.0
+	for y in range(14, 18):
+		for x in range(14, 18):
+			coverage += xyz[(y * 32 + x) * 4 + 3]
+	check(coverage == 0.0, "subtracted material changes silhouette and coverage")
+	# Clear nested dielectrics in isotropic illumination preserve equilibrium.
+	boundaries = GemBoundarySet.new()
+	boundaries.add(boxes.box(Vector3(-1, -1, -1), Vector3(1, 1, 1)), 0)
+	boundaries.add(boxes.box(Vector3(-0.7, -0.7, -0.4), Vector3(0.7, 0.7, 0.4)), 1)
+	inst["boundaries"] = boundaries
+	inst["sellmeier_b"] = Vector3(1.25, 0, 0)
+	inst["absorption"].fill(0.0)
+	filling["sellmeier_b"] = Vector3(0.7689, 0, 0) # n=1.33
+	filling["absorption"].fill(0.0)
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(1024)
+	check(absf(_center_y(tracer) - 1.0) < 0.001, "air/host/filling dielectric interfaces preserve equilibrium")
 
 func _print_checks(tracer: GemTracer) -> void:
 	var values := PackedFloat32Array()

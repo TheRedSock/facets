@@ -24,50 +24,39 @@ const WL_C := 656.3
 
 
 static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary:
-	assert(stone != null and stone.species != null)
-	var species := stone.species
+	assert(stone != null and stone.material.species != null)
+	var species := stone.material.species
 	var grade := stone.grade if stone.grade != null else GemGrade.new()
 	var cut_q := grade.cut if cut_quality_override < 0.0 else cut_quality_override
 	var n_d := species.ior_at(589.3)
 
 	var geometry := _compile_cut(stone, n_d, cut_q)
 
-	var absorption := PackedFloat32Array()
-	absorption.resize(81)
-	if stone.chromophore != null and not stone.chromophore.is_colorless():
-		var curve := stone.chromophore.absorption_mm
-		for i in 81:
-			absorption[i] = curve[i] * stone.chromophore.concentration
-	var absorption_eray := PackedFloat32Array()
-	if stone.chromophore != null and not stone.chromophore.absorption_eray_mm.is_empty():
-		absorption_eray = stone.chromophore.absorption_eray_mm.duplicate()
-		for i in absorption_eray.size():
-			absorption_eray[i] *= stone.chromophore.concentration
-
+	var bulk := GemMaterialCompiler.compile(stone.material)
 	var rng_state := [int(stone.seed) * 2654435761 + 1013904223]
-	var signed_dn := species.birefringence * (1.0 if species.uniaxial_positive else -1.0)
-
+	
 	var compiled := {
 		"planes": geometry["planes"],
 		"facet_ids": geometry.get("facet_ids", PackedInt32Array()),
 		"outline": geometry.get("outline", PackedVector2Array()),
 		"inclusions": _place_inclusions(species, grade, geometry["planes"], stone.size_mm, rng_state),
-		"absorption": absorption,
-		"absorption_eray": absorption_eray,
+		"absorption": bulk["absorption"],
+		"absorption_eray": bulk["absorption_eray"],
 		"sellmeier_b": species.sellmeier_b,
 		"sellmeier_c": species.sellmeier_c_um2,
 		"size_mm": stone.size_mm,
 		"seed": stone.seed,
-		"scatter": _crystal_to_scatter(species, grade),
+		"scatter": bulk["scatter"] if stone.material.scatter_per_mm >= 0.0 else _crystal_to_scatter(species, grade),
 		"zoning": _crystal_to_zoning(species, grade, rng_state),
-		"birefringence": signed_dn,
+		"birefringence": bulk["birefringence"],
 		"optic_axis": _resolve_optic_axis(stone).normalized(),
-		"fluorescence": _resolve_fluorescence(species, stone.chromophore),
+		"fluorescence": _resolve_fluorescence(species, stone.material.chromophore),
 		"dispersion_strong": dispersion_bg(species) >= 0.025,
 		"fingerprint": stone.fingerprint(),
 	}
 	if geometry.has("mesh"):
 		compiled["mesh"] = geometry["mesh"]
+	GemDefectCompiler.apply(compiled, stone.condition, stone.size_mm)
 	return compiled
 
 
@@ -78,7 +67,7 @@ static func dispersion_bg(species: GemSpecies) -> float:
 static func _resolve_optic_axis(stone: GemStone) -> Vector3:
 	if stone.optic_axis_override != Vector3.ZERO:
 		return stone.optic_axis_override
-	return stone.species.optic_axis_stone
+	return stone.material.species.optic_axis_stone
 
 
 ## Fluorescence is chromophore-gated: the glow comes from the coloring ion

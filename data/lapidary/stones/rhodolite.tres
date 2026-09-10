@@ -8,6 +8,13 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="material_script"]
+
+[sub_resource type="Resource" id="Material"]
+script = ExtResource("material_script")
+species = ExtResource("5_bc0qg")
+chromophore = ExtResource("1_biupn")
+
 [sub_resource type="Resource" id="Shape"]
 script = ExtResource("shape_script")
 outline = &"oval"
@@ -18,9 +25,8 @@ sectors = 8
 [resource]
 script = ExtResource("4_6ernq")
 shape = SubResource("Shape")
+material = SubResource("Material")
 stone_id = &"rhodolite"
-species = ExtResource("5_bc0qg")
-chromophore = ExtResource("1_biupn")
 cut = ExtResource("2_87xnr")
 grade = ExtResource("3_wtnro")
 seed = 53

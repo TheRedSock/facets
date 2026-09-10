@@ -1,4 +1,4 @@
-# Lapidary Kernel Contract (v5 — procedural geometry, spectral transport and linear reconstruction)
+# Lapidary Kernel Contract (v6 — nested material boundaries and procedural conditions)
 
 The single interface between the data model and the GPU tracer. Everything that
 renders — designer preview, clip bake, live board draws, evaluation sheets —
@@ -30,8 +30,15 @@ coordinates, indices, nondegeneracy, edge incidence/orientation and positive vol
 It does not yet certify arbitrary global self-intersections.
 
 Triangle (64B): vec4 a, b, c (xyz vertices, w reserved), ivec4 metadata
-(facet ID, inside medium 0, outside medium -1, source triangle ID). Medium fields
-are reserved: this version supports one host dielectric and air.
+(facet ID, reserved, reserved, region ID). Region IDs are local to each specimen.
+Binding13 contains int32 material indices, addressed by Stone.ranges1.w + region.
+Index -1 means air, otherwise it addresses the shared Stones material array.
+Host material records are first (one per authored instance), then nested materials.
+Each ray tracks up to128 active closed regions in a uvec4. Region0 is the host;
+all other regions are clipped to it. The highest active region overrides lower
+ones. Overlapping voids therefore subtract their union; a higher filled region
+can override a cavity. Coincident boundaries are unsupported: use overlap or a
+finite gap. Subpixel populations should use effective media, not unbounded regions.
 Node (48B): vec4 low/high bounds, ivec4 left/right/first/count. Count=0 denotes
 an internal node. Child and triangle indices are absolute in their shared buffers.
 The deterministic median BVH has four triangles per leaf; GPU traversal stack=64.
@@ -41,7 +48,10 @@ General transport tracks air/host segments and handles external re-entry.
 Deterministic Fresnel escape splitting is only used after visibility proves a
 branch reaches the environment; coupled branches use weighted roulette. Curved
 surfaces currently use geometric triangle normals; tessellation can be visible in
-sharp highlights. Nested media and rough interfaces are subsequent work.
+sharp highlights. Nested absorption/scattering and relative-index dielectric interfaces are supported.
+Rough interfaces are subsequent work. Mathematical region boundaries that do not
+change material are skipped for visibility and coverage. Transport still processes
+their segments to preserve optical length and scattering state.
 
 ## Light (8 floats) — analytic rig, world space
 | idx | field |
@@ -82,9 +92,9 @@ Crystals sparkle and continue; they do not resolve as spheres.
 | 2 | scatter σ_s/mm, HG g, zoning frequency, zoning contrast |
 | 3 | zoning axis.xyz, zoning phase |
 | 4 | optic axis.xyz, fluorescence strength |
-| 5 | fluorescence nm, absorb_scale, 0, 0 |
+| 5 | fluorescence nm, absorb_scale, nested_volume_present, 0 |
 | ivec4 6 | plane_offset, plane_count, incl_offset, incl_count |
-| ivec4 7 | absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), bvh_root_plus_one, 0 |
+| ivec4 7 | absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), bvh_root_plus_one, region_offset |
 
 There is no surface-condition (wear) model: the grade reaches the kernel only
 through geometry (cut), inclusions (clarity) and media (crystal).
@@ -111,7 +121,7 @@ grid 1×1 = single stone.
 ## Bindings (set 0)
 0 Planes, 1 Lights, 2 Absorb, 3 Accum (vec4 XYZ+coverage), 4 Prims, 5 Stones, 6 Insts,
 7 legacy scatter field (`image3D` in pre-pass, `sampler3D` in trace; production policies disable it).
-Trace-only bindings: 8 guides (two vec4 per pixel: normal/depth sums, residual Y squared/Y sum/min-max facet IDs), 9 zero-scatter XYZ/coverage sums, 10 residual XYZ/coverage sums, 11 triangles, 12 BVH nodes.
+Trace-only bindings: 8 guides (two vec4 per pixel: normal/depth sums, residual Y squared/Y sum/min-max facet IDs), 9 zero-scatter XYZ/coverage sums, 10 residual XYZ/coverage sums, 11 triangles, 12 BVH nodes, 13 region-to-material indices.
 
 Reconstruction (`gem_denoise.glsl`) uses bindings 0 input sums, 1 guides, 2 output sums, 3 zero-scatter sums. Push constants (32B): resolution ivec2, step int, sample count float, phi float, normal exponent float, vec2 padding. Step zero composites filtered residual with untouched zero-scatter light. Other steps run positive, variance/normal-guided a-trous filtering. Coverage is never filtered. This is a biased optional reconstruction; `read_xyz` and `read_linear_master` always expose the unchanged reference accumulation.
 
@@ -203,3 +213,13 @@ family + driver. NOT bit-exact across vendors — cache keys carry
 tolerances, never bit equality.
 
 Production policies use repeated scattering with no post-scatter environment blur. Full spectral geometry splits all four sampled wavelengths, not just high-dispersion species. `REFERENCE` is unfiltered but does not cure the still-approximate anisotropic model. Fluorescence is not rendered. `accumulate()` returns total wall time including any field work; `profile()` separates trace, field, reconstruction, and print/readback.
+
+## Authoring boundary
+`GemMaterial` owns reusable species/chromophore and optional bulk scattering.
+`GemShape` owns outline/profile/cut-independent dimensions. `GemCondition` owns
+realized millimeter-scale `GemDefect` boundaries. The old `GemGrade` remains a
+catalog recipe for cut proportions and haze, not a physical or gemological grade.
+Automatic clarity/surface recipes remain disabled. Explicit chip/fracture/crystal
+boundaries can be authored and filled with another GemMaterial. Their morphology
+is procedural, not a stress or crystal-growth simulation; current fractures have
+not passed low-SPP visual acceptance. Surface polish fields are not yet rendered.

@@ -78,7 +78,7 @@ func _exit_tree() -> void:
 func _load_libraries() -> void:
 	for path in _list_tres(STONES_DIR):
 		var stone := load(path) as GemStone
-		if stone != null and stone.species != null:
+		if stone != null and stone.material.species != null:
 			_stones.append(stone)
 		else:
 			push_warning("Atelier: skipping unloadable stone %s" % path)

@@ -256,7 +256,7 @@ func _load_stone(tile_id: StringName) -> GemStone:
 	if not ResourceLoader.exists(path):
 		return null
 	var stone := load(path) as GemStone
-	if stone == null or stone.species == null:
+	if stone == null or stone.material.species == null:
 		return null
 	return stone
 
@@ -271,7 +271,7 @@ func _smoke_stone() -> GemStone:
 	species.hardness_mohs = 7.0
 	var stone := GemStone.new()
 	stone.stone_id = &"smoke_quartz"
-	stone.species = species
+	stone.material.species = species
 	stone.silhouette = &"round"
 	stone.seed = 7
 	stone.size_mm = 5.0

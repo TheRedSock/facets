@@ -4,8 +4,8 @@ extends Resource
 ## consumers (sprite clips, live 3D) are fed. Everything else is derived.
 
 @export var stone_id: StringName        # == tile_id (t1_quartz ... t8_diamond)
-@export var species: GemSpecies
-@export var chromophore: GemChromophore # null = colorless
+@export var material: GemMaterial = GemMaterial.new()
+@export var condition: GemCondition = GemCondition.new()
 @export var cut: Resource               # GemCutTemplate (owned by core/lapidary/cut/)
 @export var shape: GemShape = GemShape.new()
 @export var grade: GemGrade

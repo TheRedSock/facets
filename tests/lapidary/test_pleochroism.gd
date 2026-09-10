@@ -87,13 +87,13 @@ func _test_species_optic_axes() -> void:
 func _test_ruby_compiler() -> void:
 	print("[ruby compile]")
 	var ruby := load("res://data/lapidary/stones/ruby.tres") as GemStone
-	_check(ruby != null and ruby.species != null, "ruby stone loads")
-	if ruby == null or ruby.species == null:
+	_check(ruby != null and ruby.material.species != null, "ruby stone loads")
+	if ruby == null or ruby.material.species == null:
 		return
 	var inst := LapidaryStoneCompiler.compile(ruby)
 	var optic: Vector3 = inst["optic_axis"]
-	_check(optic.distance_to(ruby.species.optic_axis_stone.normalized()) < 1e-5,
+	_check(optic.distance_to(ruby.material.species.optic_axis_stone.normalized()) < 1e-5,
 		"compiled optic_axis matches species default")
 	var dn: float = inst["birefringence"]
-	_check(dn < 0.0 and is_equal_approx(dn, -ruby.species.birefringence),
+	_check(dn < 0.0 and is_equal_approx(dn, -ruby.material.species.birefringence),
 		"ruby signed birefringence is negative (uniaxial−)")

@@ -192,11 +192,11 @@ func _test_stones(stones: Dictionary) -> void:
 	var fingerprints := {}
 	var size_by_tier := {}
 	for path: String in stones:
-		var stone: Resource = stones[path]
+		var stone: GemStone = stones[path]
 		var label := path.get_file()
 		var stone_id: StringName = stone.get("stone_id")
 
-		_check(stone.get("species") != null, "%s: species must be set" % label)
+		_check(stone.material.species != null, "%s: species must be set" % label)
 		_check(stone.get("grade") != null, "%s: grade must be set" % label)
 		var cut: Resource = stone.get("cut")
 		_check(cut != null, "%s: cut template must be assigned" % label)
@@ -205,13 +205,13 @@ func _test_stones(stones: Dictionary) -> void:
 			var is_step := cut.resource_path.get_file().begins_with("step")
 			_check(is_step == want_step,
 				"%s: expected %s cut, got %s" % [label, "step" if want_step else "brilliant", cut.resource_path.get_file()])
-		_check(stone.get("silhouette") != &"", "%s: silhouette must be set" % label)
+		_check(stone.shape != null and stone.shape.outline != &"", "%s: silhouette must be set" % label)
 		var size_mm: float = stone.get("size_mm")
 		_check(size_mm >= 4.4 and size_mm <= 5.6, "%s: size_mm %.2f outside 4.5-5.5 band" % [label, size_mm])
 		if stone_id in COLORLESS_STONES:
-			_check(stone.get("chromophore") == null, "%s: must be colorless (null chromophore)" % label)
+			_check(stone.material.chromophore == null, "%s: must be colorless (null chromophore)" % label)
 		else:
-			_check(stone.get("chromophore") != null, "%s: colored stone needs a chromophore" % label)
+			_check(stone.material.chromophore != null, "%s: colored stone needs a chromophore" % label)
 
 		# stone_id must be a real tile_id, and the filename must match it.
 		_check(label.trim_suffix(".tres") == String(stone_id),
@@ -246,7 +246,7 @@ func _test_stones(stones: Dictionary) -> void:
 ## the .tres round-trip (typed archetype arrays, curves, grade axes) end-to-end.
 func _test_compiler_consumption(stones: Dictionary) -> void:
 	for path: String in stones:
-		var stone: Resource = stones[path]
+		var stone: GemStone = stones[path]
 		var label := path.get_file()
 		var instance: Dictionary = LapidaryStoneCompiler.compile(stone)
 		_check(instance["planes"].size() > 0 and instance["planes"].size() % 8 == 0,

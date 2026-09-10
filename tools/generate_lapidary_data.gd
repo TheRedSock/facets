@@ -547,8 +547,8 @@ func _build_stones(species: Dictionary, chromophores: Dictionary, grades: Dictio
 	for row: Array in STONE_TABLE:
 		var stone: Resource = StoneScript.new()
 		stone.stone_id = row[0]
-		stone.species = species[row[1]]
-		stone.chromophore = chromophores[row[2]] if row[2] != &"" else null
+		stone.material.species = species[row[1]]
+		stone.material.chromophore = chromophores[row[2]] if row[2] != &"" else null
 		stone.grade = grades[row[3]]
 		stone.shape = GemShape.faceted_outline(row[4])
 		stone.cut = cuts[row[5]]
@@ -688,9 +688,9 @@ const BL_KEYS := {
 func _print_beer_lambert(chromophores: Dictionary, stones: Array) -> void:
 	print("\nBeer-Lambert check, T2 = exp(-alpha * 2 * size_mm), T4 = 4×size TIR path:")
 	for stone: Resource in stones:
-		if stone.chromophore == null:
+		if stone.material.chromophore == null:
 			continue
-		var chromo: Resource = stone.chromophore
+		var chromo: Resource = stone.material.chromophore
 		var keys: Array = BL_KEYS.get(chromo.chromophore_id, [])
 		var parts := PackedStringArray()
 		for wl: float in keys:

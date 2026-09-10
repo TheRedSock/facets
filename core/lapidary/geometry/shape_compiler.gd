@@ -9,84 +9,94 @@ static func from_hull(planes: PackedFloat32Array, identities := PackedInt32Array
 	if not Validator.check_bounded(planes):
 		return mesh
 	var cells := {}
-	var faces: Array[Dictionary] = []
 	for face in planes.size() / 8:
-		var frame := []
-		var polygon := Validator._face_polygon(planes, planes.size() / 8, face, frame, 0.0)
+		var polygon := _clip_face64(planes, face)
 		var ring := PackedInt32Array()
-		for point in polygon:
-			var position: Vector3 = frame[2] + frame[0] * point.x + frame[1] * point.y
-			position = _canonical_vertex(planes, position)
-			var index := _weld(mesh, position, cells)
-			if ring.is_empty() or ring[-1] != index:
+		for vertex: Dictionary in polygon:
+			var point: Array = vertex["point"]
+			var index := _weld(mesh, Vector3(point[0], point[1], point[2]), cells)
+			if not ring.has(index):
 				ring.append(index)
-		if ring.size() > 1 and ring[0] == ring[-1]:
-			ring.remove_at(ring.size() - 1)
-		var facet := identities[face] if identities.size() == planes.size() / 8 else face
-		if ring.size() >= 3:
-			faces.append({"ring": ring, "facet": facet})
-	var corner_count := mesh.vertices.size()
-	for face: Dictionary in faces:
-		var original: PackedInt32Array = face["ring"]
-		var ring := PackedInt32Array()
-		# A nearly vanishing facet can introduce a collinear corner on only
-		# one neighbor's clipped polygon. Split both sides at every shared
-		# corner before triangulation, so no T-junction remains.
-		for edge in original.size():
-			var a := original[edge]
-			var b := original[(edge + 1) % original.size()]
-			var delta := mesh.vertices[b] - mesh.vertices[a]
-			var candidates := []
-			for index in corner_count:
-				if index == a or index == b:
-					continue
-				var t := (mesh.vertices[index] - mesh.vertices[a]).dot(delta) / delta.length_squared()
-				if t <= 0.0 or t >= 1.0:
-					continue
-				if mesh.vertices[index].distance_squared_to(mesh.vertices[a] + delta * t) < WELD_EPS * WELD_EPS:
-					candidates.append([t, index])
-			candidates.sort_custom(func(a_value: Array, b_value: Array) -> bool: return a_value[0] < b_value[0])
-			ring.append(a)
-			for candidate: Array in candidates:
-				ring.append(candidate[1])
+		if ring.size() < 3:
+			continue
 		var center := Vector3.ZERO
 		for index in ring:
 			center += mesh.vertices[index] / ring.size()
 		var center_index := mesh.vertices.size()
 		mesh.vertices.append(center)
+		var facet := identities[face] if identities.size() == planes.size() / 8 else face
 		for edge in ring.size():
-			mesh.add_triangle(center_index, ring[edge], ring[(edge + 1) % ring.size()], face["facet"])
+			mesh.add_triangle(center_index, ring[edge], ring[(edge + 1) % ring.size()], facet)
 	return mesh
 
-## Independently clipped faces accumulate float32 frame error. Resolve each
-## corner from a common, well-conditioned triple of nearby support planes
-## with scalar float64 arithmetic before welding. All incident faces then
-## refer to the same physical intersection, rather than their own projection.
-static func _canonical_vertex(planes: PackedFloat32Array, approximate: Vector3) -> Vector3:
-	var nearby: Array[int] = []
-	for index in planes.size() / 8:
-		var offset := index * 8
-		var distance := planes[offset] * approximate.x + planes[offset + 1] * approximate.y + planes[offset + 2] * approximate.z - planes[offset + 3]
-		if absf(distance) < 0.00002:
-			nearby.append(index)
-	var best := 0.0
-	var result := approximate
-	for ai in nearby.size():
-		for bi in range(ai + 1, nearby.size()):
-			for ci in range(bi + 1, nearby.size()):
-				var a := nearby[ai] * 8
-				var b := nearby[bi] * 8
-				var c := nearby[ci] * 8
-				var bc := _cross64(planes, b, c)
-				var determinant := planes[a] * bc[0] + planes[a + 1] * bc[1] + planes[a + 2] * bc[2]
-				if absf(determinant) <= maxf(best, 1.0e-12):
-					continue
-				best = absf(determinant)
-				var ca := _cross64(planes, c, a)
-				var ab := _cross64(planes, a, b)
-				for axis in 3:
-					result[axis] = (planes[a + 3] * bc[axis] + planes[b + 3] * ca[axis] + planes[c + 3] * ab[axis]) / determinant
-	return result
+## Scalar float64 clipping retains the support planes of each edge. Shared
+## corners are computed from exactly the same plane triple on both faces,
+## avoiding independent float32 frame projections and proximity-based guesses.
+static func _clip_face64(planes: PackedFloat32Array, face: int) -> Array[Dictionary]:
+	var offset := face * 8
+	var normal := Vector3(planes[offset], planes[offset + 1], planes[offset + 2])
+	var tangent := normal.cross(Vector3.BACK)
+	if tangent.length_squared() < 1.0e-6:
+		tangent = normal.cross(Vector3.RIGHT)
+	tangent = tangent.normalized()
+	var second := normal.cross(tangent).normalized()
+	var n2: float = planes[offset] * planes[offset] + planes[offset + 1] * planes[offset + 1] + planes[offset + 2] * planes[offset + 2]
+	var extent := 8.0
+	for i in planes.size() / 8:
+		extent = maxf(extent, absf(planes[i * 8 + 3]) * 8.0)
+	var polygon: Array[Dictionary] = []
+	for corner in 4:
+		var x := -extent if corner == 0 or corner == 3 else extent
+		var y := -extent if corner < 2 else extent
+		var point := []
+		for axis in 3:
+			point.append(planes[offset + axis] * planes[offset + 3] / n2 + tangent[axis] * x + second[axis] * y)
+		polygon.append({"point": point, "supports": Vector2i(-1 - ((corner + 3) % 4), -1 - corner)})
+	for clip in planes.size() / 8:
+		if clip == face:
+			continue
+		var clipped: Array[Dictionary] = []
+		for edge in polygon.size():
+			var a := polygon[edge]
+			var b := polygon[(edge + 1) % polygon.size()]
+			var da := _distance64(planes, clip, a["point"])
+			var db := _distance64(planes, clip, b["point"])
+			if da <= 0.0:
+				clipped.append(a)
+			if (da <= 0.0 and db > 0.0) or (da > 0.0 and db <= 0.0):
+				var sa: Vector2i = a["supports"]
+				var sb: Vector2i = b["supports"]
+				var shared := sa.x if sa.x == sb.x or sa.x == sb.y else sa.y
+				var point := _triple64(planes, face, shared, clip) if shared >= 0 else []
+				if point.is_empty():
+					for axis in 3:
+						point.append(a["point"][axis] + (b["point"][axis] - a["point"][axis]) * da / (da - db))
+				clipped.append({"point": point, "supports": Vector2i(shared, clip)})
+		polygon = clipped
+		if polygon.size() < 3:
+			return []
+	return polygon
+
+static func _distance64(planes: PackedFloat32Array, plane: int, point: Array) -> float:
+	var i := plane * 8
+	return planes[i] * point[0] + planes[i + 1] * point[1] + planes[i + 2] * point[2] - planes[i + 3]
+
+static func _triple64(planes: PackedFloat32Array, first: int, second: int, third: int) -> Array:
+	var ids := [first, second, third]
+	ids.sort()
+	var a: int = ids[0] * 8
+	var b: int = ids[1] * 8
+	var c: int = ids[2] * 8
+	var bc := _cross64(planes, b, c)
+	var determinant := planes[a] * bc[0] + planes[a + 1] * bc[1] + planes[a + 2] * bc[2]
+	if absf(determinant) < 1.0e-18:
+		return []
+	var ca := _cross64(planes, c, a)
+	var ab := _cross64(planes, a, b)
+	var point := []
+	for axis in 3:
+		point.append((planes[a + 3] * bc[axis] + planes[b + 3] * ca[axis] + planes[c + 3] * ab[axis]) / determinant)
+	return point
 
 static func _cross64(planes: PackedFloat32Array, a: int, b: int) -> Array[float]:
 	return [planes[a + 1] * planes[b + 2] - planes[a + 2] * planes[b + 1],

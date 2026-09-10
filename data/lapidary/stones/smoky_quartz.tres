@@ -8,6 +8,13 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="material_script"]
+
+[sub_resource type="Resource" id="Material"]
+script = ExtResource("material_script")
+species = ExtResource("5_2tp88")
+chromophore = ExtResource("1_ctuip")
+
 [sub_resource type="Resource" id="Shape"]
 script = ExtResource("shape_script")
 outline = &"square"
@@ -18,9 +25,8 @@ sectors = 8
 [resource]
 script = ExtResource("4_oq32d")
 shape = SubResource("Shape")
+material = SubResource("Material")
 stone_id = &"smoky_quartz"
-species = ExtResource("5_2tp88")
-chromophore = ExtResource("1_ctuip")
 cut = ExtResource("2_d2pp0")
 grade = ExtResource("3_bh5e2")
 seed = 43

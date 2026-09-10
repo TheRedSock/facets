@@ -47,7 +47,7 @@ func _initialize() -> void:
 		var col := 0
 		for sid: String in stone_ids:
 			var stone := load(sid if sid.contains("/") else "res://data/lapidary/stones/%s.tres" % sid) as GemStone
-			if stone == null or stone.species == null:
+			if stone == null or stone.material.species == null:
 				print("  stone %s FAILED TO LOAD" % sid)
 				failures += 1
 				col += 1

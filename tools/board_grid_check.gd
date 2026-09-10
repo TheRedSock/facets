@@ -118,8 +118,8 @@ static func _stone(sp: GemSpecies, ch: GemChromophore, g: Array, seed: int, size
 	grade.surface = g[2]
 	grade.crystal = g[3]
 	var st := GemStone.new()
-	st.species = sp
-	st.chromophore = ch
+	st.material.species = sp
+	st.material.chromophore = ch
 	st.grade = grade
 	st.seed = seed
 	st.size_mm = size

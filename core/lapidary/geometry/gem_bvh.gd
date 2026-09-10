@@ -78,7 +78,7 @@ func intersect(origin: Vector3, direction: Vector3, min_t := 1.0e-6, max_t := IN
 	var a := mesh.vertices[mesh.indices[hit * 3]]
 	var b := mesh.vertices[mesh.indices[hit * 3 + 1]]
 	var c := mesh.vertices[mesh.indices[hit * 3 + 2]]
-	return {"t": nearest, "triangle": hit, "facet": mesh.facet_ids[hit], "normal": (b - a).cross(c - a).normalized()}
+	return {"t": nearest, "triangle": hit, "facet": mesh.facet_ids[hit], "region": mesh.region_ids[hit], "normal": (b - a).cross(c - a).normalized()}
 
 static func _box_hit(node: Dictionary, origin: Vector3, direction: Vector3, min_t: float, max_t: float) -> bool:
 	var lo := min_t
@@ -138,14 +138,14 @@ func pack_nodes(node_offset := 0, triangle_offset := 0) -> PackedByteArray:
 		buffer.put_32(node["count"])
 	return buffer.data_array
 
-## Triangle: three vec4 vertices, ivec4 facet/inside-medium/outside-medium/id (64B).
-func pack_triangles(inside_medium := 0, outside_medium := -1) -> PackedByteArray:
+## Triangle: three vec4 vertices, ivec4 facet/reserved/reserved/region (64B).
+func pack_triangles() -> PackedByteArray:
 	var buffer := StreamPeerBuffer.new()
 	for triangle in triangle_order:
 		for corner in 3:
 			var value := mesh.vertices[mesh.indices[triangle * 3 + corner]]
 			for component in [value.x, value.y, value.z, 0.0]:
 				buffer.put_float(component)
-		for value in [mesh.facet_ids[triangle], inside_medium, outside_medium, triangle]:
+		for value in [mesh.facet_ids[triangle], 0, 0, mesh.region_ids[triangle]]:
 			buffer.put_32(value)
 	return buffer.data_array

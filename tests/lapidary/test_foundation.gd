@@ -22,10 +22,10 @@ func _identity() -> void:
 	var stone: GemStone = load("res://data/lapidary/stones/ruby.tres").duplicate(true)
 	var fingerprint := stone.fingerprint()
 	check(fingerprint == (stone.duplicate(true) as GemStone).fingerprint(), "deep copy preserves content")
-	stone.chromophore.concentration *= 1.01
+	stone.material.chromophore.concentration *= 1.01
 	check(fingerprint != stone.fingerprint(), "chromophore content invalidates")
 	fingerprint = stone.fingerprint()
-	stone.species.sellmeier_b.x += 0.000001
+	stone.material.species.sellmeier_b.x += 0.000001
 	check(fingerprint != stone.fingerprint(), "species content invalidates")
 	fingerprint = stone.fingerprint()
 	stone.cut.table_ratio += 0.01

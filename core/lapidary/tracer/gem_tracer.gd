@@ -222,12 +222,35 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	var stones := StreamPeerBuffer.new()
 	var triangle_data := PackedByteArray()
 	var node_data := PackedByteArray()
+	var region_data := PackedInt32Array()
+	var nested_materials: Array[Dictionary] = []
+	var host_index := 0
 	for inst: Dictionary in instances:
 		inst = inst.duplicate()
 		inst["bvh_root"] = 0
+		inst["region_offset"] = region_data.size()
+		region_data.append(host_index)
+		if inst.has("boundaries"):
+			var boundaries: GemBoundarySet = inst["boundaries"]
+			inst["mesh"] = boundaries.mesh
+			var local_materials: Array = inst.get("region_materials", [])
+			for region in range(1, boundaries.materials.size()):
+				var material := boundaries.materials[region]
+				if material < 0:
+					region_data.append(-1)
+				elif material == 0:
+					region_data.append(host_index)
+				else:
+					assert(material <= local_materials.size(), "Missing nested material")
+					region_data.append(instances.size() + nested_materials.size())
+					var nested: Dictionary = local_materials[material - 1].duplicate()
+					nested["size_mm"] = inst["size_mm"] # all boundaries share stone coordinates
+					nested_materials.append(nested)
+					if nested.get("scatter", {}).get("sigma_per_mm", 0.0) > 0.0:
+						inst["volume_present"] = 1.0
 		if inst.has("mesh"):
 			var mesh: GemMesh = inst["mesh"]
-			assert(mesh.validate().is_empty(), "Cannot render an invalid mesh")
+			assert(mesh.validate().is_empty(), "Cannot render an invalid mesh: %s" % mesh.validate())
 			var bvh := GemBvh.build(mesh)
 			@warning_ignore("integer_division")
 			inst["bvh_root"] = node_data.size() / 48 + 1
@@ -252,6 +275,14 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 		if inst.get("dispersion_strong", false):
 			stone_flags |= STONE_FLAG_DISPERSION_STRONG
 		_pack_stone(stones, inst, plane_offset, p.size() / 8, prim_offset, pr.size() / 16, absorb_offset, stone_flags)
+		host_index += 1
+	for material in nested_materials:
+		var ab: PackedFloat32Array = material["absorption"]
+		var offset := absorb.size()
+		absorb.append_array(ab)
+		var ab_e: PackedFloat32Array = material.get("absorption_eray", PackedFloat32Array())
+		absorb.append_array(ab_e)
+		_pack_stone(stones, material, 0, 0, 0, 0, offset, STONE_FLAG_HAS_ERAY if not ab_e.is_empty() else 0)
 	_plane_count_total = planes.size() / 8
 	if planes.is_empty():
 		planes.resize(8)
@@ -270,6 +301,7 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	_bufs["stones"] = _rd.storage_buffer_create(stones.data_array.size(), stones.data_array)
 	_bufs["triangles"] = _rd.storage_buffer_create(triangle_data.size(), triangle_data)
 	_bufs["nodes"] = _rd.storage_buffer_create(node_data.size(), node_data)
+	_bufs["regions"] = _rd.storage_buffer_create(region_data.to_byte_array().size(), region_data.to_byte_array())
 
 	var insts := StreamPeerBuffer.new()
 	for i in _inst_count:
@@ -333,9 +365,9 @@ func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 			scat.get("sigma_per_mm", 0.0), scat.get("g", 0.6), zon.get("frequency", 0.0), zon.get("contrast", 0.0),
 			zaxis.x, zaxis.y, zaxis.z, zon.get("phase", 0.0),
 			optic.x, optic.y, optic.z, fluor.get("strength", 0.0),
-			fluor.get("nm", 0.0), inst.get("absorb_scale", 1.0), 0.0, 0.0]:
+			fluor.get("nm", 0.0), inst.get("absorb_scale", 1.0), inst.get("volume_present", 0.0), 0.0]:
 		b.put_float(v)
-	for v: int in [p_off, p_cnt, i_off, i_cnt, a_off, stone_flags, inst.get("bvh_root", 0), 0]:
+	for v: int in [p_off, p_cnt, i_off, i_cnt, a_off, stone_flags, inst.get("bvh_root", 0), inst.get("region_offset", 0)]:
 		b.put_32(v)
 	assert(b.data_array.size() % STONE_STRIDE_BYTES == 0)
 
@@ -378,7 +410,7 @@ func _build_uniform_sets() -> void:
 			guide.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
 			guide.add_id(_bufs["guides"])
 			uniforms.append(guide)
-			for item in [[9, "ballistic"], [10, "residual"], [11, "triangles"], [12, "nodes"]]:
+			for item in [[9, "ballistic"], [10, "residual"], [11, "triangles"], [12, "nodes"], [13, "regions"]]:
 				var uniform := RDUniform.new()
 				uniform.binding = item[0]
 				uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
@@ -760,7 +792,7 @@ func field_info() -> Dictionary:
 # ------------------------------------------------------------------ cleanup
 
 func _free_scene_buffers() -> void:
-	for key in ["planes", "lights", "absorb", "prims", "stones", "insts", "triangles", "nodes"]:
+	for key in ["planes", "lights", "absorb", "prims", "stones", "insts", "triangles", "nodes", "regions"]:
 		if _bufs.has(key) and _bufs[key].is_valid():
 			_rd.free_rid(_bufs[key])
 			_bufs.erase(key)

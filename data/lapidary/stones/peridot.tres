@@ -8,6 +8,13 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="material_script"]
+
+[sub_resource type="Resource" id="Material"]
+script = ExtResource("material_script")
+species = ExtResource("5_pxg60")
+chromophore = ExtResource("1_ktbqd")
+
 [sub_resource type="Resource" id="Shape"]
 script = ExtResource("shape_script")
 outline = &"triangle"
@@ -18,9 +25,8 @@ sectors = 6
 [resource]
 script = ExtResource("4_0rflh")
 shape = SubResource("Shape")
+material = SubResource("Material")
 stone_id = &"peridot"
-species = ExtResource("5_pxg60")
-chromophore = ExtResource("1_ktbqd")
 cut = ExtResource("2_8l87s")
 grade = ExtResource("3_cw5j5")
 seed = 17

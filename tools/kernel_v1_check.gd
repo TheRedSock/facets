@@ -40,7 +40,7 @@ func _initialize() -> void:
 func _render(stone_path: String, lights: PackedFloat32Array, environment: Dictionary,
 		policy: Dictionary, tag: String, res: int, spp: int) -> int:
 	var stone := load(stone_path) as GemStone
-	if stone == null or stone.species == null:
+	if stone == null or stone.material.species == null:
 		printerr("  %s: FAILED TO LOAD %s" % [tag, stone_path])
 		return 1
 	var instance := LapidaryStoneCompiler.compile(stone)

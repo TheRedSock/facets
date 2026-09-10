@@ -369,57 +369,87 @@ vec4 field_scatter(int inst_idx, vec3 x, vec3 dir, float g, vec4 wl) {
 // General closed-mesh transport. Air segments can hit the same specimen
 // again. Deterministic exit splitting is used only when visibility proves
 // the escaping ray reaches the environment; coupled branches use roulette.
-vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, vec4 n_wl, float n_geom,
+vec4 medium_index(int material, vec4 wl) {
+	if (material < 0) { return vec4(1.0); }
+	Stone m = stones[material];
+	return vec4(sellmeier(m.sell_b_size.xyz, m.sell_c_biref.xyz, wl.x),
+		sellmeier(m.sell_b_size.xyz, m.sell_c_biref.xyz, wl.y),
+		sellmeier(m.sell_b_size.xyz, m.sell_c_biref.xyz, wl.z),
+		sellmeier(m.sell_b_size.xyz, m.sell_c_biref.xyz, wl.w));
+}
+
+float geometry_index(int material, vec4 indices, int wavelength, bool extraordinary, vec3 direction) {
+	float ordinary = wavelength >= 0 ? indices[wavelength] : 0.5 * (indices.y + indices.z);
+	if (material < 0 || !extraordinary) { return ordinary; }
+	Stone m = stones[material];
+	return n_e_phi(ordinary, m.sell_c_biref.w, abs(dot(direction, m.optic_fluor.xyz)));
+}
+
+vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool extraordinary,
 		vec4 q, float rig_yaw, vec4 roles, int pol_mode, bool use_volume, inout uint rng) {
 	vec4 throughput = vec4(1.0), radiance = vec4(0.0);
-	bool outside = true;
-	float sigma = use_volume ? st.scatter_zone.x * st.sell_b_size.w : 0.0;
+	uvec4 region_state = uvec4(0u);
 	for (uint bounce = 0u; bounce < pc.max_bounces; bounce++) {
 		float distance; int triangle;
+		int before_medium = region_medium(st, region_state);
 		if (!mesh_hit(st.ranges1.z - 1, pos, dir, distance, triangle)) {
-			if (outside) { radiance += throughput * env_radiance(quat_rot(q, dir), wl, rig_yaw, roles, 0.0); }
+			if (before_medium < 0) { radiance += throughput * env_radiance(quat_rot(q, dir), wl, rig_yaw, roles, 0.0); }
 			break;
 		}
-		if (!outside) {
+		if (before_medium >= 0) {
+			Stone medium = stones[before_medium];
+			float sigma = use_volume ? medium.scatter_zone.x * medium.sell_b_size.w : 0.0;
 			float free_flight = sigma > 0.0 ? -log(max(1e-7, 1.0 - rnd(rng))) / sigma : INF;
 			float segment = min(free_flight, distance);
-			throughput *= segment_att(st, pos, dir, segment, st.ranges1.x, (st.ranges1.y & 1) != 0, wl, pol_mode);
+			throughput *= segment_att(medium, pos, dir, segment, medium.ranges1.x, (medium.ranges1.y & 1) != 0, wl, pol_mode);
 			if (free_flight < distance) {
 				pos += dir * free_flight;
-				dir = hg_sample_u(dir, st.scatter_zone.y, vec2(rnd(rng), rnd(rng)));
+				dir = hg_sample_u(dir, medium.scatter_zone.y, vec2(rnd(rng), rnd(rng)));
 				continue;
 			}
-			if (!use_volume) { throughput *= exp(-st.scatter_zone.x * st.sell_b_size.w * distance); }
+			if (!use_volume && FLAG_VOLUME) { throughput *= exp(-medium.scatter_zone.x * medium.sell_b_size.w * distance); }
 		}
 		pos += dir * distance;
+		uvec4 after = cross_region(region_state, triangle, dir);
+		int after_medium = region_medium(st, after);
+		if (before_medium == after_medium) {
+			region_state = after;
+			pos += dir * T_EPS * 4.0;
+			continue;
+		}
 		vec3 normal = mesh_normal(triangle);
-		vec3 facing = outside ? normal : -normal;
+		vec3 facing = dot(dir, normal) < 0.0 ? normal : -normal;
 		float ci = clamp(-dot(dir, facing), 0.0, 1.0);
-		float eta = outside ? 1.0 / n_geom : n_geom;
+		vec4 index_before = medium_index(before_medium, wl), index_after = medium_index(after_medium, wl);
+		float eta = geometry_index(before_medium, index_before, wavelength, extraordinary, dir)
+			/ geometry_index(after_medium, index_after, wavelength, extraordinary, dir);
 		float reflectance = fresnel_diel(ci, eta);
 		vec4 R;
-		for (int channel = 0; channel < 4; channel++) { R[channel] = fresnel_diel(ci, outside ? 1.0 / n_wl[channel] : n_wl[channel]); }
+		for (int channel = 0; channel < 4; channel++) { R[channel] = fresnel_diel(ci, index_before[channel] / index_after[channel]); }
 		vec3 reflected = normalize(reflect(dir, facing));
 		if (reflectance >= 1.0) {
 			dir = reflected;
 		} else {
 			vec3 transmitted = normalize(refract(dir, facing, eta));
-			vec3 escape_direction = outside ? reflected : transmitted;
+			bool escape_reflect = before_medium < 0;
+			bool can_escape = escape_reflect || after_medium < 0;
+			vec3 escape_direction = escape_reflect ? reflected : transmitted;
+			uvec4 escape_active = escape_reflect ? region_state : after;
 			float next_distance; int next_triangle;
-			bool obstructed = mesh_hit(st.ranges1.z - 1, pos + escape_direction * T_EPS * 4.0, escape_direction, next_distance, next_triangle);
+			bool obstructed = !can_escape || physical_hit(st, pos + escape_direction * T_EPS * 4.0, escape_direction, escape_active, next_distance, next_triangle);
 			if (!obstructed) {
-				vec4 escape_weight = outside ? R : vec4(1.0) - R;
+				vec4 escape_weight = escape_reflect ? R : vec4(1.0) - R;
 				radiance += throughput * escape_weight * env_radiance(quat_rot(q, escape_direction), wl, rig_yaw, roles, 0.0);
 				throughput *= vec4(1.0) - escape_weight;
-				dir = outside ? transmitted : reflected;
-				outside = false;
+				dir = escape_reflect ? transmitted : reflected;
+				if (escape_reflect) { region_state = after; }
 			} else if (rnd(rng) < reflectance) {
 				throughput *= R / max(reflectance, 1e-7);
 				dir = reflected;
 			} else {
 				throughput *= (vec4(1.0) - R) / max(1.0 - reflectance, 1e-7);
 				dir = transmitted;
-				outside = !outside;
+				region_state = after;
 			}
 		}
 		pos += dir * T_EPS * 4.0;
@@ -458,6 +488,7 @@ void main() {
 	float size_mm = st.sell_b_size.w;
 	float sigma_h = FLAG_VOLUME ? st.scatter_zone.x * size_mm : 0.0;
 	float hg_g = st.scatter_zone.y;
+	bool reconstruct_volume = FLAG_VOLUME && (sigma_h > 0.0 || st.misc.z > 0.0);
 
 	vec3 total_xyz = vec3(0.0);
 	vec3 total_ballistic = vec3(0.0);
@@ -527,8 +558,8 @@ void main() {
 			int pol_mode = biref ? (eray ? POL_K : POL_O) : POL_UNPOL;
 
 			if (st.ranges1.z > 0) {
-				radiance += mask * pass_w * trace_mesh_path(st, ro, rd, wl, n_wl, n_geom, q, rig_yaw, role_mult, pol_mode, FLAG_VOLUME, rng);
-				if (sigma_h > 0.0) { ballistic += mask * pass_w * trace_mesh_path(st, ro, rd, wl, n_wl, n_geom, q, rig_yaw, role_mult, pol_mode, false, rng); }
+				radiance += mask * pass_w * trace_mesh_path(st, ro, rd, wl, wl_i, eray, q, rig_yaw, role_mult, pol_mode, FLAG_VOLUME, rng);
+				if (reconstruct_volume) { ballistic += mask * pass_w * trace_mesh_path(st, ro, rd, wl, wl_i, eray, q, rig_yaw, role_mult, pol_mode, false, rng); }
 				continue;
 			}
 			float eta_in = 1.0 / n_geom;
@@ -721,7 +752,7 @@ void main() {
 		vec3 xyz = (radiance.x * cie_xyz(wl.x) + radiance.y * cie_xyz(wl.y)
 			+ radiance.z * cie_xyz(wl.z) + radiance.w * cie_xyz(wl.w)) * pc.spectral_norm;
 		total_xyz += xyz;
-		vec3 ballistic_xyz = sigma_h > 0.0 ? (ballistic.x * cie_xyz(wl.x) + ballistic.y * cie_xyz(wl.y)
+		vec3 ballistic_xyz = reconstruct_volume ? (ballistic.x * cie_xyz(wl.x) + ballistic.y * cie_xyz(wl.y)
 			+ ballistic.z * cie_xyz(wl.z) + ballistic.w * cie_xyz(wl.w)) * pc.spectral_norm : xyz;
 		vec3 residual_xyz = xyz - ballistic_xyz;
 		total_ballistic += ballistic_xyz;

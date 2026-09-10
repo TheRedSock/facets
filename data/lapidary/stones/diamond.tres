@@ -7,6 +7,12 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="material_script"]
+
+[sub_resource type="Resource" id="Material"]
+script = ExtResource("material_script")
+species = ExtResource("4_cjwxc")
+
 [sub_resource type="Resource" id="Shape"]
 script = ExtResource("shape_script")
 outline = &"pear"
@@ -17,8 +23,8 @@ sectors = 8
 [resource]
 script = ExtResource("3_ki6k4")
 shape = SubResource("Shape")
+material = SubResource("Material")
 stone_id = &"diamond"
-species = ExtResource("4_cjwxc")
 cut = ExtResource("1_6dlck")
 grade = ExtResource("2_gad6n")
 seed = 37

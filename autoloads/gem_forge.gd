@@ -270,7 +270,7 @@ func _load_stone(tile_id: StringName) -> GemStone:
 	if not ResourceLoader.exists(path):
 		return null
 	var stone := load(path) as GemStone
-	if stone == null or stone.species == null:
+	if stone == null or stone.material.species == null:
 		push_warning("GemForge: %s is not a usable GemStone (missing species?)" % path)
 		return null
 	_stones[tile_id] = stone

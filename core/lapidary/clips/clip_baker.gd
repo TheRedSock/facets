@@ -23,7 +23,7 @@ const ORTHO_HALF := 1.25
 ## internal resolution; caller keeps ownership (amortizes shader compiles).
 static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat32Array,
 		environment := {"bg": Vector4(0.30, 0.16, 0.05, 0.0), "white_kelvin": 0.0}, shared_tracer: GemTracer = null) -> Dictionary:
-	if stone == null or clip == null or stone.species == null or lights.is_empty():
+	if stone == null or clip == null or stone.material.species == null or lights.is_empty():
 		return {}
 	var instance := LapidaryStoneCompiler.compile(stone)
 	var policy := GemRung.policy(rung)

@@ -7,6 +7,12 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="material_script"]
+
+[sub_resource type="Resource" id="Material"]
+script = ExtResource("material_script")
+species = ExtResource("4_j5mdv")
+
 [sub_resource type="Resource" id="Shape"]
 script = ExtResource("shape_script")
 outline = &"round"
@@ -17,8 +23,8 @@ sectors = 8
 [resource]
 script = ExtResource("3_a6uk2")
 shape = SubResource("Shape")
+material = SubResource("Material")
 stone_id = &"quartz"
-species = ExtResource("4_j5mdv")
 cut = ExtResource("1_xlkyl")
 grade = ExtResource("2_rv82v")
 seed = 11
