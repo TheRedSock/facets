@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v10)
+# Lapidary kernel contract (v11)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. All floats
@@ -120,19 +120,16 @@ separate. An equal-cell grid maps pixels to instances; 1×1 is a single specimen
 ## Bindings and push constants
 
 Shared set0: 0 planes,1 lights,2 absorption,3 accumulated XYZ+coverage,4 standards,
-5 Stones,6 Instances,7 legacy scatter field image/sampler,15 emission spectra.
+5 Stones,6 Instances,15 emission spectra. Binding7 is unused.
 Trace also uses8 guides (normal/depth sums, residual Y²/Y sum/min/max facet IDs),
 9 zero-scatter sums,10 residual sums,11 triangles,12 BVH nodes,13 region materials,
 14 boundary finishes. Guide stride32B; other film buffers16B/pixel.
 
-Trace push96B: resolution, sample_base, spp, seed, max_bounces, flags, light_count,
+Trace push80B: resolution, sample_base, spp, seed, max_bounces, flags, light_count,
 grid, cell_px, background zenith/horizon/below, spectral_norm, rad_clamp,
-env_filter_rad, field_exits, field_grid, row_origin, field_insts, background SPD
-offset, throughput_epsilon. Flags bit0 dispersion,bit1 approximate birefringence,
-bit2 volume,bit4 reserved,bit5 full four-wavelength geometry.
-Legacy field push48B: grid_n,field_exits,light_count,inst_count,dirs,band_group,
-env_filter_rad,texel_base,background vec4. Production policies set field_exits=0;
-the retained SH prepass is not a validated multiple-scattering solution.
+row_origin, background SPD offset, throughput_epsilon. Flags bit0 dispersion,
+bit1 approximate birefringence, bit2 volume, bit4 reserved,
+bit5 full four-wavelength geometry. The rejected SH prepass has been removed.
 
 Print push112B: output size,inv_samples,exposure,raw,white_point,contrast,
 black_point,chroma_ceiling,chroma_soft,highlight_desat,pad; XYZ→linear-sRGB matrix
@@ -147,7 +144,10 @@ does not restart sequences. Smooth convex hosts use deterministic Fresnel escape
 splitting. General boundaries split only after the escape branch is proven to
 reach the environment; coupled internal branches use roulette. TIR continues.
 Homogeneous volume uses repeated HG scattering and analytic free-flight distance.
-Absorption/zoning act along segments; current zoning integration is approximate.
+Absorption integrates the sinusoidal concentration field analytically along each
+segment using its midpoint phase and sinc of its half-phase span. Subdividing a
+straight path preserves its optical depth, including the parallel-band limit.
+This does not fix the separate absence of persistent polarization.
 
 Production volume reconstruction filters the stochastic residual with positive,
 variance/normal-guided à-trous weights, keeping smooth zero-scatter light intact.
@@ -159,10 +159,10 @@ available. No claim of independent physical calibration follows from self-tests.
 
 `create(w,h)` needs a local RenderingDevice (windowed). Configure with compiled
 specimen(s), GemLighting and GemRung policy. `set_lighting()` atomically replaces
-lighting, resets incompatible accumulation and dirties the field; a white-only
+lighting and resets incompatible accumulation; a white-only
 change retains it. `set_print_white()` affects only print. Per-frame orientation,
-rig yaw, role multipliers, framing and seed are explicit. `accumulate()` reports
-wall time including field work; `profile()` separates stages. Checkpoints retain
+rig yaw, role multipliers, framing and seed are explicit; changing them retires
+incompatible film samples. `accumulate()` reports wall time; `profile()` separates stages. Checkpoints retain
 raw estimator buffers and the global sample count. Release frees GPU resources.
 
 GemMaterial owns bulk properties, GemShape the procedural body recipe, GemCondition

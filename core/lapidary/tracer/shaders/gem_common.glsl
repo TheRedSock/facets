@@ -1,10 +1,7 @@
 // Lapidary kernel — shared declarations (host-included into every compute
 // shader via `#include "gem_common.glsl"`; no #version here).
 //
-// Buffer layout is the KERNEL_CONTRACT. The trace kernel and the scatter-field
-// pre-pass bind the same set 0 (bindings 0-6); binding 7 is the scatter field
-// itself (image3D in the pre-pass, sampler3D in the kernel — declared by each
-// shader, not here).
+// Buffer layouts are defined in KERNEL_CONTRACT.md.
 
 struct Plane { vec4 n_d; vec4 aux; };          // aux: zone, polish (unused by kernel v3), reserved
 struct Light { vec4 dir_cos; vec4 spd_pow; };  // spd_pow: spectrum offset, power, cos_inner, role(0key..3bounce,4blocker)
@@ -41,16 +38,6 @@ const float T_EPS = 1e-5;
 const float INF = 1e30;
 const float PI = 3.14159265;
 const float TAU = 6.2831853;
-
-// ---------------------------------------------------------------- scatter field layout
-// The in-scattered radiance field lives on a grid over stone space
-// [-FIELD_HALF, FIELD_HALF]^3 (texel centres). Per texel: FIELD_BANDS spectral
-// bands x 16 real SH coefficients (l <= 3), stored as FIELD_BANDS * 4 RGBA
-// slabs stacked along z; instances stack along x.
-const float FIELD_HALF = 1.25;
-const int FIELD_BANDS = 16;             // 25 nm bands, 380..780 nm
-const float FIELD_BAND_NM = 25.0;
-const int FIELD_SLABS = FIELD_BANDS * 4;  // 4 RGBA texels hold 16 SH coefficients
 
 // ---------------------------------------------------------------- RNG / QMC
 uint pcg(inout uint s) {
@@ -115,36 +102,6 @@ float sellmeier(vec3 B, vec3 C, float wl_nm) {
 	return sqrt(max(s, 1.0));
 }
 
-// Fibonacci sphere direction i of m (deterministic quadrature set).
-vec3 fib_dir(int i, int m) {
-	float z = 1.0 - 2.0 * (float(i) + 0.5) / float(m);
-	float r = sqrt(max(0.0, 1.0 - z * z));
-	float phi = float(i) * 2.399963230;
-	return vec3(r * cos(phi), r * sin(phi), z);
-}
-
-// Real orthonormal spherical harmonics, l <= 3, in the usual (l, m) order.
-void sh16(vec3 d, out float Y[16]) {
-	float x = d.x, y = d.y, z = d.z;
-	float x2 = x * x, y2 = y * y, z2 = z * z;
-	Y[0] = 0.282095;
-	Y[1] = 0.488603 * y;
-	Y[2] = 0.488603 * z;
-	Y[3] = 0.488603 * x;
-	Y[4] = 1.092548 * x * y;
-	Y[5] = 1.092548 * y * z;
-	Y[6] = 0.315392 * (3.0 * z2 - 1.0);
-	Y[7] = 1.092548 * x * z;
-	Y[8] = 0.546274 * (x2 - y2);
-	Y[9] = 0.590044 * y * (3.0 * x2 - y2);
-	Y[10] = 2.890611 * x * y * z;
-	Y[11] = 0.457046 * y * (5.0 * z2 - 1.0);
-	Y[12] = 0.373176 * z * (5.0 * z2 - 3.0);
-	Y[13] = 0.457046 * x * (5.0 * z2 - 1.0);
-	Y[14] = 1.445306 * z * (x2 - y2);
-	Y[15] = 0.590044 * x * (x2 - 3.0 * y2);
-}
-
 // ---------------------------------------------------------------- spectra
 vec4 standard_spectrum(float wavelength) {
 	if (wavelength < 380.0 || wavelength > 780.0) { return vec4(0.0); }
@@ -168,12 +125,6 @@ float absorb_at(int base, float wl_nm) {
 	float f = clamp(wl_nm - 380.0, 0.0, 400.0);
 	int i = int(f);
 	return mix(absorb_mm[base + i], absorb_mm[base + min(i + 1, 400)], f - float(i));
-}
-
-// Henyey-Greenstein phase function, normalised over the sphere.
-float hg_phase(float g, float ct) {
-	float d = 1.0 + g * g - 2.0 * g * ct;
-	return (1.0 - g * g) / (4.0 * PI * max(d, 1e-6) * sqrt(max(d, 1e-6)));
 }
 
 float role_multiplier(float role, vec4 role_mult) {

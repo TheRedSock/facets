@@ -53,7 +53,7 @@ func _initialize() -> void:
 	var rest := Quaternion.from_euler(Vector3(
 		deg_to_rad(REST_TILT_DEG.x), deg_to_rad(REST_TILT_DEG.y), deg_to_rad(REST_TILT_DEG.z)))
 	print("\n=== grain_check  %s  %dpx  %d spp ===" % [GemRung.rung_name(rung), res, spp])
-	print("  %-14s %8s %8s %8s %8s  %s" % ["stone", "grain", "field_ms", "trace_s", "luma", ""])
+	print("  %-14s %8s %8s %8s  %s" % ["stone", "grain", "trace_s", "luma", ""])
 
 	var metrics := {"rung": GemRung.rung_name(rung), "res": res, "spp": spp, "stones": {}}
 	var failures := 0
@@ -66,7 +66,6 @@ func _initialize() -> void:
 		var instance := LapidaryStoneCompiler.compile(stone)
 		var frames: Array[Image] = []
 		var trace_ms := 0.0
-		var field_ms := 0.0
 		for seed_off: int in [0, SEED_B_OFFSET]:
 			tracer.configure_stone(instance, lights, policy)
 			tracer.set_seed(int(instance["seed"]) + seed_off)
@@ -76,7 +75,6 @@ func _initialize() -> void:
 				var n := mini(int(policy["batch"]), left)
 				trace_ms += tracer.accumulate(n)
 				left -= n
-			field_ms = tracer.last_field_ms
 			frames.append(tracer.finalize_print(print_res, false, EXPOSURE))
 		var stats := _two_seed_stats(frames[0], frames[1])
 		var grain: float = stats["grain_lsb"]
@@ -86,11 +84,11 @@ func _initialize() -> void:
 		@warning_ignore("integer_division")
 		var defect_count: int = maxi(instance.get("surfaces", []).size() - 1, 0)
 		metrics["stones"][tile_id] = {
-			"grain_lsb": grain, "mean_luma": stats["luma"], "field_ms": field_ms,
+			"grain_lsb": grain, "mean_luma": stats["luma"],
 			"trace_s": trace_ms / 1000.0, "sigma_per_mm": instance["scatter"]["sigma_per_mm"],
 			"defects": defect_count, "pass": ok,
 		}
-		print("  %-14s %8.2f %8.0f %8.1f %8.3f  %s" % [tile_id, grain, field_ms, trace_ms / 1000.0,
+		print("  %-14s %8.2f %8.1f %8.3f  %s" % [tile_id, grain, trace_ms / 1000.0,
 			stats["luma"], "PASS" if ok else "FAIL"])
 		if opts["diff"]:
 			frames[0].save_png(ProjectSettings.globalize_path("%s/%s.png" % [OUT_DIR, tile_id]))

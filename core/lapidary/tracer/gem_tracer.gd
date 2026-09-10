@@ -1,31 +1,23 @@
 class_name GemTracer
 extends RefCounted
-## Lapidary GPU tracer host — kernel v3.
+## Lapidary GPU tracer host.
 ##
 ## Consumes StoneInstance dictionaries from LapidaryStoneCompiler plus a light
 ## rig, dispatches the spectral path tracer, and finalizes through the GPU
 ## print pass (house print or raw display transform). Batch-ready: stones are
 ## ranges in shared buffers, instances sit on a pixel grid (1x1 = single stone).
 ##
-## Scatter field: when the rung policy sets `field_exits > 0`, the first
-## accumulate() after an orientation / rig change runs the scatter-field
-## pre-pass (gem_scatter_field.glsl): the in-scattered radiance of the volume
-## on a 3D grid as SH (l<=3) per spectral band. The trace kernel then reads
-## single scattering deterministically at every scatter event.
-##
 ## Requires a RenderingDevice-capable context (NOT --headless).
 
 const SHADER_DIR := "res://core/lapidary/tracer/shaders/"
 const SHADER_PATH := SHADER_DIR + "gem_pathtrace.glsl"
-const FIELD_SHADER_PATH := SHADER_DIR + "gem_scatter_field.glsl"
 const PRINT_SHADER_PATH := SHADER_DIR + "gem_print.glsl"
 const DENOISE_SHADER_PATH := SHADER_DIR + "gem_denoise.glsl"
 const COMMON_PATH := SHADER_DIR + "gem_common.glsl"
 const INCLUDE_LINE := "#include \"gem_common.glsl\""
 const Colorimetry := preload("res://core/lapidary/lighting/colorimetry.gd")
 
-const PUSH_SIZE := 96
-const FIELD_PUSH_SIZE := 48
+const PUSH_SIZE := 80
 ## Adaptive dispatch target (ms per GPU submission); far below any OS watchdog.
 const DISPATCH_TARGET_MS := 120.0
 const MAX_CHUNK_SPP := 64
@@ -33,16 +25,7 @@ const PRINT_PUSH_SIZE := 112
 const STONE_STRIDE_BYTES := 128
 const INST_STRIDE_BYTES := 64
 
-# Must match gem_common.glsl.
-const FIELD_BANDS := 16
-const FIELD_SLABS := FIELD_BANDS * 4
-const FIELD_TEXELS_PER_GROUP := 4  # gem_scatter_field.glsl TEXELS_PER_GROUP
 const MAX_LIGHTS := 8
-## 3D texture depth limit (Vulkan maxImageDimension3D floor) bounds grid * slabs.
-const FIELD_MAX_DEPTH := 2048
-## GPU memory budget for the scatter field of one configure (the grid is
-## coarsened until the instance set fits).
-const FIELD_BUDGET_BYTES := 160 * 1024 * 1024
 
 const FLAG_DISPERSION := 1
 const FLAG_BIREF := 2
@@ -57,7 +40,6 @@ var width := 0
 var height := 0
 var samples_accumulated := 0
 var last_dispatch_ms := 0.0
-var last_field_ms := 0.0
 var last_accumulate_ms := 0.0
 var last_print_ms := 0.0
 var last_denoise_ms := 0.0
@@ -65,9 +47,7 @@ var _denoise_passes := 0
 var _denoise_phi := 2.0
 var _filtered_samples := -1
 var _print_source: RID
-var field_build_count := 0
 var _instance_bytes := PackedByteArray()
-var _field_state_key := ""
 var debug_chunks := false
 
 var _rd: RenderingDevice
@@ -78,8 +58,6 @@ var _bufs: Dictionary = {}
 var _sets: Dictionary = {}       # name -> uniform set RID
 var _print_tex: RID
 var _print_size := Vector2i.ZERO
-var _field_tex: RID
-var _field_sampler: RID
 
 var _plane_count_total := 0
 var _light_count := 0
@@ -94,15 +72,9 @@ var _cell := Vector2i.ZERO
 var _bg := Vector4(0.30, 0.16, 0.05, 0.0)  # zenith, horizon, below, spectrum offset
 var _xyz_to_rgb := Colorimetry.xyz_to_srgb()  # print matrix incl. as-shot white balance
 var _rad_clamp := 48.0
-var _env_filter_rad := 0.06
-var _field_exits := 0
-var _field_grid := 16
-var _field_dirs := 2048
-var _field_dirty := true
 # Adaptive dispatch unit (see accumulate()).
 var _chunk_spp := 1
 var _chunk_rows := 8
-var _field_chunk := 2048  # texels per scatter-field dispatch (adaptive)
 var _lights_packed := PackedFloat32Array()
 var _spectra_packed := PackedFloat32Array()
 var _camera_distance := 5.0
@@ -146,7 +118,7 @@ func _compile_shaders() -> bool:
 	if common.is_empty():
 		push_error("GemTracer: cannot read %s" % COMMON_PATH)
 		return false
-	for entry in [[SHADER_PATH, "trace"], [FIELD_SHADER_PATH, "field"], [PRINT_SHADER_PATH, "print"], [DENOISE_SHADER_PATH, "denoise"]]:
+	for entry in [[SHADER_PATH, "trace"], [PRINT_SHADER_PATH, "print"], [DENOISE_SHADER_PATH, "denoise"]]:
 		var text := FileAccess.get_file_as_string(entry[0])
 		if text.is_empty():
 			push_error("GemTracer: cannot read %s" % entry[0])
@@ -170,7 +142,7 @@ func _compile_shaders() -> bool:
 
 ## Full-featured path: StoneInstance from LapidaryStoneCompiler + lights + rung policy.
 ## policy keys (see GemRung.TABLE): max_bounces, dispersion, birefringence, volume,
-## rad_clamp, env_filter_rad, field_exits, field_grid, field_dirs. Ingests the instance's own
+## rad_clamp and reconstruction settings. Ingests the instance's own
 ## seed; compiled lighting supplies all spectra, background and print neutral.
 func configure_stone(instance: Dictionary, lighting: GemLighting, policy: Dictionary) -> void:
 	if instance.has("seed"):
@@ -209,19 +181,6 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		_flags |= FLAG_VOLUME
 	# Fluorescence is deferred until excitation and emitted-path transport exist.
 	_rad_clamp = policy.get("rad_clamp", 48.0)
-	_env_filter_rad = policy.get("env_filter_rad", 0.06)
-	_field_exits = clampi(policy.get("field_exits", 0), 0, 64)
-	@warning_ignore("integer_division")
-	_field_grid = clampi(policy.get("field_grid", 32), 4, FIELD_MAX_DEPTH / FIELD_SLABS)
-	var scattering_present := false
-	for instance: Dictionary in instances:
-		if float(instance.get("scatter", {}).get("sigma_per_mm", 0.0)) > 0.0:
-			scattering_present = true
-	if not scattering_present or (_flags & FLAG_VOLUME) == 0:
-		_field_exits = 0
-	_field_dirs = clampi(policy.get("field_dirs", 2048), 64, 16384)
-	while _field_exits > 0 and _field_grid > 6 and _field_bytes_for(_field_grid) > FIELD_BUDGET_BYTES:
-		_field_grid -= 2
 	_lights_packed = lights.duplicate()
 	_spectra_packed = lighting.spectra.duplicate()
 	_bg = lighting.background
@@ -229,7 +188,6 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	# Kernel cost changed: restart the adaptive dispatch unit conservatively.
 	_chunk_spp = 1
 	_chunk_rows = mini(height, 64)
-	_field_chunk = 2048
 
 	var planes := PackedFloat32Array()
 	var absorb := PackedFloat32Array()
@@ -269,7 +227,6 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			surface_data.append_array(finish.packed())
 			if maxf(finish.alpha_u, finish.alpha_v) >= 0.0001:
 				inst["rough_present"] = 1.0
-				_field_exits = 0
 		if inst.has("mesh"):
 			var mesh: GemMesh = inst["mesh"]
 			assert(mesh.validate().is_empty(), "Cannot render an invalid mesh: %s" % mesh.validate())
@@ -279,12 +236,10 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			@warning_ignore("integer_division")
 			node_data.append_array(bvh.pack_nodes(node_data.size() / 48, triangle_data.size() / 64))
 			triangle_data.append_array(bvh.pack_triangles())
-			_field_exits = 0 # The legacy field only supports a convex plane host.
 		var p: PackedFloat32Array = inst["planes"]
 		if inst.has("analytic_shape"):
 			var shape: Vector4 = inst["analytic_shape"]
 			p = PackedFloat32Array([shape.x, shape.y, shape.z, shape.w, 0, 0, 0, 0])
-			_field_exits = 0
 		var ab: PackedFloat32Array = inst["absorption"]
 		var ab_e: PackedFloat32Array = inst.get("absorption_eray", PackedFloat32Array())
 		assert(ab.size() == 401 and (ab_e.is_empty() or ab_e.size() == 401), "Invalid compiled absorption grid")
@@ -330,20 +285,12 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		_pack_inst(insts, Quaternion.IDENTITY, 0.0, 1.25, [1.0, 1.0, 1.0, 1.0], mini(i, instances.size() - 1))
 	_bufs["insts"] = _rd.storage_buffer_create(insts.data_array.size(), insts.data_array)
 	_instance_bytes = PackedByteArray()
-	_field_state_key = ""
 	_update_instance_buffer(insts.data_array)
 	_inst_state = {"quat": Quaternion.IDENTITY, "rig_yaw": 0.0, "ortho_half": 1.25,
 		"role_mult": [1.0, 1.0, 1.0, 1.0], "stone_index": 0}
-	last_field_ms = 0.0
 
-	_create_field_texture()
 	_build_uniform_sets()
-	_field_dirty = true
 	reset_accumulation()
-
-
-func _field_bytes_for(gn: int) -> int:
-	return _inst_count * gn * gn * gn * FIELD_SLABS * 8  # RGBA16F
 
 
 ## Camera origins must be outside every region, including cavity geometry
@@ -367,33 +314,6 @@ static func _boundary_radius(instance: Dictionary) -> float:
 		for point in Geometry3D.compute_convex_mesh_points(planes):
 			radius = maxf(radius, point.length())
 	return radius
-
-
-## Scatter field texture: x = instances stacked, y, z = FIELD_SLABS slabs of
-## grid_n. Written by the field pre-pass (image), read by the kernel (sampler).
-func _create_field_texture() -> void:
-	if _field_tex.is_valid():
-		_rd.free_rid(_field_tex)
-		_field_tex = RID()
-	var gn := _field_grid if _field_exits > 0 else 1
-	var fmt := RDTextureFormat.new()
-	fmt.texture_type = RenderingDevice.TEXTURE_TYPE_3D
-	fmt.width = gn * _inst_count
-	fmt.height = gn
-	fmt.depth = gn * FIELD_SLABS
-	fmt.format = RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT
-	fmt.usage_bits = RenderingDevice.TEXTURE_USAGE_STORAGE_BIT | RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT \
-		| RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT
-	_field_tex = _rd.texture_create(fmt, RDTextureView.new())
-	if not _field_sampler.is_valid():
-		var ss := RDSamplerState.new()
-		ss.min_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
-		ss.mag_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
-		ss.mip_filter = RenderingDevice.SAMPLER_FILTER_NEAREST
-		ss.repeat_u = RenderingDevice.SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE
-		ss.repeat_v = RenderingDevice.SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE
-		ss.repeat_w = RenderingDevice.SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE
-		_field_sampler = _rd.sampler_create(ss)
 
 
 func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
@@ -428,41 +348,17 @@ func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_hal
 
 
 func _build_uniform_sets() -> void:
-	# Binding order (gem_common.glsl): 0 planes, 1 lights, 2 absorb, 3 accum, 4 CIE standards,
-	# 5 stones, 6 insts; 7 = scatter field (image in the pre-pass, sampler in the kernel).
-	var names := {0: "planes", 1: "lights", 2: "absorb", 3: "accum", 4: "standards", 5: "stones", 6: "insts", 15: "spectra"}
-	for shader_name in ["trace", "field"]:
-		var uniforms: Array[RDUniform] = []
-		for i: int in names:
-			var u := RDUniform.new()
-			u.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
-			u.binding = i
-			u.add_id(_bufs[names[i]])
-			uniforms.append(u)
-		var f := RDUniform.new()
-		f.binding = 7
-		if shader_name == "field":
-			f.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
-			f.add_id(_field_tex)
-		else:
-			f.uniform_type = RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE
-			f.add_id(_field_sampler)
-			f.add_id(_field_tex)
-		uniforms.append(f)
-		if shader_name == "trace":
-			var guide := RDUniform.new()
-			guide.binding = 8
-			guide.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
-			guide.add_id(_bufs["guides"])
-			uniforms.append(guide)
-			for item in [[9, "ballistic"], [10, "residual"], [11, "triangles"], [12, "nodes"], [13, "regions"], [14, "surfaces"]]:
-				var uniform := RDUniform.new()
-				uniform.binding = item[0]
-				uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
-				uniform.add_id(_bufs[item[1]])
-				uniforms.append(uniform)
-		_sets[shader_name] = _rd.uniform_set_create(uniforms, _shaders[shader_name], 0)
-
+	var names := {0: "planes", 1: "lights", 2: "absorb", 3: "accum", 4: "standards",
+		5: "stones", 6: "insts", 8: "guides", 9: "ballistic", 10: "residual",
+		11: "triangles", 12: "nodes", 13: "regions", 14: "surfaces", 15: "spectra"}
+	var uniforms: Array[RDUniform] = []
+	for binding: int in names:
+		var uniform := RDUniform.new()
+		uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+		uniform.binding = binding
+		uniform.add_id(_bufs[names[binding]])
+		uniforms.append(uniform)
+	_sets["trace"] = _rd.uniform_set_create(uniforms, _shaders["trace"], 0)
 	_create_print_target(Vector2i(width, height))
 
 
@@ -530,24 +426,20 @@ func set_instances(states: Array) -> void:
 func _update_instance_buffer(bytes: PackedByteArray) -> void:
 	if bytes == _instance_bytes:
 		return
-	# Framing changes primary rays, but cannot change light inside the stone.
-	var field_bytes := bytes.duplicate()
-	for index in bytes.size() / INST_STRIDE_BYTES:
-		field_bytes.encode_float(index * INST_STRIDE_BYTES + 20, 0.0)
-	var key := GemContentIdentity.digest(field_bytes)
-	if key != _field_state_key:
-		_field_dirty = true
-		_field_state_key = key
+	# Any changed instance input changes the integrand of the camera film.
 	_rd.buffer_update(_bufs["insts"], 0, bytes.size(), bytes)
 	_instance_bytes = bytes
+	reset_accumulation()
 
 
 func set_seed(s: int) -> void:
-	_seed = s
+	if _seed != s:
+		_seed = s
+		reset_accumulation()
 
 
 ## Replaces all illumination atomically and retires samples only when optical
-## inputs change. A white-only edit preserves the film and scatter field.
+## inputs change. A white-only edit preserves the optical film.
 func set_lighting(lighting: GemLighting) -> void:
 	assert(lighting != null)
 	assert(lighting.validate().is_empty(), lighting.validate())
@@ -563,7 +455,6 @@ func set_lighting(lighting: GemLighting) -> void:
 		_rd.free_rid(_bufs[key])
 	_upload_lighting_buffers()
 	_build_uniform_sets()
-	_field_dirty = true
 	reset_accumulation()
 
 
@@ -592,61 +483,6 @@ func reset_accumulation() -> void:
 	_filtered_samples = -1
 
 
-func _field_push(band_group: int, texel_base: int) -> PackedByteArray:
-	var pcb := StreamPeerBuffer.new()
-	for v: int in [_field_grid, _field_exits, _light_count, _inst_count, _field_dirs, band_group]:
-		pcb.put_32(v)
-	pcb.put_float(_env_filter_rad)
-	pcb.put_32(texel_base)
-	for v: float in [_bg.x, _bg.y, _bg.z, _bg.w]:
-		pcb.put_float(v)
-	assert(pcb.data_array.size() == FIELD_PUSH_SIZE)
-	return pcb.data_array
-
-
-## Rebuild the scatter field now (normally implicit in accumulate()). Work is
-## issued per 4 spectral bands x texel chunk, each its own submission, so no
-## dispatch approaches the OS GPU watchdog whatever the grid / dirs / exits
-## policy. Returns ms.
-func build_scatter_field() -> float:
-	if not _field_dirty:
-		return 0.0
-	if _field_exits <= 0:
-		_field_dirty = false
-		return 0.0
-	var t0 := Time.get_ticks_usec()
-	var texels := _inst_count * _field_grid * _field_grid * _field_grid
-	@warning_ignore("integer_division")
-	for band_group in FIELD_BANDS / 4:
-		var base := 0
-		while base < texels:
-			var n := mini(_field_chunk, texels - base)
-			var t1 := Time.get_ticks_usec()
-			var cl := _rd.compute_list_begin()
-			_rd.compute_list_bind_compute_pipeline(cl, _pipelines["field"])
-			_rd.compute_list_bind_uniform_set(cl, _sets["field"], 0)
-			_rd.compute_list_set_push_constant(cl, _field_push(band_group, base), FIELD_PUSH_SIZE)
-			@warning_ignore("integer_division")
-			_rd.compute_list_dispatch(cl, (n + FIELD_TEXELS_PER_GROUP - 1) / FIELD_TEXELS_PER_GROUP, 1, 1)
-			_rd.compute_list_end()
-			_rd.submit()
-			_rd.sync()
-			base += n
-			# Adapt the chunk toward DISPATCH_TARGET_MS (same watchdog policy as the kernel).
-			var ms := float(Time.get_ticks_usec() - t1) / 1000.0
-			if debug_chunks:
-				print("    field dispatch band %d texels %d -> %.1f ms" % [band_group, n, ms])
-			if n == _field_chunk:
-				if ms > DISPATCH_TARGET_MS * 1.6:
-					_field_chunk = maxi(FIELD_TEXELS_PER_GROUP * 64, _field_chunk / 2)
-				elif ms < DISPATCH_TARGET_MS * 0.4:
-					_field_chunk = mini(1 << 20, _field_chunk * 2)
-	_field_dirty = false
-	field_build_count += 1
-	last_field_ms = float(Time.get_ticks_usec() - t0) / 1000.0
-	return last_field_ms
-
-
 ## Accumulate `spp` more samples per pixel. TDR-safe: the work is issued as
 ## (row band x spp chunk) dispatches whose size adapts to the measured kernel
 ## cost (dense milk and inclusions make a path many times dearer than clean
@@ -654,8 +490,6 @@ func build_scatter_field() -> float:
 func accumulate(spp: int) -> float:
 	assert(spp > 0)
 	var start := Time.get_ticks_usec()
-	if _field_dirty:
-		build_scatter_field()
 	var t0 := Time.get_ticks_usec()
 	var remaining := spp
 	while remaining > 0:
@@ -703,11 +537,7 @@ func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
 	pcb.put_float(_bg.z)
 	pcb.put_float(_spectral_norm)
 	pcb.put_float(_rad_clamp)
-	pcb.put_float(_env_filter_rad)
-	pcb.put_32(_field_exits)
-	pcb.put_32(_field_grid)
 	pcb.put_32(row_origin)
-	pcb.put_32(_inst_count)
 	pcb.put_float(_bg.w)
 	pcb.put_float(_throughput_epsilon)
 	assert(pcb.data_array.size() == PUSH_SIZE)
@@ -878,22 +708,8 @@ func load_linear_master(master: Image) -> bool:
 
 func profile() -> Dictionary:
 	return {"accumulate_wall_ms": last_accumulate_ms, "trace_wall_ms": last_dispatch_ms,
-		"field_last_build_ms": last_field_ms, "field_builds": field_build_count,
-		"print_readback_wall_ms": last_print_ms, "denoise_wall_ms": last_denoise_ms, "samples": samples_accumulated,
-		"field": field_info()}
-
-
-## Raw scatter-field texel data (RGBA16F), for tools that inspect the field.
-func debug_field_bytes() -> PackedByteArray:
-	if not _field_tex.is_valid():
-		return PackedByteArray()
-	return _rd.texture_get_data(_field_tex, 0)
-
-
-## Scatter-field configuration in effect (diagnostics).
-func field_info() -> Dictionary:
-	return {"exits": _field_exits, "grid": _field_grid, "dirs": _field_dirs,
-		"bytes": _field_bytes_for(_field_grid) if _field_exits > 0 else 0, "build_ms": last_field_ms}
+		"print_readback_wall_ms": last_print_ms, "denoise_wall_ms": last_denoise_ms,
+		"samples": samples_accumulated}
 
 
 # ------------------------------------------------------------------ cleanup
@@ -907,7 +723,7 @@ func _free_scene_buffers() -> void:
 
 func release() -> void:
 	_free_scene_buffers()
-	var rids: Array = [_bufs.get("standards", RID()), _bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex, _field_tex, _field_sampler]
+	var rids: Array = [_bufs.get("standards", RID()), _bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex]
 	rids.append_array(_pipelines.values())
 	rids.append_array(_shaders.values())
 	for rid in rids:

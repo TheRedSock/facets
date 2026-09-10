@@ -24,8 +24,8 @@ func _initialize() -> void:
 	policy["dispersion"] = false
 	policy["spectral_geometry"] = "selective" # controlled scalar geometry comparison
 	policy["max_bounces"] = 256
-	policy["env_filter_rad"] = 0.0
-	policy["field_exits"] = 0
+
+
 	var report := []
 	for density in ([0.5] if OS.get_cmdline_user_args().has("--dense") else [0.0, 0.075, 0.5]):
 		inst["scatter"] = {"sigma_per_mm": density, "g": 0.6}

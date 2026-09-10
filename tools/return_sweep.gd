@@ -17,7 +17,7 @@ func _initialize() -> void:
 	var policy: Dictionary = GemRung.policy(GemRung.PREVIEW).duplicate()
 	policy["dispersion"] = false
 	policy["birefringence"] = false
-	policy["field_exits"] = 0
+
 	var thetas := [0, 10, 20, 30, 40, 50, 60, 70, 80, 100, 120, 150]
 	var phis := [15.0, 75.0, 135.0, 195.0, 255.0, 315.0]
 	for sid: String in ["quartz", "amethyst", "emerald", "ruby", "diamond"]:

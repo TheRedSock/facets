@@ -3,8 +3,7 @@
 // Four stratified wavelengths; quality policies select shared or independent
 // geometry. Repeated volume scattering is the production estimator. Optional
 // reconstruction filters only the volume residual against zero-scatter light.
-// The legacy SH continuation is disabled in production: it is not a validated
-// multiple-scattering solver. See KERNEL_CONTRACT.md for layouts and limitations.
+// See KERNEL_CONTRACT.md for layouts and physical limitations.
 
 #include "gem_common.glsl"
 #include "gem_mesh.glsl"
@@ -27,18 +26,12 @@ layout(push_constant, std430) uniform Params {
 	float bg_below;       // 56
 	float spectral_norm;  // 60
 	float rad_clamp;      // 64  per-sample radiance ceiling (firefly control; rung policy)
-	float env_filter_rad; // 68  footprint floor for the post-scatter environment
-	int field_exits;      // 72  Fresnel exits integrated by the scatter field (0 = field off: stochastic continuation)
-	int field_grid;       // 76  scatter-field texels per axis
-	int row_origin;       // 80  first image row of this dispatch (host chunks work for TDR safety)
-	int field_insts;      // 84  instances stacked along the field's x axis
-	float bg_spectrum;      // 88  background spectrum table offset
-	float throughput_epsilon; // 92 numerical path termination threshold
+	int row_origin;       // 68 first image row of this dispatch
+	float bg_spectrum;    // 72 background spectrum table offset
+	float throughput_epsilon; // 76 numerical path termination threshold
 } pc;
 
-// In-scattered radiance field (SH l<=3 x spectral bands), built per frame by
-// gem_scatter_field.glsl. Hardware trilinear filtering does the spatial blend.
-layout(set = 0, binding = 7) uniform sampler3D field;
+
 layout(set = 0, binding = 8, std430) buffer Guides { vec4 guides[]; };
 layout(set = 0, binding = 9, std430) buffer Ballistic { vec4 ballistic_pixels[]; };
 layout(set = 0, binding = 10, std430) buffer Residual { vec4 residual_pixels[]; };
@@ -92,24 +85,24 @@ vec4 env_radiance(vec3 dir, vec4 wl, float rig_yaw, vec4 role_mult, float fp) {
 }
 
 // ---------------------------------------------------------------- zoning / absorption
-float zoning_scale(Stone st, vec3 p) {
+float zoning_column(Stone st, vec3 position, vec3 direction, float distance) {
 	float contrast = st.scatter_zone.w;
-	if (contrast <= 0.001) { return 1.0; }
-	float band = sin(dot(p, st.zone_axis_phase.xyz) * st.scatter_zone.z * PI + st.zone_axis_phase.w);
-	return 1.0 + contrast * band;
+	if (contrast == 0.0) { return distance; }
+	float half_phase = 0.5 * distance * dot(direction, st.zone_axis_phase.xyz) * st.scatter_zone.z * PI;
+	float sinc = abs(half_phase) < 0.001 ? 1.0 - half_phase * half_phase / 6.0 : sin(half_phase) / half_phase;
+	float mid_phase = dot(position + direction * (distance * 0.5), st.zone_axis_phase.xyz) * st.scatter_zone.z * PI + st.zone_axis_phase.w;
+	return max(0.0, distance * (1.0 + contrast * sin(mid_phase) * sinc));
 }
 
 // Beer-Lambert. pol_mode: UNPOL = 0.5 To + 0.5 Tk; O = pure o-ray; K = mixed k-ray.
 // alpha_k = cos^2(phi) alpha_o + sin^2(phi) alpha_e  (GIA G&G Spring 2021).
 vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl, int pol_mode) {
 	float size_mm = st.sell_b_size.w;
-	vec3 mid = pos + dir * (t * 0.5);
-	float zf = zoning_scale(st, mid) * st.misc.y;
-	float L = t * size_mm;
+	float L = zoning_column(st, pos, dir, t) * st.misc.y * size_mm;
 	if (!has_eray) {
 		vec4 alpha = vec4(absorb_at(a_off, wl.x), absorb_at(a_off, wl.y),
 			absorb_at(a_off, wl.z), absorb_at(a_off, wl.w));
-		return exp(-alpha * zf * L);
+		return exp(-alpha * L);
 	}
 	float ca = abs(dot(dir, st.optic_fluor.xyz));
 	float c2 = ca * ca;
@@ -120,9 +113,9 @@ vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray
 		alpha_e[i] = absorb_at(a_off + 401, wl[i]);
 		alpha_k[i] = c2 * alpha_o[i] + s2 * alpha_e[i];
 	}
-	if (pol_mode == POL_O) { return exp(-alpha_o * zf * L); }
-	if (pol_mode == POL_K) { return exp(-alpha_k * zf * L); }
-	return 0.5 * exp(-alpha_o * zf * L) + 0.5 * exp(-alpha_k * zf * L);
+	if (pol_mode == POL_O) { return exp(-alpha_o * L); }
+	if (pol_mode == POL_K) { return exp(-alpha_k * L); }
+	return 0.5 * exp(-alpha_o * L) + 0.5 * exp(-alpha_k * L);
 }
 
 // ---------------------------------------------------------------- surfaces
@@ -145,42 +138,6 @@ void surface_exit_at(Stone st, int exit_plane, vec4 wl, vec4 n_wl, float n_geom,
 	}
 	dir = normalize(reflect(dir, en));
 	pos -= en * (T_EPS * 4.0);
-}
-
-// ---------------------------------------------------------------- scatter field
-// HG-scattered radiance at x toward the camera path direction `dir` for the
-// 4 hero wavelengths, from the precomputed SH field (see gem_scatter_field).
-// Convolution with the HG kernel scales SH band l by g^l.
-vec4 field_scatter(int inst_idx, vec3 x, vec3 dir, float g, vec4 wl) {
-	int gn = pc.field_grid;
-	vec3 gp = clamp((x + vec3(FIELD_HALF)) * (float(gn) / (2.0 * FIELD_HALF)), vec3(0.5), vec3(float(gn) - 0.5));
-	float u = (float(inst_idx * gn) + gp.x) / float(pc.field_insts * gn);
-	float v = gp.y / float(gn);
-	float Y[16];
-	sh16(dir, Y);
-	float gl[4] = float[](1.0, g, g * g, g * g * g);
-	vec4 out_rad = vec4(0.0);
-	for (int c = 0; c < 4; c++) {
-		float fb = clamp((wl[c] - 380.0) / FIELD_BAND_NM - 0.5, 0.0, float(FIELD_BANDS - 1));
-		int b0 = int(fb);
-		int b1 = min(b0 + 1, FIELD_BANDS - 1);
-		float f = fb - float(b0);
-		float L = 0.0;
-		for (int t = 0; t < 4; t++) {
-			float w0 = ((float(b0 * 4 + t) * float(gn)) + gp.z) / float(FIELD_SLABS * gn);
-			float w1 = ((float(b1 * 4 + t) * float(gn)) + gp.z) / float(FIELD_SLABS * gn);
-			// Explicit LOD: implicit-LOD sampling is undefined outside fragment shaders.
-			vec4 coef = mix(textureLod(field, vec3(u, v, w0), 0.0), textureLod(field, vec3(u, v, w1), 0.0), f);
-			// Coefficients t*4 .. t*4+3: l = 0 | 1 1 1 | 2 2 2 2 2 | 3 3 3 3 3 3 3
-			int k = t * 4;
-			L += coef.x * Y[k] * gl[(k == 0) ? 0 : ((k < 4) ? 1 : ((k < 9) ? 2 : 3))];
-			L += coef.y * Y[k + 1] * gl[(k + 1 < 4) ? 1 : ((k + 1 < 9) ? 2 : 3)];
-			L += coef.z * Y[k + 2] * gl[(k + 2 < 4) ? 1 : ((k + 2 < 9) ? 2 : 3)];
-			L += coef.w * Y[k + 3] * gl[(k + 3 < 4) ? 1 : ((k + 3 < 9) ? 2 : 3)];
-		}
-		out_rad[c] = max(L, 0.0);
-	}
-	return out_rad;
 }
 
 // General closed-mesh transport. Air segments can hit the same specimen
@@ -435,17 +392,13 @@ void main() {
 				throughput *= segment_att(st, pos, dir, segment, a_off, has_eray, wl, pol_mode);
 				pos += dir * segment;
 				if (collision < distance) {
-					if (pc.field_exits > 0) {
-						radiance += throughput * field_scatter(inst_idx, pos, dir, hg_g, wl);
-						break;
-					}
 					dir = hg_sample_u(dir, hg_g, scatter_events == 0 ? u_scat : vec2(rnd(rng), rnd(rng)));
 					scatter_events++;
 					tau_free = -log(max(1e-7, 1.0 - rnd(rng)));
 				} else {
 					tau_free -= sigma_h * distance;
 					surface_exit_at(st, face, wl, n_wl, n_geom, q, rig_yaw, role_mult,
-						scatter_events > 0 ? pc.env_filter_rad : 0.0, pos, dir, throughput, radiance);
+						0.0, pos, dir, throughput, radiance);
 				}
 				if (max(max(throughput.x, throughput.y), max(throughput.z, throughput.w)) < THROUGHPUT_EPS) { break; }
 			}

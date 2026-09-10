@@ -73,6 +73,8 @@ func validate() -> PackedStringArray:
 		errors.append("Invalid crystal optical axis or birefringence")
 	if not is_finite(base_scatter_per_mm) or base_scatter_per_mm < 0.0 or not is_finite(scatter_anisotropy_g) or absf(scatter_anisotropy_g) >= 1.0:
 		errors.append("Invalid species scattering")
+	if not is_finite(zoning_frequency) or zoning_frequency < 0.0 or not is_finite(zoning_contrast) or zoning_contrast < 0.0 or zoning_contrast > 1.0 or not zoning_axis.is_finite():
+		errors.append("Zoning requires finite frequency/axis and contrast in [0,1]")
 	if refraction_evidence == null:
 		errors.append("Refraction evidence descriptor is missing")
 	else:

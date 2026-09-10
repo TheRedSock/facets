@@ -18,7 +18,7 @@ func _initialize() -> void:
 	var inst := LapidaryStoneCompiler.compile(stone)
 	var lights := PackedFloat32Array([0, 0, 1, 0.5, 5600, 0, 0.9, 0])
 	var policy := GemRung.policy(GemRung.PREVIEW)
-	policy["field_exits"] = 0
+
 	policy["fluorescence"] = true
 	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4.ZERO), policy)
 	tracer.accumulate(32)
@@ -37,7 +37,7 @@ func _initialize() -> void:
 	inst["scatter"] = {"sigma_per_mm": 0.6, "g": 0.0}
 	policy["max_bounces"] = 512
 	policy["birefringence"] = false
-	policy["env_filter_rad"] = 0.0
+
 	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(32)
 	var whole := tracer.read_xyz()
@@ -67,26 +67,50 @@ func _initialize() -> void:
 	_mesh_checks(tracer, inst, lights, policy)
 	_boundary_checks(tracer, inst, lights, policy)
 	_quadric_checks(tracer, inst, lights, policy)
-	# Changes to framing or print white balance cannot invalidate volume light.
-	policy["field_exits"] = 4
-	policy["field_grid"] = 4
-	policy["field_dirs"] = 64
+	_zoning_checks(tracer, inst, lights, policy)
+	# A print edit preserves samples; changes to the physical camera/pose retire them.
 	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(1)
-	var builds := tracer.field_build_count
-	tracer.set_clip_sample(Quaternion.IDENTITY, 0.0, Vector4.ONE, 1.4)
 	tracer.set_print_white(GemColorimetry.illuminant_xyz(6500.0))
-	tracer.reset_accumulation()
+	check(tracer.samples_accumulated == 1, "print neutral preserves the film")
+	tracer.set_clip_sample(Quaternion.IDENTITY, 0.0, Vector4.ONE, 1.4)
+	check(tracer.samples_accumulated == 0, "framing change retires incompatible samples")
 	tracer.accumulate(1)
-	check(tracer.field_build_count == builds, "framing and print changes reuse volume field")
 	tracer.set_stone_orientation(Quaternion(Vector3.UP, 0.2))
-	tracer.reset_accumulation()
-	tracer.accumulate(1)
-	check(tracer.field_build_count == builds + 1, "orientation rebuilds volume field")
-	check(tracer.last_accumulate_ms >= tracer.last_field_ms, "timing includes field build")
+	check(tracer.samples_accumulated == 0, "pose change retires incompatible samples")
 	print("GPU foundation: %d checks, %d failures; partition error %.8f; equilibrium Y %.6f" % [checks, failures, max_difference, total_y / coverage])
 	tracer.release()
 	quit(1 if failures else 0)
+
+func _zoning_checks(tracer: GemTracer, source: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
+	var specimen := source.duplicate(true)
+	specimen["sellmeier_b"] = Vector3.ZERO
+	specimen["sellmeier_c"] = Vector3.ZERO
+	specimen["birefringence"] = 0.0
+	specimen["absorption"].fill(0.2)
+	specimen["absorption_eray"] = PackedFloat32Array()
+	specimen["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
+	specimen["zoning"] = {"axis": Vector3.BACK, "frequency": 1.0, "contrast": 0.8, "phase": PI * 0.5}
+	specimen["planes"] = PackedFloat32Array()
+	for axis in [Vector3.RIGHT, Vector3.UP, Vector3.BACK]:
+		for sign_value in [-1.0, 1.0]:
+			var normal: Vector3 = axis * sign_value
+			specimen["planes"].append_array(PackedFloat32Array([normal.x, normal.y, normal.z, 1, 0, 0, 0, 0]))
+	var lighting := GemLighting.analytic(lights, Vector4(1, 1, 1, 0))
+	tracer.configure_stone(specimen, lighting, policy)
+	tracer.accumulate(128)
+	var whole := _center_y(tracer)
+	var expected := exp(-0.2 * 2.0 * float(specimen["size_mm"]))
+	check(absf(whole - expected) < 0.002, "full zoning period has analytic Beer transmission")
+	var boundaries := GemBoundarySet.new()
+	boundaries.add(load("res://tests/lapidary/test_boundaries.gd").box(Vector3(-1, -1, -1), Vector3(1, 1, 1)), 0)
+	boundaries.add(load("res://tests/lapidary/test_boundaries.gd").box(Vector3(-1.1, -1.1, -0.63), Vector3(1.1, 1.1, 0.28)), 0)
+	specimen["boundaries"] = boundaries
+	specimen["mesh"] = boundaries.mesh
+	tracer.configure_stone(specimen, lighting, policy)
+	tracer.accumulate(128)
+	var divided := _center_y(tracer)
+	check(absf(whole - divided) < 0.002, "same-medium boundary subdivisions preserve zoned absorption")
 
 func _analytic_interfaces(tracer: GemTracer, instance: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
 	var inst := instance.duplicate(true)
