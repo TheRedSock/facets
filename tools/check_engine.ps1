@@ -19,10 +19,13 @@ $stages += @{ Name = 'test_fracture'; Args = @('--headless', '--quit-after', '60
 $stages += @{ Name = 'test_volume_authoring'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_volume_authoring.gd') }
 $stages += @{ Name = 'test_geometry_factory'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_geometry_factory.gd') }
 $stages += @{ Name = 'test_render_dependencies'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_render_dependencies.gd') }
+$stages += @{ Name = 'test_finish_fields'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_finish_fields.gd') }
 if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'finish_fields_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/finish_fields_gpu_check.gd') }
+	$stages += @{ Name = 'finish_fields_render_check'; Args = @('--quit-after', '600', '--script', 'res://tools/finish_fields_render_check.gd') }
 	$stages += @{ Name = 'microsurface_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/microsurface_gpu_check.gd') }
 	$stages += @{ Name = 'pipeline_cache_check'; Args = @('--quit-after', '600', '--script', 'res://tools/pipeline_cache_check.gd') }
     $stages += @{ Name = 'geometry_factory_check'; Args = @('--quit-after', '600', '--script', 'res://tools/geometry_factory_check.gd') }
@@ -51,7 +54,7 @@ foreach ($stage in $stages) {
 }
 if ($ReferencePython -and $failed.Count -eq 0) {
     $referenceChecks = @('check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')
-    if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference') }
+    if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference', 'check_finish_fields_reference') }
     foreach ($name in $referenceChecks) {
         $output = & $ReferencePython (Join-Path $projectRoot "tools/$name.py") 2>&1
         $code = $LASTEXITCODE

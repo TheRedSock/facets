@@ -130,3 +130,12 @@ renderer, checkpoint failures and uint32 counter carry. `microsurface_lookdev.gd
 renders a256px polished/single/multiple/multiple-plus-milk sheet:128-sample
 reconstructed images above independent2048-sample raw references. Results are
 numerical/model evidence; automatic surface grading remains disabled.
+
+Spatial finish is authored with `GemSurface.fields` / `GemFinishField`, in
+millimeters and object-space directions. Fields interpolate the local GGX shape
+matrix; they do not paint color or change geometry. `finish_fields_gpu_check.gd`
+and `check_finish_fields_reference.py` compare actual packed/shader results to a
+float64 matrix reference. `finish_fields_render_check.gd` checks energy and
+angle-dependent reflection; `finish_fields_lookdev.gd` anchors a thin finish
+region to the generated table plane and compares unfinished/repolished states
+under two poses. Outputs remain under ignored `artifacts/finish-fields/`.

@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v16)
+# Lapidary kernel contract (v17)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. Wire floats
@@ -100,8 +100,9 @@ these limitations. Fluorescence has no enabled transport implementation.
 
 ## Boundary finish (32B, binding14)
 
-One record per region, same offset as binding13: vec4(alpha_u,alpha_v,multiple_scattering,0),
-vec4(object-space polish direction.xyz,0). Direction projects onto the tangent
+One record per region, same offset as binding13: vec4(alpha_u,alpha_v,multiple_scattering,field_offset),
+vec4(object-space polish direction.xyz,field_count). Offset/count are exact integer
+values stored as float32. Direction projects onto the tangent
 plane at each hit. Zero slopes select an exact specular dielectric interface.
 
 Rough dielectric uses visible-normal GGX, correlated Smith masking and consistent
@@ -141,6 +142,33 @@ against real ground gemstones. `microsurface_lookdev.gd` measures128-sample
 reconstructed images against independent2048-sample raw images. Automatic surface
 grading remains disabled; explicit uniform frosting does not model wear history,
 spatial scratches, subsurface damage, or measured roughness correlations.
+
+`GemSurface.fields` adds up to16 ordered local finish overrides per boundary.
+Binding20 stores80B per `GemFinishField`: vec4(center_mm,strength),
+vec4(radius_mm,0), quaternion xyzw, vec4(alpha_u,alpha_v,0,0), and
+vec4(object-space direction,0). A dummy80B record exists when there are no fields.
+Every hit evaluates its boundary's fields at `position*host_size_mm`, including
+internal defect surfaces. Weight is strength*max(0,1-|ellipsoid_local|^2)^3.
+Fields interpolate positive semidefinite GGX slope-shape matrices in the local
+tangent plane, in authored order. This is a locally defined NDF, not a mixture of
+BSDFs or variance addition (GGX slope variance is unbounded). Determinants use
+positive cross-product terms to retain narrow lobes at1:10000 anisotropy; a
+stable eigendecomposition supplies the actual local slope widths and direction.
+Empty/outside fields preserve the original finish exactly. Zero target widths
+can describe repolishing; nonzero fields on a smooth base enable boundary
+transport and full-signal reconstruction. Crystal admission conservatively
+rejects any potentially rough field, even if its support may miss the specimen.
+
+Footprint dimensions and directions are specimen-space data. Fields do not
+displace boundaries, alter normals/primary IDs, generate cracks, or infer a
+material removal rate from hardness. A large thin region anchored to a generated
+facet plane can describe an unfinished facet; it remains an authored condition.
+`test_finish_fields.gd`, `finish_fields_gpu_check.gd` plus the independent NumPy
+matrix reference, and `finish_fields_render_check.gd` test admission, physical
+scale, optical/geometry identity, anisotropic matrix accuracy, furnace energy,
+and the reversal of local reflection contrast with view angle. The lookdev tool
+`finish_fields_lookdev.gd` compares clean, rough-table and polished-table states
+at two orientations. Automatic surface grading remains disabled.
 
 ## Compiled lighting and colorimetry
 

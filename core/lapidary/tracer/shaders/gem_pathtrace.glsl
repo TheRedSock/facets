@@ -251,6 +251,7 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 		vec3 facing = dot(dir, normal) < 0.0 ? normal : -normal;
 		int region = triangle < 0 || st.ranges1.z == 0 ? 0 : triangles[triangle].meta.w;
 		GemSurfaceData finish = surfaces[st.ranges1.w + region];
+		finish = local_finish(finish, pos*st.sell_b_size.w, facing);
 		bool rough = max(finish.slopes.x, finish.slopes.y) >= 0.0001;
 		vec4 index_before = medium_index(before_medium, wl), index_after = medium_index(after_medium, wl);
 		float eta = geometry_index(before_medium, index_before, wl, wavelength, extraordinary, dir)

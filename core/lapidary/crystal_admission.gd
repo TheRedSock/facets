@@ -16,7 +16,7 @@ static func stone_error(stone: GemStone) -> String:
 		for defect in stone.condition.defects:
 			if defect == null or not defect.enabled:
 				continue
-			if defect.finish != null and maxf(defect.finish.alpha_u, defect.finish.alpha_v) >= 0.0001:
+			if defect.finish != null and defect.finish.has_roughness():
 				return "Crystal transport does not yet support rough defect boundaries"
 			if defect.filling != null:
 				if not defect.filling.validate().is_empty():
@@ -30,7 +30,7 @@ static func compiled_error(material: Dictionary) -> String:
 	if material.get("scatter", {}).get("sigma_per_mm", 0.0) > 0:
 		return "Crystal transport does not yet support volume scattering"
 	for finish: GemSurface in material.get("surfaces", []):
-		if maxf(finish.alpha_u, finish.alpha_v) >= 0.0001:
+		if finish.has_roughness():
 			return "Crystal transport does not yet support rough boundaries"
 	var peak: float = 1.0 + absf(material.get("zoning", {}).get("contrast", 0.0))
 	for field: GemVolumeField in material.get("volume_fields", []):

@@ -252,6 +252,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	var node_data := PackedByteArray()
 	var region_data := PackedInt32Array()
 	var surface_data := PackedFloat32Array()
+	var finish_data := PackedFloat32Array()
 	var volume_data := PackedFloat32Array()
 	var nested_materials: Array[Dictionary] = []
 	var host_index := 0
@@ -281,8 +282,10 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		var surfaces: Array = inst.get("surfaces", [])
 		for region in range(region_data.size() - int(inst["region_offset"])):
 			var finish: GemSurface = surfaces[region] if region < surfaces.size() else GemSurface.new()
-			surface_data.append_array(finish.packed())
-			if maxf(finish.alpha_u, finish.alpha_v) >= 0.0001:
+			surface_data.append_array(finish.packed(finish_data.size() / 20))
+			for field in finish.fields:
+				finish_data.append_array(field.packed())
+			if finish.has_roughness():
 				inst["rough_present"] = 1.0
 				if finish.multiple_scattering:
 					_flags |= FLAG_DISPERSION | FLAG_FULL_SPECTRUM
@@ -350,6 +353,9 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	_bufs["nodes"] = _rd.storage_buffer_create(node_data.size(), node_data)
 	_bufs["regions"] = _rd.storage_buffer_create(region_data.to_byte_array().size(), region_data.to_byte_array())
 	_bufs["surfaces"] = _rd.storage_buffer_create(surface_data.to_byte_array().size(), surface_data.to_byte_array())
+	if finish_data.is_empty():
+		finish_data.resize(20)
+	_bufs["finish_fields"] = _rd.storage_buffer_create(finish_data.to_byte_array().size(), finish_data.to_byte_array())
 
 	var insts := StreamPeerBuffer.new()
 	for i in _inst_count:
@@ -449,7 +455,7 @@ func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_hal
 func _build_uniform_sets() -> void:
 	var names := {0: "planes", 1: "lights", 2: "absorb", 3: "accum", 4: "standards",
 		5: "stones", 6: "insts", 7: "volume_fields", 8: "guides", 9: "ballistic", 10: "residual",
-		11: "triangles", 12: "nodes", 13: "regions", 14: "surfaces", 15: "spectra", 19: "surface_stats"}
+		11: "triangles", 12: "nodes", 13: "regions", 14: "surfaces", 15: "spectra", 19: "surface_stats", 20: "finish_fields"}
 	var uniforms: Array[RDUniform] = []
 	for binding: int in names:
 		var uniform := RDUniform.new()
@@ -893,7 +899,7 @@ func profile() -> Dictionary:
 # ------------------------------------------------------------------ cleanup
 
 func _free_scene_buffers() -> void:
-	for key in ["volume_fields", "planes", "lights", "spectra", "absorb", "stones", "insts", "triangles", "nodes", "regions", "surfaces"]:
+	for key in ["volume_fields", "planes", "lights", "spectra", "absorb", "stones", "insts", "triangles", "nodes", "regions", "surfaces", "finish_fields"]:
 		if _bufs.has(key) and _bufs[key].is_valid():
 			_rd.free_rid(_bufs[key])
 			_bufs.erase(key)
