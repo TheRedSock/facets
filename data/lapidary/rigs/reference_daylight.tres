@@ -1,7 +1,33 @@
-[gd_resource type="Resource" script_class="GemLightRig" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="GemLightRig" load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_light_rig.gd" id="1_rig"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_rig_light.gd" id="2_light"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_spectrum.gd" id="spectrum_script"]
+
+[sub_resource type="Resource" id="spd_0_0"]
+script = ExtResource("spectrum_script")
+model = 2
+temperature_kelvin = 0.0
+normalization = 1
+
+[sub_resource type="Resource" id="spd_5500_0"]
+script = ExtResource("spectrum_script")
+model = 2
+temperature_kelvin = 5500.0
+normalization = 1
+
+[sub_resource type="Resource" id="spd_5800_0"]
+script = ExtResource("spectrum_script")
+model = 2
+temperature_kelvin = 5800.0
+normalization = 1
+
+[sub_resource type="Resource" id="spd_6500_0"]
+script = ExtResource("spectrum_script")
+model = 2
+temperature_kelvin = 6500.0
+normalization = 1
 
 [sub_resource type="Resource" id="key"]
 script = ExtResource("2_light")
@@ -10,7 +36,7 @@ azimuth_deg = -30.0
 elevation_deg = 60.0
 angular_radius_deg = 20.0
 inner_fraction = 0.55
-kelvin = 6500.0
+spectrum = SubResource("spd_6500_0")
 power = 3.0
 enabled = true
 
@@ -21,7 +47,7 @@ azimuth_deg = 60.0
 elevation_deg = 20.0
 angular_radius_deg = 35.0
 inner_fraction = 0.5
-kelvin = 5800.0
+spectrum = SubResource("spd_5800_0")
 power = 0.8
 enabled = true
 
@@ -32,7 +58,7 @@ azimuth_deg = 0.0
 elevation_deg = -60.0
 angular_radius_deg = 45.0
 inner_fraction = 0.5
-kelvin = 5500.0
+spectrum = SubResource("spd_5500_0")
 power = 0.5
 enabled = true
 
@@ -44,5 +70,6 @@ lights = [SubResource("key"), SubResource("fill"), SubResource("bounce")]
 bg_zenith = 0.28
 bg_horizon = 0.18
 bg_below = 0.08
-bg_kelvin = 0.0
+background_spectrum = SubResource("spd_0_0")
 dual_illuminant_kelvin = 2856.0
+white_spectrum = SubResource("spd_6500_0")

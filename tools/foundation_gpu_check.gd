@@ -20,8 +20,7 @@ func _initialize() -> void:
 	var policy := GemRung.policy(GemRung.PREVIEW)
 	policy["field_exits"] = 0
 	policy["fluorescence"] = true
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4.ZERO})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4.ZERO), policy)
 	tracer.accumulate(32)
 	var xyz := tracer.read_xyz()
 	var max_y := 0.0
@@ -39,8 +38,7 @@ func _initialize() -> void:
 	policy["max_bounces"] = 512
 	policy["birefringence"] = false
 	policy["env_filter_rad"] = 0.0
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(32)
 	var whole := tracer.read_xyz()
 	tracer.reset_accumulation()
@@ -73,12 +71,11 @@ func _initialize() -> void:
 	policy["field_exits"] = 4
 	policy["field_grid"] = 4
 	policy["field_dirs"] = 64
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(1)
 	var builds := tracer.field_build_count
 	tracer.set_clip_sample(Quaternion.IDENTITY, 0.0, Vector4.ONE, 1.4)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0), "white_kelvin": 6500.0})
+	tracer.set_print_white(GemColorimetry.illuminant_xyz(6500.0))
 	tracer.reset_accumulation()
 	tracer.accumulate(1)
 	check(tracer.field_build_count == builds, "framing and print changes reuse volume field")
@@ -105,8 +102,7 @@ func _analytic_interfaces(tracer: GemTracer, instance: Dictionary, lights: Packe
 	inst["sellmeier_c"] = Vector3.ZERO
 	inst["absorption"].fill(50.0)
 	for angle in [0.0, 0.3, 0.6]:
-		tracer.configure_stone(inst, lights, policy)
-		tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+		tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 		tracer.set_stone_orientation(Quaternion(Vector3.UP, angle))
 		tracer.accumulate(1024)
 		var ci := cos(angle)
@@ -117,8 +113,7 @@ func _analytic_interfaces(tracer: GemTracer, instance: Dictionary, lights: Packe
 		var expected := (rs + rp) * 0.5
 		check(absf(_center_y(tracer) - expected) < 0.0003, "Fresnel at %.1frad matches analytic R=%.6f" % [angle, expected])
 	inst["absorption"].fill(0.2)
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(1024)
 	var t := exp(-0.2 * 2.0)
 	var expected := 0.04 + 0.96 * 0.96 * t / (1.0 - 0.04 * t)
@@ -143,14 +138,12 @@ func _mesh_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFloat32
 	inst["absorption"].fill(0.2)
 	inst["sellmeier_b"] = Vector3(1.25, 0, 0)
 	inst["sellmeier_c"] = Vector3.ZERO
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(512)
 	var planes := tracer.read_xyz()
 	inst["mesh"] = GemShapeCompiler.from_hull(inst["planes"])
 	inst["planes"] = PackedFloat32Array()
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(512)
 	var triangles := tracer.read_xyz()
 	var squared := 0.0
@@ -163,8 +156,7 @@ func _mesh_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFloat32
 	var outline := PackedVector2Array([Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(0.4, 1), Vector2(0.4, -0.2), Vector2(-0.4, -0.2), Vector2(-0.4, 1), Vector2(-1, 1)])
 	inst["mesh"] = GemShapeCompiler.loft(outline, PackedVector2Array([Vector2(-0.5, 1), Vector2(0.5, 1)]))
 	inst["sellmeier_b"] = Vector3.ZERO # n=1; analytic two-chord Beer-Lambert
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.set_stone_orientation(Quaternion(Vector3.UP, PI * 0.5))
 	tracer.accumulate(1024)
 	var xyz := tracer.read_xyz()
@@ -189,8 +181,7 @@ func _boundary_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFlo
 	boundaries.add(boxes.box(Vector3(-0.8, -0.8, -0.5), Vector3(0.8, 0.8, 0.1)), -1)
 	boundaries.add(boxes.box(Vector3(-0.7, -0.7, -0.1), Vector3(0.7, 0.7, 0.5)), -1)
 	inst["boundaries"] = boundaries
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(1024)
 	check(absf(_center_y(tracer) - exp(-0.2)) < 0.001, "overlapping cavities subtract union, with true entry and exit")
 	boundaries.add(boxes.box(Vector3(-0.5, -0.5, -0.2), Vector3(0.5, 0.5, 0.2)), 1)
@@ -200,15 +191,13 @@ func _boundary_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFlo
 	filling["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
 	filling["absorption"].fill(0.4)
 	inst["region_materials"] = [filling]
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(1024)
 	check(absf(_center_y(tracer) - exp(-0.2 - 0.4 * 0.4)) < 0.001, "nested filling uses its own absorption and physical thickness")
 	# A through-void removes primary coverage. Its mathematical surface above
 	# the host is not a visible floating primitive.
 	boundaries.add(boxes.box(Vector3(-0.3, -0.3, -1.2), Vector3(0.3, 0.3, 1.2)), -1)
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(128)
 	var xyz := tracer.read_xyz()
 	var coverage := 0.0
@@ -225,8 +214,7 @@ func _boundary_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFlo
 	inst["absorption"].fill(0.0)
 	filling["sellmeier_b"] = Vector3(0.7689, 0, 0) # n=1.33
 	filling["absorption"].fill(0.0)
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(1024)
 	check(absf(_center_y(tracer) - 1.0) < 0.001, "air/host/filling dielectric interfaces preserve equilibrium")
 
@@ -239,8 +227,7 @@ func _quadric_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFloa
 	inst["sellmeier_c"] = Vector3.ZERO
 	inst["absorption"].fill(0.2)
 	inst["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(1024)
 	# Integrate analytic chord length across the same primary pixel footprint.
 	var expected := 0.0
@@ -257,8 +244,7 @@ func _quadric_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFloa
 	regions.add_cabochon(inst["analytic_shape"], 0)
 	regions.add(load("res://tests/lapidary/test_boundaries.gd").box(Vector3(-0.3, -0.3, 0.1), Vector3(0.3, 0.3, 0.3)), -1)
 	inst["boundaries"] = regions
-	tracer.configure_stone(inst, lights, policy)
-	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4(1, 1, 1, 0)), policy)
 	tracer.accumulate(1024)
 	check(absf(_center_y(tracer) - expected * exp(0.2 * 0.2)) < 0.0001, "analytic host subtracts a mesh cavity with correct optical thickness")
 

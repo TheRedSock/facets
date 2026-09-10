@@ -18,7 +18,6 @@ func _initialize() -> void:
 	policy["dispersion"] = false
 	policy["birefringence"] = false
 	policy["field_exits"] = 0
-	tracer.set_environment({"bg": Vector4(0, 0, 0, 0), "white_kelvin": 0.0})
 	var thetas := [0, 10, 20, 30, 40, 50, 60, 70, 80, 100, 120, 150]
 	var phis := [15.0, 75.0, 135.0, 195.0, 255.0, 315.0]
 	for sid: String in ["quartz", "amethyst", "emerald", "ruby", "diamond"]:
@@ -34,7 +33,7 @@ func _initialize() -> void:
 				var d := Vector3(sin(t) * cos(p), sin(t) * sin(p), cos(t))
 				var lights := PackedFloat32Array([d.x, d.y, d.z, cos(deg_to_rad(15.0)),
 					5600.0, 1.0, cos(deg_to_rad(9.0)), 0.0])
-				tracer.configure_stone(inst, lights, policy)
+				tracer.configure_stone(inst, GemLighting.analytic(lights), policy)
 				tracer.set_seed(3)
 				tracer.set_clip_sample(rest, 0.0, Vector4.ONE, ORTHO)
 				tracer.reset_accumulation()

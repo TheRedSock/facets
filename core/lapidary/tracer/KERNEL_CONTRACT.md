@@ -1,241 +1,171 @@
-# Lapidary Kernel Contract (v8 — physical surface finishes and nested material boundaries)
+# Lapidary kernel contract (v9)
 
-The single interface between the data model and the GPU tracer. Everything that
-renders — designer preview, clip bake, live board draws, evaluation sheets —
-goes through these buffers. Anything not expressible here does not exist visually.
+This is the CPU/GPU interface for offline workers and Atelier previews. The game
+loads prebuilt assets and does not instantiate the optical renderer. All floats
+are float32, std430. Stone space has the girdle at z=0, crown toward +Z, and unit
+girdle radius. `size_mm` converts one stone-space unit into millimeters. The
+orthographic camera looks down world −Z; instance quaternions rotate stone→world.
 
-All buffers are std430 float32 unless noted. Stone space: girdle plane at z=0,
-crown toward +Z, unit girdle radius. Camera: orthographic, world space, looking
-down −Z; the stone quaternion rotates stone→world.
+## Geometry and material state
 
-## Plane (8 floats) — the stone body, intersection of half-spaces
-| idx | field | notes |
-|---|---|---|
-| 0–2 | outward unit normal (stone space) | |
-| 3 | d — plane offset (`dot(n,x) <= d` is inside) | |
-| 4 | zone id | 0 table, 1 crown main/star, 2 upper girdle, 3 girdle, 4 pavilion main, 5 lower girdle, 6 culet, 7 step row (compiler metadata; finish is a separate boundary property) |
-| 5–7 | reserved | |
+A Plane is two vec4s (32B): outward normal.xyz/offset d, then zone ID/reserved3.
+The host interior obeys dot(n,x)<=d. Zone IDs: 0 table, 1 crown main/star,
+2 upper girdle, 3 girdle, 4 pavilion main, 5 lower girdle, 6 culet, 7 step row.
+They identify cut structure, not surface finish.
 
-The hull MUST be bounded (compiler responsibility). Facet-meeting error may perturb the plane program. Faceted bodies may keep the
-convex backend or compile to a shared, closed triangle surface. Lofted and
-cabochon recipes use the triangle backend; concavity is supported.
+A Triangle is four vec4s (64B): a/b/c vertices (w reserved), then ivec4
+(facet ID, reserved, reserved, local region ID). BVH Node (48B): vec4 low/high,
+ivec4 left/right/first/count. Count0 is an internal node. Absolute buffer indices,
+median split, four triangles per leaf, traversal stack64.
 
+`GemMesh` validates finite coordinates, nondegeneracy, closed oriented edge
+incidence and positive volume. Arbitrary global self-intersection certification
+is not implemented. Convex plane→mesh conversion preserves facet IDs and welds
+canonical intersections; concave lofts use procedural triangle surfaces.
 
-## Procedural triangle backend
+Round/oval cabochons use analytic upper ellipsoid + elliptical girdle cylinder +
+flat base. Stone.ranges0.y=-1 selects this host. Its Plane n_d contains x radius,
+y radius, dome height, base z<0. Analytic surface IDs are -1 dome, -2 girdle,
+-3 base; BVH triangle IDs are nonnegative. Other curved outlines use triangles.
 
-`GemShape` separates outline, aspect and profile from the cut program. Faceted
-plane conversion preserves source facet IDs and welds canonical plane intersections.
-`GemMesh` stores indexed outward-oriented closed surfaces; validation checks finite
-coordinates, indices, nondegeneracy, edge incidence/orientation and positive volume.
-It does not yet certify arbitrary global self-intersections.
+Region0 is the host; up to127 additional closed priority regions are clipped to
+it. The highest active region chooses the medium. A uvec4 tracks active regions.
+Binding13 contains int32 region→material indices at Stone.ranges1.w+region:
+-1 air, otherwise a shared Stones index. Host materials are first in that array,
+then nested materials. Overlapping cavities subtract their union; higher filled
+regions override lower ones. Exact coincident boundaries are unsupported: use a
+finite gap or overlap. Mathematical boundaries with unchanged medium are skipped
+for visibility, but transport processes their segments to preserve optical length.
 
-Triangle (64B): vec4 a, b, c (xyz vertices, w reserved), ivec4 metadata
-(facet ID, reserved, reserved, region ID). Region IDs are local to each specimen.
-Binding13 contains int32 material indices, addressed by Stone.ranges1.w + region.
-Index -1 means air, otherwise it addresses the shared Stones material array.
-Host material records are first (one per authored instance), then nested materials.
-Each ray tracks up to128 active closed regions in a uvec4. Region0 is the host;
-all other regions are clipped to it. The highest active region overrides lower
-ones. Overlapping voids therefore subtract their union; a higher filled region
-can override a cavity. Coincident boundaries are unsupported: use overlap or a
-finite gap. Subpixel populations should use effective media, not unbounded regions.
-Node (48B): vec4 low/high bounds, ivec4 left/right/first/count. Count=0 denotes
-an internal node. Child and triangle indices are absolute in their shared buffers.
-The deterministic median BVH has four triangles per leaf; GPU traversal stack=64.
-Stone `ranges1.z=0` selects planes, otherwise it is the BVH root index plus one.
+## Stone (128B)
 
-General transport tracks air/host segments and handles external re-entry.
-Deterministic Fresnel escape splitting is only used after visibility proves a
-branch reaches the environment; coupled branches use weighted roulette. Curved
-surfaces currently use geometric triangle normals; tessellation can be visible in
-sharp highlights. Nested absorption/scattering and relative-index dielectric interfaces are supported.
-Rough interfaces use the surface model below. Mathematical region boundaries that do not
-change material are skipped for visibility and coverage. Transport still processes
-their segments to preserve optical length and scattering state.
-
-## Light (8 floats) — analytic rig, world space
-| idx | field |
+| vec4 | Contents |
 |---|---|
-| 0–2 | direction TOWARD the light |
-| 3 | cos(outer angular radius) |
-| 4 | kelvin (Planck-relative SPD, normalized at 560 nm) |
-| 5 | power (BLOCKER: darkening strength 0..1) |
-| 6 | cos(inner radius) |
-| 7 | role: 0 key, 1 fill, 2 rim, 3 bounce, 4 blocker |
-
-`GemRigCompiler.pack()` is the only packer. The shader indexes per-role power
-multipliers by this role field (not by buffer index).
-
-## Boundary surface finish (32 bytes, binding14)
-Each region has one record at the same offset as binding13. Two vec4s contain
-GGX alpha_u/alpha_v/reserved/reserved and object-space polish direction.xyz/reserved.
-The direction is projected onto the geometric tangent plane at the actual hit.
-`GemSurface` is independent of the bulk material: a cavity wall, a filled inclusion
-and the host can have different finishes. Zero slopes select a perfect interface.
-
-Visible-normal GGX sampling and correlated Smith masking use consistent reflection
-and transmission weights (G2/G1 after proposal cancellation). Radiance transmission
-includes the squared incident/transmitted index ratio. Macroscopic hemisphere tests
-reject invalid sampled branches. Index-matched boundaries ignore finish entirely.
-The single-scattering microfacet model is accepted only as a light-polish foundation;
-strong frosting loses unresolved microfacet multiple scattering and is not enabled
-in automatic grade recipes. Furnace and directional checks: tools/surface_check.gd.
-
-The nonphysical inclusion primitive backend has been removed. Binding4 and Stone
-ranges0.zw are unassigned. Explicit geometry/material regions replace its fake discs,
-RGB-tinted clouds, and density-derived reflection probabilities.
-
-## Stone struct (128 bytes, std430 — array `Stones`, one per distinct stone)
-| vec4 | contents |
-|---|---|
-| 0 | sellmeier_b.xyz, size_mm |
-| 1 | sellmeier_c_um2.xyz, signed birefringence Δn |
-| 2 | scatter σ_s/mm, HG g, zoning frequency, zoning contrast |
-| 3 | zoning axis.xyz, zoning phase |
-| 4 | optic axis.xyz, fluorescence strength |
+| 0 | Sellmeier B.xyz, size_mm |
+| 1 | Sellmeier C.xyz in µm², signed birefringence Δn |
+| 2 | scattering σ_s/mm, HG g, zoning frequency, zoning contrast |
+| 3 | zoning axis.xyz, phase |
+| 4 | optic axis.xyz, fluorescence strength (disabled) |
 | 5 | fluorescence nm (disabled), absorb_scale, nested_volume_present, rough_present |
 | ivec4 6 | plane_offset, plane_count, reserved, reserved |
-| ivec4 7 | absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), bvh_root_plus_one, region_offset |
+| ivec4 7 | absorb_offset, flags, bvh_root_plus_one, region_offset |
 
-Explicit surface condition reaches the kernel through binding14. Automatic scalar
-clarity/surface grade mapping is still disabled; cut/crystal remain legacy recipes.
+Flags: bit0 has_eray, bit1 dispersion_strong. BVH selector0 is convex planes,
+-1 analytic host without mesh, positive root+1 supports triangle host/defects.
+Absorption concatenates 81-sample α/mm blocks, 380..780 nm at5nm. An e-ray
+block follows its o-ray block directly. Concentration is already applied.
 
-Absorption buffer: concatenated 81-sample blocks (α/mm, 380–780 @ 5 nm, concentration
-applied). If `has_eray`, the e-ray block directly follows the o-ray block (offset+81).
+Current anisotropy is an approximation: α_k=cos²φ α_o+sin²φ α_e; the unpolarized
+segment uses (T_o+T_k)/2. Optional o/e fork occurs above |Δn|=.015, with effective
+index 1/n_e(φ)²=cos²φ/n_o²+sin²φ/n_e². There is no persistent polarization frame,
+full anisotropic interface solver or biaxial transport. REFERENCE does not fix
+these limitations. Fluorescence has no enabled transport implementation.
 
-Polarisation (GIA G&G Spring 2021): with `c2 = cos²(φ)` for angle φ between ray and
-optic axis, `α_k = c2 α_o + (1-c2) α_e`. Unpolarised stones use `0.5 T_o + 0.5 T_k`.
-Birefringent fork (rung + |Δn| > 0.015): o-pass uses α_o, e-pass uses α_k. Index of
-the e-pass uses the indicatrix: `1/n_e(φ)² = c2/n_o² + (1-c2)/n_e²`.
+## Boundary finish (32B, binding14)
 
-## Instance struct (64 bytes — array `Insts`, one per grid cell)
-| vec4 | contents |
-|---|---|
-| 0 | stone→world quaternion |
-| 1 | rig_yaw (radians), ortho_half, key_mult, fill_mult |
-| 2 | rim_mult, bounce_mult, camera_distance, 0 |
-| ivec4 3 | stone_index, 0, 0, 0 |
+One record per region, same offset as binding13: vec4(alpha_u,alpha_v,0,0),
+vec4(object-space polish direction.xyz,0). Direction projects onto the tangent
+plane at each hit. Zero slopes select an exact specular dielectric interface.
 
-Pixels map to instances via an equal-cell grid (push constants `grid`, `cell_px`);
-grid 1×1 = single stone.
+Rough dielectric uses visible-normal GGX, correlated Smith masking and consistent
+G2/G1 proposal weights, including incident/transmitted index squared for radiance.
+Macroscopic hemisphere tests reject invalid proposals. Index-matched boundaries
+ignore finish. The single-scattering microfacet model loses unresolved energy at
+strong roughness: only light polish has passed acceptance. Strong frosting and
+automatic grade.surface recipes remain disabled. `tools/surface_check.gd` checks
+furnace response and directional polish. The old fake inclusion primitives are
+removed; explicit closed geometry and material regions are the defect backend.
 
-## Bindings (set 0)
-0 Planes, 1 Lights, 2 Absorb, 3 Accum (vec4 XYZ+coverage), 4 unassigned, 5 Stones, 6 Insts,
-7 legacy scatter field (`image3D` in pre-pass, `sampler3D` in trace; production policies disable it).
-Trace-only bindings: 8 guides (two vec4 per pixel: normal/depth sums, residual Y squared/Y sum/min-max facet IDs), 9 zero-scatter XYZ/coverage sums, 10 residual XYZ/coverage sums, 11 triangles, 12 BVH nodes, 13 region-to-material indices, 14 boundary finishes.
+## Compiled lighting and colorimetry
 
-Reconstruction (`gem_denoise.glsl`) uses bindings 0 input sums, 1 guides, 2 output sums, 3 zero-scatter sums. Push constants (32B): resolution ivec2, step int, sample count float, phi float, normal exponent float, vec2 padding. Step zero composites filtered residual with untouched zero-scatter light for smooth hosts. Rough boundaries instead reconstruct the entire stochastic signal; their ballistic buffer is zero. Other steps run positive, variance/normal-guided a-trous filtering. Coverage is never filtered. This is a biased optional reconstruction; `read_xyz` and `read_linear_master` always expose the unchanged reference accumulation.
+`GemRigCompiler.compile(rig)` returns one `GemLighting`: packed lights, deduplicated
+spectra, background, and white_xyz. No independently packed environment can carry
+stale spectral offsets. A Light is two vec4s (32B): direction toward light.xyz,
+cos outer angle; spectrum offset, radiance power, cos inner angle, role ID.
+Roles0..4 are key/fill/rim/bounce/blocker. Per-instance multipliers address roles.
+At most8 lights; a background-only rig has count0 and a dummy buffer allocation.
 
-Kernel push constants (96 B): resolution, sample_base, spp, seed, max_bounces, flags
-(bit0 dispersion_split, bit1 birefringence approximation, bit2 volume, bit4 reserved, bit5 full wavelength geometry),
-light_count, grid, cell_px, bg zenith/horizon/below, spectral_norm, rad_clamp,
-env_filter_rad, field_exits, field_grid, row_origin, field_insts, bg_kelvin, throughput_epsilon.
+Binding15 concatenates 401-float emission SPDs, 380..780 nm at1nm, linearly
+interpolated. Light slot4 and background.w address the start of a block. Emission
+recipes are equal-energy, blackbody, CIE D65, or sampled radiance. Normalization is
+explicit: preserve scale, normalize at560nm, or match unit equal-energy luminance.
+Power remains separate. Finer-than1nm structure is not represented by this ABI.
 
-Scatter-field push constants (48 B): grid_n, field_exits, light_count, inst_count,
-dirs, band_group, env_filter_rad, texel_base, bg (zenith, horizon, below, kelvin).
+Binding4 is 401 vec4s: CIE1931 2° xbar/ybar/zbar and relative D65 at1nm. Original
+CIE tables plus publisher metadata reside in data/lapidary/standards (CC BY-SA4.0;
+DOIs10.25039/CIE.DS.xvudnb9b and10.25039/CIE.DS.hjfjmt59). SHA256 is verified and
+included in optical identity. Worker bundles carry the original files. No network
+is needed to render. Tables replace the earlier Gaussian observer fit.
 
-Print push constants (112 B): output resolution, inv_samples, exposure, raw, white_point,
-contrast, black_point, chroma_ceiling, chroma_soft, highlight_desat, pad, then the
-XYZ→linear-sRGB matrix as three vec4 columns (includes the rig's as-shot white
-balance, see below), then source resolution (ivec2) and padding (ivec2).
-The print resolves coverage-associated linear XYZ over each output pixel's source
-footprint, divides XYZ by covered sample weight, then applies the display transform.
-The output is straight sRGB RGBA8. `read_linear_master()` returns associated XYZ
-and coverage as RGBAF without any display transform.
+Background is a zenith/horizon/below gradient multiplied by its SPD. Light cones
+have smooth inner/outer edges, widened by the path footprint using the existing
+solid-angle flux compensation. Blockers multiply radiance by1−power*weight.
 
-## Environment
-`env_radiance_ex(dir, wl, rig_yaw, role_mult, fp, with_lights, bg, light_count)`
-(gem_common.glsl) is the one analytic rig evaluator, shared by the kernel and the
-scatter-field pre-pass. Background = zenith/horizon/below gradient; its spectrum is
-Planckian at `bg.w` kelvin (flat when 0). Lights are Planck-relative cones widened by
-the footprint `fp` (flux-conserving `R² / (R² + fp²)` — the same cone_omega formula
-on both sides). Blockers multiply everything in their cone by `1 - power·w`.
+White balance is independent of optical transport: integrate the explicit neutral
+SPD to XYZ, normalize Y, then Bradford-adapt to D65 before linear sRGB. Null neutral
+means no adaptation. White-only changes preserve optical masters and accumulation.
+The house print applies exposure, tonescale and chroma control, then sRGB encoding.
+Coverage-associated XYZ is area-resolved before division by coverage and nonlinear
+printing. Output is straight-alpha RGBA8. Raw masters remain associated XYZ+coverage.
 
-`GemRigCompiler.environment(rig)` → `{bg: Vector4, white_kelvin}` feeds
-`GemTracer.set_environment()`. `white_kelvin` is the rig's as-shot neutral: the host
-builds Bradford(CAT) from that Planckian white to D65 (`core/lapidary/lighting/
-colorimetry.gd`, same CIE fit as the shaders) and folds it into the print matrix, so a
-colourless stone under the rig's dominant light prints white and every other light
-keeps its relative warmth. Exposure is the house print's `exposure` only — tools and
-bakes pass 1.0.
+## Instance (64B)
 
-## Estimator (v4)
-- Global sample index `n = sample_base + s` drives per-pixel Cranley-Patterson-rotated
-  Halton for pixel filter, wavelength, unified free flight + medium choice, and the
-  first scatter direction (field-off only). PCG covers remaining dimensions.
-- Deterministic Fresnel split at every interior surface: the transmitted branch
-  evaluates the environment immediately, the reflected/TIR branch continues.
-  The first inclusion surface hit splits deterministically too.
-- Angular footprint `fp` (radians) grows with the orthographic pixel footprint and
-  the path's divergence; the environment cones are widened by it.
-- Volume: repeated sampled scatter events per path (homogeneous milk + cloud primitives,
-  unified free flight). With `field_exits > 0` the scattered radiance is read from
-  the SH scatter field (l ≤ 3, 16 × 25 nm bands, HG convolution `g^l`), and the
-  path ends: the field is the whole continuation. `field_exits = 0` keeps the
-  stochastic HG continuation with a fresh exponential free flight after each event.
-  The reference includes multiple scattering; the current field remains an
-  approximation under evaluation. After a
-  scatter, the environment footprint floor is `env_filter_rad` on both sides.
-- Scatter field pre-pass (`gem_scatter_field.glsl`): per texel of a
-  `field_grid³` lattice over `[-1.25, 1.25]³` stone space, `field_dirs` Fibonacci
-  directions each traced through the Fresnel chain for `field_exits` hull hits with
-  Beer-Lambert absorption (no extinction by σ_s: higher orders are delivered
-  forward, matching the kernel). Rebuilt whenever orientation, rig, background or
-  stone set changes; the host chunks it (4 bands × texel ranges) for TDR safety.
+vec4 quaternion; vec4(rig yaw radians, ortho half-width, key mult, fill mult);
+vec4(rim mult, bounce mult, camera distance,0); ivec4(stone index,0,0,0).
+Camera distance encloses all host/defect geometry under rotation. Framing is
+separate. An equal-cell grid maps pixels to instances; 1×1 is a single specimen.
 
-## Rung flags (engineering policy — `core/lapidary/tracer/rung.gd`)
-dispersion_split (per-λ paths), birefringence fork, volume, max_bounces, spp per
-dispatch (`batch`), internal resolution → output size, rad_clamp, env_filter_rad,
-field_exits / field_grid / field_dirs. Denoise always off.
+## Bindings and push constants
 
-## Clip sample (what a render call receives)
-time_norm, stone quaternion (rest ∘ motion), rig yaw (radians), per-role power
-multipliers (vec4: key, fill, rim, bounce), effect values (exposure_pulse),
-camera ortho half-width.
+Shared set0: 0 planes,1 lights,2 absorption,3 accumulated XYZ+coverage,4 standards,
+5 Stones,6 Instances,7 legacy scatter field image/sampler,15 emission spectra.
+Trace also uses8 guides (normal/depth sums, residual Y²/Y sum/min/max facet IDs),
+9 zero-scatter sums,10 residual sums,11 triangles,12 BVH nodes,13 region materials,
+14 boundary finishes. Guide stride32B; other film buffers16B/pixel.
 
-## Host API (`gem_tracer.gd`)
-`create(w, h, rd=null)` → tracer (null in headless).
-Full path: `configure_stone(instance, lights, policy)` /
-`configure_stones(instances, lights, policy, grid)` where `instance` is
-`LapidaryStoneCompiler.compile()` output and `policy` is `GemRung.policy()`.
-Per-frame: `set_stone_orientation(q)`, `set_clip_sample(q, rig_yaw, role_mult,
-ortho_half)`, `set_instances(states)` (batch), `set_environment(env)` (from
-`GemRigCompiler.environment(rig)`), `set_seed(s)`.
-Dispatch: `accumulate(spp) -> ms` (adaptive TDR-safe chunking; rebuilds the scatter
-field first when dirty), `build_scatter_field() -> ms`, `reset_accumulation()`.
-Output: `finalize_print(print: GemPrint, raw := false, exposure := 1.0)`
-(GPU print pass; house print via `GemPrint.load_house()`), `read_xyz()` (physics tests).
-`release()` frees GPU resources.
+Trace push96B: resolution, sample_base, spp, seed, max_bounces, flags, light_count,
+grid, cell_px, background zenith/horizon/below, spectral_norm, rad_clamp,
+env_filter_rad, field_exits, field_grid, row_origin, field_insts, background SPD
+offset, throughput_epsilon. Flags bit0 dispersion,bit1 approximate birefringence,
+bit2 volume,bit4 reserved,bit5 full four-wavelength geometry.
+Legacy field push48B: grid_n,field_exits,light_count,inst_count,dirs,band_group,
+env_filter_rad,texel_base,background vec4. Production policies set field_exits=0;
+the retained SH prepass is not a validated multiple-scattering solution.
 
-## Determinism contract
-Seeded QMC + PCG from (pixel, frame, stone seed). Reproducible on the same GPU
-family + driver. NOT bit-exact across vendors — cache keys carry
-`look_version`; foreign caches regenerate. Physics tests assert with
-tolerances, never bit equality.
+Print push112B: output size,inv_samples,exposure,raw,white_point,contrast,
+black_point,chroma_ceiling,chroma_soft,highlight_desat,pad; XYZ→linear-sRGB matrix
+as three vec4 columns; source size and padding. Reconstruction push32B:
+resolution,step,sample_count,phi,normal_exponent,padding2; bindings0 input,
+1 guides,2 output,3 zero-scatter sums.
 
-Production policies use repeated scattering with no post-scatter environment blur. Full spectral geometry splits all four sampled wavelengths, not just high-dispersion species. `REFERENCE` is unfiltered but does not cure the still-approximate anisotropic model. Fluorescence is not rendered. `accumulate()` returns total wall time including any field work; `profile()` separates trace, field, reconstruction, and print/readback.
+## Estimator and reconstruction
 
-## Authoring boundary
-`GemMaterial` owns reusable species/chromophore and optional bulk scattering.
-`GemShape` owns outline/profile/cut-independent dimensions. `GemCondition` owns
-realized millimeter-scale `GemDefect` boundaries. The old `GemGrade` remains a
-catalog recipe for cut proportions and haze, not a physical or gemological grade.
-Automatic clarity/surface recipes remain disabled. Explicit chip/fracture/crystal
-boundaries can be authored and filled with another GemMaterial. Their morphology
-is procedural, not a stress or crystal-growth simulation; current fractures have
-not passed low-SPP visual acceptance. Surface polish fields are not yet rendered.
+QMC/PCG derives random samples from global sample index; dispatch partitioning
+does not restart sequences. Smooth convex hosts use deterministic Fresnel escape
+splitting. General boundaries split only after the escape branch is proven to
+reach the environment; coupled internal branches use roulette. TIR continues.
+Homogeneous volume uses repeated HG scattering and analytic free-flight distance.
+Absorption/zoning act along segments; current zoning integration is approximate.
 
-## Analytic curved hosts (v7)
-Round/oval cabochons use exact-form ellipsoid, elliptical girdle cylinder and flat
-base intersections. Stone.ranges0.y=-1 identifies an analytic host; the Plane
-record at ranges0.x is a tagged geometry parameter block: n_d=(x radius, y radius,
-dome height, base z<0), aux reserved. ranges1.z=-1 denotes no mesh BVH; positive
-values allow the same analytic host plus mesh defect regions. The analytic host
-is region0, and the shared priority medium state also handles its cavities and
-fillings. General boundary surface IDs are negative for analytic patches (-1
-dome, -2 girdle, -3 base), nonnegative for BVH triangles. Other outlines retain
-procedural triangle surfaces.
+Production volume reconstruction filters the stochastic residual with positive,
+variance/normal-guided à-trous weights, keeping smooth zero-scatter light intact.
+Rough interfaces reconstruct the whole stochastic signal. Coverage stays unchanged.
+This is a biased optional filter. Raw accumulation and unfiltered REFERENCE remain
+available. No claim of independent physical calibration follows from self-tests.
 
-Instance.rig2.z is an outside-bound camera distance, derived from an enclosing
-sphere of all host and defect geometry. It remains valid under rotation. The
-orthographic framing half-width remains a separate authoring/clip parameter.
+## Host and authoring boundary
+
+`create(w,h)` needs a local RenderingDevice (windowed). Configure with compiled
+specimen(s), GemLighting and GemRung policy. `set_lighting()` atomically replaces
+lighting, resets incompatible accumulation and dirties the field; a white-only
+change retains it. `set_print_white()` affects only print. Per-frame orientation,
+rig yaw, role multipliers, framing and seed are explicit. `accumulate()` reports
+wall time including field work; `profile()` separates stages. Checkpoints retain
+raw estimator buffers and the global sample count. Release frees GPU resources.
+
+GemMaterial owns bulk properties, GemShape the procedural body recipe, GemCondition
+realized millimeter-scale defects and host finish. GemGrade remains a legacy cut/
+haze recipe, not a calibrated gemological grade. Automatic clarity and surface
+recipes are disabled. Explicit fractures have not passed low-SPP visual acceptance.
+Recipe hashes cover physical input and optical source; producer hardware/driver
+are metadata. Determinism tests use tolerances across floating-point execution.

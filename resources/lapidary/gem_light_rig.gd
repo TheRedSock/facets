@@ -9,18 +9,15 @@ extends Resource
 @export var lights: Array[GemRigLight] = []
 
 @export_group("Background")
-## Flat-spectrum gradient intensities (chromatic backgrounds via kelvin below).
 @export var bg_zenith := 0.30
 @export var bg_horizon := 0.16
 @export var bg_below := 0.05
-## 0 = neutral flat spectrum; otherwise Planckian tint of the background.
-@export var bg_kelvin := 0.0
+@export var background_spectrum: GemSpectrum = GemSpectrum.new()
 
 @export_group("White balance")
-## As-shot neutral: the print adapts this Planckian illuminant to D65 (Bradford),
-## so a colourless stone lit by it reads white and every other light keeps its
-## relative warmth/coolness. 0 = no adaptation (scene XYZ straight to sRGB).
-@export var white_kelvin := 0.0
+## As-shot neutral spectrum. Null leaves scene XYZ unadapted; otherwise its
+## integrated XYZ is adapted to D65 by the print, independently of transport.
+@export var white_spectrum: GemSpectrum
 
 @export_group("Evaluation")
 ## Secondary illuminant kelvin for color-change A/B views (0 = disabled).

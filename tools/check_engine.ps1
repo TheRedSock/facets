@@ -10,11 +10,11 @@ $stages = @(
     @{ Name = 'import'; Args = @('--headless', '--editor', '--quit') },
     @{ Name = 'source_check'; Args = @('--headless', '--quit-after', '600', 'res://tools/source_check.tscn') }
 )
-foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler')) {
+foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_spectra', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler')) {
     $stages += @{ Name = $name; Args = @('--headless', '--quit-after', '600', '--script', "res://tests/lapidary/$name.gd") }
 }
 if ($Gpu) {
-    foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'library_gpu_check', 'surface_check')) {
+    foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'library_gpu_check', 'surface_check', 'spectra_gpu_check')) {
         $stages += @{ Name = $name; Args = @('--quit-after', '600', '--script', "res://tools/$name.gd") }
     }
 }

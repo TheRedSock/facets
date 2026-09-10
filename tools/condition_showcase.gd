@@ -30,8 +30,7 @@ func _initialize() -> void:
 			fracture.filling = water if kind == "filled" else null
 			stone.condition.defects.append(fracture)
 		var inst := LapidaryStoneCompiler.compile(stone)
-		tracer.configure_stone(inst, GemRigCompiler.pack(rig), GemRung.policy(GemRung.HERO))
-		tracer.set_environment(GemRigCompiler.environment(rig))
+		tracer.configure_stone(inst, GemRigCompiler.compile(rig), GemRung.policy(GemRung.HERO))
 		for angle in [0.0, 0.35]:
 			tracer.set_stone_orientation(Quaternion(Vector3.RIGHT, angle))
 			tracer.reset_accumulation()

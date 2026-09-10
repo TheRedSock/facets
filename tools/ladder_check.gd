@@ -14,7 +14,7 @@ const CELL := 224
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	var rig: GemLightRig = load("res://data/lapidary/rigs/gameplay_studio.tres")
-	var lights := GemRigCompiler.pack(rig)
+	var lights := GemRigCompiler.compile(rig)
 
 	var instances: Array = []
 	for tile_id in ORDER:
@@ -35,7 +35,6 @@ func _initialize() -> void:
 	if tracer == null:
 		quit(1)
 		return
-	tracer.set_environment(GemRigCompiler.environment(rig))
 	tracer.configure_stones(instances, lights,
 		{"max_bounces": 28, "volume": true, "dispersion": true, "birefringence": true, "rad_clamp": 24.0},
 		Vector2i(8, 2))

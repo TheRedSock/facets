@@ -2,11 +2,8 @@ class_name GemClipBaker
 extends RefCounted
 ## Bakes clip x stone x rung x rig -> frame sequence through the GPU tracer.
 ##
-## Pure delivery logic: no scene tree, no autoload access. Callers (GemForge,
-## tools/package_clips.gd, tests) supply the light set. All per-frame sample
-## math (orientation, rig yaw, role multipliers, exposure) lives in the static
-## helpers below so the synchronous path here and the incremental launcher
-## path in GemForge produce identical frames.
+## Synchronous evaluation helper. The resumable factory uses the same frame
+## sampling functions below. The game consumes a prebuilt delivery library.
 ##
 ## Requires a RenderingDevice (windowed run). bake() returns {} in --headless.
 
@@ -21,9 +18,9 @@ const ORTHO_HALF := 1.25
 ## or {} when no RenderingDevice exists or inputs are unusable.
 ## `shared_tracer`: optional pre-created tracer whose size matches the rung's
 ## internal resolution; caller keeps ownership (amortizes shader compiles).
-static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat32Array,
-		environment := {"bg": Vector4(0.30, 0.16, 0.05, 0.0), "white_kelvin": 0.0}, shared_tracer: GemTracer = null) -> Dictionary:
-	if stone == null or clip == null or stone.material.species == null or lights.is_empty():
+static func bake(stone: GemStone, clip: GemClip, rung: int, lights: GemLighting,
+		shared_tracer: GemTracer = null) -> Dictionary:
+	if stone == null or clip == null or stone.material.species == null or lights == null:
 		return {}
 	var instance := LapidaryStoneCompiler.compile(stone)
 	var policy := GemRung.policy(rung)
@@ -43,7 +40,6 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat3
 	var t0 := Time.get_ticks_usec()
 	tracer.configure_stone(instance, lights, policy)
 	tracer.set_seed(int(instance["seed"]))
-	tracer.set_environment(environment)
 
 	var print_res := load_house_print()
 	var frames: Array[Image] = []

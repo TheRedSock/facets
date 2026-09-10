@@ -242,11 +242,10 @@ func _process(_delta: float) -> void:
 func _rebuild_now() -> void:
 	var instance := LapidaryStoneCompiler.compile(_stone)
 	_fingerprint = str(instance.get("fingerprint", ""))
-	_tracer.configure_stone(instance, GemRigCompiler.pack(_rig),
+	_tracer.configure_stone(instance, GemRigCompiler.compile(_rig),
 		GemRung.policy(GemRung.PREVIEW))
 	# configure_stone does not ingest seed/background itself — set them after.
 	_tracer.set_seed(int(instance["seed"]))
-	_tracer.set_environment(GemRigCompiler.environment(_rig))
 	_configured = true
 	_apply_pose()
 

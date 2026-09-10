@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="GemLightRig" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="GemLightRig" load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_light_rig.gd" id="1_rig"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_rig_light.gd" id="2_light"]
@@ -13,6 +13,38 @@
 ; facets that map beyond 40 deg stay dark and give the contrast pattern.
 ; Nothing blocks the axis: a head shadow would sit exactly on the return.
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_spectrum.gd" id="spectrum_script"]
+
+[sub_resource type="Resource" id="spd_0_0"]
+script = ExtResource("spectrum_script")
+model = 0
+temperature_kelvin = 0.0
+normalization = 1
+
+[sub_resource type="Resource" id="spd_4200_0"]
+script = ExtResource("spectrum_script")
+model = 1
+temperature_kelvin = 4200.0
+normalization = 1
+
+[sub_resource type="Resource" id="spd_5600_0"]
+script = ExtResource("spectrum_script")
+model = 1
+temperature_kelvin = 5600.0
+normalization = 1
+
+[sub_resource type="Resource" id="spd_6500_0"]
+script = ExtResource("spectrum_script")
+model = 1
+temperature_kelvin = 6500.0
+normalization = 1
+
+[sub_resource type="Resource" id="spd_7200_0"]
+script = ExtResource("spectrum_script")
+model = 1
+temperature_kelvin = 7200.0
+normalization = 1
+
 [sub_resource type="Resource" id="beauty"]
 script = ExtResource("2_light")
 role = 1
@@ -20,7 +52,7 @@ azimuth_deg = 0.0
 elevation_deg = 0.0
 angular_radius_deg = 30.0
 inner_fraction = 0.6
-kelvin = 5600.0
+spectrum = SubResource("spd_5600_0")
 power = 2.0
 enabled = true
 
@@ -31,7 +63,7 @@ azimuth_deg = -35.0
 elevation_deg = 40.0
 angular_radius_deg = 20.0
 inner_fraction = 0.55
-kelvin = 5600.0
+spectrum = SubResource("spd_5600_0")
 power = 3.0
 enabled = true
 
@@ -42,7 +74,7 @@ azimuth_deg = -18.0
 elevation_deg = 30.0
 angular_radius_deg = 2.5
 inner_fraction = 0.5
-kelvin = 5600.0
+spectrum = SubResource("spd_5600_0")
 power = 30.0
 enabled = true
 
@@ -53,7 +85,7 @@ azimuth_deg = 45.0
 elevation_deg = 15.0
 angular_radius_deg = 28.0
 inner_fraction = 0.5
-kelvin = 6500.0
+spectrum = SubResource("spd_6500_0")
 power = 0.9
 enabled = true
 
@@ -64,7 +96,7 @@ azimuth_deg = 165.0
 elevation_deg = -32.0
 angular_radius_deg = 5.0
 inner_fraction = 0.5
-kelvin = 7200.0
+spectrum = SubResource("spd_7200_0")
 power = 3.6
 enabled = true
 
@@ -75,7 +107,7 @@ azimuth_deg = -10.0
 elevation_deg = -65.0
 angular_radius_deg = 40.0
 inner_fraction = 0.5
-kelvin = 4200.0
+spectrum = SubResource("spd_4200_0")
 power = 0.35
 enabled = true
 
@@ -87,6 +119,6 @@ lights = [SubResource("key"), SubResource("spark"), SubResource("rim"), SubResou
 bg_zenith = 0.14
 bg_horizon = 0.09
 bg_below = 0.03
-bg_kelvin = 5600.0
-white_kelvin = 5600.0
+background_spectrum = SubResource("spd_5600_0")
+white_spectrum = SubResource("spd_5600_0")
 dual_illuminant_kelvin = 0.0

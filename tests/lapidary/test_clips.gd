@@ -125,9 +125,9 @@ func _test_baker_sample_math() -> void:
 	_check(ClipBakerScript.frame_role_mult(idle, 0.5).is_equal_approx(Vector4.ONE),
 		"role multipliers default to 1")
 
-	var lights: PackedFloat32Array = GemRigCompiler.pack(
+	var lights: GemLighting = GemRigCompiler.compile(
 		load("res://data/lapidary/rigs/gameplay_studio.tres") as GemLightRig)
-	_check(lights.size() % 8 == 0 and lights.size() / 8 >= 1, "gameplay_studio packs >= 1 light")
+	_check(lights.lights.size() % 8 == 0 and lights.lights.size() / 8 >= 1, "gameplay_studio packs >= 1 light")
 
 
 # ------------------------------------------------------------------ forge service
@@ -155,7 +155,7 @@ func _test_gpu_smoke() -> void:
 	probe.release()
 
 	var stone := _make_stone(7)
-	var lights: PackedFloat32Array = GemRigCompiler.pack(
+	var lights: GemLighting = GemRigCompiler.compile(
 		load("res://data/lapidary/rigs/gameplay_studio.tres") as GemLightRig)
 	var idle := load("res://data/lapidary/clips/idle.tres") as GemClip
 	var baked: Dictionary = ClipBakerScript.bake(stone, idle, GemRung.INTERACT, lights)

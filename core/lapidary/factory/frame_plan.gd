@@ -17,15 +17,15 @@ static func master_key(job: GemFrameJob) -> String:
 	var policy := job.quality.duplicate(true)
 	for key in ["res", "out", "spp", "batch", "device_memory_budget_mib"]:
 		policy.erase(key)
-	var environment := GemRigCompiler.environment(job.rig)
+	var lighting := GemRigCompiler.compile(job.rig)
 	return GemContentIdentity.digest(["linear-master-v1", GemRenderIdentity.optical_digest(),
-		job.stone, GemRigCompiler.pack(job.rig), environment["bg"], policy,
+		job.stone, lighting.lights, lighting.spectra, lighting.background, policy,
 		job.resolution, job.samples, job.sample_seed, canonical_orientation(job.orientation),
 		canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half])
 
 static func display_key(job: GemFrameJob) -> String:
 	return GemContentIdentity.digest(["display-v1", master_key(job), job.print_style,
-		job.exposure, job.output_size, GemRigCompiler.environment(job.rig).get("white_kelvin", 0.0)])
+		job.exposure, job.output_size, GemRigCompiler.compile(job.rig).white_xyz])
 
 static func canonical_yaw(value: float) -> float:
 	return snappedf(wrapf(value, -PI, PI), 1.0 / POSE_GRID)

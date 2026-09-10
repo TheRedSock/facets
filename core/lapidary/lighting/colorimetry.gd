@@ -1,11 +1,12 @@
 class_name GemColorimetry
 extends RefCounted
-## Host-side colorimetry shared with the kernel: the same CIE 1931 2° CMF
-## analytic fit (Wyman, Sloan, Shirley, JCGT 2013) and 560 nm-relative Planck
-## spectrum the shaders use, plus the as-shot white balance of the print
+## Host-side colorimetry shared with the kernel: the CIE 1931 2° observer
+## tabulated at 1 nm (GemStandardSpectra) and 560 nm-relative Planck
+## spectrum compiled into GPU tables, plus the as-shot white balance of the print
 ## (Bradford chromatic adaptation from the rig's neutral to D65).
 
 const D65_XYZ := Vector3(0.95047, 1.0, 1.08883)
+static var _ybar_integral := 0.0
 
 # Bradford cone response matrix (rows), Lindbloom / Fairchild.
 const BRADFORD_R0 := Vector3(0.8951, 0.2664, -0.1614)
@@ -19,28 +20,21 @@ const SRGB_R2 := Vector3(0.0557, -0.2040, 1.0570)
 
 
 static func cie_xyz(w: float) -> Vector3:
-	var x1 := (w - 442.0) * (0.0624 if w < 442.0 else 0.0374)
-	var x2 := (w - 599.8) * (0.0264 if w < 599.8 else 0.0323)
-	var x3 := (w - 501.1) * (0.0490 if w < 501.1 else 0.0382)
-	var y1 := (w - 568.8) * (0.0213 if w < 568.8 else 0.0247)
-	var y2 := (w - 530.9) * (0.0613 if w < 530.9 else 0.0322)
-	var z1 := (w - 437.0) * (0.0845 if w < 437.0 else 0.0278)
-	var z2 := (w - 459.0) * (0.0385 if w < 459.0 else 0.0725)
-	return Vector3(
-		0.362 * exp(-0.5 * x1 * x1) + 1.056 * exp(-0.5 * x2 * x2) - 0.065 * exp(-0.5 * x3 * x3),
-		0.821 * exp(-0.5 * y1 * y1) + 0.286 * exp(-0.5 * y2 * y2),
-		1.217 * exp(-0.5 * z1 * z1) + 0.681 * exp(-0.5 * z2 * z2))
+	return GemStandardSpectra.xyz(w)
 
 
-## Integral of the ybar fit over 380..780 nm at 1 nm (kernel spectral_norm).
+## Exact integral of the piecewise-linear ybar table over the transport domain.
 static func integral_ybar() -> float:
+	if _ybar_integral > 0.0:
+		return _ybar_integral
 	var total := 0.0
 	for i in 401:
-		total += cie_xyz(380.0 + float(i)).y
+		total += cie_xyz(380.0 + float(i)).y * (0.5 if i == 0 or i == 400 else 1.0)
+	_ybar_integral = total
 	return total
 
 
-## Planck spectral radiance relative to 560 nm (matches gem_common.glsl).
+## Planck spectral radiance relative to 560 nm (sampled by GemSpectrumCompiler).
 static func planck_rel(wl_nm: float, kelvin: float) -> float:
 	var c2 := 1.4388e7
 	var r := 560.0 / wl_nm
@@ -52,7 +46,7 @@ static func illuminant_xyz(kelvin: float) -> Vector3:
 	var acc := Vector3.ZERO
 	for i in 401:
 		var w := 380.0 + float(i)
-		acc += cie_xyz(w) * planck_rel(w, kelvin)
+		acc += cie_xyz(w) * planck_rel(w, kelvin) * (0.5 if i == 0 or i == 400 else 1.0)
 	return acc / maxf(acc.y, 1e-9)
 
 
@@ -66,13 +60,24 @@ static func bradford(src_white: Vector3, dst_white: Vector3) -> Basis:
 	return m.inverse() * d * m
 
 
-## Print matrix: XYZ (scene, lit by a `white_kelvin` neutral) -> linear sRGB,
-## white-balanced so that illuminant renders as D65 white. 0 = no adaptation.
-static func xyz_to_srgb(white_kelvin: float) -> Basis:
+## Integrates two piecewise-linear tables exactly within each 1 nm interval.
+## Y is relative to unit equal-energy radiance over the transport domain.
+static func spectrum_xyz(values: PackedFloat32Array) -> Vector3:
+	assert(values.size() == 401)
+	var total := Vector3.ZERO
+	for index in 400:
+		var a := cie_xyz(380.0 + index)
+		var b := cie_xyz(381.0 + index)
+		total += (a * values[index] + (a + b) * (values[index] + values[index + 1]) + b * values[index + 1]) / 6.0
+	return total / integral_ybar()
+
+
+## Print matrix from scene XYZ to D65 sRGB. Zero means no adaptation.
+static func xyz_to_srgb(white_xyz := Vector3.ZERO) -> Basis:
 	var srgb := from_rows(SRGB_R0, SRGB_R1, SRGB_R2)
-	if white_kelvin <= 0.0:
+	if white_xyz == Vector3.ZERO:
 		return srgb
-	return srgb * bradford(illuminant_xyz(white_kelvin), D65_XYZ)
+	return srgb * bradford(white_xyz / white_xyz.y, D65_XYZ)
 
 
 ## Basis whose matrix has the given rows (Basis stores columns).

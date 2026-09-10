@@ -33,8 +33,8 @@ const TARGET_LSB := 1.0
 func _initialize() -> void:
 	var opts := _parse_args(OS.get_cmdline_user_args())
 	var rig: GemLightRig = load(RIG_PATH)
-	var lights := GemRigCompiler.pack(rig)
-	var bg := GemRigCompiler.environment(rig)
+	var lights := GemRigCompiler.compile(rig)
+
 	var print_res := GemPrint.load_house()
 	var rung: int = opts["rung"]
 	var res: int = opts["res"]
@@ -49,7 +49,6 @@ func _initialize() -> void:
 		print("GRAIN_CHECK FAILED: no RenderingDevice (run windowed)")
 		quit(1)
 		return
-	tracer.set_environment(bg)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	var rest := Quaternion.from_euler(Vector3(
 		deg_to_rad(REST_TILT_DEG.x), deg_to_rad(REST_TILT_DEG.y), deg_to_rad(REST_TILT_DEG.z)))

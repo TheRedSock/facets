@@ -13,7 +13,7 @@ enum Role { KEY, FILL, RIM, BOUNCE, BLOCKER }
 ## Cone half-angles: soft edge between inner (full) and outer (zero).
 @export var angular_radius_deg := 12.0
 @export var inner_fraction := 0.6
-@export var kelvin := 5500.0
+@export var spectrum: GemSpectrum = GemSpectrum.new()
 ## Radiance multiplier. BLOCKER uses power as darkening strength (0..1).
 @export var power := 1.0
 @export var enabled := true

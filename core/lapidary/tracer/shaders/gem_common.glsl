@@ -7,7 +7,7 @@
 // shader, not here).
 
 struct Plane { vec4 n_d; vec4 aux; };          // aux: zone, polish (unused by kernel v3), reserved
-struct Light { vec4 dir_cos; vec4 kel_pow; };  // kel_pow: kelvin, power, cos_inner, role(0key..3bounce,4blocker)
+struct Light { vec4 dir_cos; vec4 spd_pow; };  // spd_pow: spectrum offset, power, cos_inner, role(0key..3bounce,4blocker)
 struct Stone {
 	vec4 sell_b_size;      // sellmeier B xyz, size_mm
 	vec4 sell_c_biref;     // sellmeier C xyz (um^2), signed birefringence dn
@@ -30,8 +30,12 @@ layout(set = 0, binding = 0, std430) restrict readonly buffer Planes  { Plane pl
 layout(set = 0, binding = 1, std430) restrict readonly buffer Lights  { Light lights[]; };
 layout(set = 0, binding = 2, std430) restrict readonly buffer Absorb  { float absorb_mm[]; };
 layout(set = 0, binding = 3, std430) restrict buffer Accum            { vec4 accum[]; };
+// CIE tables: xbar/ybar/zbar/D65 at 1 nm over 380..780, shared by host and GPU.
+layout(set = 0, binding = 4, std430) readonly buffer Standards { vec4 standard_spectra[]; };
 layout(set = 0, binding = 5, std430) restrict readonly buffer Stones  { Stone stones[]; };
 layout(set = 0, binding = 6, std430) restrict readonly buffer Insts   { Inst insts[]; };
+
+layout(set = 0, binding = 15, std430) readonly buffer EmissionSpectra { float emission_spectra[]; };
 
 const float T_EPS = 1e-5;
 const float INF = 1e30;
@@ -142,13 +146,22 @@ void sh16(vec3 d, out float Y[16]) {
 }
 
 // ---------------------------------------------------------------- spectra
-float planck_rel(float wl, float kelvin) {
-	float c2 = 1.4388e7;
-	float r = 560.0 / wl;
-	return r * r * r * r * r * (exp(c2 / (560.0 * kelvin)) - 1.0) / max(exp(c2 / (wl * kelvin)) - 1.0, 1e-12);
+vec4 standard_spectrum(float wavelength) {
+	if (wavelength < 380.0 || wavelength > 780.0) { return vec4(0.0); }
+	float position = wavelength - 380.0;
+	int index = int(position);
+	return mix(standard_spectra[index], standard_spectra[min(index + 1, 400)], position - float(index));
 }
-vec4 planck4(vec4 wl, float kelvin) {
-	return vec4(planck_rel(wl.x, kelvin), planck_rel(wl.y, kelvin), planck_rel(wl.z, kelvin), planck_rel(wl.w, kelvin));
+vec3 cie_xyz(float wavelength) { return standard_spectrum(wavelength).xyz; }
+
+float emission_at(float wavelength, int offset) {
+	float position = clamp(wavelength - 380.0, 0.0, 400.0);
+	int index = int(position);
+	return mix(emission_spectra[offset + index], emission_spectra[offset + min(index + 1, 400)], position - float(index));
+}
+vec4 emission4(vec4 wl, float offset) {
+	int index = int(offset);
+	return vec4(emission_at(wl.x, index), emission_at(wl.y, index), emission_at(wl.z, index), emission_at(wl.w, index));
 }
 
 float absorb_at(int base, float wl_nm) {
@@ -187,15 +200,15 @@ vec4 env_radiance_ex(vec3 dir, vec4 wl, float rig_yaw, vec4 role_mult, float fp,
 	float bgv = (up >= 0.0)
 		? mix(bg.y, bg.x, smoothstep(0.0, 0.85, up))
 		: mix(bg.y, bg.z, smoothstep(0.0, 0.6, -up));
-	vec4 rad = (bg.w > 0.0) ? planck4(wl, bg.w) * bgv : vec4(bgv);
+	vec4 rad = emission4(wl, bg.w) * bgv;
 	float blocker = 1.0;
 	for (uint li = 0u; li < light_count; li++) {
 		Light L = lights[li];
 		vec3 ldir = rot_y(L.dir_cos.xyz, rig_yaw);
 		float d = dot(dir, ldir);
 		float cos_outer = L.dir_cos.w;
-		float cos_inner = L.kel_pow.z;
-		float role = L.kel_pow.w;
+		float cos_inner = L.spd_pow.z;
+		float role = L.spd_pow.w;
 		float flux = 1.0;
 		if (fp > 1e-5) {
 			float R = acos(clamp(cos_outer, -1.0, 1.0));
@@ -210,12 +223,12 @@ vec4 env_radiance_ex(vec3 dir, vec4 wl, float rig_yaw, vec4 role_mult, float fp,
 		float w = smoothstep(cos_outer, cos_inner, d);
 		if (w <= 0.0) { continue; }
 		if (role > 3.5) {
-			blocker *= 1.0 - clamp(L.kel_pow.y, 0.0, 1.0) * w * flux;
+			blocker *= 1.0 - clamp(L.spd_pow.y, 0.0, 1.0) * w * flux;
 			continue;
 		}
 		if (!with_lights) { continue; }
 		float mult = role_multiplier(role, role_mult);
-		rad += planck4(wl, L.kel_pow.x) * (L.kel_pow.y * w * mult * flux);
+		rad += emission4(wl, L.spd_pow.x) * (L.spd_pow.y * w * mult * flux);
 	}
 	return rad * blocker;
 }

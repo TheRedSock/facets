@@ -22,9 +22,8 @@ func _initialize() -> void:
 			stone.shape = GemShape.faceted_outline(&"oval")
 		var inst := LapidaryStoneCompiler.compile(stone)
 		var begin := Time.get_ticks_usec()
-		tracer.configure_stone(inst, GemRigCompiler.pack(rig), GemRung.policy(GemRung.HERO))
+		tracer.configure_stone(inst, GemRigCompiler.compile(rig), GemRung.policy(GemRung.HERO))
 		var compile_ms := (Time.get_ticks_usec() - begin) / 1000.0
-		tracer.set_environment(GemRigCompiler.environment(rig))
 		tracer.set_stone_orientation(Quaternion(Vector3.RIGHT, 0.35) * Quaternion(Vector3.UP, 0.2))
 		for batch in samples / 16:
 			tracer.accumulate(16)

@@ -40,8 +40,8 @@ func _initialize() -> void:
 			print("  rig %s FAILED TO LOAD" % path)
 			failures += 1
 			continue
-		var lights := GemRigCompiler.pack(rig)
-		var env := GemRigCompiler.environment(rig)
+		var lights := GemRigCompiler.compile(rig)
+
 		var row := Image.create(res * stone_ids.size(), res, false, Image.FORMAT_RGBA8)
 		row.fill(Color(0.06, 0.06, 0.07, 1.0))
 		var col := 0
@@ -60,7 +60,6 @@ func _initialize() -> void:
 			var policy := GemRung.policy(GemRung.PREVIEW)
 			tracer.configure_stone(instance, lights, policy)
 			tracer.set_seed(stone.seed)
-			tracer.set_environment(env)
 			tracer.set_clip_sample(TILT, 0.0, Vector4.ONE, 1.3)
 			var t0 := Time.get_ticks_usec()
 			var remaining := spp

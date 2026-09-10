@@ -1,0 +1,3 @@
+# Publisher files are checksum-pinned physical inputs. Preserve their original
+# bytes on Windows and Unix; newline conversion would break dataset validation.
+data/lapidary/standards/* -text

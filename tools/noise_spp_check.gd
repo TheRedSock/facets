@@ -25,8 +25,8 @@ func _initialize() -> void:
 		print("NOISE_SPP FAILED: gameplay rig missing")
 		quit(1)
 		return
-	var lights := GemRigCompiler.pack(rig)
-	var bg := GemRigCompiler.environment(rig)
+	var lights := GemRigCompiler.compile(rig)
+
 	var policy: Dictionary = GemRung.policy(GemRung.CLIP_BAKE)
 	var res: int = policy["res"]
 	var out: int = policy["out"]
@@ -37,7 +37,6 @@ func _initialize() -> void:
 		print("NOISE_SPP FAILED: no RenderingDevice")
 		quit(1)
 		return
-	tracer.set_environment(bg)
 
 	var metrics := {
 		"adapter": RenderingServer.get_video_adapter_name(),
@@ -128,7 +127,7 @@ func _ruby_variants() -> Array:
 	return out
 
 
-func _render(tracer: GemTracer, instance: Dictionary, seed: int, lights: PackedFloat32Array,
+func _render(tracer: GemTracer, instance: Dictionary, seed: int, lights: GemLighting,
 		policy: Dictionary, spp: int) -> Image:
 	tracer.configure_stone(instance, lights, policy)
 	tracer.set_seed(seed)

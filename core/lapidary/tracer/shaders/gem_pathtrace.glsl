@@ -32,7 +32,7 @@ layout(push_constant, std430) uniform Params {
 	int field_grid;       // 76  scatter-field texels per axis
 	int row_origin;       // 80  first image row of this dispatch (host chunks work for TDR safety)
 	int field_insts;      // 84  instances stacked along the field's x axis
-	float bg_kelvin;      // 88  background spectrum (Planckian; 0 = flat)
+	float bg_spectrum;      // 88  background spectrum table offset
 	float throughput_epsilon; // 92 numerical path termination threshold
 } pc;
 
@@ -58,24 +58,6 @@ const int POL_O = 1;
 const int POL_K = 2;
 
 // ---------------------------------------------------------------- CIE / spectra
-float cie_x(float w) {
-	float t1 = (w - 442.0) * ((w < 442.0) ? 0.0624 : 0.0374);
-	float t2 = (w - 599.8) * ((w < 599.8) ? 0.0264 : 0.0323);
-	float t3 = (w - 501.1) * ((w < 501.1) ? 0.0490 : 0.0382);
-	return 0.362 * exp(-0.5 * t1 * t1) + 1.056 * exp(-0.5 * t2 * t2) - 0.065 * exp(-0.5 * t3 * t3);
-}
-float cie_y(float w) {
-	float t1 = (w - 568.8) * ((w < 568.8) ? 0.0213 : 0.0247);
-	float t2 = (w - 530.9) * ((w < 530.9) ? 0.0613 : 0.0322);
-	return 0.821 * exp(-0.5 * t1 * t1) + 0.286 * exp(-0.5 * t2 * t2);
-}
-float cie_z(float w) {
-	float t1 = (w - 437.0) * ((w < 437.0) ? 0.0845 : 0.0278);
-	float t2 = (w - 459.0) * ((w < 459.0) ? 0.0385 : 0.0725);
-	return 1.217 * exp(-0.5 * t1 * t1) + 0.681 * exp(-0.5 * t2 * t2);
-}
-vec3 cie_xyz(float w) { return vec3(cie_x(w), cie_y(w), cie_z(w)); }
-
 // Uniaxial extraordinary index for propagation at angle phi to the optic axis
 // (ca = |cos phi|). Converges to n_o along the axis.
 float n_e_phi(float n_o, float dn, float ca) {
@@ -106,7 +88,7 @@ vec3 hg_sample_u(vec3 dir, float g, vec2 u) {
 // ---------------------------------------------------------------- environment
 vec4 env_radiance(vec3 dir, vec4 wl, float rig_yaw, vec4 role_mult, float fp) {
 	return env_radiance_ex(dir, wl, rig_yaw, role_mult, fp, true,
-		vec4(pc.bg_zenith, pc.bg_horizon, pc.bg_below, pc.bg_kelvin), pc.light_count);
+		vec4(pc.bg_zenith, pc.bg_horizon, pc.bg_below, pc.bg_spectrum), pc.light_count);
 }
 
 // ---------------------------------------------------------------- zoning / absorption

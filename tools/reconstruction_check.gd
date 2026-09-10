@@ -18,7 +18,7 @@ func _initialize() -> void:
 	inst["absorption"].fill(0.01)
 	inst["zoning"] = {}
 	var rig: GemLightRig = load("res://data/lapidary/rigs/gameplay_studio.tres")
-	var lights := GemRigCompiler.pack(rig)
+	var lights := GemRigCompiler.compile(rig)
 	var policy := GemRung.policy(GemRung.HERO)
 	policy["birefringence"] = false
 	policy["dispersion"] = false
@@ -30,7 +30,6 @@ func _initialize() -> void:
 	for density in ([0.5] if OS.get_cmdline_user_args().has("--dense") else [0.0, 0.075, 0.5]):
 		inst["scatter"] = {"sigma_per_mm": density, "g": 0.6}
 		tracer.configure_stone(inst, lights, policy)
-		tracer.set_environment(GemRigCompiler.environment(rig))
 		tracer.set_reconstruction(0)
 		var start := Time.get_ticks_usec()
 		for batch in 64:

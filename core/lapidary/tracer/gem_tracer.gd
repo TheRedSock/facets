@@ -91,8 +91,8 @@ var _throughput_epsilon := 0.0001
 var _flags := 0
 var _grid := Vector2i.ONE
 var _cell := Vector2i.ZERO
-var _bg := Vector4(0.30, 0.16, 0.05, 0.0)  # zenith, horizon, below, kelvin (0 = flat)
-var _xyz_to_rgb := Colorimetry.xyz_to_srgb(0.0)  # print matrix incl. as-shot white balance
+var _bg := Vector4(0.30, 0.16, 0.05, 0.0)  # zenith, horizon, below, spectrum offset
+var _xyz_to_rgb := Colorimetry.xyz_to_srgb()  # print matrix incl. as-shot white balance
 var _rad_clamp := 48.0
 var _env_filter_rad := 0.06
 var _field_exits := 0
@@ -104,6 +104,7 @@ var _chunk_spp := 1
 var _chunk_rows := 8
 var _field_chunk := 2048  # texels per scatter-field dispatch (adaptive)
 var _lights_packed := PackedFloat32Array()
+var _spectra_packed := PackedFloat32Array()
 var _camera_distance := 5.0
 # Cached single-instance state (grid 1x1 convenience path).
 var _inst_state := {
@@ -133,6 +134,8 @@ static func create(p_width: int, p_height: int) -> GemTracer:
 		t._bufs[name] = t._rd.storage_buffer_create(zeros.size(), zeros)
 	zeros.resize(p_width * p_height * 32)
 	t._bufs["guides"] = t._rd.storage_buffer_create(zeros.size(), zeros)
+	var standards := GemStandardSpectra.packed().to_byte_array()
+	t._bufs["standards"] = t._rd.storage_buffer_create(standards.size(), standards)
 	t._spectral_norm = (400.0 / 4.0) / Colorimetry.integral_ybar()
 	t._cell = Vector2i(p_width, p_height)
 	return t
@@ -168,15 +171,18 @@ func _compile_shaders() -> bool:
 ## Full-featured path: StoneInstance from LapidaryStoneCompiler + lights + rung policy.
 ## policy keys (see GemRung.TABLE): max_bounces, dispersion, birefringence, volume,
 ## rad_clamp, env_filter_rad, field_exits, field_grid, field_dirs. Ingests the instance's own
-## seed; background / white balance come from set_environment (they belong to the rig).
-func configure_stone(instance: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
+## seed; compiled lighting supplies all spectra, background and print neutral.
+func configure_stone(instance: Dictionary, lighting: GemLighting, policy: Dictionary) -> void:
 	if instance.has("seed"):
 		_seed = int(instance["seed"])
-	configure_stones([instance], lights, policy, Vector2i.ONE)
+	configure_stones([instance], lighting, policy, Vector2i.ONE)
 
 
 ## Multi-stone batch: instances laid out on a grid of equal cells (board atlas).
-func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dictionary, grid: Vector2i) -> void:
+func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionary, grid: Vector2i) -> void:
+	assert(lighting != null)
+	assert(lighting.validate().is_empty(), lighting.validate())
+	var lights := lighting.lights
 	assert(not instances.is_empty() and lights.size() % 8 == 0)
 	assert(lights.size() / 8 <= MAX_LIGHTS, "GemTracer: rig exceeds %d lights" % MAX_LIGHTS)
 	var bound_radius := 0.0
@@ -216,7 +222,10 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	_field_dirs = clampi(policy.get("field_dirs", 2048), 64, 16384)
 	while _field_exits > 0 and _field_grid > 6 and _field_bytes_for(_field_grid) > FIELD_BUDGET_BYTES:
 		_field_grid -= 2
-	_lights_packed = lights
+	_lights_packed = lights.duplicate()
+	_spectra_packed = lighting.spectra.duplicate()
+	_bg = lighting.background
+	set_print_white(lighting.white_xyz)
 	# Kernel cost changed: restart the adaptive dispatch unit conservatively.
 	_chunk_spp = 1
 	_chunk_rows = mini(height, 64)
@@ -307,7 +316,7 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 
 	_free_scene_buffers()
 	_bufs["planes"] = _rd.storage_buffer_create(planes.to_byte_array().size(), planes.to_byte_array())
-	_bufs["lights"] = _rd.storage_buffer_create(lights.to_byte_array().size(), lights.to_byte_array())
+	_upload_lighting_buffers()
 	_bufs["absorb"] = _rd.storage_buffer_create(absorb.to_byte_array().size(), absorb.to_byte_array())
 	_bufs["stones"] = _rd.storage_buffer_create(stones.data_array.size(), stones.data_array)
 	_bufs["triangles"] = _rd.storage_buffer_create(triangle_data.size(), triangle_data)
@@ -418,9 +427,9 @@ func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_hal
 
 
 func _build_uniform_sets() -> void:
-	# Binding order (gem_common.glsl): 0 planes, 1 lights, 2 absorb, 3 accum, 4 unassigned,
+	# Binding order (gem_common.glsl): 0 planes, 1 lights, 2 absorb, 3 accum, 4 CIE standards,
 	# 5 stones, 6 insts; 7 = scatter field (image in the pre-pass, sampler in the kernel).
-	var names := {0: "planes", 1: "lights", 2: "absorb", 3: "accum", 5: "stones", 6: "insts"}
+	var names := {0: "planes", 1: "lights", 2: "absorb", 3: "accum", 4: "standards", 5: "stones", 6: "insts", 15: "spectra"}
 	for shader_name in ["trace", "field"]:
 		var uniforms: Array[RDUniform] = []
 		for i: int in names:
@@ -536,14 +545,39 @@ func set_seed(s: int) -> void:
 	_seed = s
 
 
-## Rig environment from GemRigCompiler.environment(): "bg" Vector4 (zenith,
-## horizon, below, kelvin; 0 = flat spectrum) and "white_kelvin" (as-shot white
-## balance of the print; 0 = none).
-func set_environment(env: Dictionary) -> void:
-	if _bg != env["bg"]:
-		_bg = env["bg"]
-		_field_dirty = true
-	_xyz_to_rgb = Colorimetry.xyz_to_srgb(float(env.get("white_kelvin", 0.0)))
+## Replaces all illumination atomically and retires samples only when optical
+## inputs change. A white-only edit preserves the film and scatter field.
+func set_lighting(lighting: GemLighting) -> void:
+	assert(lighting != null)
+	assert(lighting.validate().is_empty(), lighting.validate())
+	set_print_white(lighting.white_xyz)
+	if _lights_packed == lighting.lights and _spectra_packed == lighting.spectra and _bg == lighting.background:
+		return
+	_lights_packed = lighting.lights.duplicate()
+	_spectra_packed = lighting.spectra.duplicate()
+	_bg = lighting.background
+	_light_count = _lights_packed.size() / 8
+	assert(_light_count <= MAX_LIGHTS)
+	for key in ["lights", "spectra"]:
+		_rd.free_rid(_bufs[key])
+	_upload_lighting_buffers()
+	_build_uniform_sets()
+	_field_dirty = true
+	reset_accumulation()
+
+
+func set_print_white(white_xyz: Vector3) -> void:
+	_xyz_to_rgb = Colorimetry.xyz_to_srgb(white_xyz)
+
+
+func _upload_lighting_buffers() -> void:
+	var lights := _lights_packed.to_byte_array()
+	if lights.is_empty():
+		lights.resize(32) # Background-only rig: valid zero-count SSBO.
+	var spectra := _spectra_packed.to_byte_array()
+	assert(not spectra.is_empty())
+	_bufs["lights"] = _rd.storage_buffer_create(lights.size(), lights)
+	_bufs["spectra"] = _rd.storage_buffer_create(spectra.size(), spectra)
 
 
 func reset_accumulation() -> void:
@@ -864,7 +898,7 @@ func field_info() -> Dictionary:
 # ------------------------------------------------------------------ cleanup
 
 func _free_scene_buffers() -> void:
-	for key in ["planes", "lights", "absorb", "stones", "insts", "triangles", "nodes", "regions", "surfaces"]:
+	for key in ["planes", "lights", "spectra", "absorb", "stones", "insts", "triangles", "nodes", "regions", "surfaces"]:
 		if _bufs.has(key) and _bufs[key].is_valid():
 			_rd.free_rid(_bufs[key])
 			_bufs.erase(key)
@@ -872,7 +906,7 @@ func _free_scene_buffers() -> void:
 
 func release() -> void:
 	_free_scene_buffers()
-	var rids: Array = [_bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex, _field_tex, _field_sampler]
+	var rids: Array = [_bufs.get("standards", RID()), _bufs.get("accum", RID()), _bufs.get("guides", RID()), _bufs.get("filter_a", RID()), _bufs.get("filter_b", RID()), _bufs.get("ballistic", RID()), _bufs.get("residual", RID()), _bufs.get("reconstructed", RID()), _print_tex, _field_tex, _field_sampler]
 	rids.append_array(_pipelines.values())
 	rids.append_array(_shaders.values())
 	for rid in rids:

@@ -46,8 +46,8 @@ func _initialize() -> void:
 		print("TURN_GIFS FAILED: rig missing at %s" % RIG_PATH)
 		quit(1)
 		return
-	var lights := GemRigCompiler.pack(rig)
-	var bg := GemRigCompiler.environment(rig)
+	var lights := GemRigCompiler.compile(rig)
+
 	var print_res := GemPrint.load_house()
 
 	var policy: Dictionary = GemRung.policy(GemRung.HERO)
@@ -61,7 +61,6 @@ func _initialize() -> void:
 		print("TURN_GIFS FAILED: no RenderingDevice (run windowed, not --headless)")
 		quit(1)
 		return
-	tracer.set_environment(bg)
 
 	var rest := Quaternion.from_euler(Vector3(
 		deg_to_rad(REST_TILT_DEG.x), deg_to_rad(REST_TILT_DEG.y), deg_to_rad(REST_TILT_DEG.z)))

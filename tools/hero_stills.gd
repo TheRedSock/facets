@@ -28,8 +28,8 @@ func _initialize() -> void:
 		quit(1)
 		return
 	var print_res := GemPrint.load_house()
-	var lights := GemRigCompiler.pack(rig)
-	var bg := GemRigCompiler.environment(rig)
+	var lights := GemRigCompiler.compile(rig)
+
 	var face_up := Quaternion(Vector3(1, 0, 0), deg_to_rad(-12.0))
 	var policy_res: Dictionary = GemRung.policy(GemRung.HERO)
 	var res: int = policy_res["res"]
@@ -52,7 +52,6 @@ func _initialize() -> void:
 		var spp: int = policy["spp"]
 		var batch: int = policy["batch"]
 		tracer.set_seed(int(instance["seed"]))
-		tracer.set_environment(bg)
 		tracer.configure_stone(instance, lights, policy)
 		tracer.set_clip_sample(face_up, 0.0, Vector4.ONE, ORTHO)
 		var ms := tracer.accumulate(1)

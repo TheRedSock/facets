@@ -40,9 +40,8 @@ func run(job: GemFrameJob, sample_limit := 0) -> Dictionary:
 	if stone_key != compiled_key:
 		compiled = LapidaryStoneCompiler.compile(job.stone)
 		compiled_key = stone_key
-	tracer.configure_stone(compiled, GemRigCompiler.pack(job.rig), job.quality)
+	tracer.configure_stone(compiled, GemRigCompiler.compile(job.rig), job.quality)
 	tracer.set_seed(job.sample_seed)
-	tracer.set_environment(GemRigCompiler.environment(job.rig))
 	tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), GemFramePlan.canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half)
 	var master_record := store.read(master_key)
 	var master: Image = null

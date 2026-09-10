@@ -30,7 +30,7 @@ layout(push_constant, std430) uniform P {
 	float pad;             // 44
 	vec4 m0;               // 48  XYZ -> linear sRGB, columns (includes the rig's
 	vec4 m1;               // 64  as-shot white balance: Bradford CAT from the
-	vec4 m2;               // 80  rig's white_kelvin to D65)   -> 96
+	vec4 m2;               // 80  rig's spectral neutral to D65)   -> 96
 	ivec2 source_resolution; // 96 accumulation dimensions; output can be smaller
 	ivec2 padding;           // 104 -> 112
 } pc;

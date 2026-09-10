@@ -13,7 +13,7 @@ static func write(root: String, jobs: Array[GemFrameJob], clips: Dictionary) -> 
 	if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(root.path_join("jobs"))) != OK:
 		return {}
 	var files: Array[String] = []
-	for source in ["res://core/lapidary", "res://resources/lapidary"]:
+	for source in ["res://core/lapidary", "res://resources/lapidary", "res://data/lapidary/standards"]:
 		_collect(source, files)
 	files.append("res://tools/gem_frame_worker.gd")
 	var checksums := {}
@@ -47,7 +47,7 @@ static func write(root: String, jobs: Array[GemFrameJob], clips: Dictionary) -> 
 
 static func _collect(root: String, files: Array[String]) -> void:
 	for file in DirAccess.get_files_at(root):
-		if file.get_extension() in ["gd", "glsl", "uid"] or file == ".gdignore":
+		if file.get_extension() in ["gd", "glsl", "uid", "csv", "json"] or file == ".gdignore":
 			files.append(root.path_join(file))
 	for directory in DirAccess.get_directories_at(root):
 		_collect(root.path_join(directory), files)

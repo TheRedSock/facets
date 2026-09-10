@@ -21,37 +21,29 @@ const ROLE_KERNEL := {
 }
 
 
-static func pack(rig: GemLightRig) -> PackedFloat32Array:
-	assert(rig != null and not rig.lights.is_empty(), "GemRigCompiler.pack: rig missing or empty")
-	var arr := PackedFloat32Array()
-	for role in ROLE_ORDER:
+static func compile(rig: GemLightRig) -> GemLighting:
+	assert(rig != null, "GemRigCompiler: rig missing")
+	var result := GemLighting.new()
+	for role in ROLE_ORDER + [GemRigLight.Role.BLOCKER]:
 		for light in rig.lights:
 			if light.role == role and light.enabled:
-				_append(arr, light)
-	for light in rig.lights:
-		if light.role == GemRigLight.Role.BLOCKER and light.enabled:
-			_append(arr, light)
-	assert(not arr.is_empty(), "GemRigCompiler.pack: no enabled lights")
-	return arr
+				_append(result, light)
+	var background_offset := result.add_spectrum(GemSpectrumCompiler.compile(rig.background_spectrum))
+	result.background = Vector4(rig.bg_zenith, rig.bg_horizon, rig.bg_below, background_offset)
+	if rig.white_spectrum != null:
+		result.white_xyz = GemColorimetry.spectrum_xyz(GemSpectrumCompiler.compile(rig.white_spectrum))
+		assert(result.white_xyz.y > 0.0, "Print neutral must have visible energy")
+		result.white_xyz /= result.white_xyz.y
+	return result
 
 
-## Everything about the rig that is not a light: the background gradient with
-## its Planckian kelvin (0 = flat) and the as-shot white the print adapts to D65.
-## Consumed by GemTracer.set_environment().
-static func environment(rig: GemLightRig) -> Dictionary:
-	assert(rig != null, "GemRigCompiler.environment: rig missing")
-	return {
-		"bg": Vector4(rig.bg_zenith, rig.bg_horizon, rig.bg_below, rig.bg_kelvin),
-		"white_kelvin": rig.white_kelvin,
-	}
-
-
-static func _append(arr: PackedFloat32Array, light: GemRigLight) -> void:
+static func _append(result: GemLighting, light: GemRigLight) -> void:
 	var d := light.direction()
 	var outer := cos(deg_to_rad(light.angular_radius_deg))
 	var inner := cos(deg_to_rad(light.angular_radius_deg * clampf(light.inner_fraction, 0.05, 0.98)))
 	var role: float = ROLE_KERNEL.get(light.role, 0.0)
-	arr.append_array(PackedFloat32Array([
+	var offset := result.add_spectrum(GemSpectrumCompiler.compile(light.spectrum))
+	result.lights.append_array(PackedFloat32Array([
 		d.x, d.y, d.z, outer,
-		light.kelvin, light.power, inner, role,
+		offset, light.power, inner, role,
 	]))

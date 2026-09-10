@@ -36,8 +36,7 @@ func _initialize() -> void:
 		finish.alpha_u = alpha
 		finish.alpha_v = alpha
 		base["surfaces"] = [finish]
-		tracer.configure_stone(base, dark_lights, policy)
-		tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+		tracer.configure_stone(base, GemLighting.analytic(dark_lights, Vector4(1, 1, 1, 0)), policy)
 		var ms := tracer.accumulate(256)
 		var values := tracer.read_xyz()
 		var y := mean_y(values)
@@ -48,11 +47,10 @@ func _initialize() -> void:
 		var matched := base.duplicate()
 		matched["sellmeier_b"] = Vector3.ZERO
 		matched["sellmeier_c"] = Vector3.ZERO
-		tracer.configure_stone(matched, dark_lights, policy)
-		tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+		tracer.configure_stone(matched, GemLighting.analytic(dark_lights, Vector4(1, 1, 1, 0)), policy)
 		tracer.accumulate(8)
 		check(absf(mean_y(tracer.read_xyz()) - 1.0) < 0.005, "index-matched rough boundary is invisible")
-	tracer.set_environment({"bg": Vector4.ZERO})
+	tracer.set_lighting(GemLighting.analytic(dark_lights))
 	tracer.reset_accumulation()
 	tracer.accumulate(8)
 	check(mean_y(tracer.read_xyz()) == 0.0, "rough boundary cannot emit in darkness")
@@ -79,8 +77,7 @@ func _anisotropy(tracer: GemTracer, input: Dictionary, policy: Dictionary) -> vo
 	var moments := []
 	for axis in [Vector3.RIGHT, Vector3.UP]:
 		finish.direction = axis
-		tracer.configure_stone(specimen, PackedFloat32Array([0, 0, 1, cos(0.04), 5600, 1, cos(0.02), 0]), policy)
-		tracer.set_environment({"bg": Vector4.ZERO})
+		tracer.configure_stone(specimen, GemLighting.analytic(PackedFloat32Array([0, 0, 1, cos(0.04), 5600, 1, cos(0.02), 0])), policy)
 		tracer.set_clip_sample(Quaternion.IDENTITY, 0.0, Vector4.ONE, 1.25)
 		tracer.accumulate(512)
 		var values := tracer.read_xyz()
@@ -95,7 +92,7 @@ func _anisotropy(tracer: GemTracer, input: Dictionary, policy: Dictionary) -> vo
 
 func _showcase(stone: GemStone, out: String) -> void:
 	var rig: GemLightRig = load("res://data/lapidary/rigs/gameplay_studio.tres")
-	var lights := GemRigCompiler.pack(rig)
+	var lights := GemRigCompiler.compile(rig)
 	var policy := GemRung.policy(GemRung.PREVIEW)
 	var tracer := GemTracer.create(256, 256)
 	var sheet := Image.create(256 * 4, 256 * 2, false, Image.FORMAT_RGBA8)
@@ -104,7 +101,6 @@ func _showcase(stone: GemStone, out: String) -> void:
 		stone.condition.finish.alpha_u = [0.0, 0.005, 0.02, 0.15][column]
 		stone.condition.finish.alpha_v = stone.condition.finish.alpha_u
 		tracer.configure_stone(LapidaryStoneCompiler.compile(stone), lights, policy)
-		tracer.set_environment(GemRigCompiler.environment(rig))
 		tracer.set_clip_sample(Quaternion(Vector3.RIGHT, deg_to_rad(-12.0)), 0.0, Vector4.ONE, 1.25)
 		var time_low := tracer.accumulate(128)
 		var low := tracer.finalize_print(GemPrint.load_house())

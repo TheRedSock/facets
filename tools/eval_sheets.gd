@@ -240,8 +240,8 @@ func _measure_timings() -> void:
 
 	var stone := _ruby_fine()
 	var instance := LapidaryStoneCompiler.compile(stone)
-	var lights := GemRigCompiler.pack(_rig_gameplay)
-	var bg := GemRigCompiler.environment(_rig_gameplay)
+	var lights := GemRigCompiler.compile(_rig_gameplay)
+
 	var by_rung := {}
 	for rung: int in [GemRung.INTERACT, GemRung.PREVIEW, GemRung.BOARD_LIVE, GemRung.CLIP_BAKE, GemRung.HERO]:
 		var policy: Dictionary = GemRung.policy(rung)
@@ -253,7 +253,6 @@ func _measure_timings() -> void:
 			_fail("timings: no RenderingDevice")
 			return
 		tracer.set_seed(stone.seed)
-		tracer.set_environment(bg)
 		tracer.configure_stone(instance, lights, policy)
 		tracer.set_clip_sample(_face_up, 0.0, Vector4.ONE, ORTHO_HALF)
 		var probe_ms := tracer.accumulate(1)
@@ -285,7 +284,6 @@ func _measure_timings() -> void:
 		if tracer == null:
 			_fail("timings: no RenderingDevice (grid %d)" % grid_n)
 			return
-		tracer.set_environment(bg)
 		tracer.configure_stones(instances, lights, policy_bl, Vector2i(grid_n, grid_n))
 		var states: Array = []
 		for i in count:
@@ -391,8 +389,7 @@ func _summary_lines() -> PackedStringArray:
 func _render(tracer: GemTracer, instance: Dictionary, stone_seed: int, rig: GemLightRig,
 		policy: Dictionary, spp: int, batch: int) -> float:
 	tracer.set_seed(stone_seed)
-	tracer.set_environment(GemRigCompiler.environment(rig))
-	tracer.configure_stone(instance, GemRigCompiler.pack(rig), policy)
+	tracer.configure_stone(instance, GemRigCompiler.compile(rig), policy)
 	tracer.set_clip_sample(_face_up, 0.0, Vector4.ONE, ORTHO_HALF)
 	var ms := tracer.accumulate(1)
 	var chunk := clampi(int(TDR_SAFE_DISPATCH_MS / maxf(ms, 0.05)), 1, batch)

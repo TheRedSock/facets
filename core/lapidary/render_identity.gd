@@ -12,6 +12,8 @@ static func optical_digest() -> String:
 			_collect(root, files)
 		files.append("res://core/lapidary/stone_compiler.gd")
 		files.append("res://core/lapidary/material_compiler.gd")
+		files.append(GemStandardSpectra.CMF_FILE)
+		files.append(GemStandardSpectra.D65_FILE)
 		files.sort()
 		var sources: Array = [Engine.get_version_info().get("hash", "unknown")]
 		for path in files:
