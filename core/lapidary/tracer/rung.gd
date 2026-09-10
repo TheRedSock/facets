@@ -58,3 +58,6 @@ static func policy(rung: int) -> Dictionary:
 
 static func rung_name(rung: int) -> String:
 	return ["interact", "preview", "board_live", "clip_bake", "hero", "reference"][rung]
+
+static func rung_from_name(name: String) -> int:
+	return ["interact", "preview", "board_live", "clip_bake", "hero", "reference"].find(name)

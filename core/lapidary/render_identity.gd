@@ -4,6 +4,23 @@ extends RefCounted
 ## may be served on any device; its producer and validation live in metadata.
 
 static var _engine_digest := ""
+static var _optical_digest := ""
+
+static func optical_digest() -> String:
+	if _optical_digest.is_empty():
+		var files: Array[String] = []
+		for root in ["res://core/lapidary/cut", "res://core/lapidary/geometry", "res://core/lapidary/lighting", "res://core/lapidary/tracer", "res://resources/lapidary"]:
+			_collect(root, files)
+		files.append("res://core/lapidary/stone_compiler.gd")
+		files.append("res://core/lapidary/material_compiler.gd")
+		files.sort()
+		var sources: Array = [Engine.get_version_info().get("hash", "unknown")]
+		for path in files:
+			# Factory scheduling, delivery codecs and runtime cache policy must
+			# not retire expensive optical masters.
+			sources.append([path, FileAccess.get_sha256(path)])
+		_optical_digest = GemContentIdentity.digest(sources)
+	return _optical_digest
 
 static func engine_digest() -> String:
 	if _engine_digest.is_empty():

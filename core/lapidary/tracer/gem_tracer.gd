@@ -801,6 +801,43 @@ func read_linear_master() -> Image:
 	return Image.create_from_data(width, height, false, Image.FORMAT_RGBAF, read_xyz().to_byte_array())
 
 
+## Checkpoints contain accumulation sums, not normalized images. Restoring all
+## estimator buffers preserves progressive reconstruction and sample indexing.
+func checkpoint() -> Dictionary:
+	var buffers := {}
+	for key in ["accum", "guides", "ballistic", "residual"]:
+		buffers[key] = _rd.buffer_get_data(_bufs[key])
+	return {"version": 1, "width": width, "height": height, "samples": samples_accumulated, "buffers": buffers}
+
+
+func restore_checkpoint(state: Dictionary) -> bool:
+	if state.get("version") != 1 or state.get("width") != width or state.get("height") != height or int(state.get("samples", -1)) < 0:
+		return false
+	var buffers: Dictionary = state.get("buffers", {})
+	for key in ["accum", "guides", "ballistic", "residual"]:
+		if not buffers.get(key) is PackedByteArray or buffers[key].size() != width * height * (32 if key == "guides" else 16):
+			return false
+	reset_accumulation()
+	for key: String in buffers:
+		if key in ["accum", "guides", "ballistic", "residual"]:
+			_rd.buffer_update(_bufs[key], 0, buffers[key].size(), buffers[key])
+	samples_accumulated = int(state["samples"])
+	_filtered_samples = -1
+	return true
+
+
+## Load an already normalized associated XYZ master for display-only work.
+## Caller supplies the rig white balance; no optical samples are generated.
+func load_linear_master(master: Image) -> bool:
+	if master == null or master.get_format() != Image.FORMAT_RGBAF or master.get_size() != Vector2i(width, height):
+		return false
+	reset_accumulation()
+	var bytes := master.get_data()
+	_rd.buffer_update(_bufs["accum"], 0, bytes.size(), bytes)
+	samples_accumulated = 1
+	return true
+
+
 func profile() -> Dictionary:
 	return {"accumulate_wall_ms": last_accumulate_ms, "trace_wall_ms": last_dispatch_ms,
 		"field_last_build_ms": last_field_ms, "field_builds": field_build_count,

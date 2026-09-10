@@ -6,10 +6,10 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $logRoot = Join-Path $projectRoot 'artifacts/checks'
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
-$checks = @('test_foundation', 'test_geometry', 'test_boundaries', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler')
+$checks = @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler')
 $failed = @()
 foreach ($check in $checks) {
-    $output = & $Godot --headless --path $projectRoot --script "res://tests/lapidary/$check.gd" 2>&1
+    $output = & $Godot --headless --path $projectRoot --quit-after 600 --script "res://tests/lapidary/$check.gd" 2>&1
     $code = $LASTEXITCODE
     $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot "$check.log")
     # Godot can exit zero after a GDScript exception; exit status alone is unsafe.
@@ -22,15 +22,17 @@ foreach ($check in $checks) {
     }
 }
 if ($Gpu) {
-    $output = & $Godot --path $projectRoot --script 'res://tools/foundation_gpu_check.gd' 2>&1
+  foreach ($check in @('foundation_gpu_check', 'factory_gpu_check')) {
+    $output = & $Godot --path $projectRoot --quit-after 600 --script "res://tools/$check.gd" 2>&1
     $code = $LASTEXITCODE
-    $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot 'foundation_gpu_check.log')
+    $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot "$check.log")
     if ($code -ne 0 -or ($output | Select-String -Pattern '^\s*(SCRIPT ERROR:|ERROR:|FAIL(:|\b)|FAILED\b)')) {
-        $failed += 'foundation_gpu_check'
+        $failed += $check
         Write-Output $output
     } else {
-        Write-Output 'PASS foundation_gpu_check'
+        Write-Output "PASS $check"
     }
+  }
 }
 if ($failed.Count -gt 0) {
     Write-Output "Failed checks: $($failed -join ', ')"
