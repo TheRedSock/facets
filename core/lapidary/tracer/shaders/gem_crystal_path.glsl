@@ -36,10 +36,9 @@ double crystal_absorption(inout CrystalMode packet, int material, float waveleng
         vec3 position, vec3 direction, float distance) {
     if(material<0) return 1.0;
     Stone st=stones[material]; dvec2 indices=crystal_indices(material,wavelength);
-    double ao=absorb_at(st.ranges1.x,wavelength);
-    double ae=(st.ranges1.y&1)!=0?absorb_at(st.ranges1.x+401,wavelength):ao;
-    double column=(zoning_column(st,position,direction,distance)+field_columns(st,position,direction,distance).x)
-        *st.misc.y*st.sell_b_size.w;
+    vec4 tau_o,tau_e;
+    principal_depth(st,position,direction,distance,vec4(wavelength),tau_o,tau_e);
+    double ao=double(tau_o.x), ae=double(tau_e.x);
     dvec3 axis=crystal_axis(material);
     if(indices.x==indices.y) {
         // Coherent isotropic Jones components may attenuate differently.
@@ -48,7 +47,7 @@ double crystal_absorption(inout CrystalMode packet, int material, float waveleng
         else u=normalize(u);
         dvec3 v=cross(k,u);
         double ca=dot(k,axis), ak=ca*ca*ao+(1.0-ca*ca)*ae;
-        double to=double(exp(float(-0.5*ao*column))), te=double(exp(float(-0.5*ak*column)));
+        double to=double(exp(float(-0.5*ao))), te=double(exp(float(-0.5*ak)));
         double before=length(packet.poynting);
         packet.er=u*(dot(packet.er,u)*to)+v*(dot(packet.er,v)*te);
         packet.ei=u*(dot(packet.ei,u)*to)+v*(dot(packet.ei,v)*te);
@@ -62,7 +61,7 @@ double crystal_absorption(inout CrystalMode packet, int material, float waveleng
     double e2=dot(packet.er,packet.er)+dot(packet.ei,packet.ei);
     double axial=dot(packet.er,axis)*dot(packet.er,axis)+dot(packet.ei,axis)*dot(packet.ei,axis);
     double alpha=(indices.x*ao*max(0.0,e2-axial)+indices.y*ae*axial)/(2.0*length(packet.poynting));
-    return double(exp(float(-alpha*column)));
+    return double(exp(float(-alpha)));
 }
 
 float trace_crystal_probe(Stone host, vec3 position, vec3 direction, float wavelength,

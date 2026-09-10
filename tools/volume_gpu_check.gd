@@ -26,7 +26,7 @@ layout(local_size_x=64) in;
 layout(set=0,binding=16,std430) buffer Results { vec4 results[]; };
 void main() {
  int i=int(gl_GlobalInvocationID.x);
- Stone st; st.sell_b_size=vec4(0,0,0,1); st.scatter_zone=vec4(0.03,0,0,0); st.ranges0=ivec4(0,0,0,3);
+ Stone st; st.sell_b_size=vec4(0,0,0,1); st.scatter_zone=vec4(0.03,0,0,0); st.ranges0=ivec4(0,0,0,6);
  vec3 origin=vec3(0.25*sin(float(i)*0.37),0.12,-2);
  vec3 direction=normalize(vec3(0.1*cos(float(i)*0.21),0,1));
  float tau=-log(1.0-(float(i%256)+0.5)/256.0);
@@ -41,18 +41,21 @@ void main() {
 		rd.free()
 		return
 	var fields: Array[GemVolumeField] = []
-	var data := PackedFloat32Array()
-	for index in 3:
+	var data := PackedByteArray()
+	for index in 6:
 		var field := GemVolumeField.new()
 		field.center_mm = Vector3(0.1 * index, 0, -0.7 + index * 0.7)
 		field.radius_mm = Vector3(0.55, 0.8, 0.25 + index * 0.09)
 		field.orientation = Quaternion(Vector3.UP, index * 0.2)
 		field.scatter_per_mm = 3.0 + index
+		if index>=3:
+			field.profile=GemVolumeField.Profile.PLANAR_TRANSITION
+			field.scatter_per_mm=.1
 		fields.append(field)
 		data.append_array(field.packed())
 	var shader := rd.shader_create_from_spirv(spirv)
 	var pipeline := rd.compute_pipeline_create(shader)
-	var input := rd.storage_buffer_create(data.size() * 4, data.to_byte_array())
+	var input := rd.storage_buffer_create(data.size(), data)
 	var output := rd.storage_buffer_create(1024 * 48)
 	var uniforms: Array[RDUniform] = []
 	var dummy := rd.storage_buffer_create(401 * 16)

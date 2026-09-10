@@ -21,7 +21,9 @@ be coefficient/mm or cross-section/cm2; the latter retain float64 precision unti
 physical number-density conversion and summation produce the float32 GPU table.
 Binary resource bundles retain each term, its host compatibility and provenance.
 Changing composition invalidates optical masters; concentration is not a print
-parameter. Current spatial absorption fields scale the complete mixture.
+parameter. Spatial fields can scale the complete mixture or add explicit local absorber
+terms. Their profile, physical dimensions and spectra participate in optical
+identity, while geometry companions remain independent of these coefficients.
 
 `GemRenderIdentity` separates scalar, polarized, crystal, print and geometry
 result dependencies from `worker_digest()`, the complete renderer inventory.

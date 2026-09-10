@@ -101,10 +101,16 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 	var condition := stone.condition
 	if condition != null and not condition.validate_volume_fields().is_empty():
 		return "; ".join(condition.validate_volume_fields())
+	var fields:Array=condition.volume_fields if condition!=null else []
+	var spatial:=GemMaterialCompiler.field_absorption(stone.material,fields)
+	if spatial.has("error"):return spatial.error
+	var bulk:=GemMaterialCompiler.compile(stone.material)
+	bulk["volume_fields"]=fields
+	bulk["field_absorption"]=spatial.spectra
+	bulk["zoning"]=condition.banding.normalized(stone.size_mm) if condition!=null and condition.banding!=null else {}
+	var peak:=GemMaterialCompiler.peak_absorption(bulk)
+	if peak.has("error"):return peak.error
 	if polarized:
-		var bulk := GemMaterialCompiler.compile(stone.material)
-		bulk["volume_fields"] = condition.volume_fields if condition != null else []
-		bulk["zoning"] = condition.banding.normalized(stone.size_mm) if condition != null and condition.banding != null else {}
 		bulk["optic_axis"] = stone.resolved_optic_axis()
 		error = GemMaterialCompiler.polarization_error(bulk)
 		if not error.is_empty():

@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v19)
+# Lapidary kernel contract (v20)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. Wire floats
@@ -15,7 +15,8 @@ by10 produces Napierian coefficients/mm. Total-atom ppma uses an explicitly
 declared atom density. Isotropic terms contribute to both principal axes of an
 anisotropic mixture. The final401-sample tables remain float32; no wire layout
 change or shader-side concentration conversion is needed. All terms share the
-host crystal frame; existing spatial concentration fields scale the whole sum.
+host crystal frame. Spatial fields can scale the host mixture or add their own
+explicit absorber terms in that same lattice and frame.
 
 A Plane is two vec4s (32B): outward normal.xyz/offset d, then zone ID/reserved/
 facet-ID-bits/surface-slot-bits. Both aux.z and aux.w store **int32 bit patterns**;
@@ -113,7 +114,8 @@ for visibility, but transport processes their segments to preserve optical lengt
 | 8 | extraordinary Sellmeier B.xyz, ordinary index offset |
 | 9 | extraordinary Sellmeier C.xyz in µm², extraordinary index offset |
 
-Flags: bit0 has_eray, bit1 dispersion_strong. BVH selector0 is convex planes,
+Flags: bit0 has_eray (including local spectra), bit1 dispersion_strong,
+bit2 nested_dichroism (persistent absorption state is required). BVH selector0 is convex planes,
 -1 analytic host without mesh, positive root+1 supports triangle host/defects.
 Absorption concatenates 401-sample Napierian α/mm blocks, 380..780 nm at1nm. An e-ray
 block follows its o-ray block directly (offset+401). Source resources may use
@@ -121,10 +123,11 @@ a different uniform grid, but must cover the transport interval. No implicit
 extrapolation or normalization of material absorption is allowed. Concentration is already applied.
 
 Current anisotropy is an approximation: α_k=cos²φ α_o+sin²φ α_e; the unpolarized
-segment uses (T_o+T_k)/2. Optional o/e fork occurs above the sampled visible
+incident state is an equal mixture, then axial absorption retains its Stokes
+state between segments. Optional o/e fork occurs above the sampled visible
 maximum |Δn|=.015, with effective
-index 1/n_e(φ)²=cos²φ/n_o²+sin²φ/n_e². This scalar path has no persistent polarization frame,
-full anisotropic interface solver or biaxial transport (the optional isotropic
+index 1/n_e(φ)²=cos²φ/n_o²+sin²φ/n_e². This path uses scalar Fresnel weights while retaining
+absorption polarization; it has no full anisotropic interface solver or biaxial transport (the optional isotropic
 polarized variant is described below). REFERENCE does not fix
 these limitations. Fluorescence has no enabled transport implementation.
 
@@ -354,42 +357,49 @@ principal curves; accurate anisotropic production transport is not yet enabled.
 `test_principal_indices.gd` checks independent published values and serialization;
 `principal_indices_gpu_check.gd` probes the exact packing/GLSL at 0.25 nm spacing.
 
-## Spatial coefficient fields (48B, binding7)
+## Spatial coefficient fields (64B, binding7)
 
-GemCondition.volume_fields defines at most16 additive, smooth fields in physical
-host-space millimeters. Each record is three vec4s: center.xyz/absorption amplitude,
-ellipsoid radii.xyz/scattering amplitude per mm, unit quaternion xyzw. Density is
-max(0,1−r²)^3; the value and first two derivatives vanish at its finite boundary.
-There is no refractive surface there. Host priority regions still control where
-material exists; a field never fills a cavity or changes silhouette.
+GemCondition.volume_fields defines at most16 additive fields in physical host
+coordinates. Each record contains three vec4s: center.xyz/host absorption scale,
+radii.xyz/scattering coefficient per mm, unit quaternion xyzw. A final ivec4
+contains additional spectrum offset (-1=none), parallel-spectrum flag, profile
+kind, reserved0. Offsets address binding2; a parallel table follows its ordinary
+table by401 samples. Host bit0 includes local dichroism even if bulk is colorless.
 
-Absorption adds the field's concentration times the host absorption spectrum.
-Scattering adds the field coefficient to homogeneous σ_s, using the host HG phase
-function. This is an authored effective-medium model for spatial haze and color
-variation. It does not represent resolved crystals, polarized silk, stress,
-crystal-growth mechanics, or a calibrated clarity grade. No catalog grade enables
-these fields automatically.
+Profile0 is compact ellipsoid density max(0,1-r²)^3. Profile1 is a planar C2
+transition: local z<=-radius.z gives0, z>=radius.z gives1, with quintic smootherstep
+between them. It is unbounded in local x/y and clipped by the active host medium.
+Flipping its normal gives the complementary profile. No field creates a surface,
+fills a cavity, or changes silhouette or real refraction.
 
-Restricting a field to a ray gives a degree-six polynomial over a clipped chord.
-Four-point Gauss-Legendre integrates that polynomial exactly apart from floating
-point rounding, with positive weights to avoid grazing cancellation. Reference:
-https://dlmf.nist.gov/3.5#v . Integrated σ_s is inverted with a safeguarded Newton/
-bisection solver (32 iterations, optical-depth residual target2e-6). Homogeneous
-media retain the analytic exponential inverse. Field geometry is cached per
-sampled segment. Transport uses the same integrated coefficients for Beer-Lambert
-and zero-scatter reconstruction. The relevant transmittance/free-flight framework
-is https://pbr-book.org/4ed/Light_Transport_II_Volume_Rendering/The_Equation_of_Transfer .
+Each field can scale the host mixture and/or add its own GemAbsorber terms.
+Those terms inherit the host lattice, atom density and crystal frame. Principal
+optical depths add before attenuation; scalar, Mueller and crystal paths use the
+same integrated spectra. Admission bounds the sum of all field maxima, including
+new dichroism and weak-loss requirements. These are authored dilute-composition
+fields, not chemical equilibrium, diffusion, growth kinetics or automatic grading.
+Scattering uses the host HG phase function and remains an effective medium.
 
-`test_volume_fields.gd` compares columns to independent midpoint quadrature;
-`volume_gpu_check.gd` checks the actual GLSL collision sampler against independent
-CPU integrals and tests full heterogeneous transport. `volume_lookdev.gd` compares
-raw/reconstructed low-SPP renders to high-SPP transport at multiple poses.
+Four-point positive Gauss-Legendre integrates each degree-six ellipsoid chord or
+piecewise degree-five planar transition exactly apart from floating point error;
+constant plateaus are integrated directly. Reference: https://dlmf.nist.gov/3.5#v .
+Integrated scattering is inverted by safeguarded Newton/bisection (32 iterations,
+optical-depth target2e-6). Homogeneous media keep the analytic inverse. Absorption
+and zero-scatter reconstruction use the same physical columns.
+
+`test_spatial_composition.gd` and `test_volume_fields.gd` check integrals, units,
+host compatibility, conservative bounds and portable recipes. `volume_gpu_check.gd`
+compares mixed profiles to independent CPU collision integrals.
+`spatial_composition_gpu_check.gd` checks scalar/Mueller/crystal slabs, cavity
+clipping, mixed packing and differently oriented nested absorption against an
+independent Jones product. Lookdev outputs remain ignored under artifacts/.
 
 ## Optional persistent polarization
 
 Policy `polarization=true` lazily compiles a separate variant of the same boundary
-transport source. It forces independent wavelength geometry. The scalar variant
-compiles away the extra state. The variant currently requires isotropic **real
+transport source. It forces independent wavelength geometry. Scalar interfaces
+retain absorption polarization but do not generate Fresnel polarization or TIR
+phase; only this full Mueller variant does. It currently requires isotropic **real
 refraction** in every host/filling. Axial weak-loss absorption is supported with
 persistent polarization; birefringent refraction remains rejected by its
 precondition. Existing catalog policies remain scalar pending broader
@@ -409,7 +419,10 @@ optic-axis/ray plane. The other transverse component has
 `alpha_k=cos(phi)^2*alpha_o+sin(phi)^2*alpha_e` for the supported isotropic real
 index. Each segment applies the rotated diattenuation Mueller operator to the
 existing importance state. It never resets that state to an equal mixture.
-Zoning and compact absorption fields use their exact integrated optical columns.
+Zoning, compact and planar composition fields use their integrated principal
+optical depths. This same absorption operator is used by scalar boundary paths,
+which prevents arbitrary segmentation or index-matched cavities from resetting
+polarization. The simpler convex path remains available for isotropic absorption.
 Admission limits peak `kappa/n` to 0.001 for this dichroic approximation, including
 a conservative sum of field concentrations and zoning amplitude. This bound is
 an implementation policy, not a guaranteed error near all critical angles.

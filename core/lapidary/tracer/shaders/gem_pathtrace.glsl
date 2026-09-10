@@ -95,26 +95,43 @@ float zoning_column(Stone st, vec3 position, vec3 direction, float distance) {
 
 // Beer-Lambert. pol_mode: UNPOL = 0.5 To + 0.5 Tk; O = pure o-ray; K = mixed k-ray.
 // alpha_k = cos^2(phi) alpha_o + sin^2(phi) alpha_e  (GIA G&G Spring 2021).
+// Integrate each independent principal absorption tensor along the ray.
+// All tensors share the host crystal frame, so their optical depths add.
+void principal_depth(Stone st, vec3 pos, vec3 dir, float t, vec4 wl,
+        out vec4 tau_o, out vec4 tau_e) {
+    vec4 base_o,base_e;
+    for(int i=0;i<4;i++) {
+        base_o[i]=absorb_at(st.ranges1.x,wl[i]);
+        base_e[i]=(st.ranges1.y&1)!=0?absorb_at(st.ranges1.x+401,wl[i]):base_o[i];
+    }
+    float host_column=zoning_column(st,pos,dir,t);
+    tau_o=vec4(0.0);tau_e=vec4(0.0);
+    for(int index=0;index<st.ranges0.w;index++) {
+        VolumeField field=volume_fields[st.ranges0.z+index];
+        FieldChord chord=field_chord(field,pos*st.sell_b_size.w,dir*st.sell_b_size.w,t);
+        float column=chord_column(chord,t);
+        host_column+=column*field.center_absorption.w;
+        if(column<=0.0 || field.spectrum_profile.x<0) continue;
+        for(int i=0;i<4;i++) {
+            float ao=absorb_at(field.spectrum_profile.x,wl[i]);
+            float ae=(field.spectrum_profile.y&1)!=0?absorb_at(field.spectrum_profile.x+401,wl[i]):ao;
+            tau_o[i]+=column*ao; tau_e[i]+=column*ae;
+        }
+    }
+    float scale=st.misc.y*st.sell_b_size.w;
+    tau_o=(tau_o+base_o*host_column)*scale;
+    tau_e=(tau_e+base_e*host_column)*scale;
+}
+
 void segment_beer(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl,
         out vec4 ordinary, out vec4 extraordinary) {
-	float size_mm = st.sell_b_size.w;
-	float L = (zoning_column(st, pos, dir, t) + field_columns(st, pos, dir, t).x) * st.misc.y * size_mm;
-	if (!has_eray) {
-		vec4 alpha = vec4(absorb_at(a_off, wl.x), absorb_at(a_off, wl.y),
-			absorb_at(a_off, wl.z), absorb_at(a_off, wl.w));
-		ordinary=exp(-alpha*L); extraordinary=ordinary;
-		return;
-	}
-	float ca = abs(dot(dir, st.optic_fluor.xyz));
-	float c2 = clamp(ca * ca, 0.0, 1.0);
-	float s2 = 1.0 - c2;
-	vec4 alpha_o, alpha_e, alpha_k;
-	for (int i = 0; i < 4; i++) {
-		alpha_o[i] = absorb_at(a_off, wl[i]);
-		alpha_e[i] = absorb_at(a_off + 401, wl[i]);
-		alpha_k[i] = c2 * alpha_o[i] + s2 * alpha_e[i];
-	}
-	ordinary=exp(-alpha_o*L); extraordinary=exp(-alpha_k*L);
+    vec4 tau_o,tau_e;
+    principal_depth(st,pos,dir,t,wl,tau_o,tau_e);
+    ordinary=exp(-tau_o);
+    if(!has_eray) { extraordinary=ordinary; return; }
+    float ca=dot(dir,st.optic_fluor.xyz);
+    float c2=clamp(ca*ca,0.0,1.0);
+    extraordinary=exp(-(c2*tau_o+(1.0-c2)*tau_e));
 }
 
 vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl, int pol_mode) {
@@ -126,14 +143,9 @@ vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray
 }
 
 PathWeight segment_weight(PathWeight w, Stone st, vec3 pos, vec3 dir, float t, vec4 wl, int pol_mode) {
-#ifdef POLARIZED_TRANSPORT
     vec4 ordinary,extraordinary;
     segment_beer(st,pos,dir,t,st.ranges1.x,(st.ranges1.y&1)!=0,wl,ordinary,extraordinary);
     return absorption_weight(w,dir,st.optic_fluor.xyz,ordinary,extraordinary);
-#else
-    weight_scale(w,segment_att(st,pos,dir,t,st.ranges1.x,(st.ranges1.y&1)!=0,wl,pol_mode));
-    return w;
-#endif
 }
 
 // ---------------------------------------------------------------- surfaces
@@ -219,6 +231,15 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 	sharp_radiance = vec4(0.0);
 	bool sharp_path = true;
 	PathWeight throughput = weight_initial(dir);
+#ifndef POLARIZED_TRANSPORT
+    // The optional approximate o/e ray split starts with one camera probe
+    // per polarization. Subsequent absorption keeps its persistent state.
+    if(pol_mode!=POL_UNPOL) {
+        vec3 axis=cross(st.optic_fluor.xyz,-dir);
+        if(dot(axis,axis)>1e-12) throughput.axis=normalize(axis);
+        throughput.Q=vec4(pol_mode==POL_O?1.0:-1.0);
+    }
+#endif
 	vec4 radiance = vec4(0.0);
 	uvec4 region_state = uvec4(0u);
 	for (uint bounce = 0u; bounce < pc.max_bounces; bounce++) {
@@ -366,7 +387,7 @@ void main() {
 	float hg_g = st.scatter_zone.y;
 	bool reconstruct_volume = FLAG_VOLUME && (sigma_h > 0.0 || st.misc.z > 0.0);
 	bool reconstruct_surface = st.misc.w > 0.0;
-	bool boundary_transport = st.ranges1.z != 0 || reconstruct_surface;
+	bool boundary_transport = st.ranges1.z != 0 || reconstruct_surface || (st.ranges1.y & 5) != 0;
 #ifdef POLARIZED_TRANSPORT
 	boundary_transport = true;
 #endif

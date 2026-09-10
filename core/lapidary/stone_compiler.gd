@@ -16,6 +16,9 @@ static func compile(stone: GemStone, optimize_cleavage := true) -> Dictionary:
 	assert(stone != null and stone.material.species != null)
 	assert(stone.condition == null or stone.condition.validate_volume_fields().is_empty(), "Invalid spatial material condition")
 	var bulk := GemMaterialCompiler.compile(stone.material)
+	var fields:Array=stone.condition.volume_fields if stone.condition!=null else []
+	var spatial:=GemMaterialCompiler.field_absorption(stone.material,fields)
+	assert(not spatial.has("error"),str(spatial))
 	var species := stone.material.species
 
 	var geometry := compile_geometry(stone)
@@ -45,7 +48,8 @@ static func compile(stone: GemStone, optimize_cleavage := true) -> Dictionary:
 	if geometry.has("analytic_shape"):
 		compiled["analytic_shape"] = geometry["analytic_shape"]
 	compiled["surfaces"] = [stone.condition.finish if stone.condition != null and stone.condition.finish != null else GemSurface.new()]
-	compiled["volume_fields"] = stone.condition.volume_fields if stone.condition != null else []
+	compiled["volume_fields"] = fields
+	compiled["field_absorption"] = spatial.spectra
 	GemDefectCompiler.apply(compiled, stone.condition, stone.size_mm, optimize_cleavage)
 	return compiled
 

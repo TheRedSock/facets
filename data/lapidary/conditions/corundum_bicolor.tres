@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="GemCondition" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_djoox"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_banding.gd" id="2_5ae5u"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_defect.gd" id="3_63l5f"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_finish_field.gd" id="4_l1jyv"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_surface.gd" id="5_ak8ys"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_condition.gd" id="6_ils7l"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="7_dlh0d"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_absorber.gd" id="8_xl0ye"]
+[ext_resource type="Resource" path="res://data/lapidary/materials/measured_corundum/chromium.tres" id="9_82wq0"]
+[ext_resource type="Resource" path="res://data/lapidary/materials/measured_corundum/iron_titanium.tres" id="10_013ax"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_workmanship.gd" id="11_le2ao"]
+
+[sub_resource type="Resource" id="Resource_xs7gf"]
+script = ExtResource("1_djoox")
+
+[sub_resource type="Resource" id="Resource_6gh85"]
+script = ExtResource("2_5ae5u")
+evidence = SubResource("Resource_xs7gf")
+
+[sub_resource type="Resource" id="Resource_guqyu"]
+script = ExtResource("5_ak8ys")
+
+[sub_resource type="Resource" id="Resource_dkry6"]
+script = ExtResource("8_xl0ye")
+chromophore = ExtResource("9_82wq0")
+amount = 250.0
+unit = 2
+
+[sub_resource type="Resource" id="Resource_lxcfq"]
+script = ExtResource("7_dlh0d")
+radius_mm = Vector3(1, 1, 0.5)
+orientation = Quaternion(0, 0.70710677, 0, 0.70710677)
+profile = 1
+absorbers = Array[ExtResource("8_xl0ye")]([SubResource("Resource_dkry6")])
+source_note = "Authored complementary C2 concentration transition in a shared corundum host. Measured cross section with an illustrative active-absorber concentration; no diffusion, growth kinetics, grade assignment or real-index change is inferred."
+
+[sub_resource type="Resource" id="Resource_i55ym"]
+script = ExtResource("8_xl0ye")
+chromophore = ExtResource("10_013ax")
+amount = 10.0
+unit = 2
+
+[sub_resource type="Resource" id="Resource_dm1kc"]
+script = ExtResource("7_dlh0d")
+radius_mm = Vector3(1, 1, 0.5)
+orientation = Quaternion(0, -0.70710677, 0, 0.70710677)
+profile = 1
+absorbers = Array[ExtResource("8_xl0ye")]([SubResource("Resource_i55ym")])
+source_note = "Authored complementary C2 concentration transition in a shared corundum host. Measured cross section with an illustrative active-absorber concentration; no diffusion, growth kinetics, grade assignment or real-index change is inferred."
+
+[sub_resource type="Resource" id="Resource_h2lei"]
+script = ExtResource("11_le2ao")
+
+[resource]
+script = ExtResource("6_ils7l")
+finish = SubResource("Resource_guqyu")
+workmanship = SubResource("Resource_h2lei")
+volume_fields = Array[ExtResource("7_dlh0d")]([SubResource("Resource_lxcfq"), SubResource("Resource_dm1kc")])
+banding = SubResource("Resource_6gh85")

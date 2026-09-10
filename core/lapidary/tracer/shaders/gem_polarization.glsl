@@ -1,37 +1,30 @@
 // Camera-path importance is a ROW of a Mueller product. Its basis refers to
 // physical light propagation (-camera_ray_direction). Emitters are unpolarized.
-// The scalar variant compiles away the extra state and all basis operations.
+// Scalar interfaces still preserve absorption polarization between segments.
+// Only the full Mueller variant polarizes light at dielectric interfaces.
 struct PathWeight {
 	vec4 I;
-#ifdef POLARIZED_TRANSPORT
 	vec4 Q; vec4 U; vec4 V;
 	vec3 axis;
-#endif
 };
 
 PathWeight weight_initial(vec3 direction) {
 	PathWeight w; w.I = vec4(1.0);
-#ifdef POLARIZED_TRANSPORT
 	w.Q = vec4(0.0); w.U = vec4(0.0); w.V = vec4(0.0);
 	vec3 unused; basis(-direction, w.axis, unused);
-#endif
 	return w;
 }
 
 void weight_scale(inout PathWeight w, vec4 value) {
 	w.I *= value;
-#ifdef POLARIZED_TRANSPORT
 	w.Q *= value; w.U *= value; w.V *= value;
-#endif
 }
 
 void weight_depolarize(inout PathWeight w, vec3 direction) {
-#ifdef POLARIZED_TRANSPORT
 	// The scalar HG effective medium is explicitly an ideal depolarizer.
 	// Polarized particle phase matrices are not inferred from HG g.
 	w.Q = vec4(0.0); w.U = vec4(0.0); w.V = vec4(0.0);
 	vec3 unused; basis(-direction, w.axis, unused);
-#endif
 }
 
 #ifdef POLARIZED_TRANSPORT
@@ -65,7 +58,6 @@ mat4 polarized_dielectric(float ci, float eta, bool transmission) {
 // the weak-loss transverse absorption tensor, not anisotropic refraction.
 PathWeight absorption_weight(PathWeight w, vec3 camera_direction, vec3 optic_axis,
         vec4 ordinary_transmittance, vec4 extraordinary_transmittance) {
-#ifdef POLARIZED_TRANSPORT
     vec3 propagation=-camera_direction;
     vec3 axis=cross(optic_axis,propagation);
     axis=dot(axis,axis)>1e-12?normalize(axis):w.axis;
@@ -80,16 +72,12 @@ PathWeight absorption_weight(PathWeight w, vec3 camera_direction, vec3 optic_axi
     w.I=a*w.I+b*Q;
     w.U=coherence*U; w.V*=coherence;
     w.axis=axis;
-#else
-    w.I*=0.5*(ordinary_transmittance+extraordinary_transmittance);
-#endif
     return w;
 }
 
 PathWeight interface_weight(PathWeight w, vec3 previous_dir, vec3 next_dir,
 		vec3 normal, vec4 index_before, vec4 index_after, bool transmission,
 		float geometry_weight, vec4 scalar_weight) {
-#ifdef POLARIZED_TRANSPORT
 	vec3 outgoing = -previous_dir, incident = -next_dir;
 	vec3 out_axis = cross(normal, outgoing), in_axis = cross(normal, incident);
 	if (dot(out_axis,out_axis) < 1e-12 || dot(in_axis,in_axis) < 1e-12) {
@@ -101,6 +89,7 @@ PathWeight interface_weight(PathWeight w, vec3 previous_dir, vec3 next_dir,
 	float s = dot(outgoing, cross(out_axis, w.axis));
 	vec4 Q = w.Q * (c*c-s*s) - w.U * (2.0*c*s);
 	vec4 U = w.Q * (2.0*c*s) + w.U * (c*c-s*s);
+#ifdef POLARIZED_TRANSPORT
 	float ci = clamp(abs(dot(transmission ? incident : outgoing, normal)), 0.0, 1.0);
 	for (int channel=0; channel<4; channel++) {
 		float eta = transmission ? index_after[channel]/index_before[channel] : index_before[channel]/index_after[channel];
@@ -110,9 +99,13 @@ PathWeight interface_weight(PathWeight w, vec3 previous_dir, vec3 next_dir,
 		value *= geometry_weight * (transmission ? radiance_eta*radiance_eta : 1.0);
 		w.I[channel]=value.x; w.Q[channel]=value.y; w.U[channel]=value.z; w.V[channel]=value.w;
 	}
-	w.axis = in_axis;
 #else
-	w.I *= scalar_weight;
+    // Scalar Fresnel is an approximation, but an interface must not erase
+    // polarization accumulated through selective bulk absorption. Rotate
+    // between incidence frames and retain both channels/coherence.
+    w.Q=Q;w.U=U;
+    weight_scale(w,scalar_weight);
 #endif
+    w.axis=in_axis;
 	return w;
 }

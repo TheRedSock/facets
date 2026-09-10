@@ -185,8 +185,8 @@ Absorption recipes use `GemMaterial.absorbers`, with a `GemAbsorber` per active
 coloring agent. Coefficient spectra take relative scales; cross sections take
 active absorbers/cm3 or total-atom ppma with an explicit host atom density.
 Independent terms add Napierian coefficients on both principal axes. This is a
-dilute independent-absorber model, not a chemical equilibrium calculation. Current
-spatial concentration fields multiply the whole mixture, not individual ions.
+dilute independent-absorber model, not a chemical equilibrium calculation. Spatial concentration fields can scale the whole mixture or add independent
+absorber terms using the host lattice, atom density and crystal frame.
 
 For the reviewed GIA2020 corundum examples, run
 `python tools/extract_corundum_measurements.py <downloaded-workbook.xlsx>` followed
@@ -206,3 +206,21 @@ compares scalar preview (left) and explicit crystal transport (right), with two
 crystal orientations per material, under ignored `artifacts/materials/lookdev/`.
 These are measured-spectrum examples, not calibrated specimen colors or updates
 to the authored game catalog. Fluorescence remains disabled.
+
+Spatial composition: `GemVolumeField.absorbers` specifies additional peak
+concentrations independently of the homogeneous mixture. `PLANAR_TRANSITION`
+uses a C2 concentration step across local z=-radius.z..+radius.z; reverse its
+normal for the complement. Compact ellipsoid profiles remain available. These
+change absorption/scattering only, with no artificial refractive surface.
+`generate_composition_examples.gd` rebuilds the explicit corundum bicolor preset
+and its clear host. `spatial_composition_lookdev.gd` writes384px/128spp comparisons
+of homogeneous, bicolor and bicolor-plus-milk specimens at two poses.
+
+Run `test_spatial_composition.gd` and `spatial_composition_gpu_check.gd` (included
+in the full runner). Scalar boundary paths now preserve absorption polarization
+across segments and nested media, avoiding a former reset at every cavity. Their
+Fresnel interface weights and optional o/e ray split remain approximations;
+full Mueller and crystal backends retain their separate capability gates.
+`composition_portable_check.gd` exercises the measured spatial example through
+an isolated binary job bundle, partial render, resumed render, geometry output
+and headless cache reuse. It is also included in the GPU check suite.

@@ -210,6 +210,11 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		if source_mesh != null and not source_mesh.validate().is_empty():
 			configuration_error = "Invalid optical boundary mesh: %s" % source_mesh.validate()
 			return false
+		for material:Dictionary in [instance]+instance.get("region_materials",[]):
+			var peak:=GemMaterialCompiler.peak_absorption(material)
+			if peak.has("error"):
+				configuration_error=peak.error
+				return false
 		bound_radius = maxf(bound_radius, _boundary_radius(instance))
 	_camera_distance = bound_radius + maxf(0.5, bound_radius * 0.05)
 	_grid = grid
@@ -283,7 +288,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	var region_data := PackedInt32Array()
 	var surface_data := PackedFloat32Array()
 	var finish_data := PackedFloat32Array()
-	var volume_data := PackedFloat32Array()
+	var volume_data := PackedByteArray()
 	var nested_materials: Array[Dictionary] = []
 	var host_index := 0
 	for inst: Dictionary in instances:
@@ -341,6 +346,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			plane_facet_ids.append(facet_ids[face] if face < facet_ids.size() else face)
 		var ab: PackedFloat32Array = inst["absorption"]
 		var ab_e: PackedFloat32Array = inst.get("absorption_eray", PackedFloat32Array())
+		if ab_e.is_empty() and _spatial_dichroism(inst):ab_e=ab
 		assert(ab.size() == 401 and (ab_e.is_empty() or ab_e.size() == 401), "Invalid compiled absorption grid")
 		var stone_flags := 0
 		var plane_offset := planes.size() / 8
@@ -352,7 +358,10 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			stone_flags |= STONE_FLAG_HAS_ERAY
 		if inst.get("dispersion_strong", false):
 			stone_flags |= STONE_FLAG_DISPERSION_STRONG
-		_pack_volume_fields(inst, volume_data)
+		for nested:Dictionary in inst.get("region_materials",[]):
+			if not nested.get("absorption_eray",[]).is_empty() or _spatial_dichroism(nested):
+				stone_flags|=4 # Any nested axial absorption needs persistent path state.
+		_pack_volume_fields(inst, volume_data, absorb)
 		_pack_stone(stones, inst, plane_offset, p.size() / 8, absorb_offset, stone_flags)
 		host_index += 1
 	for material in nested_materials:
@@ -360,8 +369,9 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		var offset := absorb.size()
 		absorb.append_array(ab)
 		var ab_e: PackedFloat32Array = material.get("absorption_eray", PackedFloat32Array())
+		if ab_e.is_empty() and _spatial_dichroism(material):ab_e=ab
 		absorb.append_array(ab_e)
-		_pack_volume_fields(material, volume_data)
+		_pack_volume_fields(material, volume_data, absorb)
 		_pack_stone(stones, material, 0, 0, offset, STONE_FLAG_HAS_ERAY if not ab_e.is_empty() else 0)
 	_plane_count_total = planes.size() / 8
 	if planes.is_empty():
@@ -372,9 +382,9 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		node_data.resize(48)
 
 	if volume_data.is_empty():
-		volume_data.resize(12)
+		volume_data.resize(64)
 	_free_scene_buffers()
-	_bufs["volume_fields"] = _rd.storage_buffer_create(volume_data.to_byte_array().size(), volume_data.to_byte_array())
+	_bufs["volume_fields"] = _rd.storage_buffer_create(volume_data.size(), volume_data)
 	var plane_bytes := planes.to_byte_array()
 	for face in plane_facet_ids.size():
 		# Preserve the full signed integer ID; aux.z is a bit-cast storage slot.
@@ -436,15 +446,29 @@ static func _has_spatial_scattering(instance: Dictionary) -> bool:
 	return false
 
 
-static func _pack_volume_fields(instance: Dictionary, packed: PackedFloat32Array) -> void:
+static func _spatial_dichroism(instance:Dictionary)->bool:
+	for spectrum:Dictionary in instance.get("field_absorption",[]):
+		if not spectrum.get("absorption_eray",[]).is_empty():return true
+	return false
+
+static func _pack_volume_fields(instance: Dictionary, packed: PackedByteArray, absorb:PackedFloat32Array) -> void:
 	var fields: Array = instance.get("volume_fields", [])
 	assert(fields.size() <= 16, "At most 16 coefficient fields per material")
-	instance["volume_offset"] = packed.size() / 12
+	instance["volume_offset"] = packed.size() / 64
 	instance["volume_count"] = fields.size()
 	if _has_spatial_scattering(instance):
 		instance["volume_present"] = 1.0
-	for field: GemVolumeField in fields:
-		packed.append_array(field.packed())
+	var spectra:Array=instance.get("field_absorption",[])
+	for index in fields.size():
+		var offset:=-1
+		var parallel:=false
+		if index<spectra.size() and not spectra[index].is_empty():
+			var spectrum:Dictionary=spectra[index]
+			offset=absorb.size()
+			absorb.append_array(spectrum.absorption)
+			parallel=not spectrum.absorption_eray.is_empty()
+			absorb.append_array(spectrum.absorption_eray)
+		packed.append_array(fields[index].packed(offset,parallel))
 
 
 func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="GemMaterial" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_absorber.gd" id="1_goufb"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_wxtb0"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="3_kb8to"]
+[ext_resource type="Resource" path="res://data/lapidary/species/corundum.tres" id="4_1o6no"]
+
+[sub_resource type="Resource" id="Resource_7b3pe"]
+script = ExtResource("2_wxtb0")
+method = "Explicit zero-scattering example; not a measured specimen"
+
+[resource]
+script = ExtResource("3_kb8to")
+material_id = &"clear_corundum_host"
+species = ExtResource("4_1o6no")
+atom_density_per_cm3 = 1.178e+23
+scatter_per_mm = 0.0
+scattering_evidence = SubResource("Resource_7b3pe")
+source_note = "Clear corundum host for authored dilute-absorber zoning. Atom density follows the GIA2020 total-atom ppma convention. Spatial dopants do not modify the real-index tensor in this approximation."

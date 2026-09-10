@@ -12,6 +12,9 @@ static func stone_error(stone: GemStone) -> String:
 			return "; ".join(stone.condition.validate_volume_fields())
 		material["surfaces"] = [stone.condition.finish] if stone.condition.finish != null else []
 		material["volume_fields"] = stone.condition.volume_fields
+		var spatial:=GemMaterialCompiler.field_absorption(stone.material,stone.condition.volume_fields)
+		if spatial.has("error"):return spatial.error
+		material["field_absorption"]=spatial.spectra
 		material["zoning"] = stone.condition.banding.normalized(stone.size_mm) if stone.condition.banding != null else {}
 		var cleavage := stone.condition.cleavage
 		if cleavage != null and cleavage.depth_mm > 0 and cleavage.finish != null and cleavage.finish.has_roughness():
@@ -30,22 +33,19 @@ static func stone_error(stone: GemStone) -> String:
 	return compiled_error(material)
 
 static func compiled_error(material: Dictionary) -> String:
+	var peak:=GemMaterialCompiler.peak_absorption(material)
+	if peak.has("error"):return peak.error
 	if material.get("scatter", {}).get("sigma_per_mm", 0.0) > 0:
 		return "Crystal transport does not yet support volume scattering"
 	for finish: GemSurface in material.get("surfaces", []):
 		if finish.has_roughness():
 			return "Crystal transport does not yet support rough boundaries"
-	var peak: float = 1.0 + absf(material.get("zoning", {}).get("contrast", 0.0))
 	for field: GemVolumeField in material.get("volume_fields", []):
 		if field.scatter_per_mm > 0:
 			return "Crystal transport does not yet support spatial scattering"
-		peak += field.absorption_concentration
-	peak *= material.get("absorb_scale", 1.0)
-	var absorption: PackedFloat32Array = material.get("absorption", PackedFloat32Array())
-	var extraordinary: PackedFloat32Array = material.get("absorption_eray", PackedFloat32Array())
-	for sample in absorption.size():
-		var ao := absorption[sample] * peak
-		var ae := extraordinary[sample] * peak if not extraordinary.is_empty() else ao
+	for sample in 401:
+		var ao:float=peak.ordinary[sample]
+		var ae:float=peak.parallel[sample]
 		var wavelength := 380.0 + sample
 		var no := GemMaterialCompiler.principal_index(material, wavelength)
 		var ne := GemMaterialCompiler.principal_index(material, wavelength, true)
