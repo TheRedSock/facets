@@ -13,7 +13,8 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float,
 		if not event.error.is_empty():
 			compiled["compilation_error"] = event.error
 			return
-		compiled["condition_report"] = {"cleavage":event.report}
+		if not compiled.has("condition_report"):compiled["condition_report"]={}
+		compiled["condition_report"]["cleavage"]=event.report
 		if event.has("defect"):
 			var other_enabled := false
 			for descriptor in descriptors:

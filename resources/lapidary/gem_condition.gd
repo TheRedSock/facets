@@ -4,6 +4,8 @@ extends Resource
 ## describe realized physical features and remain stable under lighting/pose.
 ## Optional authored cleavage event; zero depth leaves the pristine specimen.
 @export var cleavage: GemCleavageRecipe
+## Convex junction rounding occurs before subsequent chips/cleavage events.
+@export var rounding: GemRounding
 @export var defects: Array[GemDefect] = []
 @export var finish: GemSurface = GemSurface.new()
 @export var workmanship: GemWorkmanship = GemWorkmanship.new()

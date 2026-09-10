@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="GemCondition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_condition.gd" id="condition"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_rounding.gd" id="rounding"]
+
+[sub_resource type="Resource" id="junctions"]
+script = ExtResource("rounding")
+radius_mm = 0.03
+angular_step_deg = 6.0
+max_removed_fraction = 0.25
+
+[resource]
+script = ExtResource("condition")
+rounding = SubResource("junctions")

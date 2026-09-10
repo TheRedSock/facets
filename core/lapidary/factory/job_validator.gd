@@ -99,6 +99,9 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 		if not mesh.validate().is_empty():
 			return "invalid procedural shape topology: %s" % mesh.validate()
 	var condition := stone.condition
+	if condition!=null and condition.rounding!=null:
+		var errors:=condition.rounding.validate()
+		if not errors.is_empty():return "; ".join(errors)
 	if condition != null and not condition.validate_volume_fields().is_empty():
 		return "; ".join(condition.validate_volume_fields())
 	var fields:Array=condition.volume_fields if condition!=null else []
@@ -121,6 +124,9 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 		return "; ".join(condition.workmanship.validate())
 	if condition.finish != null and not condition.finish.validate().is_empty():
 		return "; ".join(condition.finish.validate())
+	if condition.rounding!=null and condition.rounding.radius_mm>0:
+		var rounded:=LapidaryStoneCompiler.compile_geometry(stone)
+		if rounded.has("compilation_error"):return rounded.compilation_error
 	var descriptors: Array[GemDefect] = condition.defects.duplicate()
 	if condition.cleavage != null:
 		var event := GemCleavageCompiler.realize(LapidaryStoneCompiler.compile_geometry(stone),stone.shape,stone.size_mm,condition.cleavage,stone.crystal_to_stone)

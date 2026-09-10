@@ -241,3 +241,48 @@ and Mueller transport; crystal admission remains smooth-only. Masters retain
 block publication. Checkpoint version2 retains48B of surface/crystal diagnostics
 in addition to80B/pixel estimator buffers; failed or old-version state is rejected.
 Reprints do not rerun the surface model. No grade label enables this option.
+
+
+## Explicit convex junction rounding
+
+`GemCondition.rounding` / `GemRounding` specify a physical radius in millimeters,
+an angular tessellation step and a maximum removed-volume fraction. Zero radius
+is inactive. This is a uniform spherical opening of a convex faceted host:
+inset its half-spaces by the radius, then offset that inset solid outward by
+the same sphere. It generates planar face patches, cylindrical edge strips and
+spherical corner patches with shared indexed boundaries. The result removes
+material, retains original planar facet IDs and assigns negative IDs to curved
+patches. It uses the ordinary mesh/BVH dielectric transport, including actual
+surface normals, refraction and silhouette. No normal-map or image overlay is
+involved. Radius is not the width of a worn line; dihedral angles determine that
+width.
+
+The encoded mesh is inscribed in the ideal rounded solid. Reports identify its
+volume reference, removed volume, triangle count and a conservative chord-sag
+bound (excluding floating-point construction error). Angular resolution matters
+for specular response even when positional error is subpixel. The compiler checks
+closed topology and the removed-volume limit; it rejects collapsed inset solids,
+unsupported non-faceted inputs and excessive corner tessellation. Cached geometry
+has a bounded triangle/entry budget and returned buffers cannot mutate the cache.
+
+Rounding precedes authored cleavage and other defect boundaries. Both condition
+reports survive composition. It affects optical and primary-geometry cache keys
+and survives portable binary jobs. The global finish still controls the rounded
+surface; this phase does not infer abrasion pits, polish roughness, hardness,
+contact pressure or elapsed wear from the radius. Intentional edge rounding is
+also possible. `rounded_polish.tres` is an explicit 30 micrometer example; no
+catalog grade or default specimen enables it. Automatic wear grading remains off.
+
+Construction background: [CGAL Minkowski-sum definition](https://doc.cgal.org/latest/Minkowski_sum_3/index.html).
+The distinction between rounded junctions, polish quality and intentional girdle
+rounding is discussed by [GIA](https://www.gia.edu/gia-news-research-colored-stone-cut-quality-what-to-look-for).
+Neither source supplies a calibrated wear law for this operator.
+
+The mesh operator is experimental and is not accepted for automatic grading.
+At256px/128spp, halving angular step from6 to3degrees changed opaque RGB by
+3.1–5.9LSB RMS for a120um radius and11.2–15.9LSB for600um in the diagnostic
+quartz views. These differences include sampling noise and are not a strict
+bias bound. Subpixel positional agreement does not establish specular convergence.
+Dense triangulation also incurs CPU construction/admission, BVH packing/upload
+and trace cost. Continuous analytic patches are a prospective production backend;
+the current mesh remains available as explicit geometry and reference evidence.

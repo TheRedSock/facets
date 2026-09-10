@@ -43,6 +43,10 @@ static func compile(stone: GemStone, optimize_cleavage := true) -> Dictionary:
 		"dispersion_strong": dispersion_bg(species) >= 0.025,
 		"fingerprint": stone.fingerprint(),
 	}
+	if geometry.has("compilation_error"):
+		compiled["compilation_error"]=geometry.compilation_error
+		return compiled
+	if geometry.has("condition_report"):compiled["condition_report"]=geometry.condition_report
 	if geometry.has("mesh"):
 		compiled["mesh"] = geometry["mesh"]
 	if geometry.has("analytic_shape"):
@@ -61,6 +65,10 @@ static func dispersion_bg(species: GemSpecies) -> float:
 # ------------------------------------------------------------------ cut
 
 static func compile_geometry(stone: GemStone) -> Dictionary:
+	var rounding:GemRounding=stone.condition.rounding if stone.condition!=null else null
+	if rounding!=null:
+		if not rounding.validate().is_empty():return {"planes":PackedFloat32Array(),"compilation_error":"; ".join(rounding.validate())}
+		if rounding.radius_mm>0 and stone.shape.mode!="faceted":return {"planes":PackedFloat32Array(),"compilation_error":"Junction rounding currently requires a convex faceted host"}
 	if stone.shape.mode == "cabochon" and stone.shape.outline in [&"round", &"oval"] and stone.shape.outline_points.is_empty():
 		return {"planes": PackedFloat32Array(), "outline": GemShapeCompiler.outline(stone.shape),
 			"analytic_shape": Vector4(1.0, 1.0 / stone.shape.aspect_ratio, stone.shape.dome_height, -0.04)}
@@ -74,4 +82,10 @@ static func compile_geometry(stone: GemStone) -> Dictionary:
 	var tolerances := Vector4.ZERO
 	if stone.condition != null and stone.condition.workmanship != null:
 		tolerances = stone.condition.workmanship.normalized_tolerances(stone.size_mm)
-	return compiler.call("compile", stone.cut, stone.shape, stone.seed, tolerances)
+	var geometry:Dictionary=compiler.call("compile", stone.cut, stone.shape, stone.seed, tolerances)
+	if rounding!=null and rounding.radius_mm>0:
+		var result:=GemRoundingCompiler.compile(geometry.planes,geometry.get("facet_ids",PackedInt32Array()),stone.size_mm,rounding)
+		if not result.error.is_empty():return {"planes":PackedFloat32Array(),"compilation_error":result.error}
+		geometry["planes"]=PackedFloat32Array();geometry["mesh"]=result.mesh
+		geometry["condition_report"]={"rounding":result.report}
+	return geometry

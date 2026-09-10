@@ -239,3 +239,20 @@ It archives recognized abandoned coordination records without touching bakes or
 checkpoints. No expiry timer or cross-machine PID guess releases a work claim.
 An existing maintenance lock is not recovered automatically. See the factory
 contract for filesystem assumptions and partial-recovery behavior.
+
+
+Convex junction rounding: `GemCondition.rounding` produces a closed mesh with
+physical material removal before subsequent cleavage/defects. Use the explicit
+`data/lapidary/conditions/rounded_polish.tres` example or author radius in mm.
+`test_rounding.gd` checks topology, analytic cube volume, all faceted outlines,
+units, cache isolation, admission, portable identity and operation composition.
+`rounding_gpu_check.gd` compares actual hits with an analytic rounded box and
+checks dielectric energy conservation. `rounding_portable_check.gd` executes an
+isolated worker and verifies its physical report and cached geometry. All three
+are registered in the check runner.
+
+`rounding_lookdev.gd` renders sharp/30um/120um quartz at two poses. Add `--macro`
+for sharp/120um/600um, or `--macro --fine` to halve the angular tessellation step.
+Generated comparisons remain under ignored `artifacts/rounding/`. This is an
+explicit geometry model, not a universal abrasion or grade simulator; mesh cost
+and specular convergence must be considered before using it in a large catalog.

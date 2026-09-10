@@ -447,3 +447,13 @@ and nested-material capability failures are rejected before GPU allocations.
 Material mixtures: `GemAbsorber` declares relative scale, active absorbers/cm3, or total-atom ppma (requires `GemMaterial.atom_density_per_cm3`). Cross-section spectra use float64 cm2 and enforce host identity; only the summed coefficient/mm transport table becomes float32. Reviewed GIA2020 chromium/iron-titanium examples live under `data/lapidary/materials/measured_corundum/`, separately from authored game colors. Source CSVs/provenance and reproducible extraction/import tools are tracked; test bakes are ignored. Spatial fields can scale the whole mixture or add explicit absorber terms. No bulk-element-to-active-defect chemistry, fluorescence, or universal concentration law is inferred. Run mixture CPU/GPU and independent Python checks; see tools/README.md.
 
 Spatial composition fields use64B binding7 records with exact int32 spectrum/profile metadata. GemVolumeField.absorbers inherits host species, atom density and crystal axes. Compact ellipsoids and complementary planar C2 transitions have integrated optical columns; fields never introduce geometry or a real-index discontinuity. KERNEL_CONTRACT v20 documents packing and bounds. `test_spatial_composition.gd` / `spatial_composition_gpu_check.gd` cover CPU/GPU units, clipping and persistence. Scalar boundary paths retain absorption Stokes state but still use scalar Fresnel and approximate optional birefringence; do not label that as full polarized optics. Explicit bicolor examples are authored concentration fields, not a crystal-growth or grading law.
+
+
+Explicit junction rounding uses `GemCondition.rounding` / `GemRounding` and
+`core/lapidary/geometry/rounding_compiler.gd`. A convex spherical opening in mm
+produces shared planar/cylindrical/spherical patch geometry, triangulated for the
+ordinary mesh transport. It runs before cleavage/defects, preserves both reports,
+and participates in optical/geometry/portable identities. Default radius is zero;
+the authored rounded-polish example is not applied to catalog grades. Radius is
+not a hardness/time wear law or a substitute for abrasion pits and roughness.
+See the factory contract for tessellation, removed-volume and performance limits.
