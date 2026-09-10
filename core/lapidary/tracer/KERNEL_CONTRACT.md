@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v12)
+# Lapidary kernel contract (v13)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. All floats
@@ -224,3 +224,31 @@ is https://pbr-book.org/4ed/Light_Transport_II_Volume_Rendering/The_Equation_of_
 `volume_gpu_check.gd` checks the actual GLSL collision sampler against independent
 CPU integrals and tests full heterogeneous transport. `volume_lookdev.gd` compares
 raw/reconstructed low-SPP renders to high-SPP transport at multiple poses.
+
+## Optional persistent polarization
+
+Policy `polarization=true` lazily compiles a separate variant of the same boundary
+transport source. It forces independent wavelength geometry. The scalar variant
+compiles away the extra state. The variant currently requires isotropic refraction
+and absorption in every host/filling; anisotropic material input is rejected by
+its precondition. Existing catalog policies remain scalar pending broader
+anisotropic transport. The REFERENCE rung alone does not enable polarization.
+
+Per-wavelength camera importance is a row of a Mueller product plus an explicit
+transverse basis for physical light propagation opposite the camera ray. Every
+reflection/refraction changes reference frames and retains I/Q/U/V, including TIR
+phase. Index ratios for physical transmission are reversed relative to the camera
+path; radiance eta-squared factors remain explicit. The shared boundary solver
+still handles priority regions, cavities, GGX finish and deterministic escape.
+The effective scalar HG model is explicitly treated as an ideal depolarizer; this
+is not a prediction of a particle population's polarized scattering matrix.
+
+`GemPolarization` supplies float64 CPU reference mathematics. The optional tooling
+pins Mitsuba3.9.1/DrJit1.5.0 and compares elementary and rotated matrices, plus actual
+GPU products through refractive/TIR interface chains. Exact index matching is
+checked against the identity law separately: Mitsuba's float32 grazing flux
+conversion loses precision in that degenerate case, which the reports retain.
+See https://mitsuba.readthedocs.io/en/stable/src/key_topics/polarization.html and
+https://github.com/mitsuba-renderer/mitsuba3/tree/v3.9.1/include/mitsuba/render .
+This validates isotropic polarization operations; it does not validate anisotropic
+ray direction, birefringent retardation, biaxial materials or mineral measurements.

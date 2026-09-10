@@ -19,3 +19,9 @@ Physical diagnostics include `foundation_gpu_check.gd`, `surface_check.gd`,
 belong under ignored `artifacts/`; generated delivery libraries belong under
 ignored `generated/`. Use searches that include ignored paths when investigating
 bakes or comparing experiments.
+
+Optional independent polarization validation uses an isolated Python environment
+with `tools/reference-requirements.txt`. Pass its Python executable as
+`-ReferencePython <path>` to `check_engine.ps1`; add `-Gpu` to include actual GPU
+interface products. Mitsuba is a validation dependency only. Keep environments,
+comparison JSON and rendered reference images under ignored `artifacts/`.

@@ -67,6 +67,7 @@ var _seed := 1
 var _max_bounces := 32
 var _throughput_epsilon := 0.0001
 var _flags := 0
+var _polarized := false
 var _grid := Vector2i.ONE
 var _cell := Vector2i.ZERO
 var _bg := Vector4(0.30, 0.16, 0.05, 0.0)  # zenith, horizon, below, spectrum offset
@@ -114,28 +115,30 @@ static func create(p_width: int, p_height: int) -> GemTracer:
 
 
 func _compile_shaders() -> bool:
-	var common := FileAccess.get_file_as_string(COMMON_PATH)
-	if common.is_empty():
-		push_error("GemTracer: cannot read %s" % COMMON_PATH)
-		return false
 	for entry in [[SHADER_PATH, "trace"], [PRINT_SHADER_PATH, "print"], [DENOISE_SHADER_PATH, "denoise"]]:
-		var text := FileAccess.get_file_as_string(entry[0])
-		if text.is_empty():
-			push_error("GemTracer: cannot read %s" % entry[0])
+		if not _compile_shader(entry[0], entry[1]):
 			return false
-		text = text.replace(INCLUDE_LINE, common)
-		text = text.replace("#include \"gem_mesh.glsl\"", FileAccess.get_file_as_string(SHADER_DIR + "gem_mesh.glsl"))
-		text = text.replace("#include \"gem_surface.glsl\"", FileAccess.get_file_as_string(SHADER_DIR + "gem_surface.glsl"))
-		text = text.replace('#include "gem_volume.glsl"', FileAccess.get_file_as_string(SHADER_DIR + "gem_volume.glsl"))
-		var src := RDShaderSource.new()
-		src.source_compute = text
-		var spirv := _rd.shader_compile_spirv_from_source(src)
-		if spirv.compile_error_compute != "":
-			push_error("GemTracer %s shader compile error:\n%s" % [entry[1], spirv.compile_error_compute])
-			return false
-		var shader := _rd.shader_create_from_spirv(spirv)
-		_shaders[entry[1]] = shader
-		_pipelines[entry[1]] = _rd.compute_pipeline_create(shader)
+	return true
+
+
+func _compile_shader(path: String, name: String) -> bool:
+	var source := FileAccess.get_file_as_string(path)
+	if source.is_empty():
+		push_error("GemTracer: cannot read " + path)
+		return false
+	for include in ["gem_common.glsl", "gem_mesh.glsl", "gem_surface.glsl", "gem_volume.glsl", "gem_polarization.glsl"]:
+		source = source.replace('#include "%s"' % include, FileAccess.get_file_as_string(SHADER_DIR + include))
+	if name == "trace_polarized":
+		source = source.replace("#version 450", "#version 450\n#define POLARIZED_TRANSPORT 1")
+	var src := RDShaderSource.new()
+	src.source_compute = source
+	var spirv := _rd.shader_compile_spirv_from_source(src)
+	if not spirv.compile_error_compute.is_empty():
+		push_error("GemTracer %s shader compile error:\n%s" % [name, spirv.compile_error_compute])
+		return false
+	var shader := _rd.shader_create_from_spirv(spirv)
+	_shaders[name] = shader
+	_pipelines[name] = _rd.compute_pipeline_create(shader)
 	return true
 
 
@@ -172,9 +175,13 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	_max_bounces = policy.get("max_bounces", 32)
 	_throughput_epsilon = clampf(policy.get("throughput_epsilon", 0.0001), 1.0e-8, 0.01)
 	_flags = 0
+	_polarized = policy.get("polarization", false)
+	if _polarized and not _pipelines.has("trace_polarized"):
+		var compiled_ok := _compile_shader(SHADER_PATH, "trace_polarized")
+		assert(compiled_ok, "Polarized shader failed to compile")
 	if policy.get("dispersion", false):
 		_flags |= FLAG_DISPERSION
-	if policy.get("spectral_geometry", "selective") == "full":
+	if policy.get("spectral_geometry", "selective") == "full" or _polarized:
 		_flags |= FLAG_DISPERSION | FLAG_FULL_SPECTRUM
 	if policy.get("birefringence", false):
 		_flags |= FLAG_BIREF
@@ -343,6 +350,8 @@ static func _pack_volume_fields(instance: Dictionary, packed: PackedFloat32Array
 
 func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 		a_off: int, stone_flags: int) -> void:
+	if _polarized:
+		assert(absf(inst.get("birefringence", 0.0)) < 1e-8 and inst.get("absorption_eray", PackedFloat32Array()).is_empty(), "Polarized transport currently requires isotropic refraction and absorption")
 	var sb: Vector3 = inst["sellmeier_b"]
 	var sc: Vector3 = inst["sellmeier_c"]
 	var scat: Dictionary = inst.get("scatter", {})
@@ -569,7 +578,7 @@ func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
 
 	var t0 := Time.get_ticks_usec()
 	var cl := _rd.compute_list_begin()
-	_rd.compute_list_bind_compute_pipeline(cl, _pipelines["trace"])
+	_rd.compute_list_bind_compute_pipeline(cl, _pipelines["trace_polarized" if _polarized else "trace"])
 	_rd.compute_list_bind_uniform_set(cl, _sets["trace"], 0)
 	_rd.compute_list_set_push_constant(cl, pcb.data_array, PUSH_SIZE)
 	@warning_ignore("integer_division")

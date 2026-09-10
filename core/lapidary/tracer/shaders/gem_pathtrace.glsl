@@ -9,6 +9,7 @@
 #include "gem_mesh.glsl"
 #include "gem_surface.glsl"
 #include "gem_volume.glsl"
+#include "gem_polarization.glsl"
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
@@ -162,26 +163,28 @@ float geometry_index(int material, vec4 indices, int wavelength, bool extraordin
 
 vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool extraordinary,
 		vec4 q, float rig_yaw, vec4 roles, int pol_mode, bool use_volume, inout uint rng) {
-	vec4 throughput = vec4(1.0), radiance = vec4(0.0);
+	PathWeight throughput = weight_initial(dir);
+	vec4 radiance = vec4(0.0);
 	uvec4 region_state = uvec4(0u);
 	for (uint bounce = 0u; bounce < pc.max_bounces; bounce++) {
 		float distance; int triangle;
 		int before_medium = region_medium(st, region_state);
 		if (!boundary_hit(st, pos, dir, distance, triangle)) {
-			if (before_medium < 0) { radiance += throughput * env_radiance(quat_rot(q, dir), wl, rig_yaw, roles, 0.0); }
+			if (before_medium < 0) { radiance += throughput.I * env_radiance(quat_rot(q, dir), wl, rig_yaw, roles, 0.0); }
 			break;
 		}
 		if (before_medium >= 0) {
 			Stone medium = stones[before_medium];
 			float free_flight = use_volume ? scatter_distance(medium, pos, dir, distance, -log(max(1e-7, 1.0 - rnd(rng)))) : INF;
 			float segment = min(free_flight, distance);
-			throughput *= segment_att(medium, pos, dir, segment, medium.ranges1.x, (medium.ranges1.y & 1) != 0, wl, pol_mode);
+			weight_scale(throughput, segment_att(medium, pos, dir, segment, medium.ranges1.x, (medium.ranges1.y & 1) != 0, wl, pol_mode));
 			if (free_flight < distance) {
 				pos += dir * free_flight;
 				dir = hg_sample_u(dir, medium.scatter_zone.y, vec2(rnd(rng), rnd(rng)));
+				weight_depolarize(throughput, dir);
 				continue;
 			}
-			if (!use_volume && FLAG_VOLUME) { throughput *= exp(-scattering_depth(medium, pos, dir, distance)); }
+			if (!use_volume && FLAG_VOLUME) { weight_scale(throughput, vec4(exp(-scattering_depth(medium, pos, dir, distance)))); }
 		}
 		pos += dir * distance;
 		uvec4 after = cross_region(st, region_state, triangle, pos, dir);
@@ -216,8 +219,10 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 		vec4 eta_radiance = index_before / index_after;
 		vec4 weight_r = R * reflect_geometry;
 		vec4 weight_t = (vec4(1.0) - R) * transmit_geometry * eta_radiance * eta_radiance;
+		PathWeight reflected_weight = interface_weight(throughput, dir, reflected, micro_normal, index_before, index_after, false, reflect_geometry, weight_r);
+		PathWeight transmitted_weight = interface_weight(throughput, dir, transmitted, micro_normal, index_before, index_after, true, transmit_geometry, weight_t);
 		if (reflectance >= 1.0) {
-			throughput *= weight_r;
+			throughput = reflected_weight;
 			dir = reflected;
 		} else {
 			bool escape_reflect = before_medium < 0;
@@ -227,22 +232,24 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 			float next_distance; int next_triangle;
 			bool obstructed = !can_escape || physical_hit(st, pos + escape_direction * T_EPS * 4.0, escape_direction, escape_active, next_distance, next_triangle);
 			if (!obstructed) {
-				vec4 escape_weight = escape_reflect ? weight_r : weight_t;
-				radiance += throughput * escape_weight * env_radiance(quat_rot(q, escape_direction), wl, rig_yaw, roles, 0.0);
-				throughput *= escape_reflect ? weight_t : weight_r;
+				PathWeight escape_weight = escape_reflect ? reflected_weight : transmitted_weight;
+				radiance += escape_weight.I * env_radiance(quat_rot(q, escape_direction), wl, rig_yaw, roles, 0.0);
+				throughput = escape_reflect ? transmitted_weight : reflected_weight;
 				dir = escape_reflect ? transmitted : reflected;
 				if (escape_reflect) { region_state = after; }
 			} else if (rnd(rng) < reflectance) {
-				throughput *= weight_r / max(reflectance, 1e-7);
+				throughput = reflected_weight;
+				weight_scale(throughput, vec4(1.0 / max(reflectance, 1e-7)));
 				dir = reflected;
 			} else {
-				throughput *= weight_t / max(1.0 - reflectance, 1e-7);
+				throughput = transmitted_weight;
+				weight_scale(throughput, vec4(1.0 / max(1.0 - reflectance, 1e-7)));
 				dir = transmitted;
 				region_state = after;
 			}
 		}
 		pos += dir * T_EPS * 4.0;
-		if (max(max(throughput.x, throughput.y), max(throughput.z, throughput.w)) < THROUGHPUT_EPS) { break; }
+		if (max(max(throughput.I.x, throughput.I.y), max(throughput.I.z, throughput.I.w)) < THROUGHPUT_EPS) { break; }
 	}
 	return radiance;
 }
@@ -280,6 +287,9 @@ void main() {
 	bool reconstruct_volume = FLAG_VOLUME && (sigma_h > 0.0 || st.misc.z > 0.0);
 	bool reconstruct_surface = st.misc.w > 0.0;
 	bool boundary_transport = st.ranges1.z != 0 || reconstruct_surface;
+#ifdef POLARIZED_TRANSPORT
+	boundary_transport = true;
+#endif
 
 	vec3 total_xyz = vec3(0.0);
 	vec3 total_ballistic = vec3(0.0);

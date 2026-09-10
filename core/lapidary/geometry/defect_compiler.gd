@@ -14,12 +14,14 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float)
 	assert(enabled.size() < GemBoundarySet.MAX_REGIONS, "Too many resolved material regions; use effective media for subpixel populations")
 	var boundaries := GemBoundarySet.new()
 	if compiled.has("analytic_shape"):
-		assert(boundaries.add_cabochon(compiled["analytic_shape"], 0), "Invalid analytic host")
+		var added := boundaries.add_cabochon(compiled["analytic_shape"], 0)
+		assert(added, "Invalid analytic host")
 	else:
 		var host: GemMesh = compiled.get("mesh", null)
 		if host == null:
 			host = GemShapeCompiler.from_hull(compiled["planes"], compiled.get("facet_ids", PackedInt32Array()))
-		assert(boundaries.add(host, 0), "Invalid host for defect boundaries")
+		var added := boundaries.add(host, 0)
+		assert(added, "Invalid host for defect boundaries")
 	var materials: Array[Dictionary] = []
 	var surfaces: Array = compiled.get("surfaces", [GemSurface.new()])
 	for defect in enabled:
@@ -28,7 +30,8 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float)
 		if defect.filling != null:
 			materials.append(GemMaterialCompiler.compile(defect.filling))
 			material_id = materials.size()
-		assert(boundaries.add(surface, material_id), "Invalid physical defect: %s" % surface.validate())
+		var added := boundaries.add(surface, material_id)
+		assert(added, "Invalid physical defect: %s" % surface.validate())
 		surfaces.append(defect.finish if defect.finish != null else GemSurface.new())
 	compiled["boundaries"] = boundaries
 	compiled["region_materials"] = materials
