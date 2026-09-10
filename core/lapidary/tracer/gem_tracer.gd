@@ -104,6 +104,7 @@ var _chunk_spp := 1
 var _chunk_rows := 8
 var _field_chunk := 2048  # texels per scatter-field dispatch (adaptive)
 var _lights_packed := PackedFloat32Array()
+var _camera_distance := 5.0
 # Cached single-instance state (grid 1x1 convenience path).
 var _inst_state := {
 	"quat": Quaternion.IDENTITY, "rig_yaw": 0.0, "ortho_half": 1.25,
@@ -177,6 +178,10 @@ func configure_stone(instance: Dictionary, lights: PackedFloat32Array, policy: D
 func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dictionary, grid: Vector2i) -> void:
 	assert(not instances.is_empty() and lights.size() % 8 == 0)
 	assert(lights.size() / 8 <= MAX_LIGHTS, "GemTracer: rig exceeds %d lights" % MAX_LIGHTS)
+	var bound_radius := 0.0
+	for instance: Dictionary in instances:
+		bound_radius = maxf(bound_radius, _boundary_radius(instance))
+	_camera_distance = bound_radius + maxf(0.5, bound_radius * 0.05)
 	_grid = grid
 	@warning_ignore("integer_division")
 	_cell = Vector2i(width / grid.x, height / grid.y)
@@ -227,7 +232,7 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	var host_index := 0
 	for inst: Dictionary in instances:
 		inst = inst.duplicate()
-		inst["bvh_root"] = 0
+		inst["bvh_root"] = -1 if inst.has("analytic_shape") else 0
 		inst["region_offset"] = region_data.size()
 		region_data.append(host_index)
 		if inst.has("boundaries"):
@@ -259,6 +264,10 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 			triangle_data.append_array(bvh.pack_triangles())
 			_field_exits = 0 # The legacy field only supports a convex plane host.
 		var p: PackedFloat32Array = inst["planes"]
+		if inst.has("analytic_shape"):
+			var shape: Vector4 = inst["analytic_shape"]
+			p = PackedFloat32Array([shape.x, shape.y, shape.z, shape.w, 0, 0, 0, 0])
+			_field_exits = 0
 		var pr: PackedFloat32Array = inst.get("inclusions", PackedFloat32Array())
 		var ab: PackedFloat32Array = inst["absorption"]
 		var ab_e: PackedFloat32Array = inst.get("absorption_eray", PackedFloat32Array())
@@ -324,6 +333,29 @@ func _field_bytes_for(gn: int) -> int:
 	return _inst_count * gn * gn * gn * FIELD_SLABS * 8  # RGBA16F
 
 
+## Camera origins must be outside every region, including cavity geometry
+## protruding beyond the host. Rotation preserves this enclosing sphere.
+static func _boundary_radius(instance: Dictionary) -> float:
+	var radius := 0.0
+	if instance.has("analytic_shape"):
+		var shape: Vector4 = instance["analytic_shape"]
+		radius = maxf(shape.z, sqrt(maxf(shape.x * shape.x, shape.y * shape.y) + shape.w * shape.w))
+	var mesh: GemMesh = instance.get("mesh", null)
+	if instance.has("boundaries"):
+		mesh = instance["boundaries"].mesh
+	if mesh != null:
+		for point in mesh.vertices:
+			radius = maxf(radius, point.length())
+	elif not instance.has("analytic_shape"):
+		var data: PackedFloat32Array = instance["planes"]
+		var planes: Array[Plane] = []
+		for i in data.size() / 8:
+			planes.append(Plane(Vector3(data[i * 8], data[i * 8 + 1], data[i * 8 + 2]), data[i * 8 + 3]))
+		for point in Geometry3D.compute_convex_mesh_points(planes):
+			radius = maxf(radius, point.length())
+	return radius
+
+
 ## Scatter field texture: x = instances stacked, y, z = FIELD_SLABS slabs of
 ## grid_n. Written by the field pre-pass (image), read by the kernel (sampler).
 func _create_field_texture() -> void:
@@ -367,7 +399,7 @@ func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 			optic.x, optic.y, optic.z, fluor.get("strength", 0.0),
 			fluor.get("nm", 0.0), inst.get("absorb_scale", 1.0), inst.get("volume_present", 0.0), 0.0]:
 		b.put_float(v)
-	for v: int in [p_off, p_cnt, i_off, i_cnt, a_off, stone_flags, inst.get("bvh_root", 0), inst.get("region_offset", 0)]:
+	for v: int in [p_off, -1 if inst.has("analytic_shape") else p_cnt, i_off, i_cnt, a_off, stone_flags, inst.get("bvh_root", 0), inst.get("region_offset", 0)]:
 		b.put_32(v)
 	assert(b.data_array.size() % STONE_STRIDE_BYTES == 0)
 
@@ -376,7 +408,7 @@ func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_hal
 		role_mult: Array, stone_index: int) -> void:
 	for v: float in [quat.x, quat.y, quat.z, quat.w,
 			rig_yaw, ortho_half, role_mult[0], role_mult[1],
-			role_mult[2], role_mult[3], 0.0, 0.0]:
+			role_mult[2], role_mult[3], _camera_distance, 0.0]:
 		b.put_float(v)
 	for v: int in [stone_index, 0, 0, 0]:
 		b.put_32(v)

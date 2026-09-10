@@ -13,10 +13,13 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float)
 		return
 	assert(enabled.size() < GemBoundarySet.MAX_REGIONS, "Too many resolved material regions; use effective media for subpixel populations")
 	var boundaries := GemBoundarySet.new()
-	var host: GemMesh = compiled.get("mesh", null)
-	if host == null:
-		host = GemShapeCompiler.from_hull(compiled["planes"], compiled.get("facet_ids", PackedInt32Array()))
-	assert(boundaries.add(host, 0), "Invalid host for defect boundaries")
+	if compiled.has("analytic_shape"):
+		assert(boundaries.add_cabochon(compiled["analytic_shape"], 0), "Invalid analytic host")
+	else:
+		var host: GemMesh = compiled.get("mesh", null)
+		if host == null:
+			host = GemShapeCompiler.from_hull(compiled["planes"], compiled.get("facet_ids", PackedInt32Array()))
+		assert(boundaries.add(host, 0), "Invalid host for defect boundaries")
 	var materials: Array[Dictionary] = []
 	for defect in enabled:
 		var surface := compile(defect, size_mm)

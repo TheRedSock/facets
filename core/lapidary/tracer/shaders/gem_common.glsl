@@ -28,7 +28,7 @@ struct Stone {
 struct Inst {
 	vec4 quat;         // stone->world
 	vec4 rig;          // rig_yaw (radians), ortho_half, key_mult, fill_mult
-	vec4 rig2;         // rim_mult, bounce_mult, pad, pad
+	vec4 rig2;         // rim_mult, bounce_mult, outside-bound camera distance, pad
 	ivec4 which;       // stone_index, pad x3
 };
 

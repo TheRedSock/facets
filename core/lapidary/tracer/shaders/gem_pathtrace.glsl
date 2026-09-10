@@ -392,7 +392,7 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 	for (uint bounce = 0u; bounce < pc.max_bounces; bounce++) {
 		float distance; int triangle;
 		int before_medium = region_medium(st, region_state);
-		if (!mesh_hit(st.ranges1.z - 1, pos, dir, distance, triangle)) {
+		if (!boundary_hit(st, pos, dir, distance, triangle)) {
 			if (before_medium < 0) { radiance += throughput * env_radiance(quat_rot(q, dir), wl, rig_yaw, roles, 0.0); }
 			break;
 		}
@@ -410,14 +410,14 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 			if (!use_volume && FLAG_VOLUME) { throughput *= exp(-medium.scatter_zone.x * medium.sell_b_size.w * distance); }
 		}
 		pos += dir * distance;
-		uvec4 after = cross_region(region_state, triangle, dir);
+		uvec4 after = cross_region(st, region_state, triangle, pos, dir);
 		int after_medium = region_medium(st, after);
 		if (before_medium == after_medium) {
 			region_state = after;
 			pos += dir * T_EPS * 4.0;
 			continue;
 		}
-		vec3 normal = mesh_normal(triangle);
+		vec3 normal = boundary_normal(st, triangle, pos);
 		vec3 facing = dot(dir, normal) < 0.0 ? normal : -normal;
 		float ci = clamp(-dot(dir, facing), 0.0, 1.0);
 		vec4 index_before = medium_index(before_medium, wl), index_after = medium_index(after_medium, wl);
@@ -513,7 +513,7 @@ void main() {
 
 		vec2 r2 = qmc2(n, 0u, 1u, pix_rot);
 		vec2 ndc = (cell_uv + (r2 - 0.5) / vec2(pc.cell_px)) * 2.0 - 1.0;
-		vec3 ro_w = vec3(ndc.x * ortho_half, -ndc.y * ortho_half, 5.0);
+		vec3 ro_w = vec3(ndc.x * ortho_half, -ndc.y * ortho_half, inst.rig2.z);
 		vec3 ro = quat_rot(qc, ro_w);
 		vec3 rd = quat_rot(qc, vec3(0.0, 0.0, -1.0));
 
@@ -523,7 +523,8 @@ void main() {
 		total_cov += 1.0;
 
 		vec3 p_hit = ro + rd * t_near;
-		vec3 n_entry = body_normal(entry_plane);
+		vec3 n_entry = body_normal(st, entry_plane, p_hit);
+		if (dot(rd, n_entry) > 0.0) { n_entry = -n_entry; }
 		geometry_sum += vec4(quat_rot(q, n_entry), t_near);
 		min_facet = min(min_facet, float(entry_plane));
 		max_facet = max(max_facet, float(entry_plane));
@@ -557,7 +558,7 @@ void main() {
 			float n_geom = eray ? n_e_phi(n_o, st.sell_c_biref.w, ca_in) : n_o;
 			int pol_mode = biref ? (eray ? POL_K : POL_O) : POL_UNPOL;
 
-			if (st.ranges1.z > 0) {
+			if (st.ranges1.z != 0) {
 				radiance += mask * pass_w * trace_mesh_path(st, ro, rd, wl, wl_i, eray, q, rig_yaw, role_mult, pol_mode, FLAG_VOLUME, rng);
 				if (reconstruct_volume) { ballistic += mask * pass_w * trace_mesh_path(st, ro, rd, wl, wl_i, eray, q, rig_yaw, role_mult, pol_mode, false, rng); }
 				continue;

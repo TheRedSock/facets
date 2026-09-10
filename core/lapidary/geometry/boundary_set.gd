@@ -8,6 +8,14 @@ extends RefCounted
 const MAX_REGIONS := 128
 var mesh := GemMesh.new()
 var materials := PackedInt32Array()
+var analytic_shape := Vector4.ZERO
+
+func add_cabochon(shape: Vector4, material: int) -> bool:
+	if not materials.is_empty() or shape.x <= 0.0 or shape.y <= 0.0 or shape.z <= 0.0 or shape.w >= 0.0:
+		return false
+	analytic_shape = shape
+	materials.append(material)
+	return true
 
 func add(surface: GemMesh, material: int) -> bool:
 	if materials.size() >= MAX_REGIONS or not surface.validate().is_empty():
@@ -33,6 +41,11 @@ func segments(origin: Vector3, direction: Vector3) -> Array[Dictionary]:
 	var distance := 0.0
 	for event in 4096:
 		var hit := bvh.intersect(origin, direction)
+		if analytic_shape != Vector4.ZERO:
+			var analytic := GemQuadric.intersect(analytic_shape, origin, direction)
+			if not analytic.is_empty() and (hit.is_empty() or analytic["t"] < hit["t"]):
+				hit = analytic
+				hit["region"] = 0
 		if hit.is_empty():
 			break
 		var material := medium(active)

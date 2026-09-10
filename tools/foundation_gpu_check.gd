@@ -68,6 +68,7 @@ func _initialize() -> void:
 	_analytic_interfaces(tracer, inst, lights, policy)
 	_mesh_checks(tracer, inst, lights, policy)
 	_boundary_checks(tracer, inst, lights, policy)
+	_quadric_checks(tracer, inst, lights, policy)
 	# Changes to framing or print white balance cannot invalidate volume light.
 	policy["field_exits"] = 4
 	policy["field_grid"] = 4
@@ -228,6 +229,38 @@ func _boundary_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFlo
 	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
 	tracer.accumulate(1024)
 	check(absf(_center_y(tracer) - 1.0) < 0.001, "air/host/filling dielectric interfaces preserve equilibrium")
+
+func _quadric_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
+	var inst := instance.duplicate(true)
+	inst["planes"] = PackedFloat32Array()
+	inst["analytic_shape"] = Vector4(1.0, 0.8, 0.6, -0.04)
+	inst["size_mm"] = 1.0
+	inst["sellmeier_b"] = Vector3.ZERO
+	inst["sellmeier_c"] = Vector3.ZERO
+	inst["absorption"].fill(0.2)
+	inst["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(1024)
+	# Integrate analytic chord length across the same primary pixel footprint.
+	var expected := 0.0
+	for y in range(14, 18):
+		for x in range(14, 18):
+			for sy in 8:
+				for sx in 8:
+					var px := ((x + (sx + 0.5) / 8.0 - 0.5) / 32.0 * 2.0 - 1.0) * 1.25
+					var py := ((y + (sy + 0.5) / 8.0 - 0.5) / 32.0 * 2.0 - 1.0) * 1.25
+					var chord := 0.6 * sqrt(1.0 - px * px - py * py / 0.64) + 0.04
+					expected += exp(-0.2 * chord) / 1024.0
+	check(absf(_center_y(tracer) - expected) < 0.0001, "analytic cabochon Beer-Lambert matches exact curved chord integration")
+	var regions := GemBoundarySet.new()
+	regions.add_cabochon(inst["analytic_shape"], 0)
+	regions.add(load("res://tests/lapidary/test_boundaries.gd").box(Vector3(-0.3, -0.3, 0.1), Vector3(0.3, 0.3, 0.3)), -1)
+	inst["boundaries"] = regions
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(1024)
+	check(absf(_center_y(tracer) - expected * exp(0.2 * 0.2)) < 0.0001, "analytic host subtracts a mesh cavity with correct optical thickness")
 
 func _print_checks(tracer: GemTracer) -> void:
 	var values := PackedFloat32Array()

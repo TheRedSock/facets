@@ -53,5 +53,19 @@ func _initialize() -> void:
 	check(stone.fingerprint() != original, "physical condition participates in content identity")
 	var realized := LapidaryStoneCompiler.compile(stone)
 	check(realized.has("boundaries") and realized["boundaries"].materials.size() == 2, "condition compiles to finite medium boundaries")
+	var shape := Vector4(1.0, 0.8, 0.6, -0.04)
+	for x in [-0.7, -0.3, 0.0, 0.5]:
+		var hit := GemQuadric.intersect(shape, Vector3(x, 0, 3), Vector3.FORWARD)
+		var expected := 3.0 - 0.6 * sqrt(1.0 - x * x)
+		check(not hit.is_empty() and absf(hit["t"] - expected) < 0.000002, "analytic dome intersection")
+	var cap_regions := GemBoundarySet.new()
+	check(cap_regions.add_cabochon(shape, 0), "analytic host region")
+	cap_regions.add(box(Vector3(-0.3, -0.3, 0.1), Vector3(0.3, 0.3, 0.3)), -1)
+	length = 0.0
+	for segment in cap_regions.segments(Vector3(0, 0, 3), Vector3.FORWARD):
+		length += segment["end"] - segment["begin"]
+	check(absf(length - 0.44) < 0.0001, "analytic host and mesh cavity share one medium state")
+	var deep := box(Vector3(-1, -1, -12), Vector3(1, 1, 12))
+	check(GemTracer._boundary_radius({"mesh": deep, "planes": PackedFloat32Array()}) > 12.0, "arbitrary-depth mesh bounds camera origins")
 	print("Boundaries: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)

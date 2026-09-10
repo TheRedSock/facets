@@ -56,6 +56,8 @@ static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary
 	}
 	if geometry.has("mesh"):
 		compiled["mesh"] = geometry["mesh"]
+	if geometry.has("analytic_shape"):
+		compiled["analytic_shape"] = geometry["analytic_shape"]
 	GemDefectCompiler.apply(compiled, stone.condition, stone.size_mm)
 	return compiled
 
@@ -86,6 +88,9 @@ static func _resolve_fluorescence(species: GemSpecies, chromo: GemChromophore) -
 # ------------------------------------------------------------------ cut
 
 static func _compile_cut(stone: GemStone, n_d: float, cut_q: float) -> Dictionary:
+	if stone.shape.mode == "cabochon" and stone.shape.outline in [&"round", &"oval"] and stone.shape.outline_points.is_empty():
+		return {"planes": PackedFloat32Array(), "outline": GemShapeCompiler.outline(stone.shape),
+			"analytic_shape": Vector4(1.0, 1.0 / stone.shape.aspect_ratio, stone.shape.dome_height, -0.04)}
 	if stone.shape.mode != "faceted":
 		var mesh := GemShapeCompiler.compile(stone.shape)
 		assert(mesh.validate().is_empty(), "Invalid procedural shape: %s" % mesh.validate())

@@ -1,4 +1,4 @@
-# Lapidary Kernel Contract (v6 — nested material boundaries and procedural conditions)
+# Lapidary Kernel Contract (v7 — analytic curved hosts and nested material boundaries)
 
 The single interface between the data model and the GPU tracer. Everything that
 renders — designer preview, clip bake, live board draws, evaluation sheets —
@@ -112,7 +112,7 @@ the e-pass uses the indicatrix: `1/n_e(φ)² = c2/n_o² + (1-c2)/n_e²`.
 |---|---|
 | 0 | stone→world quaternion |
 | 1 | rig_yaw (radians), ortho_half, key_mult, fill_mult |
-| 2 | rim_mult, bounce_mult, 0, 0 |
+| 2 | rim_mult, bounce_mult, camera_distance, 0 |
 | ivec4 3 | stone_index, 0, 0, 0 |
 
 Pixels map to instances via an equal-cell grid (push constants `grid`, `cell_px`);
@@ -223,3 +223,18 @@ Automatic clarity/surface recipes remain disabled. Explicit chip/fracture/crysta
 boundaries can be authored and filled with another GemMaterial. Their morphology
 is procedural, not a stress or crystal-growth simulation; current fractures have
 not passed low-SPP visual acceptance. Surface polish fields are not yet rendered.
+
+## Analytic curved hosts (v7)
+Round/oval cabochons use exact-form ellipsoid, elliptical girdle cylinder and flat
+base intersections. Stone.ranges0.y=-1 identifies an analytic host; the Plane
+record at ranges0.x is a tagged geometry parameter block: n_d=(x radius, y radius,
+dome height, base z<0), aux reserved. ranges1.z=-1 denotes no mesh BVH; positive
+values allow the same analytic host plus mesh defect regions. The analytic host
+is region0, and the shared priority medium state also handles its cavities and
+fillings. General boundary surface IDs are negative for analytic patches (-1
+dome, -2 girdle, -3 base), nonnegative for BVH triangles. Other outlines retain
+procedural triangle surfaces.
+
+Instance.rig2.z is an outside-bound camera distance, derived from an enclosing
+sphere of all host and defect geometry. It remains valid under rotation. The
+orthographic framing half-width remains a separate authoring/clip parameter.

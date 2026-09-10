@@ -383,3 +383,6 @@ Designed but excluded from current scaffold. See `plans/deferred-systems-referen
 
 ### Material and condition implementation update
 `GemStone.material` is a reusable `GemMaterial` (species/chromophore/scatter/provenance). `GemStone.condition` holds explicit `GemDefect` boundaries in millimeters. `GemBoundarySet` supports host-clipped priority media, overlapping cavities and fillings. Automatic fracture grading remains disabled after visual checks showed noise and lens-like morphology. `tools/check_engine.ps1 -Gpu` runs the current gates and treats GDScript exceptions as failures even if Godot returns exit0. Generated logs are ignored under artifacts/checks.
+
+### Analytic curved host update
+Round/oval cabochons now use `GemQuadric`/analytic GLSL intersections, including hybrid mesh cavities in the same host. This removes curved highlight tessellation for those profiles. Camera origins derive from geometry bounds. Other curved outlines remain tessellation-limited.
