@@ -193,6 +193,19 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		if not str(instance.get("compilation_error", "")).is_empty():
 			configuration_error = instance.compilation_error
 			return false
+		var face_slots: PackedInt32Array = instance.get("plane_surface_ids", PackedInt32Array())
+		if instance.has("plane_surface_ids"):
+			if face_slots.size()*8 != instance.get("planes",PackedFloat32Array()).size() or instance.has("mesh") or instance.has("analytic_shape") or instance.has("boundaries"):
+				configuration_error="Per-plane finishes require a complete convex plane buffer"
+				return false
+			var finishes: Array=instance.get("surfaces",[])
+			if finishes.size()>GemBoundarySet.MAX_REGIONS:
+				configuration_error="Too many convex surface slots"
+				return false
+			for slot in face_slots:
+				if slot<0 or slot>=finishes.size():
+					configuration_error="Convex face refers to a missing surface slot"
+					return false
 		var source_mesh: GemMesh = instance.get("mesh", null)
 		if source_mesh != null and not source_mesh.validate().is_empty():
 			configuration_error = "Invalid optical boundary mesh: %s" % source_mesh.validate()
@@ -253,6 +266,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 
 	var planes := PackedFloat32Array()
 	var plane_facet_ids := PackedInt32Array()
+	var plane_surface_ids := PackedInt32Array()
 	var absorb := PackedFloat32Array()
 	var stones := StreamPeerBuffer.new()
 	var triangle_data := PackedByteArray()
@@ -287,6 +301,9 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 					if nested.get("scatter", {}).get("sigma_per_mm", 0.0) > 0.0 or _has_spatial_scattering(nested):
 						inst["volume_present"] = 1.0
 		var surfaces: Array = inst.get("surfaces", [])
+		if inst.has("plane_surface_ids"):
+			# Plane semantic/finish slots do not create extra physical media.
+			for slot in range(1,surfaces.size()):region_data.append(host_index)
 		for region in range(region_data.size() - int(inst["region_offset"])):
 			var finish: GemSurface = surfaces[region] if region < surfaces.size() else GemSurface.new()
 			surface_data.append_array(finish.packed(finish_data.size() / 20))
@@ -309,7 +326,9 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			var shape: Vector4 = inst["analytic_shape"]
 			p = PackedFloat32Array([shape.x, shape.y, shape.z, shape.w, 0, 0, 0, 0])
 		var facet_ids: PackedInt32Array = inst.get("facet_ids", PackedInt32Array())
+		var face_slots: PackedInt32Array=inst.get("plane_surface_ids",PackedInt32Array())
 		for face in p.size() / 8:
+			plane_surface_ids.append(face_slots[face] if face<face_slots.size() else 0)
 			plane_facet_ids.append(facet_ids[face] if face < facet_ids.size() else face)
 		var ab: PackedFloat32Array = inst["absorption"]
 		var ab_e: PackedFloat32Array = inst.get("absorption_eray", PackedFloat32Array())
@@ -351,6 +370,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	for face in plane_facet_ids.size():
 		# Preserve the full signed integer ID; aux.z is a bit-cast storage slot.
 		plane_bytes.encode_s32((face * 8 + 6) * 4, plane_facet_ids[face])
+		plane_bytes.encode_s32((face * 8 + 7) * 4, plane_surface_ids[face])
 	_bufs["planes"] = _rd.storage_buffer_create(plane_bytes.size(), plane_bytes)
 	_upload_lighting_buffers()
 	_bufs["absorb"] = _rd.storage_buffer_create(absorb.to_byte_array().size(), absorb.to_byte_array())

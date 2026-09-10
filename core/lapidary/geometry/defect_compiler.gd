@@ -2,7 +2,7 @@ class_name GemDefectCompiler
 extends RefCounted
 ## Procedural defect geometry. These are correlated geometric constructions,
 ## not a stress solver. Optical transport resolves both sides of every boundary.
-static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float) -> void:
+static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float, optimize_cleavage := true) -> void:
 	if condition == null or (condition.defects.is_empty() and condition.cleavage == null):
 		return
 	var enabled: Array[GemDefect] = []
@@ -15,6 +15,12 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float)
 			return
 		compiled["condition_report"] = {"cleavage":event.report}
 		if event.has("defect"):
+			var other_enabled := false
+			for descriptor in descriptors:
+				other_enabled = other_enabled or (descriptor != null and descriptor.enabled)
+			if optimize_cleavage and not other_enabled and not compiled.has("mesh") and not compiled.has("analytic_shape") and not compiled.planes.is_empty():
+				_apply_convex_cleavage(compiled, event, size_mm)
+				return
 			descriptors.append(event.defect)
 	for defect in descriptors:
 		if defect.enabled:
@@ -153,3 +159,27 @@ static func edge_chip(compiled: Dictionary, size_mm: float, seed_value: int, rad
 	defect.center_mm = position * size_mm + normal * depth_mm * 0.15
 	defect.orientation = Basis(along, normal.cross(along).normalized(), normal).orthonormalized().get_rotation_quaternion()
 	return defect
+
+## Intersecting a convex body with one retained cleavage half-space remains
+## convex. Keep the exact facet program and give the new face its own finish
+## and semantic slot. The region backend remains the independent comparison
+## path and handles nonconvex hosts or additional physical defects.
+static func _apply_convex_cleavage(compiled: Dictionary, event: Dictionary, size_mm: float) -> void:
+	var planes: PackedFloat32Array = compiled.planes.duplicate()
+	var ids: PackedInt32Array = compiled.get("facet_ids", PackedInt32Array()).duplicate()
+	var slots := PackedInt32Array()
+	slots.resize(planes.size()/8)
+	if ids.size() != slots.size():
+		ids.resize(slots.size())
+		for i in ids.size(): ids[i]=i
+	var values: Array = event.report.normal_stone
+	planes.append_array(PackedFloat32Array([values[0],values[1],values[2],event.report.plane_offset_mm/size_mm,0,0,0,0]))
+	ids.append(-1) # Matches the negative-z cap of the reference air cutter.
+	slots.append(1)
+	var surfaces: Array = compiled.get("surfaces", [GemSurface.new()]).duplicate()
+	surfaces.append(event.defect.finish if event.defect.finish != null else GemSurface.new())
+	compiled["planes"]=planes
+	compiled["facet_ids"]=ids
+	compiled["plane_surface_ids"]=slots
+	compiled["surfaces"]=surfaces
+	compiled["geometry_backend"]="convex_cleavage"

@@ -90,7 +90,7 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 		var metadata := {"kind": "linear_master", "width": master.get_width(), "height": master.get_height(), "samples": job.samples,
 			"space": "associated_XYZ_CIE1931_2deg", "reconstruction": job.quality.get("denoise_passes", 0),
 			"engine": GemFramePlan.master_engine(job), "producer": {"source_engine": GemRenderIdentity.worker_digest(), "godot": Engine.get_version_info(), "adapter": RenderingServer.get_video_adapter_name()},
-			"condition_report": compiled.get("condition_report", {}), "profile": tracer.profile(), "crystal_transport": tracer.crystal_diagnostics(), "surface_transport": tracer.surface_diagnostics()}
+			"geometry_backend": compiled.get("geometry_backend", "general"), "condition_report": compiled.get("condition_report", {}), "profile": tracer.profile(), "crystal_transport": tracer.crystal_diagnostics(), "surface_transport": tracer.surface_diagnostics()}
 		if not store.publish(master_key, GemArtifactStore.encode_linear(master), metadata):
 			return _fail("Cannot publish linear master")
 		counters["rendered"] += 1

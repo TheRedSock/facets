@@ -25,7 +25,7 @@ static func geometry() -> String:
 	var pattern := RegEx.new()
 	pattern.compile("layout\\(set = 0, binding = 13[^\\n]*\\n")
 	source = pattern.sub(source, "", true)
-	for name in ["mesh_box", "mesh_triangle", "mesh_hit", "mesh_normal", "quadric_roots", "cabochon_hit", "boundary_hit", "boundary_normal", "region_medium", "cross_region", "physical_boundary", "physical_hit"]:
+	for name in ["mesh_box", "mesh_triangle", "mesh_hit", "mesh_normal", "quadric_roots", "cabochon_hit", "boundary_hit", "boundary_normal", "boundary_surface_slot", "region_medium", "cross_region", "physical_boundary", "physical_hit"]:
 		pattern.compile("\\b" + name + "\\b")
 		source = pattern.sub(source, "crystal_geo_" + name, true)
 	for pair in [["float", "double"], ["vec2", "dvec2"], ["vec3", "dvec3"], ["vec4", "dvec4"]]:

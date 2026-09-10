@@ -41,7 +41,7 @@ void main() {
         vec3 position=origin+direction*distance;
         vec3 normal=boundary_normal(st,surface,position);
         if(dot(normal,direction)>0.0) normal=-normal;
-        int region=surface<0||st.ranges1.z==0?0:triangles[surface].meta.w;
+        int region=boundary_surface_slot(st,surface);
         int facet=st.ranges1.z==0?floatBitsToInt(planes[surface].aux.z):
             (surface<0?surface:triangles[surface].meta.x);
         result.position_depth=vec4(position*st.sell_b_size.w,distance*st.sell_b_size.w);

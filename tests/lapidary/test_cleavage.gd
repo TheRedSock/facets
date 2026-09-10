@@ -73,7 +73,7 @@ func _initialize() -> void:
 	job.print_style=GemPrint.load_house()
 	check(GemJobValidator.validate(job).is_empty(),"physical cleavage factory admission")
 	var compiled:=LapidaryStoneCompiler.compile(stone)
-	check(compiled.has("boundaries") and compiled.boundaries.materials.size()==2,"recipe realizes host plus removed air region")
+	check(compiled.get("geometry_backend")=="convex_cleavage" and compiled.plane_surface_ids[-1]==1,"convex recipe preserves planes and independent cut-face finish")
 	check(compiled.condition_report.cleavage.host_cap_mm3>0,"realized cap volume reported")
 	var original:=GemFramePlan.master_key(job)
 	var geo:=GemGeometryPlan.key(job,4)

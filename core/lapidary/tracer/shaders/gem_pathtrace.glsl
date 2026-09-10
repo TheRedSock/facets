@@ -249,7 +249,7 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 		}
 		vec3 normal = boundary_normal(st, triangle, pos);
 		vec3 facing = dot(dir, normal) < 0.0 ? normal : -normal;
-		int region = triangle < 0 || st.ranges1.z == 0 ? 0 : triangles[triangle].meta.w;
+		int region = boundary_surface_slot(st, triangle);
 		GemSurfaceData finish = surfaces[st.ranges1.w + region];
 		finish = local_finish(finish, pos*st.sell_b_size.w, facing);
 		bool rough = max(finish.slopes.x, finish.slopes.y) >= 0.0001;

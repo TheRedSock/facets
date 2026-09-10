@@ -3,7 +3,7 @@
 //
 // Buffer layouts are defined in KERNEL_CONTRACT.md.
 
-struct Plane { vec4 n_d; vec4 aux; };          // aux: zone, polish (unused by kernel v3), reserved
+struct Plane { vec4 n_d; vec4 aux; };          // aux: zone, reserved, int32 facet ID bits, int32 surface-slot bits
 struct Light { vec4 dir_cos; vec4 spd_pow; };  // spd_pow: spectrum offset, power, cos_inner, role(0key..3bounce,4blocker)
 struct Stone {
 	vec4 sell_b_size;      // sellmeier B xyz, size_mm

@@ -163,3 +163,10 @@ not enabled. Linear master records retain the condition report for inspection.
 `cleavage_portable_check.gd` builds a fresh isolated source/job bundle with an
 enabled cleavage condition, launches its own worker, and verifies optical,
 geometry and physical-report outputs. It is included in the GPU check runner.
+
+Convex cleavage keeps half-space geometry and assigns the new face its own
+finish slot. `cleavage_backend_check.gd` compares optimized planes against the
+general boundary reference at two poses and two finishes, including optical
+images and primary geometry. `convex_surface_check.gd` checks mixed plane/mesh
+batches and rough scalar/Mueller furnace energy. Both run with `check_engine.ps1
+-Gpu`; comparison images/timings stay in ignored `artifacts/cleavage/backends/`.

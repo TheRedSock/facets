@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v17)
+# Lapidary kernel contract (v18)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. Wire floats
@@ -10,8 +10,11 @@ orthographic camera looks down world −Z; instance quaternions rotate stone→w
 ## Geometry and material state
 
 A Plane is two vec4s (32B): outward normal.xyz/offset d, then zone ID/reserved/
-facet-ID-bits/reserved. The facet ID occupies aux.z as an **int32 bit pattern**;
-read it with `floatBitsToInt`, never a numeric float conversion.
+facet-ID-bits/surface-slot-bits. Both aux.z and aux.w store **int32 bit patterns**;
+read them with `floatBitsToInt`, never numeric float conversion. Ordinary convex
+planes use surface slot0. Per-face finish slots index the host surface block; they
+do not create physical media or change convex inside/outside state. The aligned
+region-material block pads extra finish slots with the host material index.
 The host interior obeys dot(n,x)<=d. Zone IDs: 0 table, 1 crown main/star,
 2 upper girdle, 3 girdle, 4 pavilion main, 5 lower girdle, 6 culet, 7 step row.
 They identify cut structure, not surface finish.
@@ -29,7 +32,9 @@ The geometry pipeline uses existing scene buffers plus binding16 output. Its
 32-byte push block contains ivec2 resolution/grid/cell_px, coverage_side and
 row_origin. Each output record is 48 bytes: vec4 object-position-mm/camera-forward-
 distance-mm; vec4 incident-facing object-normal/coverage; ivec4 instance/facet/
-local-region/global-material. A miss has zero geometry/coverage and IDs=-1.
+local-boundary-slot/global-material. The boundary slot is the region ID for meshes
+and the per-plane finish slot for convex hosts; it is not necessarily an active
+medium-state bit. A miss has zero geometry/coverage and IDs=-1.
 Analytic patch facet IDs are negative (-1 dome, -2 girdle, -3 base), disambiguated
 from misses by coverage. Full int32 facet IDs survive BVH and plane packing.
 `physical_boundary` skips boundaries that do not change the active medium, so
@@ -536,8 +541,23 @@ The general priority-region backend therefore exposes a real cut face and change
 silhouette, optical thickness, reflection and refraction. The cut face owns its
 surface finish. Zero depth retains pristine geometry; the authored maximum cap
 fraction rejects excessive removal. Rough cleavage remains outside the admitted
-crystal-transport domain. The general mesh route is currently substantially slower
-than a pristine convex stone; there is no specialized convex-cut fast path yet.
+crystal-transport domain. A convex plane host with no other enabled defects keeps
+its half-space representation and appends the retained cleavage plane, facet ID−1,
+and finish/semantic slot1. Only host medium bit0 is active. Mesh/analytic hosts and
+combined defects use the general region backend. No plane pruning is needed.
+`LapidaryStoneCompiler.compile(stone, false)` forces the general representation
+for direct comparisons; production jobs always use the optimized compiler.
+Linear-master metadata records the selected geometry backend.
+
+`test_convex_cleavage.gd` compares clipped closed volumes across eight outlines
+and two depths; `cleavage_backend_check.gd` compares image and geometry output
+against the general backend. At256px/128spp on the development GPU, two poses
+measured11.6–12.1× smooth and5.2× rough speedups, with0.12–0.21 display-level RMS
+difference. These are specific measurements, not universal performance guarantees.
+Subpixel boundary coverage can select a different representative AOV point; full
+coverage positions agree within0.000011mm. `convex_surface_check.gd` exercises
+interleaved pristine, clipped-plane and general-region instances with scalar and
+Mueller rough-face furnaces, semantic IDs and physical material IDs.
 
 The compiler and linear-master metadata include `condition_report.cleavage`.
 `host_cap_mm3` and `host_cap_fraction` describe the host **before other defects**,

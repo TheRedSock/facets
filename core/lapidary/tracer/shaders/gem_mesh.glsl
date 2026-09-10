@@ -148,6 +148,13 @@ int region_medium(Stone stone, uvec4 region_state) {
 	return -1;
 }
 
+// Semantic/finish identity is distinct from the medium-state bit. A convex
+// body can have several surface finishes while remaining one physical medium.
+int boundary_surface_slot(Stone stone, int surface) {
+	if (stone.ranges1.z == 0) { return floatBitsToInt(planes[surface].aux.w); }
+	return surface < 0 ? 0 : triangles[surface].meta.w;
+}
+
 uvec4 cross_region(Stone stone, uvec4 region_state, int triangle, vec3 position, vec3 direction) {
 	int region = triangle < 0 || stone.ranges1.z == 0 ? 0 : triangles[triangle].meta.w;
 	uint bit = 1u << uint(region % 32);
