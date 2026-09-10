@@ -185,7 +185,7 @@ float disc_coverage(vec3 hit, vec3 c, vec3 n, float radius, float style, uint se
 		float across = -x * 0.57 + y * 0.82;
 		float wave = radius * 0.16 * sin(along * 18.0 + float(seed) * 0.01);
 		float band = abs(across - wave) / max(radius, 1e-5);
-		float taper = smoothstep(1.0, 0.35, r / max(radius, 1e-5));
+		float taper = (1.0 - smoothstep(0.35, 1.0, r / max(radius, 1e-5)));
 		if (band > mix(0.22, 0.08, taper)) { return 0.0; }
 	} else {
 		float nr = r / max(radius * (0.96 + 0.04 * sin(ang * 2.0 + float(seed % 17u))), 1e-5);
@@ -423,6 +423,8 @@ void main() {
 
 	for (uint s = 0u; s < pc.spp; s++) {
 		uint n = pc.sample_base + s;
+		rng = (uint(pix.x) * 1973u + uint(pix.y) * 9277u + n * 26699u + pc.seed * 30011u) | 1u;
+		pcg(rng);
 		float xi = qmc(n, 2u, pix_rot);
 		vec4 wl = WL_MIN + (vec4(0.0, 1.0, 2.0, 3.0) + xi) * (WL_RANGE / 4.0);
 		vec4 n_wl = vec4(
@@ -447,7 +449,6 @@ void main() {
 		float cos_i = clamp(-dot(rd, n_entry), 0.0, 1.0);
 
 		vec4 radiance = vec4(0.0);
-		float fluor_absorbed = 0.0;
 
 		vec4 r_surf = vec4(
 			fresnel_diel(cos_i, 1.0 / n_wl.x), fresnel_diel(cos_i, 1.0 / n_wl.y),
@@ -513,7 +514,7 @@ void main() {
 					// Unified free flight over homogeneous milk + cloud spans.
 					float t_scat = INF;
 					int scat_medium = -1;  // -1 homogeneous, else cloud prim index
-					if (FLAG_VOLUME && scatter_events == 0) {
+					if (FLAG_VOLUME) {
 						float c_t0[MAX_CLOUD_SPANS], c_t1[MAX_CLOUD_SPANS], c_dens[MAX_CLOUD_SPANS];
 						int c_prim[MAX_CLOUD_SPANS];
 						int n_c = gather_clouds(st, pos, dir, t_lim, c_t0, c_t1, c_dens, c_prim);
@@ -530,7 +531,7 @@ void main() {
 							for (int i = 0; i < n_c; i++) {
 								if (t_scat >= c_t0[i] && t_scat <= c_t1[i]) { total += c_dens[i]; }
 							}
-							float pick = u_med * total;
+							float pick = (scatter_events == 0 ? u_med : rnd(rng)) * total;
 							float acc = sigma_h;
 							if (pick >= acc) {
 								for (int i = 0; i < n_c; i++) {
@@ -547,10 +548,6 @@ void main() {
 
 					float t_ev = min(t_lim, t_scat);
 					vec4 seg_att = segment_att(st, pos, dir, t_ev, a_off, has_eray, wl, pol_mode);
-					if (FLAG_FLUOR && st.optic_fluor.w > 0.0) {
-						vec4 pump = smoothstep(vec4(620.0), vec4(480.0), wl);
-						fluor_absorbed += dot(throughput * (vec4(1.0) - seg_att), pump);
-					}
 					throughput *= seg_att;
 
 					if (t_scat < t_lim) {
@@ -574,6 +571,7 @@ void main() {
 						dir = hg_sample_u(dir, g_phase, u_dir);
 						throughput *= tnt;
 						scatter_events++;
+						tau_free = -log(max(1e-7, 1.0 - rnd(rng)));
 					} else if (t_incl < t_exit) {
 						pos += dir * t_incl;
 						Prim pr = prims[hit_prim];
@@ -647,11 +645,6 @@ void main() {
 		radiance = min(radiance, vec4(pc.rad_clamp));
 		vec3 xyz = (radiance.x * cie_xyz(wl.x) + radiance.y * cie_xyz(wl.y)
 			+ radiance.z * cie_xyz(wl.z) + radiance.w * cie_xyz(wl.w)) * pc.spectral_norm;
-		if (FLAG_FLUOR && st.optic_fluor.w > 0.0 && fluor_absorbed > 0.0) {
-			float pump = min(fluor_absorbed, 1.0);
-			pump *= pump * (3.0 - 2.0 * pump);
-			xyz += cie_xyz(st.misc.x) * (pump * st.optic_fluor.w * pc.spectral_norm);
-		}
 		total_xyz += xyz;
 	}
 

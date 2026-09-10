@@ -156,6 +156,10 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 		planes = kept_planes
 		anchors = kept_anchors
 
+	if not HullValidator.check_bounded(planes):
+		push_error("cut_compiler: pruning produced an open hull")
+		return _failure()
+
 	if not HullValidator.is_outline_convex(outline):
 		warnings.append("outline not convex")
 		push_warning("cut_compiler: template '%s' on '%s': outline not convex" % [template.cut_id, silhouette])

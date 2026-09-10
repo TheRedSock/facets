@@ -47,7 +47,7 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat3
 
 	var print_res := load_house_print()
 	var frames: Array[Image] = []
-	var frame_gpu_ms: Array = []
+	var frame_accumulate_wall_ms: Array = []
 	var n := clip.frame_count()
 	for i in n:
 		var t := clip.frame_time(i)
@@ -55,17 +55,15 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat3
 			tracer.reset_accumulation()
 		tracer.set_clip_sample(frame_orientation(clip, t), frame_rig_yaw_rad(clip, t),
 			frame_role_mult(clip, t), ORTHO_HALF)
-		var gpu_ms := 0.0
+		var accumulate_wall_ms := 0.0
 		var done := 0
 		while done < spp:
 			var step := mini(batch, spp - done)
-			gpu_ms += tracer.accumulate(step)
+			accumulate_wall_ms += tracer.accumulate(step)
 			done += step
-		var img := tracer.finalize_print(print_res, false, frame_exposure(clip, t))
-		if out != res:
-			img.resize(out, out, Image.INTERPOLATE_LANCZOS)
+		var img := tracer.finalize_print(print_res, false, frame_exposure(clip, t), Vector2i(out, out))
 		frames.append(img)
-		frame_gpu_ms.append(gpu_ms)
+		frame_accumulate_wall_ms.append(accumulate_wall_ms)
 
 	if shared_tracer == null:
 		tracer.release()
@@ -81,7 +79,7 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: PackedFloat3
 			"res": res,
 			"out": out,
 			"spp": spp,
-			"frame_gpu_ms": frame_gpu_ms,
+			"frame_accumulate_wall_ms": frame_accumulate_wall_ms,
 			"wall_ms": float(Time.get_ticks_usec() - t0) / 1000.0,
 			"print": "house",
 		},

@@ -44,14 +44,4 @@ func frame_time(frame: int) -> float:
 
 
 func fingerprint() -> String:
-	var env_keys := effect_envelopes.keys()
-	env_keys.sort()
-	var parts := [clip_id, "%.2f" % duration_s, "%.1f" % fps, str(loop),
-		str(stone_motion), str(rest_tilt_deg), str(turntable_axis),
-		"%.1f" % turntable_degrees, "%.1f" % rig_orbit_degrees, ",".join(env_keys)]
-	if easing != null:
-		for i in easing.point_count:
-			var p := easing.get_point_position(i)
-			parts.append("%.3f,%.3f,%.2f,%.2f" % [p.x, p.y,
-				easing.get_point_left_tangent(i), easing.get_point_right_tangent(i)])
-	return "|".join(PackedStringArray(parts)).md5_text().substr(0, 12)
+	return preload("res://resources/lapidary/content_identity.gd").digest(self)

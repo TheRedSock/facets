@@ -324,6 +324,9 @@ func _test_forge_service() -> void:
 
 func _test_gpu_smoke() -> void:
 	print("[gpu]")
+	if DisplayServer.get_name() == "headless":
+		print("  SKIP gpu (run windowed for GPU coverage)")
+		return
 	var probe = TracerScript.create(64, 64)
 	if probe == null:
 		print("  SKIP gpu (no RenderingDevice — run windowed for GPU coverage)")

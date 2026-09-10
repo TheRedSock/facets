@@ -17,15 +17,15 @@ extends RefCounted
 ## and the next bake overwrites it in place. Bumping LOOK_VERSION retires every
 ## cache at once (foreign-GPU caches regenerate rather than diffing).
 
-const LOOK_VERSION := 12
+const LOOK_VERSION := 13
 const USER_ROOT := "user://gemcache"
 const GENERATED_ROOT := "res://generated/gemcache"
 
 
 ## Identity of one baked artifact (unversioned; see versioned_key).
 static func cache_key(stone: GemStone, clip: GemClip, rung: int) -> String:
-	return "%s/%s@%s" % [stone.fingerprint(), clip.fingerprint() + String(clip.clip_id),
-		GemRung.rung_name(rung)]
+	var digest := GemContentIdentity.digest([stone, clip, GemRenderIdentity.context(rung)])
+	return "%s@%s" % [digest, GemRung.rung_name(rung)]
 
 
 ## Full identity including the look-version root.
@@ -67,13 +67,16 @@ static func write(stone: GemStone, clip: GemClip, rung: int, frames: Array,
 	if root.begins_with("res://"):
 		_ensure_gdignore(root)
 
-	err = strip.save_webp(ProjectSettings.globalize_path(strip_path(root, stone, clip, rung)), false)
-	if err != OK:
-		push_warning("GemCache: webp save failed (%s)" % error_string(err))
+	var bytes := strip.save_webp_to_buffer(false)
+	if bytes.is_empty():
+		return false
+	if not _atomic_write(strip_path(root, stone, clip, rung), bytes):
 		return false
 
 	var sidecar := {
 		"key": cache_key(stone, clip, rung),
+		"payload_sha256": _bytes_hash(bytes),
+		"payload_bytes": bytes.size(),
 		"look_version": LOOK_VERSION,
 		"fps": clip.fps,
 		"frames": frames.size(),
@@ -85,14 +88,30 @@ static func write(stone: GemStone, clip: GemClip, rung: int, frames: Array,
 		"rung": GemRung.rung_name(rung),
 		"meta": meta,
 	}
-	var fa := FileAccess.open(ProjectSettings.globalize_path(sidecar_path(root, stone, clip, rung)),
-		FileAccess.WRITE)
-	if fa == null:
-		push_warning("GemCache: cannot write sidecar (%s)" % error_string(FileAccess.get_open_error()))
+	return _atomic_write(sidecar_path(root, stone, clip, rung), JSON.stringify(sidecar, "\t").to_utf8_buffer())
+
+
+static func _bytes_hash(bytes: PackedByteArray) -> String:
+	var hash_context := HashingContext.new()
+	hash_context.start(HashingContext.HASH_SHA256)
+	hash_context.update(bytes)
+	return hash_context.finish().hex_encode()
+
+
+static func _atomic_write(path: String, bytes: PackedByteArray) -> bool:
+	var temporary := path + ".%d.%d.tmp" % [OS.get_process_id(), Time.get_ticks_usec()]
+	var file := FileAccess.open(temporary, FileAccess.WRITE)
+	if file == null:
 		return false
-	fa.store_string(JSON.stringify(sidecar, "\t"))
-	fa.close()
-	return true
+	file.store_buffer(bytes)
+	file.flush()
+	var error := file.get_error()
+	file.close()
+	if error == OK:
+		error = DirAccess.rename_absolute(temporary, path)
+	if error != OK:
+		DirAccess.remove_absolute(temporary)
+	return error == OK
 
 
 ## Horizontal strip: frames * w x h, RGBA8.
@@ -132,12 +151,9 @@ static func read(stone: GemStone, clip: GemClip, rung: int) -> Dictionary:
 	return {}
 
 
-## Cheap existence + validity check (sidecar only, no image decode).
+## A cache hit must be readable, including its payload. Corruption is a miss.
 static func has(stone: GemStone, clip: GemClip, rung: int) -> bool:
-	for root in [USER_ROOT, GENERATED_ROOT]:
-		if not _load_sidecar(root, stone, clip, rung).is_empty():
-			return true
-	return false
+	return not read(stone, clip, rung).is_empty()
 
 
 ## Deletes the user:// artifact for one stone x clip x rung (dev utility;
@@ -154,7 +170,7 @@ static func _read_from(root: String, stone: GemStone, clip: GemClip, rung: int) 
 	if sidecar.is_empty():
 		return {}
 	var bytes := FileAccess.get_file_as_bytes(strip_path(root, stone, clip, rung))
-	if bytes.is_empty():
+	if bytes.size() != int(sidecar.get("payload_bytes", -1)) or _bytes_hash(bytes) != sidecar.get("payload_sha256", ""):
 		return {}
 	var strip := Image.new()
 	if strip.load_webp_from_buffer(bytes) != OK:
@@ -181,6 +197,8 @@ static func _read_from(root: String, stone: GemStone, clip: GemClip, rung: int) 
 ## Sidecar parse + key validation. {} when missing or stale.
 static func _load_sidecar(root: String, stone: GemStone, clip: GemClip, rung: int) -> Dictionary:
 	var path := sidecar_path(root, stone, clip, rung)
+	if not FileAccess.file_exists(path):
+		return {}
 	var text := FileAccess.get_file_as_string(path)
 	if text.is_empty():
 		return {}
@@ -190,6 +208,13 @@ static func _load_sidecar(root: String, stone: GemStone, clip: GemClip, rung: in
 	var sidecar: Dictionary = parsed
 	if String(sidecar.get("key", "")) != cache_key(stone, clip, rung):
 		return {} # stale: stone or clip fingerprint changed since this bake
+	if int(sidecar.get("look_version", -1)) != LOOK_VERSION:
+		return {}
+	for field in ["frames", "frame_w", "frame_h", "fps"]:
+		if not sidecar.has(field) or not (sidecar[field] is float or sidecar[field] is int) or not is_finite(float(sidecar[field])) or float(sidecar[field]) <= 0.0:
+			return {}
+	if not sidecar.has("loop") or not FileAccess.file_exists(strip_path(root, stone, clip, rung)):
+		return {}
 	return sidecar
 
 

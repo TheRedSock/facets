@@ -5,10 +5,11 @@ extends RefCounted
 ## polygon clipping, not sampling) so the compiler can prune them — removing
 ## a half-space whose face is empty provably never changes the solid.
 
-## A hull is bounded iff plane normals positively span all directions:
-## for every direction u some plane has n·u >= eps. 26 sampled directions
-## (axes, edge diagonals, corner diagonals) suffice for our facet programs.
-const BOUND_EPS := 0.02
+## Boundedness is a recession-cone feasibility test: A*u <= 0 has no
+## nonzero solution. Intersect that cone with all six faces of [-1,1]^3.
+## Every nonzero recession direction can be scaled onto one of these faces.
+## Tolerance deliberately rejects numerically near-open hulls.
+const BOUND_EPS := 1.0e-7
 ## Interior margin for the face test: a face thinner than this counts as dead
 ## (the kernel cannot resolve it and jitter owns error at that scale anyway).
 const FACE_MARGIN := 1.0e-6
@@ -23,18 +24,25 @@ const SEED_EXTENT := 8.0
 
 
 static func check_bounded(planes: PackedFloat32Array) -> bool:
-	var count := planes.size() / 8
-	if count < 4:
+	if planes.size() < 32 or planes.size() % 8 != 0:
 		return false
-	for u in _support_directions():
-		var best := -1.0
-		for i in count:
-			var dot := planes[i * 8] * u.x + planes[i * 8 + 1] * u.y + planes[i * 8 + 2] * u.z
-			best = maxf(best, dot)
-			if best >= BOUND_EPS:
-				break
-		if best < BOUND_EPS:
-			return false
+	var axes := [Vector3.RIGHT, Vector3.UP, Vector3.BACK]
+	for axis in 3:
+		var t1: Vector3 = axes[(axis + 1) % 3]
+		var t2: Vector3 = axes[(axis + 2) % 3]
+		for sign_value in [-1.0, 1.0]:
+			var origin: Vector3 = axes[axis] * sign_value
+			var poly := PackedVector2Array([Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)])
+			for i in planes.size() / 8:
+				var n := Vector3(planes[i * 8], planes[i * 8 + 1], planes[i * 8 + 2])
+				if not n.is_finite() or n.length_squared() < 1.0e-20 or not is_finite(planes[i * 8 + 3]):
+					return false
+				n = n.normalized()
+				poly = _clip(poly, Vector2(n.dot(t1), n.dot(t2)), -n.dot(origin) + BOUND_EPS)
+				if poly.is_empty():
+					break
+			if not poly.is_empty():
+				return false
 	return true
 
 
@@ -188,14 +196,3 @@ static func is_outline_convex(outline: PackedVector2Array) -> bool:
 		if e0.normalized().cross(e1.normalized()) < -1.0e-4:
 			return false
 	return true
-
-
-static func _support_directions() -> Array[Vector3]:
-	var dirs: Array[Vector3] = []
-	for x in [-1, 0, 1]:
-		for y in [-1, 0, 1]:
-			for z in [-1, 0, 1]:
-				if x == 0 and y == 0 and z == 0:
-					continue
-				dirs.append(Vector3(x, y, z).normalized())
-	return dirs

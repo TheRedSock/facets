@@ -24,17 +24,4 @@ extends Resource
 
 ## Stable identity for cache keys. Any visual-affecting change lands here.
 func fingerprint() -> String:
-	var axis := optic_axis_override if optic_axis_override != Vector3.ZERO \
-		else (species.optic_axis_stone if species else Vector3(0, 0, 1))
-	var parts := [
-		stone_id,
-		species.species_id if species else &"none",
-		chromophore.chromophore_id if chromophore else &"none",
-		str(cut.get("cut_id")) if cut else "none",
-		silhouette,
-		"%.3f_%.3f_%.3f_%.3f" % [grade.cut, grade.clarity, grade.surface, grade.crystal] if grade else "g1",
-		str(seed),
-		"%.2f" % size_mm,
-		"%.3f_%.3f_%.3f" % [axis.x, axis.y, axis.z],
-	]
-	return "|".join(PackedStringArray(parts)).md5_text().substr(0, 16)
+	return preload("res://resources/lapidary/content_identity.gd").digest(self)

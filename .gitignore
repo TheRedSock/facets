@@ -19,3 +19,5 @@ artifacts/**
 !artifacts/.gdignore
 __pycache__/
 *.pyc
+# GLSL kernels are runtime-compiled source, not editor-imported resources.
+*.glsl.import

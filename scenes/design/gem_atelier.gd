@@ -26,6 +26,8 @@ const FIRST_BATCH_SPP := 4
 const STEP_SPP := 12
 const DEBOUNCE_MS := 250
 
+var _c: Dictionary = {}
+var _tracer: GemTracer
 var _default_print: GemPrint
 
 var _stones: Array[GemStone] = []

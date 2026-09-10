@@ -28,7 +28,7 @@ const FIELD_PUSH_SIZE := 48
 ## Adaptive dispatch target (ms per GPU submission); far below any OS watchdog.
 const DISPATCH_TARGET_MS := 120.0
 const MAX_CHUNK_SPP := 64
-const PRINT_PUSH_SIZE := 96
+const PRINT_PUSH_SIZE := 112
 const STONE_STRIDE_BYTES := 128
 const INST_STRIDE_BYTES := 64
 
@@ -56,6 +56,11 @@ var height := 0
 var samples_accumulated := 0
 var last_dispatch_ms := 0.0
 var last_field_ms := 0.0
+var last_accumulate_ms := 0.0
+var last_print_ms := 0.0
+var field_build_count := 0
+var _instance_bytes := PackedByteArray()
+var _field_state_key := ""
 var debug_chunks := false
 
 var _rd: RenderingDevice
@@ -65,6 +70,7 @@ var _pipelines: Dictionary = {}  # name -> RID
 var _bufs: Dictionary = {}
 var _sets: Dictionary = {}       # name -> uniform set RID
 var _print_tex: RID
+var _print_size := Vector2i.ZERO
 var _field_tex: RID
 var _field_sampler: RID
 
@@ -97,19 +103,17 @@ var _inst_state := {
 }
 
 
-static func create(p_width: int, p_height: int, rd: RenderingDevice = null) -> GemTracer:
+static func create(p_width: int, p_height: int) -> GemTracer:
 	var t := GemTracer.new()
 	t.width = p_width
 	t.height = p_height
-	if rd != null:
-		t._rd = rd
-	else:
-		t._rd = RenderingServer.create_local_rendering_device()
-		t._owns_rd = true
+	t._rd = RenderingServer.create_local_rendering_device()
+	t._owns_rd = true
 	if t._rd == null:
 		push_error("GemTracer: no RenderingDevice (headless mode has none).")
 		return null
 	if not t._compile_shaders():
+		t.release()
 		return null
 	var zeros := PackedByteArray()
 	zeros.resize(p_width * p_height * 16)
@@ -171,13 +175,18 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 		_flags |= FLAG_BIREF
 	if policy.get("volume", true):
 		_flags |= FLAG_VOLUME
-	if policy.get("fluorescence", true):
-		_flags |= FLAG_FLUOR
+	# Fluorescence is deferred until excitation and emitted-path transport exist.
 	_rad_clamp = policy.get("rad_clamp", 48.0)
 	_env_filter_rad = policy.get("env_filter_rad", 0.06)
 	_field_exits = clampi(policy.get("field_exits", 0), 0, 64)
 	@warning_ignore("integer_division")
 	_field_grid = clampi(policy.get("field_grid", 32), 4, FIELD_MAX_DEPTH / FIELD_SLABS)
+	var scattering_present := false
+	for instance: Dictionary in instances:
+		if float(instance.get("scatter", {}).get("sigma_per_mm", 0.0)) > 0.0 or not instance.get("inclusions", PackedFloat32Array()).is_empty():
+			scattering_present = true
+	if not scattering_present or (_flags & FLAG_VOLUME) == 0:
+		_field_exits = 0
 	_field_dirs = clampi(policy.get("field_dirs", 2048), 64, 16384)
 	while _field_exits > 0 and _field_grid > 6 and _field_bytes_for(_field_grid) > FIELD_BUDGET_BYTES:
 		_field_grid -= 2
@@ -224,6 +233,12 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	for i in _inst_count:
 		_pack_inst(insts, Quaternion.IDENTITY, 0.0, 1.25, [1.0, 1.0, 1.0, 1.0], mini(i, instances.size() - 1))
 	_bufs["insts"] = _rd.storage_buffer_create(insts.data_array.size(), insts.data_array)
+	_instance_bytes = PackedByteArray()
+	_field_state_key = ""
+	_update_instance_buffer(insts.data_array)
+	_inst_state = {"quat": Quaternion.IDENTITY, "rig_yaw": 0.0, "ortho_half": 1.25,
+		"role_mult": [1.0, 1.0, 1.0, 1.0], "stone_index": 0}
+	last_field_ms = 0.0
 
 	_create_field_texture()
 	_build_uniform_sets()
@@ -317,13 +332,21 @@ func _build_uniform_sets() -> void:
 		uniforms.append(f)
 		_sets[shader_name] = _rd.uniform_set_create(uniforms, _shaders[shader_name], 0)
 
-	if not _print_tex.is_valid():
-		var fmt := RDTextureFormat.new()
-		fmt.width = width
-		fmt.height = height
-		fmt.format = RenderingDevice.DATA_FORMAT_R8G8B8A8_UNORM
-		fmt.usage_bits = RenderingDevice.TEXTURE_USAGE_STORAGE_BIT | RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT
-		_print_tex = _rd.texture_create(fmt, RDTextureView.new())
+	_create_print_target(Vector2i(width, height))
+
+
+func _create_print_target(size: Vector2i) -> void:
+	if _print_size == size and _sets.has("print") and _rd.uniform_set_is_valid(_sets["print"]):
+		return
+	if _print_tex.is_valid():
+		_rd.free_rid(_print_tex)
+	var fmt := RDTextureFormat.new()
+	fmt.width = size.x
+	fmt.height = size.y
+	fmt.format = RenderingDevice.DATA_FORMAT_R8G8B8A8_UNORM
+	fmt.usage_bits = RenderingDevice.TEXTURE_USAGE_STORAGE_BIT | RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT
+	_print_tex = _rd.texture_create(fmt, RDTextureView.new())
+	_print_size = size
 	var pu0 := RDUniform.new()
 	pu0.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
 	pu0.binding = 0
@@ -357,8 +380,7 @@ func _push_inst_state() -> void:
 	var b := StreamPeerBuffer.new()
 	_pack_inst(b, _inst_state["quat"], _inst_state["rig_yaw"], _inst_state["ortho_half"],
 		_inst_state["role_mult"], _inst_state["stone_index"])
-	_rd.buffer_update(_bufs["insts"], 0, b.data_array.size(), b.data_array)
-	_field_dirty = true
+	_update_instance_buffer(b.data_array)
 
 
 ## Board batch path: update every instance (array of {quat, rig_yaw, ortho_half, role_mult, stone_index}).
@@ -368,8 +390,22 @@ func set_instances(states: Array) -> void:
 		var rm: Vector4 = s.get("role_mult", Vector4.ONE)
 		_pack_inst(b, s.get("quat", Quaternion.IDENTITY), s.get("rig_yaw", 0.0),
 			s.get("ortho_half", 1.25), [rm.x, rm.y, rm.z, rm.w], s.get("stone_index", 0))
-	_rd.buffer_update(_bufs["insts"], 0, b.data_array.size(), b.data_array)
-	_field_dirty = true
+	_update_instance_buffer(b.data_array)
+
+
+func _update_instance_buffer(bytes: PackedByteArray) -> void:
+	if bytes == _instance_bytes:
+		return
+	# Framing changes primary rays, but cannot change light inside the stone.
+	var field_bytes := bytes.duplicate()
+	for index in bytes.size() / INST_STRIDE_BYTES:
+		field_bytes.encode_float(index * INST_STRIDE_BYTES + 20, 0.0)
+	var key := GemContentIdentity.digest(field_bytes)
+	if key != _field_state_key:
+		_field_dirty = true
+		_field_state_key = key
+	_rd.buffer_update(_bufs["insts"], 0, bytes.size(), bytes)
+	_instance_bytes = bytes
 
 
 func set_seed(s: int) -> void:
@@ -380,9 +416,10 @@ func set_seed(s: int) -> void:
 ## horizon, below, kelvin; 0 = flat spectrum) and "white_kelvin" (as-shot white
 ## balance of the print; 0 = none).
 func set_environment(env: Dictionary) -> void:
-	_bg = env["bg"]
+	if _bg != env["bg"]:
+		_bg = env["bg"]
+		_field_dirty = true
 	_xyz_to_rgb = Colorimetry.xyz_to_srgb(float(env.get("white_kelvin", 0.0)))
-	_field_dirty = true
 
 
 func reset_accumulation() -> void:
@@ -409,6 +446,8 @@ func _field_push(band_group: int, texel_base: int) -> PackedByteArray:
 ## dispatch approaches the OS GPU watchdog whatever the grid / dirs / exits
 ## policy. Returns ms.
 func build_scatter_field() -> float:
+	if not _field_dirty:
+		return 0.0
 	if _field_exits <= 0:
 		_field_dirty = false
 		return 0.0
@@ -440,6 +479,7 @@ func build_scatter_field() -> float:
 				elif ms < DISPATCH_TARGET_MS * 0.4:
 					_field_chunk = mini(1 << 20, _field_chunk * 2)
 	_field_dirty = false
+	field_build_count += 1
 	last_field_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 	return last_field_ms
 
@@ -449,6 +489,8 @@ func build_scatter_field() -> float:
 ## cost (dense milk and inclusions make a path many times dearer than clean
 ## optics), so no single dispatch approaches the OS GPU watchdog. Returns ms.
 func accumulate(spp: int) -> float:
+	assert(spp > 0)
+	var start := Time.get_ticks_usec()
 	if _field_dirty:
 		build_scatter_field()
 	var t0 := Time.get_ticks_usec()
@@ -475,7 +517,8 @@ func accumulate(spp: int) -> float:
 		samples_accumulated += spp_now
 		remaining -= spp_now
 	last_dispatch_ms = float(Time.get_ticks_usec() - t0) / 1000.0
-	return last_dispatch_ms
+	last_accumulate_ms = float(Time.get_ticks_usec() - start) / 1000.0
+	return last_accumulate_ms
 
 
 func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
@@ -522,10 +565,14 @@ func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
 # ------------------------------------------------------------------ output
 
 ## GPU print pass. print_res is required for house print; raw bypasses mastering.
-func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0) -> Image:
+func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0, output_size := Vector2i.ZERO) -> Image:
+	var start := Time.get_ticks_usec()
+	var target := Vector2i(width, height) if output_size == Vector2i.ZERO else output_size
+	assert(target.x > 0 and target.y > 0)
+	_create_print_target(target)
 	var pcb := StreamPeerBuffer.new()
-	pcb.put_32(width)
-	pcb.put_32(height)
+	pcb.put_32(target.x)
+	pcb.put_32(target.y)
 	pcb.put_float(1.0 / maxf(1.0, float(samples_accumulated)))
 	pcb.put_float(exposure * (print_res.exposure if print_res != null else 1.0))
 	pcb.put_u32(1 if raw else 0)
@@ -540,6 +587,8 @@ func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0) -
 	for col: Vector3 in [_xyz_to_rgb.x, _xyz_to_rgb.y, _xyz_to_rgb.z]:
 		for v: float in [col.x, col.y, col.z, 0.0]:
 			pcb.put_float(v)
+	for value in [width, height, 0, 0]:
+		pcb.put_32(value)
 	assert(pcb.data_array.size() == PRINT_PUSH_SIZE)
 
 	var cl := _rd.compute_list_begin()
@@ -547,12 +596,13 @@ func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0) -
 	_rd.compute_list_bind_uniform_set(cl, _sets["print"], 0)
 	_rd.compute_list_set_push_constant(cl, pcb.data_array, PRINT_PUSH_SIZE)
 	@warning_ignore("integer_division")
-	_rd.compute_list_dispatch(cl, (width + 7) / 8, (height + 7) / 8, 1)
+	_rd.compute_list_dispatch(cl, (target.x + 7) / 8, (target.y + 7) / 8, 1)
 	_rd.compute_list_end()
 	_rd.submit()
 	_rd.sync()
 	var data := _rd.texture_get_data(_print_tex, 0)
-	return Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, data)
+	last_print_ms = float(Time.get_ticks_usec() - start) / 1000.0
+	return Image.create_from_data(target.x, target.y, false, Image.FORMAT_RGBA8, data)
 
 
 ## Reads back accumulated XYZ (normalized) + coverage. For physics tests.
@@ -562,6 +612,20 @@ func read_xyz() -> PackedFloat32Array:
 	for i in raw.size():
 		raw[i] *= inv
 	return raw
+
+
+## Scene-linear master: coverage-weighted XYZ, alpha coverage. No white
+## balance, exposure, tonescale, gamut mapping, or display encoding. EXR
+## consumers must read the declared XYZ color space, not assume RGB.
+func read_linear_master() -> Image:
+	return Image.create_from_data(width, height, false, Image.FORMAT_RGBAF, read_xyz().to_byte_array())
+
+
+func profile() -> Dictionary:
+	return {"accumulate_wall_ms": last_accumulate_ms, "trace_wall_ms": last_dispatch_ms,
+		"field_last_build_ms": last_field_ms, "field_builds": field_build_count,
+		"print_readback_wall_ms": last_print_ms, "samples": samples_accumulated,
+		"field": field_info()}
 
 
 ## Raw scatter-field texel data (RGBA16F), for tools that inspect the field.

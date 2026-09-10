@@ -165,7 +165,7 @@ func _begin_job(item: Dictionary) -> Dictionary:
 	job["frame"] = 0
 	job["spp_done"] = 0
 	job["frames"] = [] as Array[Image]
-	job["gpu_ms"] = 0.0
+	job["accumulate_wall_ms"] = 0.0
 	job["t0_ms"] = Time.get_ticks_msec()
 	_stage_frame(job)
 	return job
@@ -187,18 +187,16 @@ func _step_job() -> void:
 	var policy: Dictionary = _job["policy"]
 	var spp := int(policy["spp"])
 	var batch := mini(int(policy["batch"]), spp - int(_job["spp_done"]))
-	_job["gpu_ms"] = float(_job["gpu_ms"]) + tracer.accumulate(batch)
+	_job["accumulate_wall_ms"] = float(_job["accumulate_wall_ms"]) + tracer.accumulate(batch)
 	_job["spp_done"] = int(_job["spp_done"]) + batch
 	if int(_job["spp_done"]) < spp:
 		return
 
 	var clip: GemClip = _job["clip"]
 	var t: float = clip.frame_time(int(_job["frame"]))
-	var img := tracer.finalize_print(GemClipBaker.load_house_print(), false,
-		GemClipBaker.frame_exposure(clip, t))
 	var out := int(policy["out"])
-	if out != int(policy["res"]):
-		img.resize(out, out, Image.INTERPOLATE_LANCZOS)
+	var img := tracer.finalize_print(GemClipBaker.load_house_print(), false,
+		GemClipBaker.frame_exposure(clip, t), Vector2i(out, out))
 	(_job["frames"] as Array).append(img)
 	_job["frame"] = int(_job["frame"]) + 1
 	_job["spp_done"] = 0
@@ -215,7 +213,7 @@ func _complete_job() -> void:
 	var rung: int = _job["rung"]
 	var frames: Array = _job["frames"]
 	var meta := {
-		"gpu_ms": _job["gpu_ms"],
+		"accumulate_wall_ms": _job["accumulate_wall_ms"],
 		"wall_ms": Time.get_ticks_msec() - int(_job["t0_ms"]),
 		"spp": _job["policy"]["spp"],
 	}

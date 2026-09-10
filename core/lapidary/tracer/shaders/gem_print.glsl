@@ -31,6 +31,8 @@ layout(push_constant, std430) uniform P {
 	vec4 m0;               // 48  XYZ -> linear sRGB, columns (includes the rig's
 	vec4 m1;               // 64  as-shot white balance: Bradford CAT from the
 	vec4 m2;               // 80  rig's white_kelvin to D65)   -> 96
+	ivec2 source_resolution; // 96 accumulation dimensions; output can be smaller
+	ivec2 padding;           // 104 -> 112
 } pc;
 
 float srgb_encode(float c) {
@@ -74,8 +76,22 @@ float tonescale(float x) {
 void main() {
 	ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
 	if (pix.x >= pc.resolution.x || pix.y >= pc.resolution.y) { return; }
-	vec4 acc = accum[uint(pix.y) * uint(pc.resolution.x) + uint(pix.x)];
-	vec3 xyz = acc.xyz * pc.inv_samples;
+	// Positive area reconstruction of the linear, coverage-associated master.
+	// Resolve before the nonlinear print; a 2x bake is an exact 2x2 box resolve.
+	vec2 scale = vec2(pc.source_resolution) / vec2(pc.resolution);
+	vec2 lo = vec2(pix) * scale;
+	vec2 hi = vec2(pix + 1) * scale;
+	vec4 acc = vec4(0.0);
+	for (int y = int(floor(lo.y)); y < int(ceil(hi.y)); y++) {
+		for (int x = int(floor(lo.x)); x < int(ceil(hi.x)); x++) {
+			vec2 overlap = max(vec2(0.0), min(hi, vec2(x + 1, y + 1)) - max(lo, vec2(x, y)));
+			ivec2 src = clamp(ivec2(x, y), ivec2(0), pc.source_resolution - 1);
+			acc += accum[src.y * pc.source_resolution.x + src.x] * overlap.x * overlap.y;
+		}
+	}
+	acc /= scale.x * scale.y;
+	// Recover conditional radiance before any nonlinear display operation.
+	vec3 xyz = acc.w > 0.0 ? acc.xyz / acc.w : vec3(0.0);
 	float cov = clamp(acc.w * pc.inv_samples, 0.0, 1.0);
 
 	mat3 xyz_to_rgb = mat3(pc.m0.xyz, pc.m1.xyz, pc.m2.xyz);
@@ -97,7 +113,7 @@ void main() {
 			rgb *= tonescale(m) / m;
 		}
 		// Chroma governor in OKLCh: soft ceiling, forbidden neon.
-		vec3 lab = srgb_to_oklab(clamp(rgb, vec3(0.0), vec3(1.0)));
+		vec3 lab = srgb_to_oklab(rgb);
 		float chroma = length(lab.yz);
 		if (chroma > pc.chroma_ceiling) {
 			float over = chroma - pc.chroma_ceiling;

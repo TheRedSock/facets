@@ -96,10 +96,14 @@ env_filter_rad, field_exits, field_grid, row_origin, field_insts, bg_kelvin.
 Scatter-field push constants (48 B): grid_n, field_exits, light_count, inst_count,
 dirs, band_group, env_filter_rad, texel_base, bg (zenith, horizon, below, kelvin).
 
-Print push constants (96 B): resolution, inv_samples, exposure, raw, white_point,
+Print push constants (112 B): output resolution, inv_samples, exposure, raw, white_point,
 contrast, black_point, chroma_ceiling, chroma_soft, highlight_desat, pad, then the
 XYZ→linear-sRGB matrix as three vec4 columns (includes the rig's as-shot white
-balance, see below).
+balance, see below), then source resolution (ivec2) and padding (ivec2).
+The print resolves coverage-associated linear XYZ over each output pixel's source
+footprint, divides XYZ by covered sample weight, then applies the display transform.
+The output is straight sRGB RGBA8. `read_linear_master()` returns associated XYZ
+and coverage as RGBAF without any display transform.
 
 ## Environment
 `env_radiance_ex(dir, wl, rig_yaw, role_mult, fp, with_lights, bg, light_count)`
@@ -126,11 +130,13 @@ bakes pass 1.0.
   The first inclusion surface hit splits deterministically too.
 - Angular footprint `fp` (radians) grows with the orthographic pixel footprint and
   the path's divergence; the environment cones are widened by it.
-- Volume: one sampled scatter event per path (homogeneous milk + cloud primitives,
+- Volume: repeated sampled scatter events per path (homogeneous milk + cloud primitives,
   unified free flight). With `field_exits > 0` the scattered radiance is read from
   the SH scatter field (l ≤ 3, 16 × 25 nm bands, HG convolution `g^l`), and the
   path ends: the field is the whole continuation. `field_exits = 0` keeps the
-  stochastic HG continuation as the reference estimator (physics check). After a
+  stochastic HG continuation with a fresh exponential free flight after each event.
+  The reference includes multiple scattering; the current field remains an
+  approximation under evaluation. After a
   scatter, the environment footprint floor is `env_filter_rad` on both sides.
 - Scatter field pre-pass (`gem_scatter_field.glsl`): per texel of a
   `field_grid³` lattice over `[-1.25, 1.25]³` stone space, `field_dirs` Fibonacci
