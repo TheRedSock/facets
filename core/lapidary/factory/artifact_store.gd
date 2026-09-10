@@ -17,7 +17,22 @@ static func valid_key(key: String) -> bool:
 	return true
 
 func publish(key: String, payload: PackedByteArray, metadata: Dictionary) -> bool:
+	var guard := GemStoreGuard.enter(root, "publish")
+	if guard == null:
+		return false
+	var result := _publish_active(key, payload, metadata)
+	guard.release()
+	return result
+
+func _publish_active(key: String, payload: PackedByteArray, metadata: Dictionary) -> bool:
 	if not valid_key(key) or payload.is_empty() or payload.size() > MAX_BLOB_BYTES:
+		return false
+	var marker_path := root.path_join("store.json")
+	if not FileAccess.file_exists(marker_path):
+		if not atomic_write(marker_path, '{"kind":"lapidary_artifact_store","schema":1}'.to_utf8_buffer()):
+			return false
+	var marker: Variant = JSON.parse_string(FileAccess.get_file_as_string(marker_path))
+	if not marker is Dictionary or marker.get("kind") != "lapidary_artifact_store" or marker.get("schema") != 1:
 		return false
 	var hash := HashingContext.new()
 	hash.start(HashingContext.HASH_SHA256)

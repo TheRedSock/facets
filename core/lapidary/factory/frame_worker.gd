@@ -18,6 +18,14 @@ func release() -> void:
 		tracer = null
 
 func run(job: GemFrameJob, sample_limit := 0) -> Dictionary:
+	var guard := GemStoreGuard.enter(store.root, "render")
+	if guard == null:
+		return _fail("Artifact store is undergoing maintenance")
+	var result := _run_active(job, sample_limit)
+	guard.release()
+	return result
+
+func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 	last_error = ""
 	if job == null or job.stone == null or job.rig == null or job.print_style == null or job.samples < 1 or job.resolution.x < 1 or job.resolution.y < 1 or job.output_size.x < 1 or job.output_size.y < 1:
 		return _fail("Incomplete frame job")

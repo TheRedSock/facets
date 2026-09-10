@@ -17,6 +17,14 @@ func _init(source: GemArtifactStore, destination: String) -> void:
 	output = destination
 
 func pack(clips: Dictionary) -> Dictionary:
+	var guard := GemStoreGuard.enter(store.root, "delivery-pack")
+	if guard == null:
+		return _fail("Artifact store is undergoing maintenance")
+	var result := _pack_active(clips)
+	guard.release()
+	return result
+
+func _pack_active(clips: Dictionary) -> Dictionary:
 	last_error = ""
 	if page_edge < 16 or page_edge > 8192 or page_edge % 4 != 0 or codec not in ["webp_lossless", "bc7", "astc4x4"]:
 		return _fail("Invalid page size or compression profile")

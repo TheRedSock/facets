@@ -9,6 +9,9 @@ param(
     [int]$Resolution = 0,
     [int]$Samples = 0,
     [int]$Page = 512,
+    [ValidateRange(0, 1048576)]
+    [int]$CacheBudgetMiB = 2048,
+    [switch]$SkipCollection,
     [switch]$PlanOnly
 )
 # Generated source bundle/ZIP, resumable store and shipping PCK stay ignored.
@@ -36,3 +39,6 @@ Invoke-GemStage 'prepare' $prepare
 if ($PlanOnly) { exit 0 }
 Invoke-GemStage 'render' @('--path', $projectRoot, '--quit-after', '600', '--script', 'res://tools/gem_frame_worker.gd', '--', '--manifest=res://generated/gem-job-bundle/manifest.json', '--output=res://generated/gemfactory')
 Invoke-GemStage 'pack' @('--headless', '--path', $projectRoot, '--quit-after', '600', '--script', 'res://tools/pack_gem_library.gd', '--', "--codec=$Codec", "--page=$Page")
+if (-not $SkipCollection) {
+    Invoke-GemStage 'collect' @('--headless', '--path', $projectRoot, '--quit-after', '600', '--script', 'res://tools/maintain_gem_store.gd', '--', "--budget-mib=$CacheBudgetMiB", '--apply=true')
+}
