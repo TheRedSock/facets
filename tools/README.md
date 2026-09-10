@@ -48,6 +48,16 @@ angular/millimeter tolerances. Run windowed `tools/optimize_cut.gd -- --stone=qu
 resources, training and held-out metrics, and comparison images under artifacts/.
 The brightness objective is not a cut grade; no candidate is promoted automatically.
 
+Explicit fractures use `GemFractureProfile`: a correlated aperture and shared
+rough mid-surface, clipped into closed material regions. Wall closure creates
+host contact patches and separated pockets. Dimensions are millimeters. These
+are authored statistics, not a fracture-mechanics or healed-inclusion model.
+`condition_showcase.gd -- --high --fracture-only` compares open and contacting
+walls at 256 samples; outputs stay in `artifacts/conditions/aperture/`.
+Automatic fracture grading remains disabled: topology validation alone does not
+establish convincing appearance or acceptable render cost. Meshing regularizes
+near-node sliver contours; admission rejects unresolved degenerate geometry.
+
 Completed farm output stores can be consolidated headlessly with
 `merge_gem_results.gd -- --source=... --destination=... --manifest=...` (repeat
 source for multiple shards). Inspect its dry-run report before `--apply=true`.

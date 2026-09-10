@@ -9,6 +9,7 @@ extends Resource
 @export var half_extent_mm := Vector3(0.8, 0.5, 0.003)
 @export var filling: GemMaterial
 @export var finish: GemSurface = GemSurface.new()
+@export var fracture_profile: GemFractureProfile = GemFractureProfile.new()
 @export var seed := 1
 ## Correlated front and surface variation, not independent primitive placement.
 @export_range(0.0, 1.0) var irregularity := 0.4

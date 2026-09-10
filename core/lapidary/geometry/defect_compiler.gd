@@ -6,9 +6,15 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float)
 	if condition == null or condition.defects.is_empty():
 		return
 	var enabled: Array[GemDefect] = []
+	var geometries: Array[GemMesh] = []
 	for defect in condition.defects:
 		if defect.enabled:
+			var surface := compile(defect, size_mm)
+			if defect.kind == "fracture" and surface.vertices.is_empty():
+				# A fully closed aperture contributes no separate material region.
+				continue
 			enabled.append(defect)
+			geometries.append(surface)
 	if enabled.is_empty():
 		return
 	assert(enabled.size() < GemBoundarySet.MAX_REGIONS, "Too many resolved material regions; use effective media for subpixel populations")
@@ -24,8 +30,9 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float)
 		assert(added, "Invalid host for defect boundaries")
 	var materials: Array[Dictionary] = []
 	var surfaces: Array = compiled.get("surfaces", [GemSurface.new()])
-	for defect in enabled:
-		var surface := compile(defect, size_mm)
+	for index in enabled.size():
+		var defect := enabled[index]
+		var surface := geometries[index]
 		var material_id := -1
 		if defect.filling != null:
 			materials.append(GemMaterialCompiler.compile(defect.filling))
@@ -44,6 +51,8 @@ static func compile(defect: GemDefect, size_mm: float) -> GemMesh:
 	var extent := defect.half_extent_mm
 	if extent.x <= 0.0 or extent.y <= 0.0 or extent.z <= 0.0:
 		return GemMesh.new()
+	if defect.kind == "fracture":
+		return GemFractureCompiler.compile(defect, size_mm)
 	var points := PackedVector2Array()
 	var phase := TAU * sample(defect.seed, 0)
 	var count := defect.radial_segments
@@ -67,8 +76,7 @@ static func compile(defect: GemDefect, size_mm: float) -> GemMesh:
 	var mesh := GemShapeCompiler.loft(points, sections)
 	for index in mesh.vertices.size():
 		var p := mesh.vertices[index]
-		# Shared long-scale corrugation on both fracture walls. Aperture stays
-		# positive; the surfaces close at a common irregular front.
+		# Shared long-scale corrugation of the chip cavity.
 		if defect.kind != "crystal":
 			p.z += defect.irregularity * 0.7 * sin(4.5 * p.x + phase) * sin(3.2 * p.y - phase)
 		mesh.vertices[index] = (defect.center_mm + defect.orientation * (p * extent)) / size_mm

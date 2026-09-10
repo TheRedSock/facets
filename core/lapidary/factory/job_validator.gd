@@ -116,9 +116,6 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 			return "missing defect descriptor"
 		if not defect.enabled:
 			continue
-		count += 1
-		if count >= GemBoundarySet.MAX_REGIONS:
-			return "too many physical defect regions"
 		if defect.kind not in ["fracture", "chip", "crystal"] or not defect.center_mm.is_finite() or not _rotation(defect.orientation):
 			return "invalid defect kind, center, or orientation"
 		for axis in 3:
@@ -128,11 +125,18 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 			return "invalid defect irregularity or tessellation"
 		if defect.finish != null and not defect.finish.validate().is_empty():
 			return "; ".join(defect.finish.validate())
+		if defect.kind == "fracture" and (defect.fracture_profile == null or not defect.fracture_profile.validate().is_empty()):
+			return "fracture needs a valid aperture/contact profile"
 		if defect.filling != null:
 			error = _material(defect.filling, polarized)
 			if not error.is_empty():
 				return "defect filling: " + error
 		var mesh := GemDefectCompiler.compile(defect, stone.size_mm)
+		if defect.kind == "fracture" and mesh.vertices.is_empty():
+			continue # Fully closed, validated aperture: no optical region remains.
+		count += 1
+		if count >= GemBoundarySet.MAX_REGIONS:
+			return "too many physical defect regions"
 		if not mesh.validate().is_empty():
 			return "defect geometry degenerates at the requested physical scale"
 	return ""

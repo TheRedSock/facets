@@ -15,6 +15,7 @@ $stages = @(
 foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_store_transfer', 'test_spectra', 'test_material_inputs', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_crystal_modes', 'test_crystal_interface', 'test_crystal_packet', 'test_crystal_loss', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler', 'test_cut_design')) {
     $stages += @{ Name = $name; Args = @('--headless', '--quit-after', '600', '--script', "res://tests/lapidary/$name.gd") }
 }
+$stages += @{ Name = 'test_fracture'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_fracture.gd') }
 if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
