@@ -198,6 +198,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	_chunk_rows = mini(height, 64)
 
 	var planes := PackedFloat32Array()
+	var plane_facet_ids := PackedInt32Array()
 	var absorb := PackedFloat32Array()
 	var stones := StreamPeerBuffer.new()
 	var triangle_data := PackedByteArray()
@@ -249,6 +250,9 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		if inst.has("analytic_shape"):
 			var shape: Vector4 = inst["analytic_shape"]
 			p = PackedFloat32Array([shape.x, shape.y, shape.z, shape.w, 0, 0, 0, 0])
+		var facet_ids: PackedInt32Array = inst.get("facet_ids", PackedInt32Array())
+		for face in p.size() / 8:
+			plane_facet_ids.append(facet_ids[face] if face < facet_ids.size() else face)
 		var ab: PackedFloat32Array = inst["absorption"]
 		var ab_e: PackedFloat32Array = inst.get("absorption_eray", PackedFloat32Array())
 		assert(ab.size() == 401 and (ab_e.is_empty() or ab_e.size() == 401), "Invalid compiled absorption grid")
@@ -285,7 +289,11 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 		volume_data.resize(12)
 	_free_scene_buffers()
 	_bufs["volume_fields"] = _rd.storage_buffer_create(volume_data.to_byte_array().size(), volume_data.to_byte_array())
-	_bufs["planes"] = _rd.storage_buffer_create(planes.to_byte_array().size(), planes.to_byte_array())
+	var plane_bytes := planes.to_byte_array()
+	for face in plane_facet_ids.size():
+		# Preserve the full signed integer ID; aux.z is a bit-cast storage slot.
+		plane_bytes.encode_s32((face * 8 + 6) * 4, plane_facet_ids[face])
+	_bufs["planes"] = _rd.storage_buffer_create(plane_bytes.size(), plane_bytes)
 	_upload_lighting_buffers()
 	_bufs["absorb"] = _rd.storage_buffer_create(absorb.to_byte_array().size(), absorb.to_byte_array())
 	_bufs["stones"] = _rd.storage_buffer_create(stones.data_array.size(), stones.data_array)
@@ -688,6 +696,51 @@ func read_reconstructed_xyz() -> PackedFloat32Array:
 
 
 ## Reads back accumulated XYZ (normalized) + coverage. For physics tests.
+## Cheap deterministic geometry companions, evaluated independently of SPP,
+## lighting and the optical film. They describe the first physical boundary.
+func geometry_aov(coverage_side := 4) -> GemGeometryAov:
+	if coverage_side not in [1, 2, 4, 8] or not _bufs.has("stones") or width * height * GemGeometryAov.STRIDE > GemArtifactStore.MAX_BLOB_BYTES:
+		push_error("Invalid geometry AOV request or unconfigured tracer")
+		return null
+	if not _pipelines.has("geometry_aov"):
+		if not _compile_shader(SHADER_DIR + "gem_geometry_aov.glsl", "geometry_aov"):
+			return null
+	var output := _rd.storage_buffer_create(width * height * GemGeometryAov.STRIDE)
+	var names := {0: "planes", 1: "lights", 2: "absorb", 3: "accum", 4: "standards", 5: "stones", 6: "insts",
+		11: "triangles", 12: "nodes", 13: "regions", 15: "spectra"}
+	var uniforms: Array[RDUniform] = []
+	for binding: int in names:
+		var uniform := RDUniform.new()
+		uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+		uniform.binding = binding
+		uniform.add_id(_bufs[names[binding]])
+		uniforms.append(uniform)
+	var destination := RDUniform.new()
+	destination.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+	destination.binding = 16
+	destination.add_id(output)
+	uniforms.append(destination)
+	var uniform_set := _rd.uniform_set_create(uniforms, _shaders["geometry_aov"], 0)
+	for row in range(0, height, 8):
+		var push := PackedInt32Array([width, height, _grid.x, _grid.y, _cell.x, _cell.y, coverage_side, row]).to_byte_array()
+		var list := _rd.compute_list_begin()
+		_rd.compute_list_bind_compute_pipeline(list, _pipelines["geometry_aov"])
+		_rd.compute_list_bind_uniform_set(list, uniform_set, 0)
+		_rd.compute_list_set_push_constant(list, push, push.size())
+		_rd.compute_list_dispatch(list, ceili(width / 8.0), 1, 1)
+		_rd.compute_list_end()
+		_rd.submit()
+		_rd.sync()
+	var result := GemGeometryAov.new()
+	result.width = width
+	result.height = height
+	result.coverage_side = coverage_side
+	result.data = _rd.buffer_get_data(output)
+	_rd.free_rid(uniform_set)
+	_rd.free_rid(output)
+	return result
+
+
 func read_xyz() -> PackedFloat32Array:
 	var raw := _rd.buffer_get_data(_bufs["accum"]).to_float32_array()
 	var inv := 1.0 / maxf(1.0, float(samples_accumulated))

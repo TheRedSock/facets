@@ -19,7 +19,7 @@ if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
-    foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'farm_gpu_check', 'library_gpu_check', 'surface_check', 'spectra_gpu_check', 'volume_gpu_check', 'polarization_gpu_check', 'crystal_gpu_check')) {
+    foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'farm_gpu_check', 'library_gpu_check', 'surface_check', 'spectra_gpu_check', 'volume_gpu_check', 'polarization_gpu_check', 'crystal_gpu_check', 'geometry_aov_check')) {
         $stages += @{ Name = $name; Args = @('--quit-after', '600', '--script', "res://tools/$name.gd") }
     }
 }

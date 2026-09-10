@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v13)
+# Lapidary kernel contract (v14)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. All floats
@@ -8,10 +8,40 @@ orthographic camera looks down world −Z; instance quaternions rotate stone→w
 
 ## Geometry and material state
 
-A Plane is two vec4s (32B): outward normal.xyz/offset d, then zone ID/reserved3.
+A Plane is two vec4s (32B): outward normal.xyz/offset d, then zone ID/reserved/
+facet-ID-bits/reserved. The facet ID occupies aux.z as an **int32 bit pattern**;
+read it with `floatBitsToInt`, never a numeric float conversion.
 The host interior obeys dot(n,x)<=d. Zone IDs: 0 table, 1 crown main/star,
 2 upper girdle, 3 girdle, 4 pavilion main, 5 lower girdle, 6 culet, 7 step row.
 They identify cut structure, not surface finish.
+
+## Optional primary geometry companions
+
+`GemTracer.geometry_aov(coverage_side)` runs a separate lazy compute pipeline;
+it does not sample light, change film state or depend on optical SPP/seed. A
+deterministic 1/2/4/8-square subpixel grid estimates primary physical coverage.
+The representative covered sample nearest the pixel center supplies discrete
+geometry; fields and IDs are never averaged across facet boundaries. Sampling
+matches the optical tracer's `pixel + sample - 0.5` center convention.
+
+The geometry pipeline uses existing scene buffers plus binding16 output. Its
+32-byte push block contains ivec2 resolution/grid/cell_px, coverage_side and
+row_origin. Each output record is 48 bytes: vec4 object-position-mm/camera-forward-
+distance-mm; vec4 incident-facing object-normal/coverage; ivec4 instance/facet/
+local-region/global-material. A miss has zero geometry/coverage and IDs=-1.
+Analytic patch facet IDs are negative (-1 dome, -2 girdle, -3 base), disambiguated
+from misses by coverage. Full int32 facet IDs survive BVH and plane packing.
+`physical_boundary` skips boundaries that do not change the active medium, so
+an exposed cavity wall replaces the clipped-away outer surface.
+
+`GemGeometryAov` encodes standalone GAO1 little-endian diagnostics: uint32 magic
+0x314f4147, width, height, coverage_side, raw_length, then Zstd-compressed records.
+Decode bounds dimensions/payload and rejects nonfinite geometry or invalid
+coverage/normal/visibility state. These are optional authoring companions, **not
+automatically shipped game textures**. They describe the first visible boundary,
+not refracted inclusions, internal optical contributions or a simulated grade.
+The portable frame store/pack builder does not yet schedule these companions;
+`tools/export_gem_aov.gd` exports them independently for evaluation/stylizer work.
 
 A Triangle is four vec4s (64B): a/b/c vertices (w reserved), then ivec4
 (facet ID, reserved, reserved, local region ID). BVH Node (48B): vec4 low/high,

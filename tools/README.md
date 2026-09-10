@@ -20,6 +20,12 @@ belong under ignored `artifacts/`; generated delivery libraries belong under
 ignored `generated/`. Use searches that include ignored paths when investigating
 bakes or comparing experiments.
 
+`export_gem_aov.gd -- --stone=quartz --resolution=512 --angle-deg=20 --coverage=4`
+writes typed primary geometry, a normal preview and metadata under `artifacts/aov/`.
+The pass uses no optical samples. Position/depth are millimeters; normals are in
+object space; facet/region/material IDs remain discrete. These optional companions
+are for grading inspection and stylizer development, not automatic game payloads.
+
 Optional independent polarization validation uses an isolated Python environment
 with `tools/reference-requirements.txt`. Pass its Python executable as
 `-ReferencePython <path>` to `check_engine.ps1`; add `-Gpu` to include actual GPU

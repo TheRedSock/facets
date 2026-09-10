@@ -159,20 +159,27 @@ uvec4 cross_region(Stone stone, uvec4 region_state, int triangle, vec3 position,
 // Skip mathematical boundaries that do not change the physical medium.
 // Used for primary coverage and visibility; transport processes each raw event
 // separately so a sampled volume collision preserves the correct region_state set.
-bool physical_hit(Stone stone, vec3 origin, vec3 direction, uvec4 region_state,
-		out float distance, out int triangle) {
+bool physical_boundary(Stone stone, vec3 origin, vec3 direction, uvec4 region_state,
+		out float distance, out int triangle, out uvec4 state_after) {
 	distance = 0.0;
+	state_after=region_state;
 	for (int event = 0; event < 4096; event++) {
 		float segment;
 		if (!boundary_hit(stone, origin, direction, segment, triangle)) { return false; }
 		uvec4 after = cross_region(stone, region_state, triangle, origin + direction * segment, direction);
 		distance += segment;
-		if (region_medium(stone, region_state) != region_medium(stone, after)) { return true; }
+		if (region_medium(stone, region_state) != region_medium(stone, after)) { state_after=after; return true; }
 		region_state = after;
 		origin += direction * (segment + T_EPS * 4.0);
 		distance += T_EPS * 4.0;
 	}
 	return false;
+}
+
+bool physical_hit(Stone stone, vec3 origin, vec3 direction, uvec4 region_state,
+		out float distance, out int triangle) {
+	uvec4 state_after;
+	return physical_boundary(stone,origin,direction,region_state,distance,triangle,state_after);
 }
 
 bool body_entry(Stone stone, vec3 origin, vec3 direction, out float distance, out int surface) {
