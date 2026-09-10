@@ -75,7 +75,7 @@ func _initialize() -> void:
 
 	tracer.release()
 	var sheet: Image = SheetComposer.compose(tiles, 8, true,
-		"HERO STILLS - %d PX - POLICY SPP - HOUSE PRINT - LOOK V%d" % [res, GemCache.LOOK_VERSION],
+		"HERO STILLS - %d PX - POLICY SPP - HOUSE PRINT" % res,
 		[], [])
 	sheet.save_png(ProjectSettings.globalize_path(OUT_DIR + "/hero_sheet.png"))
 	print("  wrote %s/hero_sheet.png + %d stills in %.1f s" % [

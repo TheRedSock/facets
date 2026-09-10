@@ -244,15 +244,15 @@ Used by `SpawnResolver` (tile creation) and `EffectResolver` (merge chains). Bot
 
 ### GemForge
 
-Launcher/cache/manifest for gem visuals (`autoloads/gem_forge.gd`). Owns the GPU tracer instance and background clip baking. Key API:
+Read-only game delivery service (`autoloads/gem_forge.gd`). It mounts the generated `gem-assets.pck`, reads library metadata, and uploads bounded texture pages on demand. No runtime optical baking.
 
-- `get_clip(tile_id, clip_id) -> Dictionary` — cached authored clip frames (empty if not baked yet)
-- `ensure_required(tile_ids)` — priority-bakes the required-now set (run start), rest fills in the background
-- `get_placeholder_still(tile_id)` — synchronous single INTERACT-rung frame while clips bake
-- `cold_start_report()` — timing telemetry
-- `clip_ready(tile_id, clip_id)` signal — consumers upgrade visuals as bakes land
+- `get_clip(tile_id, clip_id)` — frame count, fps and loop metadata only.
+- `get_frame(tile_id, clip_id, index)` — trimmed AtlasTexture preserving the original canvas size.
+- `ensure_required(tile_ids)` — warms the actual run's idle pages; animation pages remain lazy.
+- `delivery_report()` — metadata time, page loads and cache ownership bytes.
+- `open_library(path)` / `library_changed` — explicit library replacement for viewers/tools.
 
-Cache on disk keyed by stone fingerprint + clip id + rig + print + `look_version`; `data/lapidary/manifest.json` is the authored-catalog index. Requires a windowed process (GPU); in `--headless` it degrades to placeholder colours.
+Build with `tools/build_gem_assets.ps1`. Source jobs, resumable masters and delivery files stay ignored under `generated/`. Copy `generated/gem-assets.pck` beside an exported desktop executable. Project settings `lapidary/delivery/pack` and `lapidary/delivery/library` can select another pack/library. The PCK contains only the manifest's referenced pages; no optics, masters, checkpoints or stale pages. Missing assets use the debug tier tint.
 
 ---
 
@@ -272,9 +272,8 @@ The engine is being rebuilt under explicit user authorization (2026-09-10); earl
 
 ### TileView Visual Priority
 
-1. GemForge authored clip (idle still; "turn" oneshot on upgrade)
-2. GemForge placeholder still (synchronous INTERACT render)
-3. Coloured rectangle via `TileRegistry.get_tier_color` (headless / no data)
+1. Generated delivery clip (idle still; "turn" oneshot on upgrade), loaded by page.
+2. Coloured rectangle via `TileRegistry.get_tier_color` when the requested asset is absent.
 
 ### GPU/Headless Constraint
 
@@ -306,7 +305,7 @@ godot --headless --script tests/test_rng_cross_platform.gd          # Cross-plat
 godot --headless --script tests/lapidary/test_cut_compiler.gd       # Cut language -> hulls (30 cuts)
 godot --headless --script tests/lapidary/test_species_data.gd       # Species/chromophore/grade/stone data
 godot --headless --script tests/lapidary/test_pleochroism.gd        # Optic axis + GIA dichroism mix (CPU)
-godot --headless --script tests/lapidary/test_clips.gd              # Clip resources + cache keys
+godot --headless --script tests/lapidary/test_clips.gd              # Animation sampling + service contract
 godot --headless --script tests/lapidary/test_board_consumer.gd     # TileView/GemForge contract
 ```
 
@@ -362,7 +361,7 @@ Designed but excluded from current scaffold. See `plans/deferred-systems-referen
 | Quality rung policy | `core/lapidary/tracer/rung.gd` — `GemRung.TABLE` |
 | Lighting rigs | `data/lapidary/rigs/*.tres` + `core/lapidary/lighting/rig_compiler.gd`; judge with `tools/rig_ab_check.gd`, design from `tools/return_sweep.gd` |
 | Named clip animations | `GemClip` in `data/lapidary/clips/` + `core/lapidary/clips/clip_baker.gd` |
-| Clip cache / manifest | `core/lapidary/clips/gem_cache.gd` / `gem_manifest.gd`, `autoloads/gem_forge.gd` |
+| Asset build / delivery | `core/lapidary/factory/`, `tools/build_gem_assets.ps1`, `autoloads/gem_forge.gd` |
 | Atelier preview/scrub | `scenes/design/gem_atelier.tscn` |
 | Evaluation sheets | `tools/eval_sheets.gd` -> `artifacts/eval/` |
 | Merge behavior (4/5-match) | `core/board/effect_planner.gd` — `_plan_match_4()`, `_plan_match_5_plus()` |
@@ -386,3 +385,8 @@ Designed but excluded from current scaffold. See `plans/deferred-systems-referen
 
 ### Analytic curved host update
 Round/oval cabochons now use `GemQuadric`/analytic GLSL intersections, including hybrid mesh cavities in the same host. This removes curved highlight tessellation for those profiles. Camera origins derive from geometry bounds. Other curved outlines remain tessellation-limited.
+
+### Asset factory and delivery
+`GemFramePlan` expands named animations into explicit poses and light samples; optical masters deduplicate independently of exposure, print and delivery resolution. `GemJobBundle` creates a minimal standalone GPU worker project/ZIP with exact binary resource inputs. `GemFrameWorker` resumes raw estimator checkpoints and reprints compressed associated-XYZ masters. Master-grouped shard jobs can run on separate workers; GPU environment and Godot version are recorded, not assumed portable to headless Vulkan.
+
+`GemPagePacker` trims and pixel-deduplicates frames, preserves canvas offsets, pads boundaries and packs bounded specimen pages. Lossless WebP is the default. BC7/ASTC are explicit platform profiles with per-frame black/white-composited RGB and alpha error gates; the loader rejects unsupported formats. A low error over empty atlas space is insufficient. `GemAssetLibrary` validates all references/dimensions/checksums, loads pages selectively, and bounds LRU ownership (active view references can exceed that cache budget). `tools/library_gpu_check.gd` tests compression, PCK roundtrip, selective loading and actual TileView playback.

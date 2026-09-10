@@ -3,10 +3,8 @@ extends Control
 
 ## Renders one gem tile from authored clips served by the GemForge autoload.
 ##
-## Visual priority:
-##   1. Clip strip from GemForge (idle still; "turn" oneshot on upgrade)
-##   2. GemForge placeholder still (synchronous INTERACT render)
-##   3. ColorRect tinted via TileRegistry.get_tier_color (headless / no data)
+## Delivery pages come from the offline asset build. Missing assets use the
+## debug tier tint; the game never invokes the optical renderer.
 ##
 ## BoardScene owns all position/scale/modulate animation via Control tweens;
 ## this node only decides WHAT the tile draws, never how the board moves it.
@@ -26,7 +24,6 @@ var tier: int = 0
 
 var _background: ColorRect
 var _clip_rect: TextureRect
-var _frame_atlas: AtlasTexture
 ## GemForge autoload, resolved by path: a compile-time identifier would break
 ## this script in --script tool mode and headless tests, where the analyzer
 ## has no autoload map. Null when the forge is absent (fallback visuals).
@@ -39,7 +36,6 @@ var _clip_id: StringName = &""
 var _frames := 0
 var _fps := 1.0
 var _loop := false
-var _frame_size := Vector2i.ZERO
 var _frame := 0
 var _elapsed := 0.0
 
@@ -54,7 +50,6 @@ func _ready() -> void:
 	_background.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_background)
 
-	_frame_atlas = AtlasTexture.new()
 	_clip_rect = TextureRect.new()
 	_clip_rect.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	_clip_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -69,15 +64,15 @@ func _ready() -> void:
 	resized.connect(_on_resized)
 	set_process(false)
 	_forge = get_node_or_null("/root/GemForge")
-	if _forge != null and not _forge.clip_ready.is_connected(_on_clip_ready):
-		_forge.clip_ready.connect(_on_clip_ready)
+	if _forge != null and not _forge.library_changed.is_connected(_on_library_changed):
+		_forge.library_changed.connect(_on_library_changed)
 
 	_show_idle_or_fallback()
 
 
 func _exit_tree() -> void:
-	if _forge != null and _forge.clip_ready.is_connected(_on_clip_ready):
-		_forge.clip_ready.disconnect(_on_clip_ready)
+	if _forge != null and _forge.library_changed.is_connected(_on_library_changed):
+		_forge.library_changed.disconnect(_on_library_changed)
 
 
 func configure(tile: TileState, new_cell: Vector2i) -> void:
@@ -144,8 +139,11 @@ func _process(delta: float) -> void:
 			return
 	if next_frame != _frame:
 		_frame = next_frame
-		_frame_atlas.region = Rect2(
-			_frame * _frame_size.x, 0, _frame_size.x, _frame_size.y)
+		var texture: AtlasTexture = _forge.get_frame(tile_id, _clip_id, _frame)
+		if texture == null:
+			_show_tier_color()
+			return
+		_clip_rect.texture = texture
 
 
 # ---- Visual state ----
@@ -157,37 +155,24 @@ func _show_idle_or_fallback() -> void:
 		if not idle.is_empty():
 			_apply_clip(idle, IDLE_CLIP)
 			return
-		var still: ImageTexture = _forge.get_placeholder_still(tile_id)
-		if still != null:
-			_show_still(still)
-			return
 	_show_tier_color()
 
 
 func _apply_clip(clip: Dictionary, clip_id: StringName) -> void:
+	var texture: AtlasTexture = _forge.get_frame(tile_id, clip_id, 0)
+	if texture == null:
+		_show_tier_color()
+		return
 	_clip_id = clip_id
 	_frames = int(clip["frames"])
 	_fps = maxf(float(clip["fps"]), 0.001)
 	_loop = bool(clip["loop"])
-	_frame_size = clip["frame_size"]
 	_frame = 0
 	_elapsed = 0.0
-	_frame_atlas.atlas = clip["texture"]
-	_frame_atlas.region = Rect2(0, 0, _frame_size.x, _frame_size.y)
-	_clip_rect.texture = _frame_atlas
+	_clip_rect.texture = texture
 	_clip_rect.visible = true
 	_background.visible = false
 	set_process(_frames > 1)
-
-
-func _show_still(still: Texture2D) -> void:
-	_clip_id = &""
-	_frames = 1
-	_loop = false
-	set_process(false)
-	_clip_rect.texture = still
-	_clip_rect.visible = true
-	_background.visible = false
 
 
 func _show_tier_color() -> void:
@@ -201,15 +186,10 @@ func _show_tier_color() -> void:
 	_background.visible = true
 
 
-## Upgrades a placeholder/ColorRect visual once the background bake lands.
-func _on_clip_ready(ready_tile_id: StringName, ready_clip_id: StringName) -> void:
-	if not visible or ready_tile_id != tile_id or ready_clip_id != IDLE_CLIP:
-		return
-	if _clip_id == IDLE_CLIP:
-		return
-	if is_processing() and not _loop:
-		return # active oneshot returns to idle on its own completion
-	_show_idle_or_fallback()
+## Reloading an asset library resets playback against the new catalog.
+func _on_library_changed() -> void:
+	if is_inside_tree():
+		_show_idle_or_fallback()
 
 
 func _on_resized() -> void:

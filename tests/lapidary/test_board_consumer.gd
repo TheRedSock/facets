@@ -134,7 +134,7 @@ func _test_cached_clip_path(forge: Node, _registry: Node) -> void:
 	print("[served clip path]")
 	var served: Dictionary = forge.get_clip(&"quartz", &"idle")
 	if served.is_empty():
-		print("  SKIP served clips (no packaged gemcache — run tools/package_clips.gd)")
+		print("  SKIP served clips (no delivery library — run tools/build_gem_assets.ps1)")
 		return
 	var view: TileView = (load(TILE_VIEW_SCENE) as PackedScene).instantiate()
 	root.add_child(view)
@@ -144,7 +144,7 @@ func _test_cached_clip_path(forge: Node, _registry: Node) -> void:
 	_check(not view.is_processing(), "1-frame idle does not process per-frame")
 	var turn_served: Dictionary = forge.get_clip(&"quartz", &"turn")
 	if turn_served.is_empty():
-		print("  SKIP turn oneshot (no packaged 360 turn cache)")
+		print("  SKIP turn oneshot (no generated turn animation)")
 	else:
 		view.play_clip(&"turn")
 		_check(view.is_processing(), "turn oneshot starts frame advancing")

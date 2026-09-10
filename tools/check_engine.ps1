@@ -22,7 +22,7 @@ foreach ($check in $checks) {
     }
 }
 if ($Gpu) {
-  foreach ($check in @('foundation_gpu_check', 'factory_gpu_check')) {
+  foreach ($check in @('foundation_gpu_check', 'factory_gpu_check', 'library_gpu_check')) {
     $output = & $Godot --path $projectRoot --quit-after 600 --script "res://tools/$check.gd" 2>&1
     $code = $LASTEXITCODE
     $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot "$check.log")

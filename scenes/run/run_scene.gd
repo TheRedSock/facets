@@ -115,8 +115,7 @@ func _on_back_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn")
 
 
-## Queues background baking for any of the run's gems whose clips are not
-## cached yet. GemForge is lazy and non-blocking; cache hits are skipped.
+## Prefetches idle delivery pages for the run. Animation pages load on demand.
 ## Resolved by path, not identifier: compile-time autoload identifiers break
 ## --script tool mode and headless tests.
 func _ensure_forge_clips() -> void:

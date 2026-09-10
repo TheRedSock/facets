@@ -6,8 +6,6 @@ extends SceneTree
 ## Run: godot --headless --script tests/lapidary/test_clips.gd
 
 const ClipBakerScript := preload("res://core/lapidary/clips/clip_baker.gd")
-const CacheScript := preload("res://core/lapidary/clips/gem_cache.gd")
-const ManifestScript := preload("res://core/lapidary/clips/gem_manifest.gd")
 const TracerScript := preload("res://core/lapidary/tracer/gem_tracer.gd")
 
 var _pass := 0
@@ -18,9 +16,6 @@ func _init() -> void:
 	print("\n=== Lapidary clip delivery tests ===\n")
 	_test_clip_frame_math()
 	_test_baker_sample_math()
-	_test_cache_keys()
-	_test_manifest()
-	_test_strip_roundtrip()
 	_test_forge_service()
 	_test_gpu_smoke()
 	print("\n%d passed, %d failed" % [_pass, _fail])
@@ -135,188 +130,14 @@ func _test_baker_sample_math() -> void:
 	_check(lights.size() % 8 == 0 and lights.size() / 8 >= 1, "gameplay_studio packs >= 1 light")
 
 
-# ------------------------------------------------------------------ cache keys
-
-func _test_cache_keys() -> void:
-	print("[cache keys]")
-	var stone_a := _make_stone(1)
-	var stone_b := _make_stone(1)
-	var stone_c := _make_stone(2)
-	var clip := _make_clip(&"keytest")
-
-	var key_a: String = CacheScript.cache_key(stone_a, clip, GemRung.CLIP_BAKE)
-	var key_b: String = CacheScript.cache_key(stone_b, clip, GemRung.CLIP_BAKE)
-	_check(key_a == key_b, "identical stone+clip+rung -> identical key")
-	_check(key_a != CacheScript.cache_key(stone_c, clip, GemRung.CLIP_BAKE),
-		"stone seed change -> new key")
-	_check(key_a != CacheScript.cache_key(stone_a, clip, GemRung.INTERACT),
-		"rung change -> new key")
-	_check(key_a.ends_with("@clip_bake"), "key carries rung name")
-
-	var clip_changed := _make_clip(&"keytest", 2.0)
-	_check(key_a != CacheScript.cache_key(stone_a, clip_changed, GemRung.CLIP_BAKE),
-		"clip duration change -> new key (fingerprint)")
-
-	var clip_ease := _make_clip(&"keytest")
-	clip_ease.easing = Curve.new()
-	clip_ease.easing.add_point(Vector2(0.0, 0.0))
-	clip_ease.easing.add_point(Vector2(1.0, 1.0))
-	_check(key_a != CacheScript.cache_key(stone_a, clip_ease, GemRung.CLIP_BAKE),
-		"clip easing change -> new key (fingerprint)")
-
-	var v1: String = CacheScript.versioned_key(stone_a, clip, GemRung.CLIP_BAKE, 1)
-	var v2: String = CacheScript.versioned_key(stone_a, clip, GemRung.CLIP_BAKE, 2)
-	_check(v1 != v2 and v1.begins_with("v1/") and v2.begins_with("v2/"),
-		"look_version bump -> new versioned key")
-
-
-# ------------------------------------------------------------------ manifest
-
-func _test_manifest() -> void:
-	print("[manifest]")
-	var shuffled := """
-	{"version": 1, "entries": [
-		{"stone_id": "ruby", "clip_id": "flash", "rung": "clip_bake", "priority": "later"},
-		{"stone_id": "quartz", "clip_id": "idle", "rung": "clip_bake", "priority": "required_now"},
-		{"stone_id": "ruby", "clip_id": "turn", "rung": "interact", "priority": "soon"},
-		{"stone_id": "ruby", "clip_id": "idle", "rung": "clip_bake", "priority": "required_now"}
-	]}
-	"""
-	var m: GemManifest = ManifestScript.from_json_text(shuffled)
-	_check(m.size() == 4, "inline manifest parses 4 entries")
-	var order: Array[Dictionary] = m.entries()
-	_check(order[0]["priority"] == ManifestScript.PRIORITY_REQUIRED_NOW
-		and order[1]["priority"] == ManifestScript.PRIORITY_REQUIRED_NOW
-		and order[2]["priority"] == ManifestScript.PRIORITY_SOON
-		and order[3]["priority"] == ManifestScript.PRIORITY_LATER,
-		"entries sorted required_now -> soon -> later")
-	_check(order[0]["stone_id"] == &"quartz" and order[1]["stone_id"] == &"ruby",
-		"stable file order within a priority class")
-	_check(m.required_now(["ruby"]).size() == 1, "required_now filters by tile set")
-	_check(m.required_now(["unknown_gem"]).is_empty(), "required_now: unknown tile -> empty")
-	_check(m.rung_for(&"ruby", &"turn") == GemRung.INTERACT, "rung_for reads catalog rung")
-	_check(m.rung_for(&"ruby", &"missing") == GemRung.CLIP_BAKE, "rung_for fallback")
-
-	var live: GemManifest = ManifestScript.load_default()
-	_check(live.size() == 48, "shipped manifest has 48 entries (16 stones x 3 clips)")
-	var ladder := ["quartz", "amethyst", "peridot", "topaz", "sapphire", "emerald", "ruby", "diamond"]
-	_check(live.required_now(ladder).size() == 8, "shipped manifest: 8 required_now idles (main ladder)")
-	var alternate := ["fluorite", "smoky_quartz", "tourmaline", "rhodolite",
-		"aquamarine", "alexandrite", "painite", "blue_garnet"]
-	_check(live.required_now(alternate).size() == 8, "shipped manifest: 8 required_now idles (alternate ladder)")
-	for e: Dictionary in live.required_now(ladder):
-		if e["clip_id"] != &"idle" or e["rung"] != GemRung.CLIP_BAKE:
-			_check(false, "required_now entries are idle@clip_bake")
-			return
-	_check(true, "required_now entries are idle@clip_bake")
-	_check(live.required_now(["quartz", "ruby"]).size() == 2,
-		"shipped manifest filters to active tile set")
-	var soon_n := 0
-	var later_n := 0
-	for e: Dictionary in live.entries():
-		if e["priority"] == ManifestScript.PRIORITY_SOON:
-			soon_n += 1
-			if e["clip_id"] != &"turn":
-				_check(false, "soon entries are turn")
-				return
-		elif e["priority"] == ManifestScript.PRIORITY_LATER:
-			later_n += 1
-			if e["clip_id"] != &"flash":
-				_check(false, "later entries are flash")
-				return
-	_check(soon_n == 16, "shipped manifest: 16 soon turns")
-	_check(later_n == 16, "shipped manifest: 16 later flashes")
-
-
-# ------------------------------------------------------------------ strip roundtrip
-
-func _test_strip_roundtrip() -> void:
-	print("[strip/sidecar roundtrip]")
-	var stone := _make_stone(99)
-	var clip := _make_clip(&"roundtrip", 1.0, 2.0) # 2 frames
-	_check(clip.frame_count() == 2, "synthetic clip has 2 frames")
-
-	var f0 := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
-	f0.fill(Color(1, 0, 0, 1))
-	var f1 := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
-	f1.fill(Color(0, 1, 0, 0.5))
-	var frames := [f0, f1]
-
-	CacheScript.invalidate(stone, clip, GemRung.CLIP_BAKE)
-	_check(CacheScript.read(stone, clip, GemRung.CLIP_BAKE).is_empty(), "cold cache misses")
-	_check(CacheScript.write(stone, clip, GemRung.CLIP_BAKE, frames, {"synthetic": true}),
-		"write strip + sidecar to user://")
-	_check(CacheScript.has(stone, clip, GemRung.CLIP_BAKE), "has() sees the artifact")
-
-	var cached: Dictionary = CacheScript.read(stone, clip, GemRung.CLIP_BAKE)
-	_check(not cached.is_empty(), "read returns the artifact")
-	if cached.is_empty():
-		return
-	_check(int(cached["frames"]) == 2 and is_equal_approx(float(cached["fps"]), 2.0)
-		and bool(cached["loop"]) == false, "sidecar playback fields roundtrip")
-	_check(int(cached["frame_w"]) == 4 and int(cached["frame_h"]) == 4
-		and (cached["strip"] as Image).get_width() == 8, "strip is frames*w x h")
-	_check((cached["meta"] as Dictionary).get("synthetic", false) == true, "meta roundtrips")
-
-	var sliced: Array[Image] = CacheScript.slice_frames(cached["strip"], 4, 4, 2)
-	var p0 := sliced[0].get_pixel(1, 1)
-	var p1 := sliced[1].get_pixel(2, 2)
-	_check(p0.r > 0.99 and p0.g < 0.01 and p0.a > 0.99, "frame 0 pixels survive (red)")
-	_check(p1.g > 0.99 and p1.r < 0.01 and absf(p1.a - 0.5) < 0.01,
-		"frame 1 pixels + alpha survive (lossless)")
-
-	# Invalidation: any fingerprint change makes the same path unreadable.
-	var edited := _make_clip(&"roundtrip", 1.5, 2.0)
-	_check(CacheScript.read(stone, edited, GemRung.CLIP_BAKE).is_empty(),
-		"clip fingerprint change invalidates (key mismatch -> miss)")
-	_check(not CacheScript.has(stone, edited, GemRung.CLIP_BAKE), "has() honours invalidation")
-
-	CacheScript.invalidate(stone, clip, GemRung.CLIP_BAKE)
-	_check(CacheScript.read(stone, clip, GemRung.CLIP_BAKE).is_empty(), "invalidate deletes user:// files")
-
-
 # ------------------------------------------------------------------ forge service
 
-## GemForge is not autoload-registered yet; instantiate the script directly.
-## Serving from disk cache is CPU-only and must work headless too; the
-## placeholder path is GPU and only asserted windowed.
 func _test_forge_service() -> void:
-	print("[forge service]")
+	print("[delivery service]")
 	var forge: Node = (load("res://autoloads/gem_forge.gd") as GDScript).new()
-	var headless := DisplayServer.get_name() == "headless"
-
-	var missing: Dictionary = forge.get_clip(&"no_such_gem", &"idle")
-	_check(missing.is_empty(), "get_clip: missing stone -> {}")
-	_check(forge.get_clip(&"quartz", &"no_such_clip").is_empty(), "get_clip: missing clip -> {}")
-
-	# Serving depends on the packaged dev cache; skip gracefully when a fresh
-	# checkout has not run tools/package_clips.gd yet.
-	var served: Dictionary = forge.get_clip(&"quartz", &"idle")
-	if served.is_empty():
-		print("  SKIP forge serving (no packaged cache — run tools/package_clips.gd)")
-	else:
-		_check(served["texture"] is ImageTexture and int(served["frames"]) == 1
-			and served["frame_size"] == Vector2i(112, 112),
-			"get_clip serves packaged idle (1 frame @ 112px)")
-		var again: Dictionary = forge.get_clip(&"quartz", &"idle")
-		_check(again["texture"] == served["texture"], "get_clip memory-caches the served strip")
-
-		var ladder := ["quartz", "amethyst", "peridot", "topaz", "sapphire", "emerald", "ruby", "diamond"]
-		forge.ensure_required(ladder)
-		var report: Dictionary = forge.cold_start_report()
-		_check(int(report.get("pending", -1)) == 0 and int(report["clips_baked"]) == 0,
-			"ensure_required skips full cache (nothing queued)")
-
-	if headless:
-		_check(forge.get_placeholder_still(&"quartz") == null,
-			"headless: placeholder degrades to null")
-	else:
-		var still: ImageTexture = forge.get_placeholder_still(&"quartz")
-		if still == null:
-			print("  SKIP placeholder (quartz stone resource not landed)")
-		else:
-			_check(still.get_width() == 128, "placeholder still is a 128px INTERACT render")
-			_check(forge.get_placeholder_still(&"quartz") == still, "placeholder memory-cached")
+	_check(forge.get_clip(&"no_such_gem", &"idle").is_empty(), "missing specimen -> empty metadata")
+	_check(forge.get_frame(&"no_such_gem", &"idle", 0) == null, "missing frame -> null")
+	_check(not forge.is_processing(), "delivery service has no runtime render loop")
 	forge.free()
 
 
