@@ -1,6 +1,7 @@
 extends SceneTree
 ## Windowed worker, including inside a generated standalone job bundle.
 ## --manifest=... --output=... --shard=0 --shards=1 --sample-limit=0
+## --outputs=all|optical|geometry (geometry companions must be requested in bundle)
 func _initialize() -> void:
 	var args := {}
 	for argument in OS.get_cmdline_user_args():
@@ -25,12 +26,21 @@ func _initialize() -> void:
 		return
 	var shard := int(args.get("shard", 0))
 	var shards := int(args.get("shards", 1))
+	var outputs: String = args.get("outputs", "all")
+	var geometry: Variant = manifest.get("geometry", {})
+	var geometry_error := GemGeometryPlan.references_error(manifest)
+	if outputs not in ["all", "optical", "geometry"] or not geometry_error.is_empty() or (outputs == "geometry" and geometry.is_empty()):
+		printerr("Invalid output selection or missing/invalid geometry requests: " + geometry_error)
+		quit(1)
+		return
 	if shards < 1 or shard < 0 or shard >= shards:
 		printerr("Invalid shard selection")
 		quit(1)
 		return
 	var worker := GemFrameWorker.new(args.get("output", "res://output"))
 	var keys: Array = manifest["jobs"].keys()
+	if outputs == "geometry":
+		keys.clear()
 	keys.sort_custom(func(a: String, b: String) -> bool:
 		var ma: String = manifest["jobs"][a]["master"]
 		var mb: String = manifest["jobs"][b]["master"]
@@ -63,4 +73,40 @@ func _initialize() -> void:
 		else:
 			print(JSON.stringify({"job": key, "status": result.get("status", "complete"), "counters": worker.counters}))
 	worker.release()
+	if outputs != "optical":
+		failures += _geometry(geometry, base, args.get("output", "res://output"), shard, shards)
 	quit(1 if failures else 0)
+
+func _geometry(records: Dictionary, base: String, output: String, shard: int, shards: int) -> int:
+	var worker := GemGeometryWorker.new(output)
+	var failures := 0
+	var keys := records.keys()
+	keys.sort()
+	for key: String in keys:
+		if key.left(8).hex_to_int() % shards != shard:
+			continue
+		var record: Dictionary = records[key]
+		var relative := str(record.get("path", ""))
+		if relative != "jobs/" + relative.get_file() or relative.get_extension() != "res" or not GemArtifactStore.valid_key(relative.get_file().get_basename()):
+			printerr("Invalid geometry job path")
+			failures += 1
+			continue
+		var path := base.path_join(relative)
+		if FileAccess.get_sha256(path) != record.get("sha256"):
+			printerr("Geometry input checksum mismatch")
+			failures += 1
+			continue
+		var job := load(path) as GemFrameJob
+		var side := int(record.coverage_side)
+		if not GemGeometryPlan.validate(job, side).is_empty() or job.resolution != Vector2i(int(record.width), int(record.height)) or GemGeometryPlan.key(job, side) != key:
+			printerr("Geometry request or identity mismatch")
+			failures += 1
+			continue
+		var result := worker.run(job, side)
+		if result.is_empty():
+			printerr(worker.last_error)
+			failures += 1
+		else:
+			print(JSON.stringify({"geometry": key, "status": result.status, "counters": worker.counters}))
+	worker.release()
+	return failures

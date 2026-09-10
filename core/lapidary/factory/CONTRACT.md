@@ -33,6 +33,15 @@ the validated transfer protocol below. Linux farm deployment is not yet validate
 
 ## Retention and concurrency
 
+Job bundle output is generated and owned, marked by `bundle.json`. First creation
+requires an empty unlinked directory; recognized older bundle manifests can be
+adopted. Rebuilding a stopped bundle removes obsolete generated code/data inside
+its managed source subtrees and hash-named job resources. Unrelated notes remain.
+Linked paths are rejected before writing or pruning. This prevents deleted engine
+modules from contaminating the standalone source fingerprint. ZIP archives still
+use only the explicit current manifest whitelist. Do not rebuild a bundle while
+workers are reading it; deploy a separate immutable bundle directory per run.
+
 `GemJobValidator.validate` is CPU-only admission shared by workers and portable
 bundle creation. It checks finite physical inputs, supported optical modes,
 spectral normalization, camera transforms, procedural topology, known quality
@@ -104,7 +113,9 @@ pass `--initialize-destination=true`. Initialization refuses existing unrelated 
 
 Consolidation takes nonblocking exclusive locks on all stores, verifies marked
 unlinked paths, checks every requested checksum and decoded image format/dimension,
-and admits only manifest-listed completed displays and their optical masters.
+and admits only manifest-listed completed displays, optical masters and geometry
+companions. Geometry validates the decoded GAO1 dimensions, coverage and finite
+typed records as well as its checksum.
 Source JSON cannot supply executable resources or arbitrary destination paths.
 Missing results are reported so incomplete shards can be retried. Checkpoints and
 unrequested recipes remain in their original attempt store.
@@ -120,3 +131,29 @@ and retry is idempotent. Only one payload is loaded at a time during copying.
 
 Distributed duplicate-work scheduling and expiring leases require an external
 coordinator; the local protocol never steals a slow or interrupted process's lock.
+
+## Optional primary geometry companions
+
+`GemJobBundle.write(..., geometry_coverage_side)` accepts 0 (off), 1, 2, 4 or 8.
+The additive `geometry` manifest table contains independent recipe keys, dimensions,
+coverage and a checksum-verified binary job input. Each optical job's optional
+`geometry` reference points into that table. Missing references are rejected before
+generation, retention or transfer. JSON integer-valued numbers are normalized only
+after validation. Workers can select `--outputs=all|optical|geometry`.
+
+`GemGeometryPlan` identities include shape, cut, size, workmanship, ordered enabled
+defect geometry, filled-region presence, canonical camera pose, framing, dimensions
+and coverage. Lighting, optical coefficients, grade labels, sample count and print
+are excluded. The optical source digest and geometry plan/worker source hashes are
+included so changes to shared intersections or companion generation retire them.
+Geometry records are independently
+sharded by their key; duplicate simultaneous work is still not coordinated.
+
+`GemGeometryWorker` generates GAO1 companions with no optical samples, validates
+cached payloads before use, and can serve cache hits without a RenderingDevice.
+Requested companions are pinned by retention; unrequested companions are disposable.
+They carry object-space normals/positions, millimeter depth, coverage and discrete
+IDs for the primary visible physical boundary. They do not describe refracted
+inclusion visibility or separate optical contributions. A future stylizer must use
+the optical master for those appearances rather than painting internal defects from
+primary-surface IDs. Companions are authoring data and never automatically ship.

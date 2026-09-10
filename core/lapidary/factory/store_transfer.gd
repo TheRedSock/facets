@@ -114,6 +114,12 @@ static func _expected(manifest: Dictionary) -> Dictionary:
 	if manifest.get("schema") != 1 or not manifest.get("jobs") is Dictionary or not GemArtifactStore.valid_key(str(manifest.get("engine", ""))):
 		return {}
 	var expected := {}
+	var geometry: Variant = manifest.get("geometry", {})
+	if not GemGeometryPlan.references_error(manifest).is_empty():
+		return {}
+	for key: String in geometry:
+		expected[key] = {"kind": "primary_geometry", "width": geometry[key].width,
+			"height": geometry[key].height, "coverage_side": geometry[key].coverage_side}
 	for key: Variant in manifest.jobs:
 		if not key is String or not GemArtifactStore.valid_key(key) or not manifest.jobs[key] is Dictionary:
 			return {}
@@ -129,6 +135,8 @@ static func _expected(manifest: Dictionary) -> Dictionary:
 	return expected
 
 static func _validate_payload(record: Dictionary, expected: Dictionary, engine: String) -> String:
+	if expected.kind == "primary_geometry":
+		return GemGeometryPlan.payload_error(record, expected, engine)
 	var metadata: Dictionary = record.metadata
 	if metadata.get("kind") != expected.kind:
 		return "unexpected artifact kind"

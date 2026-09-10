@@ -40,10 +40,16 @@ func _initialize() -> void:
 		printerr("No matching stone/clip jobs")
 		quit(1)
 		return
-	var manifest := GemJobBundle.write(output, jobs, clips)
+	var geometry_value := str(args.get("geometry-coverage", "0"))
+	if not geometry_value.is_valid_int():
+		printerr("Geometry coverage must be an integer: 0, 1, 2, 4 or 8")
+		quit(1)
+		return
+	var geometry_side := int(geometry_value)
+	var manifest := GemJobBundle.write(output, jobs, clips, geometry_side)
 	if manifest.is_empty() or GemJobBundle.archive(output, output + ".zip") != OK:
 		printerr("Failed to write portable job bundle")
 		quit(1)
 		return
-	print("Portable jobs: ", output, " ", JSON.stringify(manifest["estimate"]))
+	print("Portable jobs: ", output, " ", JSON.stringify(manifest["estimate"]), " geometry companions: ", manifest.geometry.size())
 	quit()

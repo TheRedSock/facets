@@ -64,6 +64,11 @@ func _collect_locked(base: String, manifests: Array, budget: int, apply: bool) -
 	for manifest: Variant in manifests:
 		if not manifest is Dictionary or manifest.get("schema") != 1 or not manifest.get("jobs") is Dictionary:
 			return _fail("Invalid retention manifest")
+		var geometry: Variant = manifest.get("geometry", {})
+		if not GemGeometryPlan.references_error(manifest).is_empty():
+			return _fail("Invalid retained geometry requests")
+		for key: String in geometry:
+			required[key] = true
 		for key: String in manifest["jobs"]:
 			var job: Variant = manifest["jobs"][key]
 			if not job is Dictionary or not GemArtifactStore.valid_key(key) or not GemArtifactStore.valid_key(str(job.get("master", ""))):

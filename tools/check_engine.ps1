@@ -17,10 +17,12 @@ foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test
 }
 $stages += @{ Name = 'test_fracture'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_fracture.gd') }
 $stages += @{ Name = 'test_volume_authoring'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_volume_authoring.gd') }
+$stages += @{ Name = 'test_geometry_factory'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_geometry_factory.gd') }
 if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+    $stages += @{ Name = 'geometry_factory_check'; Args = @('--quit-after', '600', '--script', 'res://tools/geometry_factory_check.gd') }
     foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'farm_gpu_check', 'library_gpu_check', 'surface_check', 'spectra_gpu_check', 'volume_gpu_check', 'polarization_gpu_check', 'crystal_gpu_check', 'geometry_aov_check')) {
         $stages += @{ Name = $name; Args = @('--quit-after', '600', '--script', "res://tools/$name.gd") }
     }
@@ -30,7 +32,7 @@ if ($CrystalPrecision) {
 }
 $failed = @()
 foreach ($stage in $stages) {
-    $arguments = @('--path', $projectRoot) + $stage.Args
+    $arguments = @('--audio-driver', 'Dummy', '--path', $projectRoot) + $stage.Args
     $output = & $Godot @arguments 2>&1
     $code = $LASTEXITCODE
     $log = Join-Path $logRoot ($stage.Name + '.log')

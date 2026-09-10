@@ -26,6 +26,14 @@ The pass uses no optical samples. Position/depth are millimeters; normals are in
 object space; facet/region/material IDs remain discrete. These optional companions
 are for grading inspection and stylizer development, not automatic game payloads.
 
+Use `build_gem_assets.ps1 -GeometryCoverage 4` to request cached geometry alongside
+the normal animation outputs (default is off). The standalone planner accepts
+`--geometry-coverage=4`; workers accept `--outputs=geometry` to generate only
+companions, or `--outputs=optical` to skip them. `all` is the default. Geometry
+shares the artifact store, retention manifests and farm transfer protocol, but
+never enters the shipping texture pages. Each display job references its companion;
+equivalent shapes/poses reuse one result across lighting and optical edits.
+
 Optional independent polarization validation uses an isolated Python environment
 with `tools/reference-requirements.txt`. Pass its Python executable as
 `-ReferencePython <path>` to `check_engine.ps1`; add `-Gpu` to include actual GPU

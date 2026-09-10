@@ -9,6 +9,8 @@ param(
     [int]$Resolution = 0,
     [int]$Samples = 0,
     [int]$Page = 512,
+    [ValidateSet(0, 1, 2, 4, 8)]
+    [int]$GeometryCoverage = 0,
     [ValidateRange(0, 1048576)]
     [int]$CacheBudgetMiB = 2048,
     [switch]$SkipCollection,
@@ -25,12 +27,13 @@ New-Item -ItemType Directory -Force -Path $generatedRoot | Out-Null
 New-Item -ItemType File -Force -Path (Join-Path $generatedRoot '.gdignore') | Out-Null
 function Invoke-GemStage([string]$Name, [string[]]$Arguments) {
     $log = Join-Path $logRoot "$Name.log"
-    & $Godot @Arguments 2>&1 | Tee-Object -FilePath $log
+    & $Godot --audio-driver Dummy @Arguments 2>&1 | Tee-Object -FilePath $log
     if ($LASTEXITCODE -ne 0 -or (Select-String -LiteralPath $log -Pattern '^\s*(SCRIPT ERROR:|ERROR:|FAIL(:|\b)|FAILED\b)')) {
         throw "Asset stage $Name failed; see $log"
     }
 }
 $prepare = @('--headless', '--path', $projectRoot, '--quit-after', '600', '--script', 'res://tools/prepare_gem_jobs.gd', '--', "--rung=$Rung")
+$prepare += "--geometry-coverage=$GeometryCoverage"
 if ($Stone) { $prepare += "--stone=$Stone" }
 if ($Clip) { $prepare += "--clip=$Clip" }
 if ($Resolution -gt 0) { $prepare += "--resolution=$Resolution" }
