@@ -190,6 +190,10 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	assert(lights.size() / 8 <= MAX_LIGHTS, "GemTracer: rig exceeds %d lights" % MAX_LIGHTS)
 	var bound_radius := 0.0
 	for instance: Dictionary in instances:
+		var source_mesh: GemMesh = instance.get("mesh", null)
+		if source_mesh != null and not source_mesh.validate().is_empty():
+			configuration_error = "Invalid optical boundary mesh: %s" % source_mesh.validate()
+			return false
 		bound_radius = maxf(bound_radius, _boundary_radius(instance))
 	_camera_distance = bound_radius + maxf(0.5, bound_radius * 0.05)
 	_grid = grid
@@ -291,7 +295,6 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 					_flags |= FLAG_DISPERSION | FLAG_FULL_SPECTRUM
 		if inst.has("mesh"):
 			var mesh: GemMesh = inst["mesh"]
-			assert(mesh.validate().is_empty(), "Cannot render an invalid mesh: %s" % mesh.validate())
 			var bvh := GemBvh.build(mesh)
 			@warning_ignore("integer_division")
 			inst["bvh_root"] = node_data.size() / 48 + 1

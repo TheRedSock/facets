@@ -18,7 +18,7 @@ static func compile(stone: GemStone) -> Dictionary:
 	var bulk := GemMaterialCompiler.compile(stone.material)
 	var species := stone.material.species
 
-	var geometry := _compile_cut(stone)
+	var geometry := compile_geometry(stone)
 	var compiled := {
 		"planes": geometry["planes"],
 		"facet_ids": geometry.get("facet_ids", PackedInt32Array()),
@@ -73,7 +73,7 @@ static func _resolve_fluorescence(species: GemSpecies, chromo: GemChromophore) -
 
 # ------------------------------------------------------------------ cut
 
-static func _compile_cut(stone: GemStone) -> Dictionary:
+static func compile_geometry(stone: GemStone) -> Dictionary:
 	if stone.shape.mode == "cabochon" and stone.shape.outline in [&"round", &"oval"] and stone.shape.outline_points.is_empty():
 		return {"planes": PackedFloat32Array(), "outline": GemShapeCompiler.outline(stone.shape),
 			"analytic_shape": Vector4(1.0, 1.0 / stone.shape.aspect_ratio, stone.shape.dome_height, -0.04)}

@@ -139,3 +139,12 @@ float64 matrix reference. `finish_fields_render_check.gd` checks energy and
 angle-dependent reflection; `finish_fields_lookdev.gd` anchors a thin finish
 region to the generated table plane and compares unfinished/repolished states
 under two poses. Outputs remain under ignored `artifacts/finish-fields/`.
+
+Mesh admission: run `tests/lapidary/test_mesh_admission.gd` headlessly, then
+`python tools/check_mesh_predicates.py` for an independent exact-rational check
+of determinant signs and constructed triangle intersections. The full runner
+includes this comparison when reference Python is supplied; it needs only the
+standard library. `mesh_admission_benchmark.gd` measures dense fracture generation,
+first admission and repeated content checks separately. Outputs stay under
+ignored `artifacts/geometry/`. Topological admission does not certify that tiny
+features are resolvable by a chosen GPU transport policy.

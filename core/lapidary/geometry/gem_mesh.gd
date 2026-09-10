@@ -22,48 +22,57 @@ func append_region(source: GemMesh, region: int) -> void:
 	for triangle in source.triangle_count():
 		add_triangle(offset + source.indices[triangle * 3], offset + source.indices[triangle * 3 + 1], offset + source.indices[triangle * 3 + 2], source.facet_ids[triangle], region)
 
+# Buffers remain mutable authoring data. A content key prevents stale admission
+# after in-place edits while avoiding repeated BVH/predicate work on a specimen.
+var _validated_key := ""
+var _validated_errors := PackedStringArray()
+static var _admission_cache: Dictionary = {}
+const ADMISSION_CACHE_LIMIT := 64
+
 func signed_volume() -> float:
-	var volume := 0.0
+	var triangles: Array[int] = []
 	for i in triangle_count():
-		volume += vertices[indices[i * 3]].dot(vertices[indices[i * 3 + 1]].cross(vertices[indices[i * 3 + 2]])) / 6.0
+		triangles.append(i)
+	return component_volume(triangles)
+
+func component_volume(triangles: Array[int]) -> float:
+	if triangles.is_empty():
+		return 0.0
+	var origin := vertices[indices[triangles[0] * 3]]
+	var volume := 0.0
+	var correction := 0.0
+	for i in triangles:
+		var a := vertices[indices[i * 3]]
+		var b := vertices[indices[i * 3 + 1]]
+		var c := vertices[indices[i * 3 + 2]]
+		# Scalar arithmetic stays binary64; Vector3 cross/dot would round to 32.
+		var ax: float = float(a.x) - origin.x
+		var ay: float = float(a.y) - origin.y
+		var az: float = float(a.z) - origin.z
+		var bx: float = float(b.x) - origin.x
+		var by: float = float(b.y) - origin.y
+		var bz: float = float(b.z) - origin.z
+		var cx: float = float(c.x) - origin.x
+		var cy: float = float(c.y) - origin.y
+		var cz: float = float(c.z) - origin.z
+		var term := (ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)) / 6.0 - correction
+		var total := volume + term
+		correction = (total - volume) - term
+		volume = total
 	return volume
 
 func validate() -> PackedStringArray:
-	var errors := PackedStringArray()
-	if indices.size() % 3 != 0 or facet_ids.size() != triangle_count() or region_ids.size() != triangle_count():
-		errors.append("Triangle/facet buffer sizes disagree")
-		return errors
-	if vertices.size() < 4 or triangle_count() < 4:
-		errors.append("A solid needs at least four vertices and faces")
-		return errors
-	for vertex in vertices:
-		if not vertex.is_finite():
-			errors.append("Nonfinite vertex")
-			return errors
-	for index in indices:
-		if index < 0 or index >= vertices.size():
-			errors.append("Triangle index outside vertex buffer")
-			return errors
-	var edges := {}
-	for triangle in triangle_count():
-		var a := indices[triangle * 3]
-		var b := indices[triangle * 3 + 1]
-		var c := indices[triangle * 3 + 2]
-		if (vertices[b] - vertices[a]).cross(vertices[c] - vertices[a]).length_squared() < 1.0e-18:
-			errors.append("Degenerate triangle %d" % triangle)
-		for edge in [Vector2i(a, b), Vector2i(b, c), Vector2i(c, a)]:
-			var key := Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y))
-			var record: Vector2i = edges.get(key, Vector2i.ZERO)
-			record.x += 1
-			record.y += 1 if edge.x < edge.y else -1
-			edges[key] = record
-	for edge: Vector2i in edges:
-		var record: Vector2i = edges[edge]
-		if record.x != 2 or record.y != 0:
-			errors.append("Open, nonmanifold or inconsistently wound edge %s (%s)" % [edge, record])
-	if signed_volume() <= 1.0e-12:
-		errors.append("Solid has zero or negative oriented volume")
-	return errors
+	var key := fingerprint()
+	if key != _validated_key:
+		if _admission_cache.has(key):
+			_validated_errors = _admission_cache[key]
+		else:
+			_validated_errors = GemMeshValidation.validate(self)
+			if _admission_cache.size() >= ADMISSION_CACHE_LIMIT:
+				_admission_cache.erase(_admission_cache.keys()[0])
+			_admission_cache[key] = _validated_errors.duplicate()
+		_validated_key = key
+	return _validated_errors.duplicate()
 
 func fingerprint() -> String:
 	return GemContentIdentity.digest([vertices, indices, facet_ids, region_ids])

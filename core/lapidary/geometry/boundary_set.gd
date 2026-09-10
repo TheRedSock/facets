@@ -20,6 +20,11 @@ func add_cabochon(shape: Vector4, material: int) -> bool:
 func add(surface: GemMesh, material: int) -> bool:
 	if materials.size() >= MAX_REGIONS or not surface.validate().is_empty():
 		return false
+	# add() collapses a source to ONE medium. Do not let separately valid but
+	# mutually overlapping source regions evade same-region admission.
+	for region in surface.region_ids:
+		if region != surface.region_ids[0]:
+			return false
 	mesh.append_region(surface, materials.size())
 	materials.append(material)
 	return true

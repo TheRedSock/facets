@@ -49,10 +49,27 @@ A Triangle is four vec4s (64B): a/b/c vertices (w reserved), then ivec4
 ivec4 left/right/first/count. Count0 is an internal node. Absolute buffer indices,
 median split, four triangles per leaf, traversal stack64.
 
-`GemMesh` validates finite coordinates, nondegeneracy, closed oriented edge
-incidence and positive volume. Arbitrary global self-intersection certification
-is not implemented. Convex plane→mesh conversion preserves facet IDs and welds
-canonical intersections; concave lofts use procedural triangle surfaces.
+`GemMesh` validates finite coordinates, exact triangle nondegeneracy, oriented
+edge incidence per region, connected vertex fans, and global triangle contacts
+using BVH broad phase. Filtered binary64 determinants fall back to exact floating
+expansions for the encoded binary32 vertices; no proximity epsilon turns a finite
+gap into contact. Same-region intersections and unshared contacts are rejected.
+Separate priority regions may cross, but coincident triangle patches are rejected.
+Disconnected shells are allowed. Their orientation must alternate by containment
+depth (solid, inward cavity, outward island); positive total volume cannot hide an
+inverted component. Half-open projected ray crossings determine containment.
+Volume uses translated binary64 arithmetic and compensated summation. A bounded
+64-result content cache reuses admission across rebuilt animation specimens;
+in-place buffer changes invalidate it. Factory admission checks combined mesh
+regions before GPU acquisition, and renderer configuration rejects invalid meshes
+at runtime (not only with debug assertions).
+
+This certifies the encoded piecewise-linear topology, not transport resolution,
+feature thickness, curved analytic-host coincidence, or physical wear history.
+Analytic-host/triangle coincidence still requires authoring a finite gap or overlap.
+Convex plane→mesh conversion preserves facet IDs and welds canonical intersections;
+concave lofts use procedural triangle surfaces. `test_mesh_admission.gd` and the
+independent Fraction oracle cover determinant/contact degeneracies and nesting.
 
 Round/oval cabochons use analytic upper ellipsoid + elliptical girdle cylinder +
 flat base. Stone.ranges0.y=-1 selects this host. Its Plane n_d contains x radius,

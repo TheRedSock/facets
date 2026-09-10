@@ -117,6 +117,7 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 	if condition.finish != null and not condition.finish.validate().is_empty():
 		return "; ".join(condition.finish.validate())
 	var count := 0
+	var combined := GemMesh.new()
 	for defect in condition.defects:
 		if defect == null:
 			return "missing defect descriptor"
@@ -144,7 +145,20 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 		if count >= GemBoundarySet.MAX_REGIONS:
 			return "too many physical defect regions"
 		if not mesh.validate().is_empty():
-			return "defect geometry degenerates at the requested physical scale"
+			return "defect geometry invalid at the requested physical scale: %s" % mesh.validate()
+		combined.append_region(mesh, count)
+	if count > 0:
+		var geometry := LapidaryStoneCompiler.compile_geometry(stone)
+		if not geometry.has("analytic_shape"):
+			var host: GemMesh = geometry.get("mesh", null)
+			if host == null:
+				host = GemShapeCompiler.from_hull(geometry.planes, geometry.get("facet_ids", PackedInt32Array()))
+			if not host.validate().is_empty():
+				return "invalid host boundary: %s" % host.validate()
+			combined.append_region(host, 0)
+		var errors := combined.validate()
+		if not errors.is_empty():
+			return "invalid combined region boundaries: %s" % errors
 	return ""
 
 static func _material(material: GemMaterial, polarized: bool, axis_override := Vector3.ZERO) -> String:
