@@ -69,6 +69,7 @@ var _throughput_epsilon := 0.0001
 var _flags := 0
 var _polarized := false
 var _crystal := false
+var _print_only := false
 var configuration_error := ""
 var _grid := Vector2i.ONE
 var _cell := Vector2i.ZERO
@@ -88,8 +89,9 @@ var _inst_state := {
 }
 
 
-static func create(p_width: int, p_height: int) -> GemTracer:
+static func create(p_width: int, p_height: int, print_only := false) -> GemTracer:
 	var t := GemTracer.new()
+	t._print_only = print_only
 	t.width = p_width
 	t.height = p_height
 	t._rd = RenderingServer.create_local_rendering_device()
@@ -102,8 +104,11 @@ static func create(p_width: int, p_height: int) -> GemTracer:
 		return null
 	var zeros := PackedByteArray()
 	zeros.resize(p_width * p_height * 16)
-	t._bufs["crystal_stats"] = t._rd.storage_buffer_create(16)
 	t._bufs["accum"] = t._rd.storage_buffer_create(zeros.size(), zeros)
+	if print_only:
+		t._cell = Vector2i(p_width, p_height)
+		return t
+	t._bufs["crystal_stats"] = t._rd.storage_buffer_create(16)
 	t._bufs["filter_a"] = t._rd.storage_buffer_create(zeros.size(), zeros)
 	t._bufs["filter_b"] = t._rd.storage_buffer_create(zeros.size(), zeros)
 	for name in ["ballistic", "residual", "reconstructed"]:
@@ -118,6 +123,8 @@ static func create(p_width: int, p_height: int) -> GemTracer:
 
 
 func _compile_shaders() -> bool:
+	if _print_only:
+		return _compile_shader(PRINT_SHADER_PATH, "print")
 	for entry in [[SHADER_PATH, "trace"], [PRINT_SHADER_PATH, "print"], [DENOISE_SHADER_PATH, "denoise"]]:
 		if not _compile_shader(entry[0], entry[1]):
 			return false
@@ -171,6 +178,9 @@ func configure_stone(instance: Dictionary, lighting: GemLighting, policy: Dictio
 ## Multi-stone batch: instances laid out on a grid of equal cells (board atlas).
 func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionary, grid: Vector2i) -> bool:
 	configuration_error = ""
+	if _print_only:
+		configuration_error = "Print-only devices do not configure optical transport"
+		return false
 	assert(lighting != null)
 	assert(lighting.validate().is_empty(), lighting.validate())
 	var lights := lighting.lights
@@ -572,10 +582,12 @@ func reset_accumulation() -> void:
 	var zeros := PackedByteArray()
 	zeros.resize(width * height * 16)
 	for name in ["accum", "ballistic", "residual"]:
-		_rd.buffer_update(_bufs[name], 0, zeros.size(), zeros)
+		if _bufs.has(name):
+			_rd.buffer_update(_bufs[name], 0, zeros.size(), zeros)
 	samples_accumulated = 0
-	zeros.resize(width * height * 32)
-	_rd.buffer_update(_bufs["guides"], 0, zeros.size(), zeros)
+	if _bufs.has("guides"):
+		zeros.resize(width * height * 32)
+		_rd.buffer_update(_bufs["guides"], 0, zeros.size(), zeros)
 	_filtered_samples = -1
 
 
@@ -584,6 +596,9 @@ func reset_accumulation() -> void:
 ## cost (dense milk and inclusions make a path many times dearer than clean
 ## optics), so no single dispatch approaches the OS GPU watchdog. Returns ms.
 func accumulate(spp: int) -> float:
+	if _print_only:
+		push_error("Print-only devices cannot accumulate optical samples")
+		return 0.0
 	if not configuration_error.is_empty():
 		push_error(configuration_error)
 		return 0.0

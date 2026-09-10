@@ -72,7 +72,7 @@ func _run() -> void:
 		record["heldout"] = GemCutSearch.evaluate(tracer, stone, heldout, policy, samples)
 		GemResourceBundle.save(stone, output.path_join("candidate-%d.res" % rank))
 	var winner := records[0]
-	var report := {"source": source.fingerprint(), "engine": GemRenderIdentity.optical_digest(),
+	var report := {"source": source.fingerprint(), "engine": GemRenderIdentity.worker_digest(),
 		"specimen": id, "resolution": resolution, "samples": samples, "policy": policy,
 		"objective": "0.75 mean face-up linear Y + 0.25 worst-view Y; not a cut grade",
 		"limits": "Bounded grid search, approximate anisotropic transport, no automatic catalog promotion; inspect held-out views and visual output.",

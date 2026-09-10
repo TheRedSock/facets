@@ -41,5 +41,13 @@ func _initialize() -> void:
 		max_error = maxf(max_error, absf(a[i] - b[i]))
 	check(max_error < 0.00001, "resumed reconstruction matches uninterrupted rendering: %.8f" % max_error)
 	worker.release()
+	worker = GemFrameWorker.new(root)
+	job.exposure = 0.625
+	check(not worker.run(job).is_empty() and worker.counters.reprinted == 1, "fresh worker reprints an existing master")
+	check(worker.tracer._print_only and worker.tracer._bufs.size() == 1 and worker.tracer._pipelines.keys() == ["print"], "reprint allocates only XYZ and print shader, no geometry or transport")
+	check(worker.compiled.is_empty(), "reprint does not compile specimen geometry")
+	job.samples += 1
+	check(not worker.run(job).is_empty() and worker.counters.rendered == 1 and not worker.tracer._print_only, "print worker promotes to transport for a missing master")
+	worker.release()
 	print("Factory GPU: %d failures; checkpoint difference %.8f" % [failures, max_error])
 	quit(1 if failures else 0)

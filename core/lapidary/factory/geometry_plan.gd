@@ -6,7 +6,7 @@ static var _source_digest := ""
 
 static func source_digest() -> String:
 	if _source_digest.is_empty():
-		_source_digest = GemContentIdentity.digest([GemRenderIdentity.optical_digest(),
+		_source_digest = GemContentIdentity.digest([GemRenderIdentity.pipeline_digest("geometry"),
 			FileAccess.get_sha256("res://core/lapidary/factory/geometry_plan.gd"),
 			FileAccess.get_sha256("res://core/lapidary/factory/geometry_worker.gd")])
 	return _source_digest
@@ -55,6 +55,8 @@ static func records_error(records: Variant) -> String:
 		if not id is String or not GemArtifactStore.valid_key(id) or not records[id] is Dictionary:
 			return "Invalid geometry recipe identity"
 		var record: Dictionary = records[id]
+		if not GemArtifactStore.valid_key(str(record.get("engine", ""))):
+			return "Geometry pipeline identity is missing or invalid"
 		for field in ["width", "height", "coverage_side"]:
 			var value: Variant = record.get(field)
 			if not (value is int or value is float) or not is_finite(float(value)) or float(value) != floorf(float(value)):

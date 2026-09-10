@@ -39,12 +39,12 @@ func merge(destination: String, sources: PackedStringArray, manifest: Dictionary
 				held.release()
 			return _fail("Store is active or locked; stop the shard before transfer: " + root)
 		guards.append(guard)
-	var result := _merge_locked(target, inputs, expected, str(manifest.engine), apply, conflict_policy)
+	var result := _merge_locked(target, inputs, expected, apply, conflict_policy)
 	for guard in guards:
 		guard.release()
 	return result
 
-func _merge_locked(target: String, sources: Array[String], expected: Dictionary, engine: String, apply: bool, policy: String) -> Dictionary:
+func _merge_locked(target: String, sources: Array[String], expected: Dictionary, apply: bool, policy: String) -> Dictionary:
 	var selected := {}
 	var conflicts: Array[Dictionary] = []
 	var duplicates := 0
@@ -75,7 +75,7 @@ func _merge_locked(target: String, sources: Array[String], expected: Dictionary,
 			if record.is_empty():
 				return _fail("Corrupt recipe or payload: " + key)
 			var metadata: Dictionary = record.metadata
-			var error := _validate_payload(record, expected[key], engine)
+			var error := _validate_payload(record, expected[key])
 			if not error.is_empty():
 				return _fail("Invalid result %s: %s" % [key, error])
 			if selected.has(key):
@@ -118,35 +118,41 @@ static func _expected(manifest: Dictionary) -> Dictionary:
 	if not GemGeometryPlan.references_error(manifest).is_empty():
 		return {}
 	for key: String in geometry:
-		expected[key] = {"kind": "primary_geometry", "width": geometry[key].width,
+		expected[key] = {"kind": "primary_geometry", "engine": geometry[key].engine, "width": geometry[key].width,
 			"height": geometry[key].height, "coverage_side": geometry[key].coverage_side}
 	for key: Variant in manifest.jobs:
 		if not key is String or not GemArtifactStore.valid_key(key) or not manifest.jobs[key] is Dictionary:
 			return {}
 		var master := str(manifest.jobs[key].get("master", ""))
+		var engine := str(manifest.jobs[key].get("engine", ""))
+		var print_engine := str(manifest.jobs[key].get("print_engine", ""))
+		if not GemArtifactStore.valid_key(engine) or not GemArtifactStore.valid_key(print_engine):
+			return {}
 		if not GemArtifactStore.valid_key(master) or key == master:
 			return {}
 		if expected.has(key) and expected[key].kind != "display":
 			return {}
-		if expected.has(master) and expected[master].kind != "linear_master":
+		if expected.has(master) and (expected[master].kind != "linear_master" or expected[master].engine != engine):
 			return {}
-		expected[key] = {"kind": "display", "master": master}
-		expected[master] = {"kind": "linear_master"}
+		expected[key] = {"kind": "display", "master": master, "engine": print_engine}
+		expected[master] = {"kind": "linear_master", "engine": engine}
 	return expected
 
-static func _validate_payload(record: Dictionary, expected: Dictionary, engine: String) -> String:
+static func _validate_payload(record: Dictionary, expected: Dictionary) -> String:
 	if expected.kind == "primary_geometry":
-		return GemGeometryPlan.payload_error(record, expected, engine)
+		return GemGeometryPlan.payload_error(record, expected, expected.engine)
 	var metadata: Dictionary = record.metadata
 	if metadata.get("kind") != expected.kind:
 		return "unexpected artifact kind"
+	if metadata.get("engine") != expected.engine:
+		return "result pipeline engine mismatch"
 	var width := int(metadata.get("width", 0))
 	var height := int(metadata.get("height", 0))
 	if width < 1 or height < 1 or width > 8192 or height > 8192:
 		return "invalid frame dimensions"
 	var image: Image
 	if expected.kind == "linear_master":
-		if metadata.get("engine") != engine or metadata.get("space") != "associated_XYZ_CIE1931_2deg":
+		if metadata.get("space") != "associated_XYZ_CIE1931_2deg":
 			return "optical engine or linear color space mismatch"
 		image = GemArtifactStore.decode_linear(record.payload)
 	else:

@@ -49,17 +49,18 @@ static func write(root: String, jobs: Array[GemFrameJob], clips: Dictionary, geo
 		var relative := "jobs/" + key + ".res"
 		if GemResourceBundle.save(job, root.path_join(relative)) != OK:
 			return {}
-		records[key] = {"path": relative, "master": GemFramePlan.master_key(job), "sha256": FileAccess.get_sha256(root.path_join(relative))}
+		records[key] = {"path": relative, "master": GemFramePlan.master_key(job), "engine": GemFramePlan.master_engine(job),
+			"print_engine": GemRenderIdentity.pipeline_digest("print"), "sha256": FileAccess.get_sha256(root.path_join(relative))}
 		if geometry_coverage_side > 0:
 			var geometry_key := GemGeometryPlan.key(job, geometry_coverage_side)
 			records[key]["geometry"] = geometry_key
 			if not geometry.has(geometry_key):
-				geometry[geometry_key] = {"path": relative, "sha256": records[key].sha256,
+				geometry[geometry_key] = {"path": relative, "sha256": records[key].sha256, "engine": GemGeometryPlan.source_digest(),
 					"width": job.resolution.x, "height": job.resolution.y, "coverage_side": geometry_coverage_side}
 	var project := 'config_version=5\n\n[application]\nconfig/name="Lapidary Asset Worker"\n\n[rendering]\nrenderer/rendering_method="mobile"\n'
 	if not GemArtifactStore.atomic_write(root.path_join("project.godot"), project.to_utf8_buffer()):
 		return {}
-	var manifest := {"schema": 1, "engine": GemRenderIdentity.optical_digest(), "godot": Engine.get_version_info(),
+	var manifest := {"schema": 1, "engine": GemRenderIdentity.worker_digest(), "godot": Engine.get_version_info(),
 		"source_sha256": checksums, "jobs": records, "geometry": geometry, "clips": clips, "estimate": GemFramePlan.estimate(jobs),
 		"worker": {"gpu_required": true, "headless_supported": false,
 			"import_args": ["--headless", "--editor", "--quit"],

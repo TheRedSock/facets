@@ -76,8 +76,8 @@ func _initialize() -> void:
 	for pixel in 16:
 		for field in 4:
 			geometry.data.encode_s32(pixel * GemGeometryAov.STRIDE + 32 + field * 4, -1)
-	var expected := {"width": 4, "height": 4, "coverage_side": 1}
-	var engine := GemRenderIdentity.optical_digest()
+	var engine := GemGeometryPlan.source_digest()
+	var expected := {"width": 4, "height": 4, "coverage_side": 1, "engine": engine}
 	var metadata := expected.duplicate()
 	metadata.merge({"kind": "primary_geometry", "engine": engine, "codec": "gao1", "status": "complete"})
 	var source := GemArtifactStore.new(root + "/source")

@@ -33,30 +33,34 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 	var display_key := GemFramePlan.display_key(job)
 	var master_key := GemFramePlan.master_key(job)
 	var existing := store.read(display_key)
-	if not existing.is_empty() and existing["metadata"].get("kind") == "display":
+	if not existing.is_empty() and existing["metadata"].get("kind") == "display" and existing.metadata.get("engine") == GemRenderIdentity.pipeline_digest("print") and existing.metadata.get("master") == master_key:
 		counters["display_hits"] += 1
 		return existing["metadata"]
-	var stone_key := job.stone.fingerprint()
-	if stone_key != compiled_key:
-		compiled = LapidaryStoneCompiler.compile(job.stone)
-		if compiled.get("planes", PackedFloat32Array()).is_empty() and not compiled.has("mesh") and not compiled.has("analytic_shape"):
-			return _fail("Specimen compiler produced no closed host geometry")
-		compiled_key = stone_key
-	if tracer == null or tracer.width != job.resolution.x or tracer.height != job.resolution.y:
-		release()
-		tracer = GemTracer.create(job.resolution.x, job.resolution.y)
-	if tracer == null:
-		return _fail("RenderingDevice unavailable; GPU workers need a supported display/Vulkan environment")
-	if not tracer.configure_stone(compiled, GemRigCompiler.compile(job.rig), job.quality):
-		return _fail(tracer.configuration_error)
-	tracer.set_seed(job.sample_seed)
-	tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), GemFramePlan.canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half)
 	var master_record := store.read(master_key)
 	var master: Image = null
-	if not master_record.is_empty() and master_record["metadata"].get("kind") == "linear_master":
+	if not master_record.is_empty() and master_record["metadata"].get("kind") == "linear_master" and master_record.metadata.get("engine") == GemFramePlan.master_engine(job):
 		master = GemArtifactStore.decode_linear(master_record["payload"])
 		if master != null and master.get_size() != job.resolution:
 			master = null
+	if master == null:
+		var stone_key := job.stone.fingerprint()
+		if stone_key != compiled_key:
+			compiled = LapidaryStoneCompiler.compile(job.stone)
+			if compiled.get("planes", PackedFloat32Array()).is_empty() and not compiled.has("mesh") and not compiled.has("analytic_shape"):
+				return _fail("Specimen compiler produced no closed host geometry")
+			compiled_key = stone_key
+	if tracer == null or tracer.width != job.resolution.x or tracer.height != job.resolution.y or (master == null and tracer._print_only):
+		release()
+		tracer = GemTracer.create(job.resolution.x, job.resolution.y, master != null)
+	if tracer == null:
+		return _fail("RenderingDevice unavailable; GPU workers need a supported display/Vulkan environment")
+	var lighting := GemRigCompiler.compile(job.rig)
+	tracer.set_print_white(lighting.white_xyz)
+	if master == null:
+		if not tracer.configure_stone(compiled, lighting, job.quality):
+			return _fail(tracer.configuration_error)
+		tracer.set_seed(job.sample_seed)
+		tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), GemFramePlan.canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half)
 	var checkpoint_key := GemContentIdentity.digest(["checkpoint-v1", master_key])
 	if master == null:
 		var saved := store.read(checkpoint_key)
@@ -85,7 +89,7 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 		master = Image.create_from_data(tracer.width, tracer.height, false, Image.FORMAT_RGBAF, tracer.read_reconstructed_xyz().to_byte_array())
 		var metadata := {"kind": "linear_master", "width": master.get_width(), "height": master.get_height(), "samples": job.samples,
 			"space": "associated_XYZ_CIE1931_2deg", "reconstruction": job.quality.get("denoise_passes", 0),
-			"engine": GemRenderIdentity.optical_digest(), "producer": {"godot": Engine.get_version_info(), "adapter": RenderingServer.get_video_adapter_name()},
+			"engine": GemFramePlan.master_engine(job), "producer": {"source_engine": GemRenderIdentity.worker_digest(), "godot": Engine.get_version_info(), "adapter": RenderingServer.get_video_adapter_name()},
 			"profile": tracer.profile(), "crystal_transport": tracer.crystal_diagnostics()}
 		if not store.publish(master_key, GemArtifactStore.encode_linear(master), metadata):
 			return _fail("Cannot publish linear master")
@@ -96,7 +100,7 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 	if not tracer.load_linear_master(master):
 		return _fail("Invalid master dimensions/format")
 	var display := tracer.finalize_print(job.print_style, false, job.exposure, job.output_size, false)
-	var metadata := {"kind": "display", "master": master_key, "width": display.get_width(), "height": display.get_height(),
+	var metadata := {"kind": "display", "master": master_key, "engine": GemRenderIdentity.pipeline_digest("print"), "width": display.get_width(), "height": display.get_height(),
 		"codec": "webp_lossless", "space": "srgb_straight_alpha", "status": "complete"}
 	if not store.publish(display_key, display.save_webp_to_buffer(false), metadata):
 		return _fail("Cannot publish display frame")

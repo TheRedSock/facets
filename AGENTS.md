@@ -420,3 +420,12 @@ other anisotropic catalog axes remain explicit constant-offset approximations.
 The scalar renderer still uses approximate o/e transport and skips weak
 anisotropy; do not mistake improved inputs for validated full anisotropic optics.
 Run `test_principal_indices.gd` and `principal_indices_gpu_check.gd` with the suite.
+
+Result identity uses `GemRenderIdentity.pipeline_digest()` by scalar, polarized,
+crystal, print or geometry pass; `worker_digest()` retains full renderer provenance.
+Bundle source checks remain exact. Master/display/geometry records declare their
+own pipeline engine; farm transfer accepts compatible pipelines across worker
+revisions without rewriting producer metadata. Unknown files in inventoried roots
+are conservative shared dependencies. Verify changes with
+`test_render_dependencies.gd` and `pipeline_cache_check.gd`; rebuild old manifests
+that lack per-result pipeline declarations.

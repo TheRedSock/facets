@@ -111,3 +111,11 @@ GLSL at 0.25 nm intervals. Authoring rejects coefficient quantization exceeding
 1e-6 in index on the visible 1 nm grid; this is not a full transport error bound.
 Evaluation sheets and the batched board diagnostic now use the actual catalog,
 with no duplicate in-code gemstone material definitions.
+
+Pipeline dependency checks: `test_render_dependencies.gd` changes detached source
+inventories and verifies actual master/display/geometry keys. The windowed
+`pipeline_cache_check.gd` builds an isolated worker, modifies only copied shaders,
+and launches fresh processes. It checks headless scalar/geometry reuse after a
+crystal edit, reprinting after a print edit, invalidation after a shared mesh edit,
+cross-worker result transfer, and rejection of a stale worker source manifest.
+Logs and copied projects stay under ignored `artifacts/pipeline-cache/`.

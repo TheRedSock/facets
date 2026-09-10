@@ -6,7 +6,7 @@ func _initialize() -> void:
 	var clip: GemClip = load("res://data/lapidary/clips/flash.tres")
 	var jobs: Array[GemFrameJob] = []
 	var sources := PackedStringArray()
-	var manifest := {"schema": 1, "engine": GemRenderIdentity.optical_digest(), "jobs": {}}
+	var manifest := {"schema": 1, "engine": GemRenderIdentity.worker_digest(), "jobs": {}}
 	var failures := 0
 	for id in ["quartz", "diamond"]:
 		var worker := GemFrameWorker.new(root.path_join(id))
@@ -17,7 +17,7 @@ func _initialize() -> void:
 			job.output_size = Vector2i(24, 24)
 			job.samples = 16
 			jobs.append(job)
-			manifest.jobs[GemFramePlan.display_key(job)] = {"master": GemFramePlan.master_key(job)}
+			manifest.jobs[GemFramePlan.display_key(job)] = {"master": GemFramePlan.master_key(job), "engine": GemFramePlan.master_engine(job), "print_engine": GemRenderIdentity.pipeline_digest("print")}
 			if worker.run(job).is_empty():
 				failures += 1
 		if worker.counters.rendered != 1:

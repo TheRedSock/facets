@@ -7,7 +7,7 @@ Equivalent poses reuse one optical master, and exposure/output-size changes repr
 that master. Artist style belongs after linear optical output.
 
 `GemFrameJob` contains all authored inputs and render policy. `GemFramePlan` hashes
-physical resources, optical source, packed lighting, canonical pose, framing,
+physical resources, the selected transport pipeline, packed lighting, canonical pose, framing,
 resolution, sample seed/count and estimator policy. Display identity also hashes
 print, exposure, output dimensions and spectral neutral. Scheduling batch size and
 worker hardware are not optical identity. Hardware/driver provenance is recorded.
@@ -16,12 +16,41 @@ them retains expensive masters. `GemStone.fingerprint()` still tracks the comple
 authored record. Physical input changes retire masters through `transport_inputs()`.
 Pose quantization is explicit and the renderer uses the same canonical pose.
 
+`GemRenderIdentity` separates scalar, polarized, crystal, print and geometry
+result dependencies from `worker_digest()`, the complete renderer inventory.
+Known crystal-only modules affect crystal masters; print implementation changes
+affect displays; primary-AOV code affects geometry companions. Shared host,
+packing and geometry code remain conservative dependencies. New files within the
+inventoried source roots are shared unless explicitly classified. The dependency
+policy itself, frame executor, pose planner and Godot compiler version are hashed.
+Frame-executor edits conservatively retire optical/print results, including when
+an edit only changes scheduling; geometry uses its separate executor digest.
+This is not automatic
+call-graph analysis; move code between passes only with dependency tests.
+
+Master recipe v3 includes its transport digest. Display recipe v2 includes the
+print digest and master key. Geometry includes its own pipeline and planner/worker
+digests. Each result's `engine` means that result pipeline, not a worker revision.
+Producer metadata retains the original `source_engine`; cache hits never relabel
+old producers. Bundle-level `engine` and `source_sha256` still require an exact
+worker source match. Job records additionally declare `engine`/`print_engine`, and
+geometry records declare `engine`. Transfer checks these requested result engines,
+so compatible completed assets can cross worker revisions. Conflicting master
+pipeline declarations are rejected. Older manifests without pipeline declarations
+must be rebuilt; old cache payloads are not silently relabeled or migrated.
+
 `GemArtifactStore` has a store.json marker, atomic recipe JSON and SHA256-addressed
 immutable blobs. Linear masters are associated CIE XYZ+coverage RGBAF compressed
 losslessly with ZSTD. Checkpoints contain raw estimator buffers and global sample
 count; prints are lossless WebP. A worker resumes missing samples or reprints from
 an available master. Stored masters include the requested reconstruction; raw
 REFERENCE jobs remain available for evaluation. Payload checksums are verified.
+Fresh reprint workers skip specimen compilation and allocate only the associated
+XYZ input buffer (16 bytes/pixel) plus print output, compiling only the print
+shader. They do not require the original transport backend's GPU capabilities.
+A subsequent missing master recreates a full transport device. Existing full
+devices may be reused for printing; job admission still validates the complete
+physical request and conservatively applies its declared full-render memory budget.
 
 `GemJobBundle` creates a minimal independent Godot project and ZIP, with bundled
 binary resources, raw shaders, standard tables and source/job checksums. Rendering
@@ -144,7 +173,7 @@ after validation. Workers can select `--outputs=all|optical|geometry`.
 `GemGeometryPlan` identities include shape, cut, size, workmanship, ordered enabled
 defect geometry, filled-region presence, canonical camera pose, framing, dimensions
 and coverage. Lighting, optical coefficients, grade labels, sample count and print
-are excluded. The optical source digest and geometry plan/worker source hashes are
+are excluded. The geometry pipeline digest and geometry plan/worker source hashes are
 included so changes to shared intersections or companion generation retire them.
 Geometry records are independently
 sharded by their key; duplicate simultaneous work is still not coordinated.

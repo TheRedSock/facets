@@ -2,6 +2,7 @@ extends SceneTree
 var checks := 0
 var failures := 0
 var engine_id := "test-engine".sha256_text()
+var print_id := "test-print".sha256_text()
 
 func check(value: bool, label: String) -> void:
 	checks += 1
@@ -23,7 +24,7 @@ func master(output: GemArtifactStore, key: String, value: float) -> void:
 func display(output: GemArtifactStore, key: String, dependency: String) -> void:
 	var image := Image.create(2, 2, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.4, 0.5, 0.6, 1))
-	check(output.publish(key, image.save_webp_to_buffer(false), {"kind": "display", "master": dependency,
+	check(output.publish(key, image.save_webp_to_buffer(false), {"kind": "display", "master": dependency, "engine": print_id,
 		"space": "srgb_straight_alpha", "width": 2, "height": 2, "codec": "webp_lossless", "status": "complete"}), "publish display fixture")
 
 func _initialize() -> void:
@@ -42,7 +43,9 @@ func _initialize() -> void:
 	master(second, m1, 0.2)
 	var unrelated := "unrelated".sha256_text()
 	first.publish(unrelated, "not requested".to_utf8_buffer(), {"kind": "test"})
-	var manifest := {"schema": 1, "engine": engine_id, "jobs": {d1: {"master": m1}, d2: {"master": m2}}}
+	var manifest := {"schema": 1, "engine": "worker-build".sha256_text(), "jobs": {
+		d1: {"master": m1, "engine": engine_id, "print_engine": print_id},
+		d2: {"master": m2, "engine": engine_id, "print_engine": print_id}}}
 	var transfer := GemStoreTransfer.new()
 	var inputs := PackedStringArray([first.root, second.root])
 	var preview := transfer.merge(destination.root, inputs, manifest)
@@ -67,7 +70,12 @@ func _initialize() -> void:
 	check(transfer.merge(destination.root, PackedStringArray([destination.root + "/child"]), manifest).is_empty(), "nested-store transfer rejected")
 	var wrong := manifest.duplicate(true)
 	wrong.engine = "other-engine".sha256_text()
-	check(transfer.merge(destination.root, inputs, wrong).is_empty() and transfer.last_error.contains("engine"), "wrong engine rejected")
+	check(not transfer.merge(destination.root, inputs, wrong, false, "keep_existing").is_empty(), "different worker build may reuse matching result pipelines")
+	wrong.jobs[d1].engine = "incompatible-pipeline".sha256_text()
+	check(transfer.merge(destination.root, inputs, wrong).is_empty() and transfer.last_error.contains("engine"), "wrong optical pipeline rejected")
+	wrong = manifest.duplicate(true)
+	wrong.jobs[d1].print_engine = "incompatible-print".sha256_text()
+	check(transfer.merge(destination.root, inputs, wrong).is_empty() and transfer.last_error.contains("engine"), "wrong print pipeline rejected")
 	var corrupt: Dictionary = first.read(d1).metadata
 	GemArtifactStore.atomic_write(first.root.path_join(corrupt.object), "truncated".to_utf8_buffer())
 	check(transfer.merge(destination.root, inputs, manifest).is_empty() and transfer.last_error.contains("Corrupt"), "corrupt source fails before importing")

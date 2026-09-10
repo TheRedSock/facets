@@ -20,7 +20,7 @@ func _initialize() -> void:
 			printerr("Worker source mismatch: " + relative)
 			quit(1)
 			return
-	if GemRenderIdentity.optical_digest() != manifest["engine"]:
+	if GemRenderIdentity.worker_digest() != manifest["engine"]:
 		printerr("Worker optical engine/version differs from the job bundle")
 		quit(1)
 		return
@@ -63,6 +63,10 @@ func _initialize() -> void:
 			printerr("Job rejected before identity evaluation: " + admission_error)
 			failures += 1
 			continue
+		if record.get("engine") != GemFramePlan.master_engine(job) or record.get("print_engine") != GemRenderIdentity.pipeline_digest("print"):
+			printerr("Job pipeline identity differs from request: " + key)
+			failures += 1
+			continue
 		if GemFramePlan.display_key(job) != key:
 			printerr("Job identity mismatch: " + key)
 			failures += 1
@@ -98,7 +102,7 @@ func _geometry(records: Dictionary, base: String, output: String, shard: int, sh
 			continue
 		var job := load(path) as GemFrameJob
 		var side := int(record.coverage_side)
-		if not GemGeometryPlan.validate(job, side).is_empty() or job.resolution != Vector2i(int(record.width), int(record.height)) or GemGeometryPlan.key(job, side) != key:
+		if not GemGeometryPlan.validate(job, side).is_empty() or record.engine != GemGeometryPlan.source_digest() or job.resolution != Vector2i(int(record.width), int(record.height)) or GemGeometryPlan.key(job, side) != key:
 			printerr("Geometry request or identity mismatch")
 			failures += 1
 			continue

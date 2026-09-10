@@ -1,27 +1,63 @@
 class_name GemRenderIdentity
 extends RefCounted
-## Recipe identity is independent of worker/GPU identity. A packaged result
-## may be served on any device; its producer and validation live in metadata.
+## Result compatibility is distinct from the complete renderer inventory.
+## Unknown/new files are shared conservatively until explicitly classified.
+const EXCLUSIVE := {
+	"frame_execution": ["core/lapidary/factory/frame_worker.gd"],
+	"crystal": ["core/lapidary/tracer/crystal_shader.gd", "core/lapidary/tracer/shaders/gem_crystal.glsl", "core/lapidary/tracer/shaders/gem_crystal_path.glsl"],
+	"print": ["core/lapidary/tracer/shaders/gem_print.glsl", "resources/lapidary/gem_print.gd"],
+	"geometry": ["core/lapidary/tracer/geometry_aov.gd", "core/lapidary/tracer/shaders/gem_geometry_aov.glsl"],
+	"transport": ["core/lapidary/tracer/shaders/gem_pathtrace.glsl", "core/lapidary/tracer/shaders/gem_surface.glsl",
+		"core/lapidary/tracer/shaders/gem_volume.glsl", "core/lapidary/tracer/shaders/gem_polarization.glsl", "core/lapidary/tracer/shaders/gem_denoise.glsl"]
+}
+const DOMAINS := ["worker", "scalar", "polarized", "crystal", "print", "geometry"]
+static var _inventory: Dictionary = {}
+static var _digests: Dictionary = {}
 
-static var _optical_digest := ""
+static func worker_digest() -> String:
+	return pipeline_digest("worker")
 
-static func optical_digest() -> String:
-	if _optical_digest.is_empty():
+static func transport_domain(policy: Dictionary) -> String:
+	return "crystal" if policy.get("crystal_transport", false) else ("polarized" if policy.get("polarization", false) else "scalar")
+
+static func pipeline_digest(domain: String) -> String:
+	if not _digests.has(domain):
+		_digests[domain] = digest_inventory(domain, inventory(), Engine.get_version_info().get("hash", "unknown"))
+	return _digests[domain]
+
+## Detached inventory for dependency mutation tests without editing live files.
+static func inventory() -> Dictionary:
+	if _inventory.is_empty():
 		var files: Array[String] = []
 		for root in ["res://core/lapidary/cut", "res://core/lapidary/geometry", "res://core/lapidary/lighting", "res://core/lapidary/tracer", "res://resources/lapidary"]:
 			_collect(root, files)
-		files.append("res://core/lapidary/stone_compiler.gd")
-		files.append("res://core/lapidary/material_compiler.gd")
-		files.append(GemStandardSpectra.CMF_FILE)
-		files.append(GemStandardSpectra.D65_FILE)
-		files.sort()
-		var sources: Array = [Engine.get_version_info().get("hash", "unknown")]
+		files.append_array(["res://core/lapidary/stone_compiler.gd", "res://core/lapidary/material_compiler.gd",
+			"res://core/lapidary/render_identity.gd", "res://core/lapidary/factory/frame_worker.gd",
+			"res://core/lapidary/factory/frame_plan.gd", GemStandardSpectra.CMF_FILE, GemStandardSpectra.D65_FILE])
 		for path in files:
-			# Factory scheduling, delivery codecs and runtime cache policy must
-			# not retire expensive optical masters.
-			sources.append([path, FileAccess.get_sha256(path)])
-		_optical_digest = GemContentIdentity.digest(sources)
-	return _optical_digest
+			_inventory[path.trim_prefix("res://")] = FileAccess.get_sha256(path)
+	return _inventory.duplicate()
+
+static func digest_inventory(domain: String, hashes: Dictionary, engine_hash: String) -> String:
+	assert(domain in DOMAINS, "Unknown result pipeline")
+	var paths := hashes.keys()
+	paths.sort()
+	var sources: Array = ["pipeline-source-v1", domain, engine_hash]
+	for path: String in paths:
+		if includes_source(domain, path):
+			sources.append([path, hashes[path]])
+	return GemContentIdentity.digest(sources)
+
+static func includes_source(domain: String, path: String) -> bool:
+	assert(domain in DOMAINS)
+	if domain == "worker":
+		return true
+	for group: String in EXCLUSIVE:
+		if path in EXCLUSIVE[group]:
+			if group == "frame_execution":
+				return domain != "geometry"
+			return domain in ["scalar", "polarized", "crystal"] if group == "transport" else domain == group
+	return true
 
 static func _collect(root: String, files: Array[String]) -> void:
 	var directory := DirAccess.open(root)

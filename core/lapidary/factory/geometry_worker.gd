@@ -32,7 +32,7 @@ func _run_active(job: GemFrameJob, coverage_side: int) -> Dictionary:
 	var key := GemGeometryPlan.key(job, coverage_side)
 	var expected := {"width": job.resolution.x, "height": job.resolution.y, "coverage_side": coverage_side}
 	var record := store.read(key)
-	if not record.is_empty() and GemGeometryPlan.payload_error(record, expected, GemRenderIdentity.optical_digest()).is_empty():
+	if not record.is_empty() and GemGeometryPlan.payload_error(record, expected, GemGeometryPlan.source_digest()).is_empty():
 		counters.cache_hits += 1
 		return record.metadata
 	var specimen_key := GemContentIdentity.digest(GemGeometryPlan.specimen_inputs(job.stone))
@@ -53,9 +53,9 @@ func _run_active(job: GemFrameJob, coverage_side: int) -> Dictionary:
 		last_error = "Geometry pass failed"
 		return {}
 	var metadata := expected.duplicate()
-	metadata.merge({"kind": "primary_geometry", "engine": GemRenderIdentity.optical_digest(), "geometry_pipeline": GemGeometryPlan.source_digest(), "codec": "gao1", "status": "complete",
+	metadata.merge({"kind": "primary_geometry", "engine": GemGeometryPlan.source_digest(), "geometry_pipeline": GemGeometryPlan.source_digest(), "codec": "gao1", "status": "complete",
 		"position_depth_unit": "mm", "normal_space": "object_incident_facing", "geometry_wall_ms": (Time.get_ticks_usec() - begin) / 1000.0,
-		"optical_samples": tracer.samples_accumulated, "producer": {"godot": Engine.get_version_info(), "adapter": RenderingServer.get_video_adapter_name()}})
+		"optical_samples": tracer.samples_accumulated, "producer": {"source_engine": GemRenderIdentity.worker_digest(), "godot": Engine.get_version_info(), "adapter": RenderingServer.get_video_adapter_name()}})
 	if not store.publish(key, geometry.encode(), metadata):
 		last_error = "Cannot publish geometry companion"
 		return {}
