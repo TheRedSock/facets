@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v9)
+# Lapidary kernel contract (v10)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. All floats
@@ -52,8 +52,10 @@ for visibility, but transport processes their segments to preserve optical lengt
 
 Flags: bit0 has_eray, bit1 dispersion_strong. BVH selector0 is convex planes,
 -1 analytic host without mesh, positive root+1 supports triangle host/defects.
-Absorption concatenates 81-sample α/mm blocks, 380..780 nm at5nm. An e-ray
-block follows its o-ray block directly. Concentration is already applied.
+Absorption concatenates 401-sample Napierian α/mm blocks, 380..780 nm at1nm. An e-ray
+block follows its o-ray block directly (offset+401). Source resources may use
+a different uniform grid, but must cover the transport interval. No implicit
+extrapolation or normalization of material absorption is allowed. Concentration is already applied.
 
 Current anisotropy is an approximation: α_k=cos²φ α_o+sin²φ α_e; the unpolarized
 segment uses (T_o+T_k)/2. Optional o/e fork occurs above |Δn|=.015, with effective
@@ -169,3 +171,25 @@ haze recipe, not a calibrated gemological grade. Automatic clarity and surface
 recipes are disabled. Explicit fractures have not passed low-SPP visual acceptance.
 Recipe hashes cover physical input and optical source; producer hardware/driver
 are metadata. Determinism tests use tolerances across floating-point execution.
+
+
+## Measurement ingestion and evidence
+
+`GemOpticalEvidence` scopes evidence to refraction, absorption or scattering:
+authored approximation, published model, fitted targets or supplied measurement.
+The catalog's absorption bands remain authored approximations. Four refraction
+models use published Sellmeier coefficients; most others fit sparse targets, and
+painite dispersion remains an explicit assumption. These descriptors do not claim
+independent laboratory calibration. Temperature and uncertainty can be unknown.
+
+`tools/import_absorption.gd` reads CSV wavelength_nm,ordinary[,extraordinary] plus
+JSON quantity/optical_basis/citation/method. It converts Napierian or decadic
+coefficients (/mm,/cm,/m), internal transmittance or decadic absorbance to α/mm
+before coefficient-space interpolation. Transmission/absorbance requires path_mm
+and explicit removal of interface and scattering losses. Saturated zero,
+negative/nonfinite data, unordered wavelengths and incomplete spectral coverage
+are rejected. Raw CSV SHA256 and interpretation metadata are retained beside the
+resource and in its evidence. Importing data is not certification of its origin.
+Material validation also rejects invalid concentration, visible Sellmeier poles,
+unsupported model range and invalid scattering. Signed Sellmeier terms are
+consistent on CPU/GPU; invalid n² is not silently repaired on the CPU.

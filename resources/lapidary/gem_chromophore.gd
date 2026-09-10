@@ -7,9 +7,13 @@ extends Resource
 @export var display_name := ""
 ## Citation / derivation note for the absorption curve.
 @export var source_note := ""
+@export var absorption_evidence: GemOpticalEvidence = GemOpticalEvidence.new()
 
 ## Absorption alpha(lambda) per mm at reference concentration.
-## 81 samples, 380..780 nm at 5 nm steps. Empty = colorless.
+## Uniform source grid; the compiler resamples to the 1 nm transport grid.
+## The catalog's authored approximations use 81 samples at 5 nm. Empty=colorless.
+@export var wavelength_start_nm := 380.0
+@export var wavelength_step_nm := 5.0
 @export var absorption_mm := PackedFloat32Array()
 ## Concentration multiplier applied to the curve.
 @export var concentration := 1.0
@@ -30,3 +34,25 @@ extends Resource
 
 func is_colorless() -> bool:
 	return absorption_mm.is_empty()
+
+func validate() -> PackedStringArray:
+	var errors := PackedStringArray()
+	if not is_finite(concentration) or concentration < 0.0:
+		errors.append("Absorption concentration must be finite and nonnegative")
+	if not is_finite(wavelength_start_nm) or not is_finite(wavelength_step_nm) or wavelength_step_nm <= 0.0:
+		errors.append("Invalid absorption wavelength grid")
+	for curve in [absorption_mm, absorption_eray_mm]:
+		if not curve.is_empty() and (curve.size() < 2 or curve.size() > 10000 or wavelength_start_nm > 380.0 or wavelength_start_nm + wavelength_step_nm * (curve.size() - 1) < 780.0):
+			errors.append("Absorption data must cover the complete 380..780 nm transport interval")
+		for value in curve:
+			if not is_finite(value) or value < 0.0:
+				errors.append("Absorption coefficients must be finite and nonnegative")
+			if value * concentration > 3.4028234e38:
+				errors.append("Scaled absorption exceeds the float32 transport range")
+	if not absorption_eray_mm.is_empty() and absorption_eray_mm.size() != absorption_mm.size():
+		errors.append("Ordinary and extraordinary absorption must share the same source grid")
+	if absorption_evidence == null:
+		errors.append("Absorption evidence descriptor is missing")
+	else:
+		errors.append_array(absorption_evidence.validate())
+	return errors

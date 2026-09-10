@@ -644,6 +644,12 @@ func _pole(l_um: float, c_um2: float) -> float:
 
 
 func _save(res: Resource, path: String) -> void:
+	if res is GemSpecies:
+		var evidence := GemOpticalEvidence.new()
+		evidence.kind = GemOpticalEvidence.Kind.PUBLISHED_MODEL if res.species_id in [&"quartz", &"corundum", &"diamond", &"fluorite"] else (GemOpticalEvidence.Kind.AUTHORED_APPROXIMATION if res.species_id == &"painite" else GemOpticalEvidence.Kind.FITTED_TARGETS)
+		evidence.citation = res.source_note
+		evidence.method = "Published Sellmeier coefficients" if evidence.kind == GemOpticalEvidence.Kind.PUBLISHED_MODEL else "Two-target empirical dispersion fit; see citation for assumptions"
+		res.refraction_evidence = evidence
 	var err := ResourceSaver.save(res, path)
 	assert(err == OK, "failed to save %s (err %d)" % [path, err])
 	# Register the saved path on the instance so resources saved later reference

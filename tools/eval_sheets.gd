@@ -441,12 +441,7 @@ static func _ladder_key(file: String) -> String:
 static func _stone_invalid_reason(stone: GemStone) -> String:
 	if stone.material.species == null:
 		return "no species"
-	var ch := stone.material.chromophore
-	if ch != null and not ch.absorption_mm.is_empty() and ch.absorption_mm.size() != 81:
-		return "absorption curve has %d samples - want 81" % ch.absorption_mm.size()
-	if ch != null and not ch.absorption_eray_mm.is_empty() and ch.absorption_eray_mm.size() != 81:
-		return "e-ray curve has %d samples - want 81" % ch.absorption_eray_mm.size()
-	return ""
+	return "; ".join(stone.material.validate())
 
 
 static func _axis_grade(axis: String, stop: float) -> GemGrade:

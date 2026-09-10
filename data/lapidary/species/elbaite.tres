@@ -1,7 +1,15 @@
-[gd_resource type="Resource" script_class="GemSpecies" format=3]
+[gd_resource type="Resource" script_class="GemSpecies" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_yc1t2"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_a6eil"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="refraction_evidence_script"]
+
+[sub_resource type="Resource" id="refraction_evidence"]
+script = ExtResource("refraction_evidence_script")
+kind = 2
+citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.635 (gemologyproject.com: usual RI 1.62-1.64) and B-G dispersion 0.018 (same source: 'Low, 0.018'); UV pole 0.025 um^2 + constant term. Uniaxial(-) delta-n 0.018 (lit. 0.014-0.021). Mohs 7.5. Strong colour zoning along c."
+method = "Two-target empirical dispersion fit; see citation for assumptions"
 
 [sub_resource type="Resource" id="Resource_15mlv"]
 script = ExtResource("1_yc1t2")
@@ -27,6 +35,7 @@ center_bias = 0.25
 
 [resource]
 script = ExtResource("2_a6eil")
+refraction_evidence = SubResource("refraction_evidence")
 species_id = &"elbaite"
 display_name = "Elbaite tourmaline (Li borosilicate)"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.635 (gemologyproject.com: usual RI 1.62-1.64) and B-G dispersion 0.018 (same source: 'Low, 0.018'); UV pole 0.025 um^2 + constant term. Uniaxial(-) delta-n 0.018 (lit. 0.014-0.021). Mohs 7.5. Strong colour zoning along c."

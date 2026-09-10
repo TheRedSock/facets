@@ -1,7 +1,15 @@
-[gd_resource type="Resource" script_class="GemSpecies" format=3]
+[gd_resource type="Resource" script_class="GemSpecies" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_kruo5"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_3arvd"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="refraction_evidence_script"]
+
+[sub_resource type="Resource" id="refraction_evidence"]
+script = ExtResource("refraction_evidence_script")
+kind = 1
+citation = "Sellmeier: G. Ghosh, Opt. Commun. 163, 95-102 (1999), alpha-quartz o-ray (refractiveindex.info SiO2/Ghosh-o; C already in um^2, constant 0.28604141 stored as B with C=0). Birefringence 0.009 uniaxial(+), Mohs 7, dispersion B-G 0.013: standard gemological values. Sector zoning (amethyst) approximated as planar banding, see docs/lapidary-spectra-sources.md."
+method = "Published Sellmeier coefficients"
 
 [sub_resource type="Resource" id="Resource_ejd13"]
 script = ExtResource("1_kruo5")
@@ -25,6 +33,7 @@ center_bias = 0.15
 
 [resource]
 script = ExtResource("2_3arvd")
+refraction_evidence = SubResource("refraction_evidence")
 species_id = &"quartz"
 display_name = "Quartz (SiO2)"
 source_note = "Sellmeier: G. Ghosh, Opt. Commun. 163, 95-102 (1999), alpha-quartz o-ray (refractiveindex.info SiO2/Ghosh-o; C already in um^2, constant 0.28604141 stored as B with C=0). Birefringence 0.009 uniaxial(+), Mohs 7, dispersion B-G 0.013: standard gemological values. Sector zoning (amethyst) approximated as planar banding, see docs/lapidary-spectra-sources.md."

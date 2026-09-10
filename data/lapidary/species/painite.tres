@@ -1,7 +1,15 @@
-[gd_resource type="Resource" script_class="GemSpecies" format=3]
+[gd_resource type="Resource" script_class="GemSpecies" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_i5cr6"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_ylu0r"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="refraction_evidence_script"]
+
+[sub_resource type="Resource" id="refraction_evidence"]
+script = ExtResource("refraction_evidence_script")
+kind = 0
+citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.80 (published RI range ~1.787-1.816) and ASSUMED B-G dispersion 0.018 (no published dispersion found; corundum-like oxide assumed). Uniaxial(-) delta-n 0.028. Mohs 8. Sparse literature — constants are best-effort, flagged for revisit."
+method = "Two-target empirical dispersion fit; see citation for assumptions"
 
 [sub_resource type="Resource" id="Resource_7i2jy"]
 script = ExtResource("1_i5cr6")
@@ -27,6 +35,7 @@ center_bias = 0.25
 
 [resource]
 script = ExtResource("2_ylu0r")
+refraction_evidence = SubResource("refraction_evidence")
 species_id = &"painite"
 display_name = "Painite (CaZrAl9O15(BO3))"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.80 (published RI range ~1.787-1.816) and ASSUMED B-G dispersion 0.018 (no published dispersion found; corundum-like oxide assumed). Uniaxial(-) delta-n 0.028. Mohs 8. Sparse literature — constants are best-effort, flagged for revisit."

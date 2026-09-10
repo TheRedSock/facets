@@ -110,8 +110,8 @@ float fresnel_diel(float cos_i, float eta) {
 
 float sellmeier(vec3 B, vec3 C, float wl_nm) {
 	float l2 = (wl_nm * 1e-3) * (wl_nm * 1e-3);
-	float s = 1.0 + B.x * l2 / (l2 - C.x) + B.y * l2 / (l2 - C.y);
-	if (B.z > 0.0) { s += B.z * l2 / (l2 - C.z); }
+	float s = 1.0;
+	for (int i=0; i<3; ++i) { if (B[i] != 0.0) { s += B[i] * l2 / (l2 - C[i]); } }
 	return sqrt(max(s, 1.0));
 }
 
@@ -165,9 +165,9 @@ vec4 emission4(vec4 wl, float offset) {
 }
 
 float absorb_at(int base, float wl_nm) {
-	float f = clamp((wl_nm - 380.0) / 5.0, 0.0, 80.0);
+	float f = clamp(wl_nm - 380.0, 0.0, 400.0);
 	int i = int(f);
-	return mix(absorb_mm[base + i], absorb_mm[base + min(i + 1, 80)], f - float(i));
+	return mix(absorb_mm[base + i], absorb_mm[base + min(i + 1, 400)], f - float(i));
 }
 
 // Henyey-Greenstein phase function, normalised over the sphere.
@@ -189,8 +189,7 @@ float role_multiplier(float role, vec4 role_mult) {
 float cone_omega(float ci, float co) { return TAU * ((1.0 - ci) + 0.5 * (ci - co)); }
 
 // Analytic rig radiance for 4 wavelengths. bg = (zenith, horizon, below,
-// kelvin): the background spectrum is Planckian at bg.w (flat when 0), so a
-// rig can be one consistent neutral that the print's white balance removes.
+// spectrum offset): all sources address the same compiled emission table.
 // `fp` widens every cone by the angular footprint (flux-conserving: radiance
 // scaled by the ratio of effective solid angles). Blockers always apply;
 // with_lights = false returns the background only.

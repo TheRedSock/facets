@@ -287,6 +287,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			_field_exits = 0
 		var ab: PackedFloat32Array = inst["absorption"]
 		var ab_e: PackedFloat32Array = inst.get("absorption_eray", PackedFloat32Array())
+		assert(ab.size() == 401 and (ab_e.is_empty() or ab_e.size() == 401), "Invalid compiled absorption grid")
 		var stone_flags := 0
 		var plane_offset := planes.size() / 8
 		var absorb_offset := absorb.size()

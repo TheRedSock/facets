@@ -117,7 +117,7 @@ vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray
 	vec4 alpha_o, alpha_e, alpha_k;
 	for (int i = 0; i < 4; i++) {
 		alpha_o[i] = absorb_at(a_off, wl[i]);
-		alpha_e[i] = absorb_at(a_off + 81, wl[i]);
+		alpha_e[i] = absorb_at(a_off + 401, wl[i]);
 		alpha_k[i] = c2 * alpha_o[i] + s2 * alpha_e[i];
 	}
 	if (pol_mode == POL_O) { return exp(-alpha_o * zf * L); }

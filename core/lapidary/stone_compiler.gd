@@ -18,6 +18,7 @@ const WL_C := 656.3
 
 static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary:
 	assert(stone != null and stone.material.species != null)
+	var bulk := GemMaterialCompiler.compile(stone.material)
 	var species := stone.material.species
 	var grade := stone.grade if stone.grade != null else GemGrade.new()
 	var cut_q := grade.cut if cut_quality_override < 0.0 else cut_quality_override
@@ -25,7 +26,6 @@ static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary
 
 	var geometry := _compile_cut(stone, n_d, cut_q)
 
-	var bulk := GemMaterialCompiler.compile(stone.material)
 	var rng_state := [int(stone.seed) * 2654435761 + 1013904223]
 	
 	var compiled := {

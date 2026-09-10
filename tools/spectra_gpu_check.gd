@@ -76,6 +76,43 @@ func _initialize() -> void:
 	tracer.set_lighting(GemRigCompiler.compile(rig))
 	tracer.accumulate(128)
 	check(mean_xyz(tracer.read_xyz()).distance_to(GemColorimetry.spectrum_xyz(GemSpectrumCompiler.compile(recipe))) < 0.003, "light-cone emission uses the compiled SPD")
+	_absorption_band(tracer, specimen, policy)
 	tracer.release()
 	print("GPU spectra: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)
+
+func _absorption_band(tracer: GemTracer, specimen: Dictionary, policy: Dictionary) -> void:
+	var material := GemMaterial.new()
+	material.species = GemSpecies.new() # index-matched analytical slab
+	material.chromophore = GemChromophore.new()
+	material.chromophore.wavelength_step_nm = 1.0
+	material.chromophore.absorption_mm.resize(401)
+	material.chromophore.absorption_mm[182] = 1.0 # 562 nm: missed by the old 5 nm grid
+	var bulk := GemMaterialCompiler.compile(material)
+	specimen["absorption"] = bulk["absorption"]
+	specimen["planes"] = PackedFloat32Array()
+	for axis in [Vector3.RIGHT, Vector3.UP, Vector3.BACK]:
+		for sign_value in [-1.0, 1.0]:
+			var normal: Vector3 = axis * sign_value
+			specimen["planes"].append_array(PackedFloat32Array([normal.x, normal.y, normal.z, 1, 0, 0, 0, 0]))
+	var rig := GemLightRig.new()
+	rig.background_spectrum.model = GemSpectrum.Model.CIE_D65
+	rig.bg_zenith = 1.0
+	rig.bg_horizon = 1.0
+	rig.bg_below = 1.0
+	var lighting := GemRigCompiler.compile(rig)
+	tracer.configure_stone(specimen, lighting, policy)
+	tracer.accumulate(256)
+	var expected := Vector3.ZERO
+	var emission := GemSpectrumCompiler.compile(rig.background_spectrum)
+	for sample_index in 1600:
+		var wavelength := 380.0 + (sample_index + 0.5) * 0.25
+		var index := int(wavelength - 380.0)
+		var fraction := wavelength - 380.0 - index
+		var alpha := lerpf(specimen["absorption"][index], specimen["absorption"][index + 1], fraction)
+		var radiance := lerpf(emission[index], emission[index + 1], fraction)
+		expected += GemStandardSpectra.xyz(wavelength) * radiance * exp(-alpha * 2.0 * float(specimen["size_mm"])) * 0.25
+	expected /= GemColorimetry.integral_ybar()
+	var actual := mean_xyz(tracer.read_xyz())
+	check(actual.distance_to(expected) < 0.0015, "1 nm absorption band agrees with independent slab quadrature: %s vs %s" % [actual, expected])
+	check(actual.y < 0.99, "sub-5 nm absorption feature measurably reaches transport")

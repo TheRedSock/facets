@@ -19,7 +19,8 @@ const WL_C := 656.3
 const WL_B := 686.7
 const WL_G := 430.8
 
-## Published values (see docs/lapidary-spectra-sources.md for citations).
+## Catalog refraction targets (published constants or explicitly fitted/assumed
+## targets; these tests are regression checks, not independent calibration).
 const ND_TARGETS := {
 	&"quartz": 1.544,      # Ghosh 1999 alpha-quartz o-ray
 	&"olivine": 1.654,     # gem peridot n_alpha (RI 1.654-1.690)
@@ -100,12 +101,12 @@ func _test_species(species: Dictionary) -> void:
 		var n_d: float = sp.ior_at(WL_D)
 		var target: float = ND_TARGETS[id]
 		_check(absf(n_d - target) <= ND_TOLERANCE,
-			"%s: n_D %.4f differs from published %.4f by more than %.3f" % [label, n_d, target, ND_TOLERANCE])
+			"%s: n_D %.4f differs from catalog target %.4f by more than %.3f" % [label, n_d, target, ND_TOLERANCE])
 
 		var disp_bg: float = sp.ior_at(WL_G) - sp.ior_at(WL_B)
 		var disp_target: float = DISPERSION_BG_TARGETS[id]
 		_check(absf(disp_bg - disp_target) <= DISPERSION_TOLERANCE,
-			"%s: B-G dispersion %.4f differs from published %.4f" % [label, disp_bg, disp_target])
+			"%s: B-G dispersion %.4f differs from catalog target %.4f" % [label, disp_bg, disp_target])
 
 		_check(sp.ior_at(380.0) > sp.ior_at(780.0),
 			"%s: normal dispersion requires n(380) > n(780)" % label)
@@ -251,7 +252,7 @@ func _test_compiler_consumption(stones: Dictionary) -> void:
 		var instance: Dictionary = LapidaryStoneCompiler.compile(stone)
 		_check(instance["planes"].size() > 0 and instance["planes"].size() % 8 == 0,
 			"%s: compiled hull must have plane records (stride 8)" % label)
-		_check(instance["absorption"].size() == 81, "%s: compiled absorption must be 81 samples" % label)
+		_check(instance["absorption"].size() == 401, "%s: compiled absorption must be 401 samples" % label)
 		_check(instance["fingerprint"] == stone.fingerprint(),
 			"%s: compiled fingerprint must match the stone's" % label)
 		var strong: bool = instance["dispersion_strong"]

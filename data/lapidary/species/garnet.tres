@@ -1,7 +1,15 @@
-[gd_resource type="Resource" script_class="GemSpecies" format=3]
+[gd_resource type="Resource" script_class="GemSpecies" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_st222"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_jhkny"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="refraction_evidence_script"]
+
+[sub_resource type="Resource" id="refraction_evidence"]
+script = ExtResource("refraction_evidence_script")
+kind = 2
+citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.760 (rhodolite RI 1.760 +0.010/-0.020, Wikipedia/Chemija 32:4549) and B-G dispersion 0.026 (Wikipedia rhodolite); UV pole 0.025 um^2 + constant term. Cubic: birefringence 0 (anomalous DR ignored). Mohs 7.25 (lit. 7-7.5). Colour-change pyrope-spessartine (~1.76) shares the species at this granularity."
+method = "Two-target empirical dispersion fit; see citation for assumptions"
 
 [sub_resource type="Resource" id="Resource_0rh2a"]
 script = ExtResource("1_st222")
@@ -26,6 +34,7 @@ center_bias = 0.4
 
 [resource]
 script = ExtResource("2_jhkny")
+refraction_evidence = SubResource("refraction_evidence")
 species_id = &"garnet"
 display_name = "Garnet, pyralspite (Mg,Fe,Mn)3Al2(SiO4)3"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.760 (rhodolite RI 1.760 +0.010/-0.020, Wikipedia/Chemija 32:4549) and B-G dispersion 0.026 (Wikipedia rhodolite); UV pole 0.025 um^2 + constant term. Cubic: birefringence 0 (anomalous DR ignored). Mohs 7.25 (lit. 7-7.5). Colour-change pyrope-spessartine (~1.76) shares the species at this granularity."

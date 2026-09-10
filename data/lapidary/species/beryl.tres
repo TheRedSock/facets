@@ -1,7 +1,15 @@
-[gd_resource type="Resource" script_class="GemSpecies" format=3]
+[gd_resource type="Resource" script_class="GemSpecies" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_u0535"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="2_4ktyr"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="refraction_evidence_script"]
+
+[sub_resource type="Resource" id="refraction_evidence"]
+script = ExtResource("refraction_evidence_script")
+kind = 2
+citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.577 (natural emerald n_omega 1.575-1.600, geo.libretexts Gemology: Emerald) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Birefringence 0.006 uniaxial(-) (lit. 0.004-0.010). Mohs 7.75 (lit. 7.5-8)."
+method = "Two-target empirical dispersion fit; see citation for assumptions"
 
 [sub_resource type="Resource" id="Resource_l0ux1"]
 script = ExtResource("1_u0535")
@@ -38,6 +46,7 @@ center_bias = 0.4
 
 [resource]
 script = ExtResource("2_4ktyr")
+refraction_evidence = SubResource("refraction_evidence")
 species_id = &"beryl"
 display_name = "Beryl (Be3Al2Si6O18)"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.577 (natural emerald n_omega 1.575-1.600, geo.libretexts Gemology: Emerald) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Birefringence 0.006 uniaxial(-) (lit. 0.004-0.010). Mohs 7.75 (lit. 7.5-8)."
