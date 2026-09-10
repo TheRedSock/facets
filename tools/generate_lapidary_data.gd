@@ -550,7 +550,7 @@ func _build_stones(species: Dictionary, chromophores: Dictionary, grades: Dictio
 		stone.species = species[row[1]]
 		stone.chromophore = chromophores[row[2]] if row[2] != &"" else null
 		stone.grade = grades[row[3]]
-		stone.silhouette = row[4]
+		stone.shape = GemShape.faceted_outline(row[4])
 		stone.cut = cuts[row[5]]
 		stone.seed = row[6]
 		stone.size_mm = row[7]

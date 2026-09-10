@@ -7,9 +7,7 @@ extends Resource
 @export var species: GemSpecies
 @export var chromophore: GemChromophore # null = colorless
 @export var cut: Resource               # GemCutTemplate (owned by core/lapidary/cut/)
-## Silhouette from the gameplay taxonomy (round/oval/square/triangle/diamond/
-## rectangle/marquise/pear). Tile readability language, unchanged.
-@export var silhouette: StringName = &"round"
+@export var shape: GemShape = GemShape.new()
 @export var grade: GemGrade
 ## Deterministic seed: inclusions, wear and jitter are stable across
 ## preview, bake and replays.

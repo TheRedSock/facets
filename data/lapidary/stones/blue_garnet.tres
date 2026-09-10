@@ -6,13 +6,22 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_yefgd"]
 [ext_resource type="Resource" path="res://data/lapidary/species/garnet.tres" id="5_hu5kv"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"pear"
+aspect_ratio = 1.4
+corner_radius = 0.1
+sectors = 8
+
 [resource]
 script = ExtResource("4_yefgd")
+shape = SubResource("Shape")
 stone_id = &"blue_garnet"
 species = ExtResource("5_hu5kv")
 chromophore = ExtResource("1_3knps")
 cut = ExtResource("2_qb6px")
-silhouette = &"pear"
 grade = ExtResource("3_3ylki")
 seed = 71
 size_mm = 5.5

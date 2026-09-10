@@ -6,13 +6,22 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_83wxx"]
 [ext_resource type="Resource" path="res://data/lapidary/species/beryl.tres" id="5_d67f1"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"rectangle"
+aspect_ratio = 1.35
+corner_radius = 0.1
+sectors = 8
+
 [resource]
 script = ExtResource("4_83wxx")
+shape = SubResource("Shape")
 stone_id = &"emerald"
 species = ExtResource("5_d67f1")
 chromophore = ExtResource("1_l3ky1")
 cut = ExtResource("2_ivlth")
-silhouette = &"rectangle"
 grade = ExtResource("3_8dukx")
 seed = 29
 size_mm = 5.25

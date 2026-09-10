@@ -6,13 +6,22 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_finip"]
 [ext_resource type="Resource" path="res://data/lapidary/species/chrysoberyl.tres" id="5_usqoy"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"rectangle"
+aspect_ratio = 1.35
+corner_radius = 0.1
+sectors = 8
+
 [resource]
 script = ExtResource("4_finip")
+shape = SubResource("Shape")
 stone_id = &"alexandrite"
 species = ExtResource("5_usqoy")
 chromophore = ExtResource("1_12t44")
 cut = ExtResource("2_vk2vf")
-silhouette = &"rectangle"
 grade = ExtResource("3_qgaiw")
 seed = 61
 size_mm = 5.25

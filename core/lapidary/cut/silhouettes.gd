@@ -34,6 +34,7 @@ const KINDS: Array[StringName] = [
 class Silhouette:
 	var kind: StringName = &"round"
 	var sectors: int = 8
+	var radial_segments: int = 32
 	# Rounded regular polygon (square / triangle / diamond / rectangle).
 	var poly_k: int = 0
 	var poly_phase: float = 0.0
@@ -143,7 +144,7 @@ class Silhouette:
 		return b_dot + sqrt(maxf(disc, 0.0))
 
 
-static func make(kind: StringName) -> Silhouette:
+static func make(kind: StringName, shape: GemShape = null) -> Silhouette:
 	var s := Silhouette.new()
 	s.kind = kind
 	match kind:
@@ -187,6 +188,14 @@ static func make(kind: StringName) -> Silhouette:
 			s.pear_beta = acos(s.pear_b)
 		_:
 			return null
+	if shape != null:
+		if not is_finite(shape.aspect_ratio) or shape.aspect_ratio <= 0.0:
+			return null
+		var default_aspect: float = {&"oval": 1.0 / 0.78, &"diamond": 1.3, &"rectangle": 1.35, &"marquise": 1.8, &"pear": 1.4}.get(kind, 1.0)
+		s.scale_y *= default_aspect / shape.aspect_ratio
+		s.corner_r = clampf(shape.corner_radius, 0.0, 0.45)
+		s.sectors = maxi(3, shape.sectors)
+		s.radial_segments = clampi(shape.radial_segments, 8, 512)
 	var peak := 0.0
 	for i in SUPERSAMPLE:
 		peak = maxf(peak, s.radius(TAU * float(i) / float(SUPERSAMPLE)))
@@ -206,7 +215,7 @@ static func make(kind: StringName) -> Silhouette:
 static func girdle_supports(sil: Silhouette) -> Dictionary:
 	if sil.poly_k >= 3:
 		return _polygon_supports(sil)
-	return _support_ring(sil, GIRDLE_SMOOTH, true)
+	return _support_ring(sil, sil.radial_segments, true)
 
 
 static func _polygon_supports(sil: Silhouette) -> Dictionary:

@@ -1,37 +1,13 @@
 #version 450
-// Lapidary gem path tracer — kernel v3 (clean optics).
-//
-// Stone = convex plane set (intersection of half-spaces) + analytic inclusion
-// primitives + volumetric media. Transport = spectral, 4 hero wavelengths
-// sharing path geometry; per-wavelength path split when the rung enables
-// dispersion; entry birefringence fork when the rung + species enable it.
-// Facets are perfect specular dielectric interfaces (no wear model).
-//
-// Deterministic Fresnel splitting: at every interior exit the transmitted
-// branch immediately evaluates the analytic environment; the reflected / TIR
-// branch continues. The first inclusion surface hit splits deterministically
-// (reflected + transmitted branches) instead of a Bernoulli choice.
-//
-// Volume: unified free flight over homogeneous milk + cloud primitives. At a
-// scatter event the scattered radiance (every light AND the background,
-// through every Fresnel exit until the throughput dies) is read
-// DETERMINISTICALLY from the per-frame SH scatter field
-// (gem_scatter_field.glsl), convolved analytically with the HG phase function
-// (band l scaled by g^l), and the path terminates: the field IS the
-// continuation. Higher scattering orders are delivered forward (the medium
-// attenuates by absorption only after the sampled event), the same model on
-// both sides of the estimator. field_exits = 0 keeps the stochastic HG
-// continuation (reference estimator for the physics check).
-//
-// Structured dimensions use per-pixel Cranley-Patterson-rotated Halton with a
-// GLOBAL sample index; PCG covers the remainder.
-//
-// Batch-ready: instances are laid out on a pixel grid (grid 1x1 = single
-// stone). Stones are ranges into shared plane/inclusion/absorption buffers.
-//
-// CIE CMF analytic fit: Wyman, Sloan, Shirley, JCGT 2013 (multi-lobe).
+// Spectral transport over convex half-spaces or procedural closed meshes.
+// Four stratified wavelengths; quality policies select shared or independent
+// geometry. Repeated volume scattering is the production estimator. Optional
+// reconstruction filters only the volume residual against zero-scatter light.
+// The legacy SH continuation is disabled in production: it is not a validated
+// multiple-scattering solver. See KERNEL_CONTRACT.md for layouts and limitations.
 
 #include "gem_common.glsl"
+#include "gem_mesh.glsl"
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
@@ -390,6 +366,68 @@ vec4 field_scatter(int inst_idx, vec3 x, vec3 dir, float g, vec4 wl) {
 	return out_rad;
 }
 
+// General closed-mesh transport. Air segments can hit the same specimen
+// again. Deterministic exit splitting is used only when visibility proves
+// the escaping ray reaches the environment; coupled branches use roulette.
+vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, vec4 n_wl, float n_geom,
+		vec4 q, float rig_yaw, vec4 roles, int pol_mode, bool use_volume, inout uint rng) {
+	vec4 throughput = vec4(1.0), radiance = vec4(0.0);
+	bool outside = true;
+	float sigma = use_volume ? st.scatter_zone.x * st.sell_b_size.w : 0.0;
+	for (uint bounce = 0u; bounce < pc.max_bounces; bounce++) {
+		float distance; int triangle;
+		if (!mesh_hit(st.ranges1.z - 1, pos, dir, distance, triangle)) {
+			if (outside) { radiance += throughput * env_radiance(quat_rot(q, dir), wl, rig_yaw, roles, 0.0); }
+			break;
+		}
+		if (!outside) {
+			float free_flight = sigma > 0.0 ? -log(max(1e-7, 1.0 - rnd(rng))) / sigma : INF;
+			float segment = min(free_flight, distance);
+			throughput *= segment_att(st, pos, dir, segment, st.ranges1.x, (st.ranges1.y & 1) != 0, wl, pol_mode);
+			if (free_flight < distance) {
+				pos += dir * free_flight;
+				dir = hg_sample_u(dir, st.scatter_zone.y, vec2(rnd(rng), rnd(rng)));
+				continue;
+			}
+			if (!use_volume) { throughput *= exp(-st.scatter_zone.x * st.sell_b_size.w * distance); }
+		}
+		pos += dir * distance;
+		vec3 normal = mesh_normal(triangle);
+		vec3 facing = outside ? normal : -normal;
+		float ci = clamp(-dot(dir, facing), 0.0, 1.0);
+		float eta = outside ? 1.0 / n_geom : n_geom;
+		float reflectance = fresnel_diel(ci, eta);
+		vec4 R;
+		for (int channel = 0; channel < 4; channel++) { R[channel] = fresnel_diel(ci, outside ? 1.0 / n_wl[channel] : n_wl[channel]); }
+		vec3 reflected = normalize(reflect(dir, facing));
+		if (reflectance >= 1.0) {
+			dir = reflected;
+		} else {
+			vec3 transmitted = normalize(refract(dir, facing, eta));
+			vec3 escape_direction = outside ? reflected : transmitted;
+			float next_distance; int next_triangle;
+			bool obstructed = mesh_hit(st.ranges1.z - 1, pos + escape_direction * T_EPS * 4.0, escape_direction, next_distance, next_triangle);
+			if (!obstructed) {
+				vec4 escape_weight = outside ? R : vec4(1.0) - R;
+				radiance += throughput * escape_weight * env_radiance(quat_rot(q, escape_direction), wl, rig_yaw, roles, 0.0);
+				throughput *= vec4(1.0) - escape_weight;
+				dir = outside ? transmitted : reflected;
+				outside = false;
+			} else if (rnd(rng) < reflectance) {
+				throughput *= R / max(reflectance, 1e-7);
+				dir = reflected;
+			} else {
+				throughput *= (vec4(1.0) - R) / max(1.0 - reflectance, 1e-7);
+				dir = transmitted;
+				outside = !outside;
+			}
+		}
+		pos += dir * T_EPS * 4.0;
+		if (max(max(throughput.x, throughput.y), max(throughput.z, throughput.w)) < THROUGHPUT_EPS) { break; }
+	}
+	return radiance;
+}
+
 // ================================================================= main
 void main() {
 	ivec2 pix = ivec2(gl_GlobalInvocationID.xy) + ivec2(0, pc.row_origin);
@@ -450,11 +488,11 @@ void main() {
 
 		float t_near;
 		int entry_plane;
-		if (!hull_entry(p_off, p_cnt, ro, rd, t_near, entry_plane)) { continue; }
+		if (!body_entry(st, ro, rd, t_near, entry_plane)) { continue; }
 		total_cov += 1.0;
 
 		vec3 p_hit = ro + rd * t_near;
-		vec3 n_entry = planes[entry_plane].n_d.xyz;
+		vec3 n_entry = body_normal(entry_plane);
 		geometry_sum += vec4(quat_rot(q, n_entry), t_near);
 		min_facet = min(min_facet, float(entry_plane));
 		max_facet = max(max_facet, float(entry_plane));
@@ -465,7 +503,7 @@ void main() {
 		vec4 r_surf = vec4(
 			fresnel_diel(cos_i, 1.0 / n_wl.x), fresnel_diel(cos_i, 1.0 / n_wl.y),
 			fresnel_diel(cos_i, 1.0 / n_wl.z), fresnel_diel(cos_i, 1.0 / n_wl.w));
-		radiance += r_surf * env_radiance(quat_rot(q, reflect(rd, n_entry)), wl, rig_yaw, role_mult, 0.0);
+		if (st.ranges1.z == 0) { radiance += r_surf * env_radiance(quat_rot(q, reflect(rd, n_entry)), wl, rig_yaw, role_mult, 0.0); }
 
 		vec4 ballistic = radiance;
 		bool disp = FLAG_DISPERSION && ((pc.flags & 32u) != 0u || (st.ranges1.y & 2) != 0);
@@ -488,6 +526,11 @@ void main() {
 			float n_geom = eray ? n_e_phi(n_o, st.sell_c_biref.w, ca_in) : n_o;
 			int pol_mode = biref ? (eray ? POL_K : POL_O) : POL_UNPOL;
 
+			if (st.ranges1.z > 0) {
+				radiance += mask * pass_w * trace_mesh_path(st, ro, rd, wl, n_wl, n_geom, q, rig_yaw, role_mult, pol_mode, FLAG_VOLUME, rng);
+				if (sigma_h > 0.0) { ballistic += mask * pass_w * trace_mesh_path(st, ro, rd, wl, n_wl, n_geom, q, rig_yaw, role_mult, pol_mode, false, rng); }
+				continue;
+			}
 			float eta_in = 1.0 / n_geom;
 			float s2 = eta_in * eta_in * (1.0 - cos_i * cos_i);
 			if (s2 >= 1.0) { continue; }

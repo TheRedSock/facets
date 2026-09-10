@@ -1,4 +1,4 @@
-# Lapidary Kernel Contract (v4 — spectral transport and linear reconstruction)
+# Lapidary Kernel Contract (v5 — procedural geometry, spectral transport and linear reconstruction)
 
 The single interface between the data model and the GPU tracer. Everything that
 renders — designer preview, clip bake, live board draws, evaluation sheets —
@@ -16,8 +16,32 @@ down −Z; the stone quaternion rotates stone→world.
 | 4 | zone id | 0 table, 1 crown main/star, 2 upper girdle, 3 girdle, 4 pavilion main, 5 lower girdle, 6 culet, 7 step row (compiler metadata; kernel v3 treats every facet as a perfect specular dielectric) |
 | 5–7 | reserved | |
 
-The hull MUST be bounded (compiler responsibility). Facet-meeting error is
-per-plane jitter — never break the half-space representation.
+The hull MUST be bounded (compiler responsibility). Facet-meeting error may perturb the plane program. Faceted bodies may keep the
+convex backend or compile to a shared, closed triangle surface. Lofted and
+cabochon recipes use the triangle backend; concavity is supported.
+
+
+## Procedural triangle backend
+
+`GemShape` separates outline, aspect and profile from the cut program. Faceted
+plane conversion preserves source facet IDs and welds canonical plane intersections.
+`GemMesh` stores indexed outward-oriented closed surfaces; validation checks finite
+coordinates, indices, nondegeneracy, edge incidence/orientation and positive volume.
+It does not yet certify arbitrary global self-intersections.
+
+Triangle (64B): vec4 a, b, c (xyz vertices, w reserved), ivec4 metadata
+(facet ID, inside medium 0, outside medium -1, source triangle ID). Medium fields
+are reserved: this version supports one host dielectric and air.
+Node (48B): vec4 low/high bounds, ivec4 left/right/first/count. Count=0 denotes
+an internal node. Child and triangle indices are absolute in their shared buffers.
+The deterministic median BVH has four triangles per leaf; GPU traversal stack=64.
+Stone `ranges1.z=0` selects planes, otherwise it is the BVH root index plus one.
+
+General transport tracks air/host segments and handles external re-entry.
+Deterministic Fresnel escape splitting is only used after visibility proves a
+branch reaches the environment; coupled branches use weighted roulette. Curved
+surfaces currently use geometric triangle normals; tessellation can be visible in
+sharp highlights. Nested media and rough interfaces are subsequent work.
 
 ## Light (8 floats) — analytic rig, world space
 | idx | field |
@@ -60,7 +84,7 @@ Crystals sparkle and continue; they do not resolve as spheres.
 | 4 | optic axis.xyz, fluorescence strength |
 | 5 | fluorescence nm, absorb_scale, 0, 0 |
 | ivec4 6 | plane_offset, plane_count, incl_offset, incl_count |
-| ivec4 7 | absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), 0, 0 |
+| ivec4 7 | absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), bvh_root_plus_one, 0 |
 
 There is no surface-condition (wear) model: the grade reaches the kernel only
 through geometry (cut), inclusions (clarity) and media (crystal).
@@ -87,9 +111,9 @@ grid 1×1 = single stone.
 ## Bindings (set 0)
 0 Planes, 1 Lights, 2 Absorb, 3 Accum (vec4 XYZ+coverage), 4 Prims, 5 Stones, 6 Insts,
 7 legacy scatter field (`image3D` in pre-pass, `sampler3D` in trace; production policies disable it).
-+Trace-only bindings: 8 guides (two vec4 per pixel: normal/depth sums, residual Y squared/Y sum/min-max facet IDs), 9 zero-scatter XYZ/coverage sums, 10 residual XYZ/coverage sums.
-+
-+Reconstruction (`gem_denoise.glsl`) uses bindings 0 input sums, 1 guides, 2 output sums, 3 zero-scatter sums. Push constants (32B): resolution ivec2, step int, sample count float, phi float, normal exponent float, vec2 padding. Step zero composites filtered residual with untouched zero-scatter light. Other steps run positive, variance/normal-guided a-trous filtering. Coverage is never filtered. This is a biased optional reconstruction; `read_xyz` and `read_linear_master` always expose the unchanged reference accumulation.
+Trace-only bindings: 8 guides (two vec4 per pixel: normal/depth sums, residual Y squared/Y sum/min-max facet IDs), 9 zero-scatter XYZ/coverage sums, 10 residual XYZ/coverage sums, 11 triangles, 12 BVH nodes.
+
+Reconstruction (`gem_denoise.glsl`) uses bindings 0 input sums, 1 guides, 2 output sums, 3 zero-scatter sums. Push constants (32B): resolution ivec2, step int, sample count float, phi float, normal exponent float, vec2 padding. Step zero composites filtered residual with untouched zero-scatter light. Other steps run positive, variance/normal-guided a-trous filtering. Coverage is never filtered. This is a biased optional reconstruction; `read_xyz` and `read_linear_master` always expose the unchanged reference accumulation.
 
 Kernel push constants (96 B): resolution, sample_base, spp, seed, max_bounces, flags
 (bit0 dispersion_split, bit1 birefringence approximation, bit2 volume, bit4 reserved, bit5 full wavelength geometry),

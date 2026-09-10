@@ -6,13 +6,22 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_oq32d"]
 [ext_resource type="Resource" path="res://data/lapidary/species/quartz.tres" id="5_2tp88"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"square"
+aspect_ratio = 1.0
+corner_radius = 0.12
+sectors = 8
+
 [resource]
 script = ExtResource("4_oq32d")
+shape = SubResource("Shape")
 stone_id = &"smoky_quartz"
 species = ExtResource("5_2tp88")
 chromophore = ExtResource("1_ctuip")
 cut = ExtResource("2_d2pp0")
-silhouette = &"square"
 grade = ExtResource("3_bh5e2")
 seed = 43
 size_mm = 4.65

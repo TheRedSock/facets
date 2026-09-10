@@ -6,13 +6,22 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_8kxcl"]
 [ext_resource type="Resource" path="res://data/lapidary/species/quartz.tres" id="5_rryr4"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"square"
+aspect_ratio = 1.0
+corner_radius = 0.12
+sectors = 8
+
 [resource]
 script = ExtResource("4_8kxcl")
+shape = SubResource("Shape")
 stone_id = &"amethyst"
 species = ExtResource("5_rryr4")
 chromophore = ExtResource("1_382k0")
 cut = ExtResource("2_fhjgi")
-silhouette = &"square"
 grade = ExtResource("3_wrftf")
 seed = 13
 size_mm = 4.65

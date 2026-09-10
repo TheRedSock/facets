@@ -6,13 +6,22 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_hdkti"]
 [ext_resource type="Resource" path="res://data/lapidary/species/painite.tres" id="5_ui7fr"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"marquise"
+aspect_ratio = 1.8
+corner_radius = 0.1
+sectors = 8
+
 [resource]
 script = ExtResource("4_hdkti")
+shape = SubResource("Shape")
 stone_id = &"painite"
 species = ExtResource("5_ui7fr")
 chromophore = ExtResource("1_lkayf")
 cut = ExtResource("2_n5f0v")
-silhouette = &"marquise"
 grade = ExtResource("3_irr11")
 seed = 67
 size_mm = 5.4

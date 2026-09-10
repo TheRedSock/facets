@@ -77,7 +77,7 @@ const STEP_DEDUP_OFFSET := 1.0e-4
 
 
 static func compile(cut_template: Resource, silhouette: StringName, ior_d: float,
-		cut_quality: float, seed: int) -> Dictionary:
+		cut_quality: float, seed: int, shape: GemShape = null) -> Dictionary:
 	var template := _resolve_template(cut_template)
 	if template == null:
 		return _failure()
@@ -85,7 +85,7 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 	if template_error != "":
 		push_error("cut_compiler: template '%s' invalid: %s" % [template.cut_id, template_error])
 		return _failure()
-	var sil: SilhouetteLib.Silhouette = SilhouetteLib.make(silhouette)
+	var sil: SilhouetteLib.Silhouette = SilhouetteLib.make(silhouette, shape)
 	if sil == null:
 		push_error("cut_compiler: unknown silhouette '%s'" % silhouette)
 		return _failure()
@@ -140,11 +140,15 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 	# soft corners) or when a fan facet cannot fit a pointed silhouette. The
 	# 2D outline keeps ALL girdle lines: the sprite silhouette stays faithful
 	# even where the 3D tip has gone knife-edge.
+	var facet_ids := PackedInt32Array()
+	for index in planes.size() / 8:
+		facet_ids.append(index)
 	var dead: PackedInt32Array = HullValidator.find_dead_planes(planes)
 	var pruned := dead.size()
 	if pruned > 0:
 		var kept_planes := PackedFloat32Array()
 		var kept_anchors := PackedVector3Array()
+		var kept_ids := PackedInt32Array()
 		var next_dead := 0
 		for i in planes.size() / 8:
 			if next_dead < dead.size() and dead[next_dead] == i:
@@ -153,8 +157,10 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 			for k in 8:
 				kept_planes.append(planes[i * 8 + k])
 			kept_anchors.append(anchors[i])
+			kept_ids.append(facet_ids[i])
 		planes = kept_planes
 		anchors = kept_anchors
+		facet_ids = kept_ids
 
 	if not HullValidator.check_bounded(planes):
 		push_error("cut_compiler: pruning produced an open hull")
@@ -166,6 +172,7 @@ static func compile(cut_template: Resource, silhouette: StringName, ior_d: float
 
 	return {
 		"planes": planes,
+		"facet_ids": facet_ids,
 		"outline": outline,
 		"solved_pavilion_deg": solved_pavilion_deg,
 		"sectors": sil.sectors,

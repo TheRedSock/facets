@@ -6,13 +6,22 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_6ernq"]
 [ext_resource type="Resource" path="res://data/lapidary/species/garnet.tres" id="5_bc0qg"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"oval"
+aspect_ratio = 1.282051282051282
+corner_radius = 0.1
+sectors = 8
+
 [resource]
 script = ExtResource("4_6ernq")
+shape = SubResource("Shape")
 stone_id = &"rhodolite"
 species = ExtResource("5_bc0qg")
 chromophore = ExtResource("1_biupn")
 cut = ExtResource("2_87xnr")
-silhouette = &"oval"
 grade = ExtResource("3_wtnro")
 seed = 53
 size_mm = 4.95

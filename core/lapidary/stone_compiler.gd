@@ -47,8 +47,9 @@ static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary
 	var rng_state := [int(stone.seed) * 2654435761 + 1013904223]
 	var signed_dn := species.birefringence * (1.0 if species.uniaxial_positive else -1.0)
 
-	return {
+	var compiled := {
 		"planes": geometry["planes"],
+		"facet_ids": geometry.get("facet_ids", PackedInt32Array()),
 		"outline": geometry.get("outline", PackedVector2Array()),
 		"inclusions": _place_inclusions(species, grade, geometry["planes"], stone.size_mm, rng_state),
 		"absorption": absorption,
@@ -65,6 +66,9 @@ static func compile(stone: GemStone, cut_quality_override := -1.0) -> Dictionary
 		"dispersion_strong": dispersion_bg(species) >= 0.025,
 		"fingerprint": stone.fingerprint(),
 	}
+	if geometry.has("mesh"):
+		compiled["mesh"] = geometry["mesh"]
+	return compiled
 
 
 static func dispersion_bg(species: GemSpecies) -> float:
@@ -93,10 +97,14 @@ static func _resolve_fluorescence(species: GemSpecies, chromo: GemChromophore) -
 # ------------------------------------------------------------------ cut
 
 static func _compile_cut(stone: GemStone, n_d: float, cut_q: float) -> Dictionary:
+	if stone.shape.mode != "faceted":
+		var mesh := GemShapeCompiler.compile(stone.shape)
+		assert(mesh.validate().is_empty(), "Invalid procedural shape: %s" % mesh.validate())
+		return {"planes": PackedFloat32Array(), "mesh": mesh, "outline": GemShapeCompiler.outline(stone.shape)}
 	assert(ResourceLoader.exists(CUT_COMPILER_PATH),
 		"LapidaryStoneCompiler: cut compiler missing at %s" % CUT_COMPILER_PATH)
 	var compiler: GDScript = load(CUT_COMPILER_PATH)
-	return compiler.call("compile", stone.cut, stone.silhouette, n_d, cut_q, stone.seed)
+	return compiler.call("compile", stone.cut, stone.shape.outline, n_d, cut_q, stone.seed, stone.shape)
 
 
 ## Pavilion law v2 (re-derived from the prototype's solver):

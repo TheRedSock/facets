@@ -116,7 +116,7 @@ static func facet_adjacency(planes: PackedFloat32Array, stride := 16) -> PackedI
 
 ## Face polygon of plane i in its own 2D frame (clipped by every other live
 ## half-space). `frame_out`, if given, receives [t1, t2, p0, n, d].
-static func _face_polygon(planes: PackedFloat32Array, count: int, i: int, frame_out: Array) -> PackedVector2Array:
+static func _face_polygon(planes: PackedFloat32Array, count: int, i: int, frame_out: Array, margin := FACE_MARGIN) -> PackedVector2Array:
 	var n := Vector3(planes[i * 8], planes[i * 8 + 1], planes[i * 8 + 2])
 	var d := planes[i * 8 + 3]
 	var t1 := n.cross(Vector3(0, 0, 1))
@@ -141,7 +141,7 @@ static func _face_polygon(planes: PackedFloat32Array, count: int, i: int, frame_
 		# Half-space j on plane i's frame: a*x + b*y <= c.
 		var a := nj.dot(t1)
 		var b := nj.dot(t2)
-		var c := dj - nj.dot(p0) - FACE_MARGIN
+		var c := dj - nj.dot(p0) - margin
 		if Vector2(a, b).length_squared() < 1.0e-18:
 			if c < 0.0:
 				return PackedVector2Array()	# parallel plane fully covers this face

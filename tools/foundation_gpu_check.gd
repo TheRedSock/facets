@@ -66,6 +66,7 @@ func _initialize() -> void:
 		alpha_equal = alpha_equal and untouched[i * 4 + 3] == reconstructed[i * 4 + 3]
 	check(alpha_equal, "reconstruction preserves coverage exactly")
 	_analytic_interfaces(tracer, inst, lights, policy)
+	_mesh_checks(tracer, inst, lights, policy)
 	# Changes to framing or print white balance cannot invalidate volume light.
 	policy["field_exits"] = 4
 	policy["field_grid"] = 4
@@ -132,6 +133,45 @@ func _center_y(tracer: GemTracer) -> float:
 		for x in range(14, 18):
 			total += values[(y * 32 + x) * 4 + 1]
 	return total / 16.0
+
+func _mesh_checks(tracer: GemTracer, instance: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
+	var inst := instance.duplicate(true)
+	inst["size_mm"] = 1.0
+	inst["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
+	inst["absorption"].fill(0.2)
+	inst["sellmeier_b"] = Vector3(1.25, 0, 0)
+	inst["sellmeier_c"] = Vector3.ZERO
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(512)
+	var planes := tracer.read_xyz()
+	inst["mesh"] = GemShapeCompiler.from_hull(inst["planes"])
+	inst["planes"] = PackedFloat32Array()
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.accumulate(512)
+	var triangles := tracer.read_xyz()
+	var squared := 0.0
+	var count := 0
+	for i in planes.size() / 4:
+		if planes[i * 4 + 3] > 0.99 and triangles[i * 4 + 3] > 0.99:
+			squared += pow(planes[i * 4 + 1] - triangles[i * 4 + 1], 2)
+			count += 1
+	check(count > 50 and sqrt(squared / maxf(count, 1)) < 0.002, "mesh and convex backends agree for the same physical solid")
+	var outline := PackedVector2Array([Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(0.4, 1), Vector2(0.4, -0.2), Vector2(-0.4, -0.2), Vector2(-0.4, 1), Vector2(-1, 1)])
+	inst["mesh"] = GemShapeCompiler.loft(outline, PackedVector2Array([Vector2(-0.5, 1), Vector2(0.5, 1)]))
+	inst["sellmeier_b"] = Vector3.ZERO # n=1; analytic two-chord Beer-Lambert
+	tracer.configure_stone(inst, lights, policy)
+	tracer.set_environment({"bg": Vector4(1, 1, 1, 0)})
+	tracer.set_stone_orientation(Quaternion(Vector3.UP, PI * 0.5))
+	tracer.accumulate(1024)
+	var xyz := tracer.read_xyz()
+	var actual := 0.0
+	for y in range(8, 12):
+		for x in range(14, 18):
+			actual += xyz[(y * 32 + x) * 4 + 1] / 16.0
+	var expected := exp(-0.2 * (0.6 + 0.6))
+	check(absf(actual - expected) < 0.001, "concave reentry includes both absorbing chords: %.6f vs %.6f" % [actual, expected])
 
 func _print_checks(tracer: GemTracer) -> void:
 	var values := PackedFloat32Array()

@@ -5,12 +5,21 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="3_ki6k4"]
 [ext_resource type="Resource" path="res://data/lapidary/species/diamond.tres" id="4_cjwxc"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"pear"
+aspect_ratio = 1.4
+corner_radius = 0.1
+sectors = 8
+
 [resource]
 script = ExtResource("3_ki6k4")
+shape = SubResource("Shape")
 stone_id = &"diamond"
 species = ExtResource("4_cjwxc")
 cut = ExtResource("1_6dlck")
-silhouette = &"pear"
 grade = ExtResource("2_gad6n")
 seed = 37
 size_mm = 5.5

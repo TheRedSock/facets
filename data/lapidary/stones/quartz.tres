@@ -5,8 +5,18 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="3_a6uk2"]
 [ext_resource type="Resource" path="res://data/lapidary/species/quartz.tres" id="4_j5mdv"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"round"
+aspect_ratio = 1.0
+corner_radius = 0.1
+sectors = 8
+
 [resource]
 script = ExtResource("3_a6uk2")
+shape = SubResource("Shape")
 stone_id = &"quartz"
 species = ExtResource("4_j5mdv")
 cut = ExtResource("1_xlkyl")

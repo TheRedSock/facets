@@ -6,13 +6,22 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="4_b1ka8"]
 [ext_resource type="Resource" path="res://data/lapidary/species/elbaite.tres" id="5_7w7a6"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="shape_script"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("shape_script")
+outline = &"triangle"
+aspect_ratio = 1.0
+corner_radius = 0.14
+sectors = 6
+
 [resource]
 script = ExtResource("4_b1ka8")
+shape = SubResource("Shape")
 stone_id = &"tourmaline"
 species = ExtResource("5_7w7a6")
 chromophore = ExtResource("1_penoi")
 cut = ExtResource("2_tmyq7")
-silhouette = &"triangle"
 grade = ExtResource("3_fmq2k")
 seed = 47
 size_mm = 4.8

@@ -148,6 +148,7 @@ func _compile_shaders() -> bool:
 			push_error("GemTracer: cannot read %s" % entry[0])
 			return false
 		text = text.replace(INCLUDE_LINE, common)
+		text = text.replace("#include \"gem_mesh.glsl\"", FileAccess.get_file_as_string(SHADER_DIR + "gem_mesh.glsl"))
 		var src := RDShaderSource.new()
 		src.source_compute = text
 		var spirv := _rd.shader_compile_spirv_from_source(src)
@@ -219,7 +220,21 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	var prims := PackedFloat32Array()
 	var absorb := PackedFloat32Array()
 	var stones := StreamPeerBuffer.new()
+	var triangle_data := PackedByteArray()
+	var node_data := PackedByteArray()
 	for inst: Dictionary in instances:
+		inst = inst.duplicate()
+		inst["bvh_root"] = 0
+		if inst.has("mesh"):
+			var mesh: GemMesh = inst["mesh"]
+			assert(mesh.validate().is_empty(), "Cannot render an invalid mesh")
+			var bvh := GemBvh.build(mesh)
+			@warning_ignore("integer_division")
+			inst["bvh_root"] = node_data.size() / 48 + 1
+			@warning_ignore("integer_division")
+			node_data.append_array(bvh.pack_nodes(node_data.size() / 48, triangle_data.size() / 64))
+			triangle_data.append_array(bvh.pack_triangles())
+			_field_exits = 0 # The legacy field only supports a convex plane host.
 		var p: PackedFloat32Array = inst["planes"]
 		var pr: PackedFloat32Array = inst.get("inclusions", PackedFloat32Array())
 		var ab: PackedFloat32Array = inst["absorption"]
@@ -238,6 +253,12 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 			stone_flags |= STONE_FLAG_DISPERSION_STRONG
 		_pack_stone(stones, inst, plane_offset, p.size() / 8, prim_offset, pr.size() / 16, absorb_offset, stone_flags)
 	_plane_count_total = planes.size() / 8
+	if planes.is_empty():
+		planes.resize(8)
+	if triangle_data.is_empty():
+		triangle_data.resize(64)
+	if node_data.is_empty():
+		node_data.resize(48)
 	if prims.is_empty():
 		prims.resize(16) # SSBO cannot be zero-sized
 
@@ -247,6 +268,8 @@ func configure_stones(instances: Array, lights: PackedFloat32Array, policy: Dict
 	_bufs["absorb"] = _rd.storage_buffer_create(absorb.to_byte_array().size(), absorb.to_byte_array())
 	_bufs["prims"] = _rd.storage_buffer_create(prims.to_byte_array().size(), prims.to_byte_array())
 	_bufs["stones"] = _rd.storage_buffer_create(stones.data_array.size(), stones.data_array)
+	_bufs["triangles"] = _rd.storage_buffer_create(triangle_data.size(), triangle_data)
+	_bufs["nodes"] = _rd.storage_buffer_create(node_data.size(), node_data)
 
 	var insts := StreamPeerBuffer.new()
 	for i in _inst_count:
@@ -312,7 +335,7 @@ func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 			optic.x, optic.y, optic.z, fluor.get("strength", 0.0),
 			fluor.get("nm", 0.0), inst.get("absorb_scale", 1.0), 0.0, 0.0]:
 		b.put_float(v)
-	for v: int in [p_off, p_cnt, i_off, i_cnt, a_off, stone_flags, 0, 0]:
+	for v: int in [p_off, p_cnt, i_off, i_cnt, a_off, stone_flags, inst.get("bvh_root", 0), 0]:
 		b.put_32(v)
 	assert(b.data_array.size() % STONE_STRIDE_BYTES == 0)
 
@@ -355,7 +378,7 @@ func _build_uniform_sets() -> void:
 			guide.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
 			guide.add_id(_bufs["guides"])
 			uniforms.append(guide)
-			for item in [[9, "ballistic"], [10, "residual"]]:
+			for item in [[9, "ballistic"], [10, "residual"], [11, "triangles"], [12, "nodes"]]:
 				var uniform := RDUniform.new()
 				uniform.binding = item[0]
 				uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
@@ -737,7 +760,7 @@ func field_info() -> Dictionary:
 # ------------------------------------------------------------------ cleanup
 
 func _free_scene_buffers() -> void:
-	for key in ["planes", "lights", "absorb", "prims", "stones", "insts"]:
+	for key in ["planes", "lights", "absorb", "prims", "stones", "insts", "triangles", "nodes"]:
 		if _bufs.has(key) and _bufs[key].is_valid():
 			_rd.free_rid(_bufs[key])
 			_bufs.erase(key)

@@ -377,3 +377,6 @@ Designed but excluded from current scaffold. See `plans/deferred-systems-referen
 | Input handling | `BoardScene._gui_input()` (board), `RunScene` (game-level) |
 | New autoload | `autoloads/` + register in `project.godot` `[autoload]` |
 | Board validation | `tools/board_validator.gd` |
+
+### Geometry implementation update
+`GemShape` is the procedural outline/profile recipe on `GemStone`. Faceted cuts may use convex planes; `GemShapeCompiler` also builds closed indexed surfaces from cuts, cabochons and concave lofts. `GemBvh` and `gem_mesh.glsl` provide general dielectric transport with external re-entry. Triangle normals are currently geometric, so curved highlight quality is tessellation-limited. `tests/lapidary/test_geometry.gd` and `tools/foundation_gpu_check.gd` are the current geometry/transport gates.
