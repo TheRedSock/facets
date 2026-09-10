@@ -1,5 +1,6 @@
 // Lossless uniaxial Maxwell interface math, independently checked against the
-// float64 CPU solver. This module is not yet used by the production path tracer.
+// float64 CPU solver. The explicit crystal backend compiles this same source
+// at float64 precision; float32 remains a diagnostic variant.
 struct CrystalMode {
     vec3 kr; vec3 ki;
     vec3 er; vec3 ei;
@@ -25,10 +26,9 @@ vec3 crystal_metric(vec3 v, vec3 axis, float no, float ne) {
 vec3 crystal_inverse_epsilon(vec3 v, vec3 axis, float no, float ne) {
     return v/(no*no) + axis*dot(v,axis)*(1.0/(ne*ne)-1.0/(no*no));
 }
-CrystalMode crystal_mode(float no, float ne, vec3 axis, vec3 normal, vec3 tangent, float side, bool extraordinary) {
+CrystalMode crystal_mode_unit(float no, float ne, vec3 axis, vec3 normal, vec3 tangent, float side, bool extraordinary) {
     CrystalMode m;
     m.valid=false;
-    axis=normalize(axis); normal=normalize(normal);
     float a=1.0, b=0.0, c=dot(tangent,tangent)-no*no;
     if (extraordinary) {
         vec3 mn=crystal_metric(normal,axis,no,ne);
@@ -61,15 +61,53 @@ CrystalMode crystal_mode(float no, float ne, vec3 axis, vec3 normal, vec3 tangen
     m.valid=true;
     return m;
 }
+CrystalMode crystal_mode(float no, float ne, vec3 axis, vec3 normal, vec3 tangent, float side, bool extraordinary) {
+    return crystal_mode_unit(no,ne,normalize(axis),normalize(normal),tangent,side,extraordinary);
+}
 vec2 crystal_field(CrystalMode m, vec3 u, vec3 v, int row) {
     vec3 axis=(row%2)==0?u:v;
     return row<2?vec2(dot(m.er,axis),dot(m.ei,axis)):vec2(dot(m.hr,axis),dot(m.hi,axis));
+}
+// Propagating lossless modes have real basis fields, even when the incoming
+// coherent packet is elliptical. Solve one real matrix with two RHS components;
+// evanescent modes still use the complete complex system below.
+bool crystal_solve_real(inout CrystalInterface result, CrystalMode incoming, vec3 u, vec3 v) {
+    vec4 rows[4]; vec2 rhs[4];
+    for (int row=0;row<4;row++) {
+        for (int col=0;col<4;col++) rows[row][col]=crystal_field(result.mode[col],u,v,row).x*(col<2?1.0:-1.0);
+        rhs[row]=-crystal_field(incoming,u,v,row);
+    }
+    for (int pivot=0;pivot<4;pivot++) {
+        int best=pivot; float magnitude=0.0;
+        for (int row=pivot;row<4;row++) {
+            float candidate=rows[row][pivot]*rows[row][pivot];
+            if (candidate>magnitude) { magnitude=candidate; best=row; }
+        }
+        if (magnitude<1e-16) return false;
+        if (best!=pivot) {
+            vec4 temporary=rows[pivot]; rows[pivot]=rows[best]; rows[best]=temporary;
+            vec2 r=rhs[pivot]; rhs[pivot]=rhs[best]; rhs[best]=r;
+        }
+        float inverse=1.0/rows[pivot][pivot];
+        for (int row=pivot+1;row<4;row++) {
+            float factor=rows[row][pivot]*inverse;
+            for (int col=pivot+1;col<4;col++) rows[row][col]-=factor*rows[pivot][col];
+            rhs[row]-=factor*rhs[pivot];
+        }
+    }
+    for (int row=3;row>=0;row--) {
+        vec2 value=rhs[row];
+        for (int col=row+1;col<4;col++) value-=rows[row][col]*result.amplitude[col];
+        result.amplitude[row]=value/rows[row][row];
+    }
+    return true;
 }
 CrystalInterface crystal_interface(vec2 source_n, vec3 source_axis, vec2 target_n, vec3 target_axis,
         vec3 normal, CrystalMode incoming) {
     CrystalInterface result;
     result.valid=false; result.power=vec4(0); result.residual=0.0;
     normal=normalize(normal);
+    source_axis=normalize(source_axis); target_axis=normalize(target_axis);
     float flux=dot(incoming.poynting,normal);
     if (!incoming.valid || incoming.evanescent || flux<=1e-8) return result;
     vec3 tangent=incoming.kr-normal*dot(incoming.kr,normal);
@@ -77,38 +115,49 @@ CrystalInterface crystal_interface(vec2 source_n, vec3 source_axis, vec2 target_
         bool reflected=i<2;
         vec2 indices=reflected?source_n:target_n;
         vec3 axis=reflected?source_axis:target_axis;
-        result.mode[i]=crystal_mode(indices.x,indices.y,axis,normal,tangent,reflected?-1.0:1.0,(i%2)==1);
+        result.mode[i]=crystal_mode_unit(indices.x,indices.y,axis,normal,tangent,reflected?-1.0:1.0,(i%2)==1);
         if (!result.mode[i].valid) return result;
     }
     vec3 helper=abs(normal.x)<0.8?vec3(1,0,0):vec3(0,1,0);
     vec3 u=normalize(cross(helper,normal)), v=cross(normal,u);
-    vec2 a[20];
-    for (int row=0;row<4;row++) {
-        for (int col=0;col<4;col++) a[row*5+col]=crystal_field(result.mode[col],u,v,row)*(col<2?1.0:-1.0);
-        a[row*5+4]=-crystal_field(incoming,u,v,row);
-    }
-    for (int pivot=0;pivot<4;pivot++) {
-        int best=pivot; float magnitude=0.0;
-        for (int row=pivot;row<4;row++) {
-            float candidate=dot(a[row*5+pivot],a[row*5+pivot]);
-            if (candidate>magnitude) { magnitude=candidate; best=row; }
+    bool real_basis=true;
+    for (int i=0;i<4;i++) real_basis=real_basis && !result.mode[i].evanescent;
+    if (real_basis) {
+        if (!crystal_solve_real(result,incoming,u,v)) return result;
+    } else {
+        vec2 a[20];
+        for (int row=0;row<4;row++) {
+            for (int col=0;col<4;col++) a[row*5+col]=crystal_field(result.mode[col],u,v,row)*(col<2?1.0:-1.0);
+            a[row*5+4]=-crystal_field(incoming,u,v,row);
         }
-        if (magnitude<1e-16) return result;
-        if (best!=pivot) {
-            for (int col=0;col<5;col++) {
-                vec2 temporary=a[pivot*5+col]; a[pivot*5+col]=a[best*5+col]; a[best*5+col]=temporary;
+        for (int pivot=0;pivot<4;pivot++) {
+            int best=pivot; float magnitude=0.0;
+            for (int row=pivot;row<4;row++) {
+                float candidate=dot(a[row*5+pivot],a[row*5+pivot]);
+                if (candidate>magnitude) { magnitude=candidate; best=row; }
+            }
+            if (magnitude<1e-16) return result;
+            if (best!=pivot) {
+                for (int col=0;col<5;col++) {
+                    vec2 temporary=a[pivot*5+col]; a[pivot*5+col]=a[best*5+col]; a[best*5+col]=temporary;
+                }
+            }
+            // Forward elimination needs only rows below the pivot. One reciprocal
+            // serves the whole column; back substitution avoids reducing all four
+            // columns to an identity matrix for a single incident-field RHS.
+            vec2 inverse=crystal_div(vec2(1,0),a[pivot*5+pivot]);
+            for (int row=pivot+1;row<4;row++) {
+                vec2 factor=crystal_mul(a[row*5+pivot],inverse);
+                for (int col=pivot+1;col<5;col++) a[row*5+col]-=crystal_mul(factor,a[pivot*5+col]);
             }
         }
-        vec2 divisor=a[pivot*5+pivot];
-        for (int col=pivot;col<5;col++) a[pivot*5+col]=crystal_div(a[pivot*5+col],divisor);
-        for (int row=0;row<4;row++) {
-            if (row==pivot) continue;
-            vec2 factor=a[row*5+pivot];
-            for (int col=pivot;col<5;col++) a[row*5+col]-=crystal_mul(factor,a[pivot*5+col]);
+        for (int row=3;row>=0;row--) {
+            vec2 rhs=a[row*5+4];
+            for (int col=row+1;col<4;col++) rhs-=crystal_mul(a[row*5+col],result.amplitude[col]);
+            result.amplitude[row]=crystal_div(rhs,a[row*5+row]);
         }
     }
     for (int col=0;col<4;col++) {
-        result.amplitude[col]=a[col*5+4];
         float factor=dot(result.amplitude[col],result.amplitude[col]);
         result.power[col]=result.mode[col].evanescent?0.0:(col<2?-1.0:1.0)*result.mode[col].normal_flux*factor/flux;
     }

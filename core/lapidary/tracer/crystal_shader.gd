@@ -4,7 +4,9 @@ extends RefCounted
 ## required by crystal transport until a mixed-precision alternative passes
 ## the critical-angle/optic-axis tests. It is not a silent device fallback.
 static func module(fp64 := true) -> String:
-	var source := FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_crystal.glsl")
+	return at_precision(FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_crystal.glsl"), fp64)
+
+static func at_precision(source: String, fp64 := true) -> String:
 	if not fp64:
 		return source
 	var pattern := RegEx.new()

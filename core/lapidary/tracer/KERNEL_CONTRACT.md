@@ -375,8 +375,9 @@ incident complex field to both solvers and also checks summed boundary fields
 and reflected/transmitted power. The float32 variant **fails** the current stress
 gate (up to about 0.0015 side-power error and 0.0028 field-component error on the
 tested device). `--stress --fp64` runs a diagnostic double-precision variant of
-the same source, retaining float32 wire inputs/outputs. The expanded 676-case gate
-includes published principal curves. Both this diagnostic and crystal rendering
+the same source, retaining float32 wire inputs/outputs. The expanded 1,352-case gate
+includes published principal curves, phase-rotated eigenmodes and elliptical
+isotropic incident packets. Both this diagnostic and crystal rendering
 require shaderFloat64; prebuilt game assets do not. Selective precision and broader
 transport validation must precede default promotion. Near-axis basis labels alone
 are not accuracy metrics.
@@ -428,3 +429,14 @@ absorbing o/e slabs, faceted/analytic/mesh/nested-region furnace renders, checkp
 restoration and a complete isotropic comparison with the Mueller renderer under
 directional studio lighting. This is reference-quality, currently expensive work;
 it is not a claim of general anisotropic convergence or measured catalog realism.
+
+The fixed-size interface solve uses partial-pivot forward elimination and back
+substitution. When every output mode propagates, its lossless basis fields are
+real, so a real 4x4 matrix solves the two real/imaginary RHS components. Any
+evanescent output uses the full complex matrix; elliptical incident polarization
+is retained in both paths. Interface axes are normalized once. Continuing-branch
+storage holds mode indices, combination flags and powers; only the selected
+packet is normalized and retained. These are algebra/storage optimizations, not
+lower precision or a changed branch estimator. Optional `crystal_benchmark.gd`
+compares saved baseline sources with current code using warmed repeated renders
+and complete linear-image differences. Performance remains device/scene dependent.

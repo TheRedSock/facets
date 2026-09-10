@@ -37,6 +37,12 @@ func _initialize() -> void:
 						0, 0, 1, mode, 0.6, 0, 0.8, 0, 0, 0, 1, 0, angle, 0, 0, 0]))
 	if stress:
 		inputs.append_array(_stress_inputs())
+	# Exercise imaginary RHS components independently of evanescent basis fields.
+	# Isotropic inputs mix coincident modes into an elliptical Jones state;
+	# uniaxial inputs retain one eigenmode with a nonzero global phase.
+	for original: PackedFloat32Array in inputs.duplicate(true):
+		original[11] = 1
+		inputs.append(original)
 	for input in inputs:
 		var n := V.unit(V.vec(input[12], input[13], input[14]))
 		var t := V.vec(input[16], input[17], input[18])
@@ -49,9 +55,19 @@ func _initialize() -> void:
 		t = V.subtract(t, V.scale(n, V.dot(t, n)))
 		var source := {"no": input[0], "ne": input[1], "axis": V.vec(input[4], input[5], input[6])}
 		var target := {"no": input[2], "ne": input[3], "axis": V.vec(input[8], input[9], input[10])}
-		var incoming := V.modes(source.no, source.ne, source.axis, n, t, 1)[int(input[7])]
+		var modes := V.modes(source.no, source.ne, source.axis, n, t, 1)
+		var incoming := modes[int(input[7])]
 		if incoming.evanescent or incoming.normal_flux < 1e-7:
 			continue
+		if input[11] == 1:
+			var phase := 0.37 + input[7] * 0.23
+			if source.no == source.ne:
+				incoming = GemCrystalPacket.combine([
+					{"mode": modes[0], "amplitude": PackedFloat64Array([0.8 * cos(phase), 0.8 * sin(phase)])},
+					{"mode": modes[1], "amplitude": PackedFloat64Array([-0.6 * sin(phase), 0.6 * cos(phase)])}])
+			else:
+				incoming = GemCrystalPacket.combine([{"mode": incoming, "amplitude": PackedFloat64Array([cos(phase), sin(phase)])}])
+			incoming["normal_flux"] = V.dot(incoming.poynting, n)
 		var result := GemCrystalInterface.scatter(source, target, n, incoming)
 		if result.has("error"):
 			printerr(result.error)

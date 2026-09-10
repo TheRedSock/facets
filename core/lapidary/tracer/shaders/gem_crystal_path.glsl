@@ -96,7 +96,9 @@ float trace_crystal_probe(Stone host, vec3 position, vec3 direction, float wavel
         CrystalInterface boundary=crystal_interface(crystal_indices(before,wavelength),crystal_axis(before),
             crystal_indices(next,wavelength),crystal_axis(next),normal,packet);
         if(!boundary.valid || boundary.residual>1e-7) { atomicAdd(crystal_stats[0],1u); atomicOr(crystal_stats[2],2u); return float(radiance); }
-        CrystalMode choices[4]; double powers[4]; uvec4 states[4]; int count=0;
+        // Keep compact branch descriptors, not four copies of every complex
+        // field vector. Only the selected continuing packet needs persistence.
+        int mode_indices[4]; bool combined[4]; double powers[4]; int count=0;
         double remaining=0.0, total=0.0;
         for(int side=0;side<2;side++) {
             int medium=side==0?before:next;
@@ -110,20 +112,20 @@ float trace_crystal_probe(Stone host, vec3 position, vec3 direction, float wavel
                 double power=(side==0?-1.0:1.0)*dot(out_packet.poynting,normal)/dot(packet.poynting,normal);
                 if(power<=1e-20) continue;
                 total+=power;
-                out_packet=crystal_normalize_packet(out_packet);
                 dvec3 ray=normalize(out_packet.poynting);
                 uvec4 outgoing_state=side==0?region_state:after;
                 double next_distance; int next_hit;
                 bool escape=medium<0 && !crystal_geo_physical_hit(host,point+ray*CRYSTAL_GEO_EPS*4.0,ray,outgoing_state,next_distance,next_hit);
                 if(escape) radiance+=weight*power*env_radiance(quat_rot(rotation,vec3(ray)),vec4(wavelength),rig_yaw,roles,0).x;
-                else { choices[count]=out_packet; powers[count]=power; states[count]=outgoing_state; remaining+=power; count++; }
+                else { mode_indices[count]=j; combined[count]=combine; powers[count]=power; remaining+=power; count++; }
             }
         }
         if(abs(total-1.0)>1e-6) { atomicAdd(crystal_stats[0],1u); atomicOr(crystal_stats[2],4u); atomicMax(crystal_stats[3],floatBitsToUint(float(abs(total-1.0)))); return float(radiance); }
         if(count==0 || remaining<=1e-20) return float(radiance);
         double pick=double(rnd(rng))*remaining, cumulative=0.0; int chosen=count-1;
         for(int j=0;j<count;j++) { cumulative+=powers[j]; if(pick<cumulative) { chosen=j; break; } }
-        packet=choices[chosen]; region_state=states[chosen]; weight*=remaining;
+        packet=crystal_normalize_packet(crystal_packet(boundary,mode_indices[chosen],combined[chosen]));
+        region_state=mode_indices[chosen]<2?region_state:after; weight*=remaining;
         ray_direction=normalize(packet.poynting); point+=ray_direction*CRYSTAL_GEO_EPS*4.0;
         if(weight<double(THROUGHPUT_EPS)) return float(radiance);
     }

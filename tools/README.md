@@ -53,6 +53,16 @@ resume equivalence and the isotropic limit against the Mueller renderer.
 records whole-job wall time separately from the last accumulation batch profile.
 This backend is expensive and still needs broader anisotropic image comparisons;
 it is not the fast default or a complete biaxial/scattering implementation.
+For a repeatable performance comparison, save `gem_crystal.glsl` and
+`gem_crystal_path.glsl` from the baseline revision as
+`artifacts/crystal-performance/baseline-math.glsl` and `baseline-path.glsl`.
+Run windowed `tools/crystal_benchmark.gd`. It compares three warmed 128px/16-sample
+runs of clear quartz/ruby for each version, excluding compilation, and records
+source hashes, device, timings, diagnostics and maximum linear XYZ differences.
+The fixture compares interface/path changes with the current shared geometry and
+lighting; it is not a whole historical-engine benchmark. Baseline sources and
+reports remain ignored. FP64 precision checks now include elliptical incident
+fields even at interfaces whose mode basis is real.
 The isotropic-real-index polarized variant does support persistent axial weak-loss
 absorption. `polarization_lookdev.gd -- --dichroic` renders a labeled synthetic
 two-band diagnostic under `artifacts/polarization/dichroic/`; its coefficients
