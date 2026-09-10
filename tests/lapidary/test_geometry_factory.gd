@@ -21,7 +21,7 @@ func _initialize() -> void:
 	job.stone.material.scatter_per_mm = 2
 	job.stone.condition.banding.contrast = 0.8
 	job.stone.grade.clarity = 0.1
-	job.stone.material.species.sellmeier_b.x += 0.1
+	job.stone.material.species.ordinary.b[0] += 0.1
 	check(GemGeometryPlan.key(job, 4) == key, "lighting, optical coefficients, grade, estimator and print do not change geometry")
 	check(GemGeometryPlan.key(job, 2) != key, "coverage grid participates in geometry identity")
 	job.orientation = Quaternion(Vector3.UP, 0.1)

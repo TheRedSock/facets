@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v14)
+# Lapidary kernel contract (v15)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. All floats
@@ -67,18 +67,20 @@ regions override lower ones. Exact coincident boundaries are unsupported: use a
 finite gap or overlap. Mathematical boundaries with unchanged medium are skipped
 for visibility, but transport processes their segments to preserve optical length.
 
-## Stone (128B)
+## Stone (160B)
 
 | vec4 | Contents |
 |---|---|
 | 0 | Sellmeier B.xyz, size_mm |
-| 1 | Sellmeier C.xyz in µm², signed birefringence Δn |
+| 1 | ordinary Sellmeier C.xyz in µm², sampled visible maximum |n_e-n_o| |
 | 2 | scattering σ_s/mm, HG g, zoning frequency, zoning contrast |
 | 3 | zoning axis.xyz, phase |
 | 4 | optic axis.xyz, fluorescence strength (disabled) |
 | 5 | fluorescence nm (disabled), absorb_scale, nested_volume_present, rough_present |
 | ivec4 6 | plane_offset, plane_count, volume_field_offset, volume_field_count |
 | ivec4 7 | absorb_offset, flags, bvh_root_plus_one, region_offset |
+| 8 | extraordinary Sellmeier B.xyz, ordinary index offset |
+| 9 | extraordinary Sellmeier C.xyz in µm², extraordinary index offset |
 
 Flags: bit0 has_eray, bit1 dispersion_strong. BVH selector0 is convex planes,
 -1 analytic host without mesh, positive root+1 supports triangle host/defects.
@@ -88,9 +90,11 @@ a different uniform grid, but must cover the transport interval. No implicit
 extrapolation or normalization of material absorption is allowed. Concentration is already applied.
 
 Current anisotropy is an approximation: α_k=cos²φ α_o+sin²φ α_e; the unpolarized
-segment uses (T_o+T_k)/2. Optional o/e fork occurs above |Δn|=.015, with effective
-index 1/n_e(φ)²=cos²φ/n_o²+sin²φ/n_e². There is no persistent polarization frame,
-full anisotropic interface solver or biaxial transport. REFERENCE does not fix
+segment uses (T_o+T_k)/2. Optional o/e fork occurs above the sampled visible
+maximum |Δn|=.015, with effective
+index 1/n_e(φ)²=cos²φ/n_o²+sin²φ/n_e². This scalar path has no persistent polarization frame,
+full anisotropic interface solver or biaxial transport (the optional isotropic
+polarized variant is described below). REFERENCE does not fix
 these limitations. Fluorescence has no enabled transport implementation.
 
 ## Boundary finish (32B, binding14)
@@ -198,9 +202,9 @@ raw estimator buffers and the global sample count. Release frees GPU resources.
 GemMaterial owns bulk properties, GemShape the procedural body recipe, GemCondition
 realized millimeter-scale defects, manufacturing tolerances and host finish.
 Cut templates carry explicit pavilion/crown/table/culet proportions: material
-IOR and grade never rewrite geometry. GemGrade retains a legacy crystal-haze
-recipe, not a calibrated gemological grade. Automatic clarity and surface
-recipes are disabled. Explicit fractures have not passed low-SPP visual acceptance.
+IOR and grade never rewrite geometry. All GemGrade axes are metadata;
+homogeneous scattering and spatial banding are explicit physical inputs.
+Automatic clarity and surface recipes are disabled. Explicit fractures have not passed low-SPP visual acceptance.
 Recipe hashes cover physical input and optical source; producer hardware/driver
 are metadata. Determinism tests use tolerances across floating-point execution.
 
@@ -224,7 +228,28 @@ are rejected. Raw CSV SHA256 and interpretation metadata are retained beside the
 resource and in its evidence. Importing data is not certification of its origin.
 Material validation also rejects invalid concentration, visible Sellmeier poles,
 unsupported model range and invalid scattering. Signed Sellmeier terms are
-consistent on CPU/GPU; invalid n² is not silently repaired on the CPU.
+consistent on CPU/GPU; invalid n² is not silently repaired.
+
+`GemSpecies.ordinary` and optional `extraordinary` are independent
+`GemIndexCurve` resources with float64 B/C coefficients, explicit index offset,
+valid domain and per-axis evidence. Null extraordinary means isotropic real
+refraction. The offset is an authored approximation, never an inferred grade or
+birefringence law. The current analytic backend accepts three Sellmeier terms;
+an additive n² constant uses C=0. GPU coefficients are packed to float32.
+Quartz uses Ghosh o/e curves and sapphire uses Malitson/Dodge o/e curves from
+refractiveindex.info, with original formula coefficients/units retained in the
+evidence. Other anisotropic catalog axes remain explicitly authored constant
+offsets; the biaxial approximations are not full biaxial models.
+`GemMaterialCompiler.polarization_error` checks all visible integer wavelengths,
+so curves crossing at a single reference wavelength cannot bypass its gate.
+This discrete policy check is not a proof for arbitrary sub-nanometer features.
+The scalar o/e approximation evaluates both principal spectra at the traced
+wavelengths but still ignores walk-off/mode conversion and uses ordinary Fresnel
+weights. Default splitting threshold .015 still skips weak anisotropy, including
+quartz/corundum. The independent Maxwell CPU/GPU probes consume their true
+principal curves; accurate anisotropic production transport is not yet enabled.
+`test_principal_indices.gd` checks independent published values and serialization;
+`principal_indices_gpu_check.gd` probes the exact packing/GLSL at 0.25 nm spacing.
 
 ## Spatial coefficient fields (48B, binding7)
 

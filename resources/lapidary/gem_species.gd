@@ -7,17 +7,11 @@ extends Resource
 @export var display_name := ""
 ## Citation for the optical constants (journal / refractiveindex.info page).
 @export var source_note := ""
-@export var refraction_evidence: GemOpticalEvidence = GemOpticalEvidence.new()
-## Model evaluation domain, not a claim of measured accuracy throughout it.
-@export var refraction_range_nm := Vector2(380.0, 780.0)
-
 @export_group("Refraction")
-## 3-term Sellmeier, ordinary ray: n^2 - 1 = sum B_i * L^2 / (L^2 - C_i), L in micrometers.
-@export var sellmeier_b := Vector3.ZERO
-@export var sellmeier_c_um2 := Vector3.ZERO
-## Birefringence |delta-n| at 589 nm (0 for cubic minerals). Sign from uniaxial_positive.
-@export var birefringence := 0.0
-@export var uniaxial_positive := true
+@export var ordinary: GemIndexCurve = GemIndexCurve.new()
+## Null means isotropic real refraction. Otherwise both principal spectra
+## are explicit. Biaxial approximations must be identified in the evidence.
+@export var extraordinary: GemIndexCurve
 ## Optic axis in stone space (girdle plane z=0, crown +Z). Corundum cutters
 ## typically set the table perpendicular to c; tourmaline parallel to c.
 @export var optic_axis_stone := Vector3(0.0, 0.0, 1.0)
@@ -42,36 +36,24 @@ extends Resource
 
 
 func ior_at(wl_nm: float) -> float:
-	var l2 := (wl_nm * 1e-3) * (wl_nm * 1e-3)
-	var s := 1.0
-	for index in 3:
-		if sellmeier_b[index] != 0.0:
-			var denominator := l2 - sellmeier_c_um2[index]
-			if absf(denominator) < 1e-12:
-				return NAN
-			s += sellmeier_b[index] * l2 / denominator
-	return sqrt(s) if s > 0.0 else NAN
+	return ordinary.at(wl_nm) if ordinary != null else NAN
+
+func extraordinary_ior_at(wl_nm: float) -> float:
+	return extraordinary.at(wl_nm) if extraordinary != null else ior_at(wl_nm)
+
+func birefringence_at(wl_nm: float) -> float:
+	return extraordinary_ior_at(wl_nm) - ior_at(wl_nm)
 
 func validate() -> PackedStringArray:
 	var errors := PackedStringArray()
-	if not sellmeier_b.is_finite() or not sellmeier_c_um2.is_finite():
-		errors.append("Refraction coefficients must be finite")
-	if not refraction_range_nm.is_finite() or refraction_range_nm.x > 380.0 or refraction_range_nm.y < 780.0:
-		errors.append("Refraction model does not cover the transport interval")
-	for index in 3:
-		if sellmeier_b[index] != 0.0 and sellmeier_c_um2[index] >= 0.38 * 0.38 and sellmeier_c_um2[index] <= 0.78 * 0.78:
-			errors.append("Sellmeier pole lies inside the transport interval")
-	for wavelength in range(380, 781, 5):
-		var value := ior_at(wavelength)
-		if not is_finite(value) or value < 1.0:
-			errors.append("Invalid visible dielectric refractive index")
-			break
-	if not is_finite(birefringence) or birefringence < 0.0 or not optic_axis_stone.is_finite() or (birefringence > 0.0 and optic_axis_stone.length_squared() < 1e-12):
-		errors.append("Invalid crystal optical axis or birefringence")
+	if ordinary == null:
+		errors.append("Ordinary principal index is missing")
+	else:
+		errors.append_array(ordinary.validate())
+	if extraordinary != null:
+		errors.append_array(extraordinary.validate())
+	if not optic_axis_stone.is_finite() or (extraordinary != null and optic_axis_stone.length_squared() < 1e-12):
+		errors.append("Invalid crystal optical axis")
 	if not is_finite(base_scatter_per_mm) or base_scatter_per_mm < 0.0 or not is_finite(scatter_anisotropy_g) or absf(scatter_anisotropy_g) >= 1.0:
 		errors.append("Invalid species scattering")
-	if refraction_evidence == null:
-		errors.append("Refraction evidence descriptor is missing")
-	else:
-		errors.append_array(refraction_evidence.validate())
 	return errors

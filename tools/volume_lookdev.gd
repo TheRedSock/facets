@@ -30,7 +30,7 @@ func _initialize() -> void:
 	var instance := LapidaryStoneCompiler.compile(stone)
 	instance["absorption"].fill(0.01)
 	instance["absorption_eray"] = PackedFloat32Array()
-	instance["birefringence"] = 0.0
+	instance["extraordinary_refraction"] = {}
 	instance["zoning"] = {}
 	var policy := GemRung.policy(GemRung.HERO)
 	policy["birefringence"] = false

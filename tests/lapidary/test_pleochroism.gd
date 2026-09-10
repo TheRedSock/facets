@@ -94,6 +94,6 @@ func _test_ruby_compiler() -> void:
 	var optic: Vector3 = inst["optic_axis"]
 	_check(optic.distance_to(ruby.material.species.optic_axis_stone.normalized()) < 1e-5,
 		"compiled optic_axis matches species default")
-	var dn: float = inst["birefringence"]
-	_check(dn < 0.0 and is_equal_approx(dn, -ruby.material.species.birefringence),
+	var dn := GemMaterialCompiler.principal_index(inst, 589.3, true) - GemMaterialCompiler.principal_index(inst, 589.3)
+	_check(dn < 0.0 and absf(dn - ruby.material.species.birefringence_at(589.3)) < 1e-6,
 		"ruby signed birefringence is negative (uniaxial−)")

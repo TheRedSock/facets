@@ -24,7 +24,7 @@ func _initialize() -> void:
 	fracture.fracture_profile.roughness_mm = 0.002
 	var water := GemMaterial.new()
 	water.species = GemSpecies.new()
-	water.species.sellmeier_b = Vector3(0.7689, 0, 0)
+	water.species.ordinary.b = PackedFloat64Array([0.7689, 0, 0])
 	water.source_note = "Constant n=1.33 test filling, not a measured water spectrum."
 	var kinds := ["fracture", "contact"] if "--fracture-only" in OS.get_cmdline_user_args() else ["clean", "chip", "fracture", "contact", "filled"]
 	var measurements := []

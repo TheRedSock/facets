@@ -26,6 +26,15 @@ func _initialize() -> void:
 				source_axis.x, source_axis.y, source_axis.z, mode, target_axis.x, target_axis.y, target_axis.z, 0,
 				normal.x, normal.y, normal.z, 0, tangent.x, tangent.y, tangent.z, 0])
 			inputs.append(input)
+	# Real principal dispersion feeds the independent Maxwell implementation;
+	# it is not approximated by a constant delta-n in these interface cases.
+	for species_id in ["quartz", "corundum"]:
+		var species: GemSpecies = load("res://data/lapidary/species/" + species_id + ".tres")
+		for wavelength in [380, 486.1, 589.3, 656.3, 780]:
+			for angle in [0.0, 0.3, 0.8]:
+				for mode in 2:
+					inputs.append(PackedFloat32Array([1, 1, species.ior_at(wavelength), species.extraordinary_ior_at(wavelength),
+						0, 0, 1, mode, 0.6, 0, 0.8, 0, 0, 0, 1, 0, angle, 0, 0, 0]))
 	if stress:
 		inputs.append_array(_stress_inputs())
 	for input in inputs:

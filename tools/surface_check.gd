@@ -19,7 +19,7 @@ func _initialize() -> void:
 	var base := LapidaryStoneCompiler.compile(stone)
 	base["absorption"].fill(0.0)
 	base["absorption_eray"] = PackedFloat32Array()
-	base["birefringence"] = 0.0
+	base["extraordinary_refraction"] = {}
 	base["zoning"] = {}
 	var policy := GemRung.policy(GemRung.PREVIEW)
 	policy["birefringence"] = false

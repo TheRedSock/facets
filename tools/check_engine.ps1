@@ -12,7 +12,7 @@ $stages = @(
     @{ Name = 'import'; Args = @('--headless', '--editor', '--quit') },
     @{ Name = 'source_check'; Args = @('--headless', '--quit-after', '600', 'res://tools/source_check.tscn') }
 )
-foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_store_transfer', 'test_spectra', 'test_material_inputs', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_crystal_modes', 'test_crystal_interface', 'test_crystal_packet', 'test_crystal_loss', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler', 'test_cut_design')) {
+foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_store_transfer', 'test_spectra', 'test_material_inputs', 'test_principal_indices', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_crystal_modes', 'test_crystal_interface', 'test_crystal_packet', 'test_crystal_loss', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler', 'test_cut_design')) {
     $stages += @{ Name = $name; Args = @('--headless', '--quit-after', '600', '--script', "res://tests/lapidary/$name.gd") }
 }
 $stages += @{ Name = 'test_fracture'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_fracture.gd') }
@@ -23,7 +23,7 @@ if ($ReferencePython) {
 }
 if ($Gpu) {
     $stages += @{ Name = 'geometry_factory_check'; Args = @('--quit-after', '600', '--script', 'res://tools/geometry_factory_check.gd') }
-    foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'farm_gpu_check', 'library_gpu_check', 'surface_check', 'spectra_gpu_check', 'volume_gpu_check', 'polarization_gpu_check', 'crystal_gpu_check', 'geometry_aov_check')) {
+    foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'farm_gpu_check', 'library_gpu_check', 'surface_check', 'spectra_gpu_check', 'principal_indices_gpu_check', 'volume_gpu_check', 'polarization_gpu_check', 'crystal_gpu_check', 'geometry_aov_check')) {
         $stages += @{ Name = $name; Args = @('--quit-after', '600', '--script', "res://tools/$name.gd") }
     }
 }

@@ -63,11 +63,9 @@ func _build_species() -> Dictionary:
 	var quartz: Resource = SpeciesScript.new()
 	quartz.species_id = &"quartz"
 	quartz.display_name = "Quartz (SiO2)"
-	quartz.source_note = "Sellmeier: G. Ghosh, Opt. Commun. 163, 95-102 (1999), alpha-quartz o-ray (refractiveindex.info SiO2/Ghosh-o; C already in um^2, constant 0.28604141 stored as B with C=0). Birefringence 0.009 uniaxial(+), Mohs 7, dispersion B-G 0.013: standard gemological values. Sector zoning (amethyst) approximated as planar banding, see docs/lapidary-spectra-sources.md."
-	quartz.sellmeier_b = Vector3(1.07044083, 1.10202242, 0.28604141)
-	quartz.sellmeier_c_um2 = Vector3(0.0100585997, 100.0, 0.0)
-	quartz.birefringence = 0.009
-	quartz.uniaxial_positive = true
+	quartz.source_note = "Alpha-quartz principal dispersion: Ghosh (1999), ordinary and extraordinary curves; see per-axis evidence. Optic axis normal to the table. Mohs hardness is metadata; color and specimen scattering are separate authored inputs."
+	quartz.extraordinary = _published_axis("quartz", true)
+	quartz.ordinary = _published_axis("quartz", false)
 	quartz.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	quartz.base_scatter_per_mm = 0.002
 	quartz.scatter_anisotropy_g = 0.55
@@ -87,10 +85,9 @@ func _build_species() -> Dictionary:
 	olivine.species_id = &"olivine"
 	olivine.display_name = "Olivine (Mg,Fe)2SiO4 Fo90"
 	olivine.source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.654 (n_alpha; gem peridot RI 1.654-1.690, GIA Gem Encyclopedia / globalgemology.com) and B-G dispersion 0.020; UV pole 0.025 um^2 + constant term. Biaxial, approximated uniaxial(+) with delta-n 0.036 (lit. 0.035-0.038). Mohs 6.5 (GIA: 6.5-7)."
-	olivine.sellmeier_b = olivine_fit["b"]
-	olivine.sellmeier_c_um2 = olivine_fit["c"]
-	olivine.birefringence = 0.036
-	olivine.uniaxial_positive = true
+	olivine.ordinary.b = olivine_fit["b"]
+	olivine.ordinary.c_um2 = olivine_fit["c"]
+	olivine.extraordinary = _shifted_axis(olivine.ordinary, 0.036, olivine.source_note)
 	olivine.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	olivine.base_scatter_per_mm = 0.002
 	olivine.hardness_mohs = 6.5
@@ -117,10 +114,9 @@ func _build_species() -> Dictionary:
 	topaz.species_id = &"topaz"
 	topaz.display_name = "Topaz (Al2SiO4(F,OH)2)"
 	topaz.source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.612 (F-rich topaz 1.61-1.62, gemologyproject.com; full range 1.606-1.644) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Biaxial(+), approximated uniaxial(+) with delta-n 0.010 (lit. 0.008-0.010). Mohs 8."
-	topaz.sellmeier_b = topaz_fit["b"]
-	topaz.sellmeier_c_um2 = topaz_fit["c"]
-	topaz.birefringence = 0.010
-	topaz.uniaxial_positive = true
+	topaz.ordinary.b = topaz_fit["b"]
+	topaz.ordinary.c_um2 = topaz_fit["c"]
+	topaz.extraordinary = _shifted_axis(topaz.ordinary, 0.010, topaz.source_note)
 	topaz.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	topaz.base_scatter_per_mm = 0.001
 	topaz.hardness_mohs = 8.0
@@ -136,11 +132,9 @@ func _build_species() -> Dictionary:
 	var corundum: Resource = SpeciesScript.new()
 	corundum.species_id = &"corundum"
 	corundum.display_name = "Corundum (Al2O3)"
-	corundum.source_note = "Sellmeier: I. H. Malitson & M. J. Dodge, JOSA 62, 1405 (1972), o-ray (refractiveindex.info Al2O3/Malitson-o); published pole wavelengths 0.0726631/0.1193242/18.028251 um SQUARED to um^2. n_D=1.7680. Birefringence 0.008 uniaxial(-), Mohs 9. Fluorescence: Cr3+ R-line ~693 nm (GIA G&G Spring 2020, Dubinsky et al.); carried by the species, so Fe-quenched sapphire inherits it — see limitations in docs/lapidary-spectra-sources.md."
-	corundum.sellmeier_b = Vector3(1.4313493, 0.65054713, 5.3414021)
-	corundum.sellmeier_c_um2 = Vector3(0.0052799261, 0.0142382647, 325.017834)
-	corundum.birefringence = 0.008
-	corundum.uniaxial_positive = false
+	corundum.source_note = "Synthetic sapphire ordinary and extraordinary dispersion: Dodge (1986), as transcribed by refractiveindex.info from Malitson/Dodge data; see per-axis evidence. Ruby/sapphire dopant effects on real refraction are not modeled."
+	corundum.extraordinary = _published_axis("corundum", true)
+	corundum.ordinary = _published_axis("corundum", false)
 	corundum.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	corundum.base_scatter_per_mm = 0.001
 	corundum.fluorescence_emission_nm = 693.0
@@ -164,10 +158,9 @@ func _build_species() -> Dictionary:
 	beryl.species_id = &"beryl"
 	beryl.display_name = "Beryl (Be3Al2Si6O18)"
 	beryl.source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.577 (natural emerald n_omega 1.575-1.600, geo.libretexts Gemology: Emerald) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Birefringence 0.006 uniaxial(-) (lit. 0.004-0.010). Mohs 7.75 (lit. 7.5-8)."
-	beryl.sellmeier_b = beryl_fit["b"]
-	beryl.sellmeier_c_um2 = beryl_fit["c"]
-	beryl.birefringence = 0.006
-	beryl.uniaxial_positive = false
+	beryl.ordinary.b = beryl_fit["b"]
+	beryl.ordinary.c_um2 = beryl_fit["c"]
+	beryl.extraordinary = _shifted_axis(beryl.ordinary, -0.006, beryl.source_note)
 	beryl.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	beryl.base_scatter_per_mm = 0.002
 	beryl.hardness_mohs = 7.75
@@ -187,10 +180,9 @@ func _build_species() -> Dictionary:
 	diamond.species_id = &"diamond"
 	diamond.display_name = "Diamond (C)"
 	diamond.source_note = "Sellmeier: F. Peter, Z. Phys. 15, 358-368 (1923) (refractiveindex.info C/Peter); published poles 0.1060/0.1750 um SQUARED to 0.011236/0.030625 um^2. n_D=2.4173 (lit. 2.41726, JHU/APL Tech. Digest 14-1). Cubic: birefringence 0. Mohs 10. Faint blue fluorescence ~440 nm (N3 centers)."
-	diamond.sellmeier_b = Vector3(4.3356, 0.3306, 0.0)
-	diamond.sellmeier_c_um2 = Vector3(0.011236, 0.030625, 0.0)
-	diamond.birefringence = 0.0
-	diamond.uniaxial_positive = true
+	diamond.ordinary.b = PackedFloat64Array([4.3356, 0.3306, 0.0])
+	diamond.ordinary.c_um2 = PackedFloat64Array([0.011236, 0.030625, 0.0])
+
 	diamond.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # cubic: unused
 	diamond.base_scatter_per_mm = 0.0005
 	diamond.fluorescence_emission_nm = 440.0
@@ -207,10 +199,9 @@ func _build_species() -> Dictionary:
 	fluorite.species_id = &"fluorite"
 	fluorite.display_name = "Fluorite (CaF2)"
 	fluorite.source_note = "Sellmeier: I. H. Malitson, Appl. Opt. 2, 1103-1107 (1963) (refractiveindex.info CaF2/Malitson); published poles 0.050263605/0.1003909/34.649040 um SQUARED to um^2. n_D~1.4338, dispersion 0.007 (low). Cubic: birefringence 0. Mohs 4 — the wear model scratches it honestly. Blue fluorescence ~425 nm (Eu2+ activator; the word 'fluorescence' comes from this mineral). Strong colour banding (zoning)."
-	fluorite.sellmeier_b = Vector3(0.5675888, 0.4710914, 3.8484723)
-	fluorite.sellmeier_c_um2 = Vector3(0.0025262995, 0.0100783343, 1200.5559999)
-	fluorite.birefringence = 0.0
-	fluorite.uniaxial_positive = true
+	fluorite.ordinary.b = PackedFloat64Array([0.5675888, 0.4710914, 3.8484723])
+	fluorite.ordinary.c_um2 = PackedFloat64Array([0.0025262995, 0.0100783343, 1200.5559999])
+
 	fluorite.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # cubic: unused
 	fluorite.base_scatter_per_mm = 0.003
 	# Blue fluorescence is real (Eu2+), but the kernel pumps emission from
@@ -235,10 +226,9 @@ func _build_species() -> Dictionary:
 	chrysoberyl.species_id = &"chrysoberyl"
 	chrysoberyl.display_name = "Chrysoberyl (BeAl2O4)"
 	chrysoberyl.source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.746 (GIA alexandrite page: RI 1.746-1.755) and B-G dispersion 0.015 (cigem.ca alexandrite report); UV pole 0.025 um^2 + constant term. Biaxial(+), approximated uniaxial(+) with delta-n 0.009 (lit. 0.008-0.010). Mohs 8.5."
-	chrysoberyl.sellmeier_b = chryso_fit["b"]
-	chrysoberyl.sellmeier_c_um2 = chryso_fit["c"]
-	chrysoberyl.birefringence = 0.009
-	chrysoberyl.uniaxial_positive = true
+	chrysoberyl.ordinary.b = chryso_fit["b"]
+	chrysoberyl.ordinary.c_um2 = chryso_fit["c"]
+	chrysoberyl.extraordinary = _shifted_axis(chrysoberyl.ordinary, 0.009, chrysoberyl.source_note)
 	chrysoberyl.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	chrysoberyl.base_scatter_per_mm = 0.001
 	chrysoberyl.hardness_mohs = 8.5
@@ -260,10 +250,9 @@ func _build_species() -> Dictionary:
 	garnet.species_id = &"garnet"
 	garnet.display_name = "Garnet, pyralspite (Mg,Fe,Mn)3Al2(SiO4)3"
 	garnet.source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.760 (rhodolite RI 1.760 +0.010/-0.020, Wikipedia/Chemija 32:4549) and B-G dispersion 0.026 (Wikipedia rhodolite); UV pole 0.025 um^2 + constant term. Cubic: birefringence 0 (anomalous DR ignored). Mohs 7.25 (lit. 7-7.5). Colour-change pyrope-spessartine (~1.76) shares the species at this granularity."
-	garnet.sellmeier_b = garnet_fit["b"]
-	garnet.sellmeier_c_um2 = garnet_fit["c"]
-	garnet.birefringence = 0.0
-	garnet.uniaxial_positive = true
+	garnet.ordinary.b = garnet_fit["b"]
+	garnet.ordinary.c_um2 = garnet_fit["c"]
+
 	garnet.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # cubic: unused
 	garnet.base_scatter_per_mm = 0.002
 	garnet.hardness_mohs = 7.25
@@ -283,10 +272,9 @@ func _build_species() -> Dictionary:
 	elbaite.species_id = &"elbaite"
 	elbaite.display_name = "Elbaite tourmaline (Li borosilicate)"
 	elbaite.source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.635 (gemologyproject.com: usual RI 1.62-1.64) and B-G dispersion 0.018 (same source: 'Low, 0.018'); UV pole 0.025 um^2 + constant term. Uniaxial(-) delta-n 0.018 (lit. 0.014-0.021). Mohs 7.5. Strong colour zoning along c."
-	elbaite.sellmeier_b = elbaite_fit["b"]
-	elbaite.sellmeier_c_um2 = elbaite_fit["c"]
-	elbaite.birefringence = 0.018
-	elbaite.uniaxial_positive = false
+	elbaite.ordinary.b = elbaite_fit["b"]
+	elbaite.ordinary.c_um2 = elbaite_fit["c"]
+	elbaite.extraordinary = _shifted_axis(elbaite.ordinary, -0.018, elbaite.source_note)
 	elbaite.optic_axis_stone = Vector3(1.0, 0.0, 0.0) # table ∥ c
 	elbaite.base_scatter_per_mm = 0.002
 	elbaite.hardness_mohs = 7.5
@@ -307,10 +295,9 @@ func _build_species() -> Dictionary:
 	painite.species_id = &"painite"
 	painite.display_name = "Painite (CaZrAl9O15(BO3))"
 	painite.source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.80 (published RI range ~1.787-1.816) and ASSUMED B-G dispersion 0.018 (no published dispersion found; corundum-like oxide assumed). Uniaxial(-) delta-n 0.028. Mohs 8. Sparse literature — constants are best-effort, flagged for revisit."
-	painite.sellmeier_b = painite_fit["b"]
-	painite.sellmeier_c_um2 = painite_fit["c"]
-	painite.birefringence = 0.028
-	painite.uniaxial_positive = false
+	painite.ordinary.b = painite_fit["b"]
+	painite.ordinary.c_um2 = painite_fit["c"]
+	painite.extraordinary = _shifted_axis(painite.ordinary, -0.028, painite.source_note)
 	painite.optic_axis_stone = Vector3(0.0, 0.0, 1.0) # table ⊥ c
 	painite.base_scatter_per_mm = 0.001
 	painite.hardness_mohs = 8.0
@@ -632,8 +619,8 @@ func _curve(base: float, bands: Array) -> PackedFloat32Array:
 
 ## 2-term Sellmeier fit: one UV pole at c1_um2 plus a constant term (C = 0).
 ## Solves B1 by bisection so n(430.8) - n(686.7) hits the published gemological
-## (B-G) dispersion exactly, then B2 from n_D. Both B stay positive, which the
-## GemSpecies.ior_at() term guards require.
+## (B-G) dispersion exactly, then B2 from n_D. Both fitted B stay positive;
+## signed terms are supported for other published models.
 func _fit_two_term(n_d: float, disp_bg: float, c1_um2: float) -> Dictionary:
 	var f_d := _pole(WL_D * 1e-3, c1_um2)
 	var f_g := _pole(WL_G * 1e-3, c1_um2)
@@ -653,8 +640,8 @@ func _fit_two_term(n_d: float, disp_bg: float, c1_um2: float) -> Dictionary:
 	var b2 := nd2 - 1.0 - b1 * f_d
 	assert(b2 > 0.0, "fit produced non-positive constant term; raise c1_um2")
 	return {
-		"b": Vector3(snappedf(b1, 0.0000001), snappedf(b2, 0.0000001), 0.0),
-		"c": Vector3(c1_um2, 0.0, 0.0),
+		"b": PackedFloat64Array([b1, b2, 0.0]),
+		"c": PackedFloat64Array([c1_um2, 0.0, 0.0]),
 	}
 
 
@@ -664,12 +651,12 @@ func _pole(l_um: float, c_um2: float) -> float:
 
 
 func _save(res: Resource, path: String) -> void:
-	if res is GemSpecies:
+	if res is GemSpecies and res.species_id not in [&"quartz", &"corundum"]:
 		var evidence := GemOpticalEvidence.new()
 		evidence.kind = GemOpticalEvidence.Kind.PUBLISHED_MODEL if res.species_id in [&"quartz", &"corundum", &"diamond", &"fluorite"] else (GemOpticalEvidence.Kind.AUTHORED_APPROXIMATION if res.species_id == &"painite" else GemOpticalEvidence.Kind.FITTED_TARGETS)
 		evidence.citation = res.source_note
 		evidence.method = "Published Sellmeier coefficients" if evidence.kind == GemOpticalEvidence.Kind.PUBLISHED_MODEL else "Two-target empirical dispersion fit; see citation for assumptions"
-		res.refraction_evidence = evidence
+		res.ordinary.evidence = evidence
 	var err := ResourceSaver.save(res, path)
 	assert(err == OK, "failed to save %s (err %d)" % [path, err])
 	# Register the saved path on the instance so resources saved later reference
@@ -726,3 +713,39 @@ func _print_beer_lambert(chromophores: Dictionary, stones: Array) -> void:
 			var t4 := exp(-alpha * 4.0 * stone.size_mm)
 			parts.append("%dnm a=%.3f T2=%.3f T4=%.3f" % [int(wl), alpha, t, t4])
 		print("  %-10s (%.2f mm): %s" % [stone.stone_id, stone.size_mm, "; ".join(parts)])
+
+
+func _shifted_axis(ordinary: GemIndexCurve, offset: float, citation: String) -> GemIndexCurve:
+	var curve := ordinary.duplicate_deep(Resource.DEEP_DUPLICATE_ALL) as GemIndexCurve
+	curve.index_offset = offset
+	curve.evidence = GemOpticalEvidence.new()
+	curve.evidence.citation = citation
+	curve.evidence.method = "Authored constant offset from the ordinary dispersion model"
+	curve.evidence.assumptions = "Extraordinary dispersion is unmeasured here. A constant index difference is an approximation; biaxial species additionally use an effective uniaxial model."
+	return curve
+
+
+func _published_axis(species: String, extraordinary: bool) -> GemIndexCurve:
+	var curve := GemIndexCurve.new()
+	var axis := "e" if extraordinary else "o"
+	var record := {}
+	if species == "quartz":
+		curve.b = PackedFloat64Array([1.09509924, 1.15662475, 0.28851804]) if extraordinary else PackedFloat64Array([1.07044083, 1.10202242, 0.28604141])
+		curve.c_um2 = PackedFloat64Array([0.0102101864, 100, 0]) if extraordinary else PackedFloat64Array([0.0100585997, 100, 0])
+		curve.range_nm = Vector2(198, 2053.1)
+		curve.evidence.citation = "G. Ghosh, Opt. Commun. 163, 95-102 (1999), DOI 10.1016/S0030-4018(99)00091-7; refractiveindex.info SiO2/Ghosh-" + axis
+		record = {"formula": 2, "coefficients": [0.28851804, 1.09509924, 0.0102101864, 1.15662475, 100] if extraordinary else [0.28604141, 1.07044083, 0.0100585997, 1.10202242, 100], "url": "https://raw.githubusercontent.com/polyanskiy/refractiveindex.info-database/master/database/data/main/SiO2/nk/Ghosh-" + axis + ".yml", "temperature": "room temperature; exact value unreported"}
+	else:
+		curve.b = PackedFloat64Array([1.5039759, 0.55069141, 6.5927379]) if extraordinary else PackedFloat64Array([1.4313493, 0.65054713, 5.3414021])
+		var poles := PackedFloat64Array([0.0740288, 0.1216529, 20.072248]) if extraordinary else PackedFloat64Array([0.0726631, 0.1193242, 18.028251])
+		for term in 3:
+			curve.c_um2[term] = poles[term] * poles[term]
+		curve.range_nm = Vector2(200, 5000)
+		curve.evidence.temperature_kelvin = 293.0
+		curve.evidence.citation = "M. J. Dodge, Refractive index, Handbook of Laser Science and Technology IV, Optical Materials Part 2 (1986), p.30; refractiveindex.info Al2O3/Malitson-" + axis
+		record = {"formula": 1, "coefficients": [0, curve.b[0], poles[0], curve.b[1], poles[1], curve.b[2], poles[2]], "url": "https://raw.githubusercontent.com/polyanskiy/refractiveindex.info-database/master/database/data/main/Al2O3/nk/Malitson-" + axis + ".yml"}
+		curve.evidence.assumptions = "Synthetic sapphire at 20 C. The 1972 Malitson/Dodge reference is a conference abstract; the database attributes the dispersion formula to Dodge 1986. Dopant/composition and temperature changes are not modeled."
+	curve.evidence.kind = GemOpticalEvidence.Kind.PUBLISHED_MODEL
+	curve.evidence.method = "Published principal dispersion transcribed from the CC0 refractiveindex.info database; formula-1 poles squared into um^2, formula-2 constant stored as C=0 term"
+	curve.evidence.source_record = record
+	return curve

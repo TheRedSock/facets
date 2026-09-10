@@ -16,7 +16,7 @@ func _initialize() -> void:
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres")
 	var inst := LapidaryStoneCompiler.compile(stone)
 	inst["size_mm"] = 1.0
-	inst["birefringence"] = 0.0
+	inst["extraordinary_refraction"] = {}
 	inst["absorption_eray"] = PackedFloat32Array()
 	inst["zoning"] = {}
 	inst["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}

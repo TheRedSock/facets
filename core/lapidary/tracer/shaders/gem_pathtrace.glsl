@@ -52,17 +52,6 @@ const int POL_UNPOL = 0;
 const int POL_O = 1;
 const int POL_K = 2;
 
-// ---------------------------------------------------------------- CIE / spectra
-// Uniaxial extraordinary index for propagation at angle phi to the optic axis
-// (ca = |cos phi|). Converges to n_o along the axis.
-float n_e_phi(float n_o, float dn, float ca) {
-	float n_e = n_o + dn;
-	float c2 = ca * ca;
-	float s2 = 1.0 - c2;
-	float inv2 = c2 / max(n_o * n_o, 1e-6) + s2 / max(n_e * n_e, 1e-6);
-	return inversesqrt(max(inv2, 1e-6));
-}
-
 // ---------------------------------------------------------------- phase function
 // Henyey-Greenstein direction from stratified (u1,u2).
 vec3 hg_sample_u(vec3 dir, float g, vec2 u) {
@@ -166,18 +155,16 @@ void surface_exit_at(Stone st, int exit_plane, vec4 wl, vec4 n_wl, float n_geom,
 // the escaping ray reaches the environment; coupled branches use roulette.
 vec4 medium_index(int material, vec4 wl) {
 	if (material < 0) { return vec4(1.0); }
-	Stone m = stones[material];
-	return vec4(sellmeier(m.sell_b_size.xyz, m.sell_c_biref.xyz, wl.x),
-		sellmeier(m.sell_b_size.xyz, m.sell_c_biref.xyz, wl.y),
-		sellmeier(m.sell_b_size.xyz, m.sell_c_biref.xyz, wl.z),
-		sellmeier(m.sell_b_size.xyz, m.sell_c_biref.xyz, wl.w));
+	return principal_indices(stones[material], wl, false);
 }
 
-float geometry_index(int material, vec4 indices, int wavelength, bool extraordinary, vec3 direction) {
+float geometry_index(int material, vec4 indices, vec4 wl, int wavelength, bool extraordinary, vec3 direction) {
 	float ordinary = wavelength >= 0 ? indices[wavelength] : 0.5 * (indices.y + indices.z);
 	if (material < 0 || !extraordinary) { return ordinary; }
 	Stone m = stones[material];
-	return n_e_phi(ordinary, m.sell_c_biref.w, abs(dot(direction, m.optic_fluor.xyz)));
+	vec4 extra = principal_indices(m, wl, true);
+	float ne = wavelength >= 0 ? extra[wavelength] : 0.5 * (extra.y + extra.z);
+	return n_e_phi(ordinary, ne, abs(dot(direction, m.optic_fluor.xyz)));
 }
 
 vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool extraordinary,
@@ -219,8 +206,8 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 		GemSurfaceData finish = surfaces[st.ranges1.w + region];
 		bool rough = max(finish.slopes.x, finish.slopes.y) >= 0.0001;
 		vec4 index_before = medium_index(before_medium, wl), index_after = medium_index(after_medium, wl);
-		float eta = geometry_index(before_medium, index_before, wavelength, extraordinary, dir)
-			/ geometry_index(after_medium, index_after, wavelength, extraordinary, dir);
+		float eta = geometry_index(before_medium, index_before, wl, wavelength, extraordinary, dir)
+			/ geometry_index(after_medium, index_after, wl, wavelength, extraordinary, dir);
 		// An index-matched interface is invisible, regardless of its finish.
 		rough = rough && abs(eta - 1.0) > 1e-6;
 		mat3 frame = surface_frame(facing, finish.direction.xyz);
@@ -325,11 +312,7 @@ void main() {
 		pcg(rng);
 		float xi = qmc(n, 2u, pix_rot);
 		vec4 wl = WL_MIN + (vec4(0.0, 1.0, 2.0, 3.0) + xi) * (WL_RANGE / 4.0);
-		vec4 n_wl = vec4(
-			sellmeier(st.sell_b_size.xyz, st.sell_c_biref.xyz, wl.x),
-			sellmeier(st.sell_b_size.xyz, st.sell_c_biref.xyz, wl.y),
-			sellmeier(st.sell_b_size.xyz, st.sell_c_biref.xyz, wl.z),
-			sellmeier(st.sell_b_size.xyz, st.sell_c_biref.xyz, wl.w));
+		vec4 n_wl = principal_indices(st, wl, false);
 
 		vec2 r2 = qmc2(n, 0u, 1u, pix_rot);
 		vec2 ndc = (cell_uv + (r2 - 0.5) / vec2(pc.cell_px)) * 2.0 - 1.0;
@@ -374,7 +357,9 @@ void main() {
 			// Shared geometry uses a mid-spectrum index when not splitting.
 			float n_o = disp ? n_wl[wl_i] : 0.5 * (n_wl.y + n_wl.z);
 			float ca_in = abs(dot(rd, st.optic_fluor.xyz));
-			float n_geom = eray ? n_e_phi(n_o, st.sell_c_biref.w, ca_in) : n_o;
+			vec4 ne_wl = eray ? principal_indices(st, wl, true) : n_wl;
+			float ne = disp ? ne_wl[wl_i] : 0.5 * (ne_wl.y + ne_wl.z);
+			float n_geom = eray ? n_e_phi(n_o, ne, ca_in) : n_o;
 			int pol_mode = biref ? (eray ? POL_K : POL_O) : POL_UNPOL;
 
 			if (boundary_transport) {

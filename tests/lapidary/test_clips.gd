@@ -36,8 +36,8 @@ func _check(cond: bool, name: String) -> void:
 func _make_stone(seed_val := 1, size_mm := 5.0) -> GemStone:
 	var species := GemSpecies.new()
 	species.species_id = &"test_quartz"
-	species.sellmeier_b = Vector3(0.6962, 0.4079, 0.8975)
-	species.sellmeier_c_um2 = Vector3(0.0047, 0.0135, 97.93)
+	species.ordinary.b = PackedFloat64Array([0.6962, 0.4079, 0.8975])
+	species.ordinary.c_um2 = PackedFloat64Array([0.0047, 0.0135, 97.93])
 	var stone := GemStone.new()
 	stone.stone_id = &"test_stone"
 	stone.material.species = species

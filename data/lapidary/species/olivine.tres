@@ -1,11 +1,25 @@
 [gd_resource type="Resource" script_class="GemSpecies" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_vc4jn"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_6d6e3"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="3_hg258"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_6d6e3"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_hg258"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_6igl8"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_ji4l0"]
 
-[sub_resource type="Resource" id="Resource_6igl8"]
-script = ExtResource("1_vc4jn")
+[sub_resource type="Resource" id="Resource_pkakr"]
+script = ExtResource("1_6d6e3")
+citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.654 (n_alpha; gem peridot RI 1.654-1.690, GIA Gem Encyclopedia / globalgemology.com) and B-G dispersion 0.020; UV pole 0.025 um^2 + constant term. Biaxial, approximated uniaxial(+) with delta-n 0.036 (lit. 0.035-0.038). Mohs 6.5 (GIA: 6.5-7)."
+method = "Authored constant offset from the ordinary dispersion model"
+assumptions = "Extraordinary dispersion is unmeasured here. A constant index difference is an approximation; biaxial species additionally use an effective uniaxial model."
+
+[sub_resource type="Resource" id="Resource_bkia7"]
+script = ExtResource("2_hg258")
+b = PackedFloat64Array(0.665901256845411, 1.0181583696664627, 0)
+c_um2 = PackedFloat64Array(0.025, 0, 0)
+index_offset = 0.036
+evidence = SubResource("Resource_pkakr")
+
+[sub_resource type="Resource" id="Resource_tni74"]
+script = ExtResource("3_6igl8")
 archetype_id = &"olivine_lily_pad"
 form = 1
 size_mm_range = Vector2(0.12, 0.32)
@@ -16,8 +30,8 @@ tint = Color(0.92, 0.98, 0.88, 1)
 weight = 2.0
 center_bias = 0.35
 
-[sub_resource type="Resource" id="Resource_ji4l0"]
-script = ExtResource("1_vc4jn")
+[sub_resource type="Resource" id="Resource_l02n1"]
+script = ExtResource("3_6igl8")
 archetype_id = &"olivine_lily_pad_halo"
 form = 3
 size_mm_range = Vector2(0.08, 0.2)
@@ -28,21 +42,25 @@ tint = Color(0.94, 1, 0.92, 1)
 weight = 2.0
 center_bias = 0.35
 
-[sub_resource type="Resource" id="Resource_pkakr"]
-script = ExtResource("2_6d6e3")
+[sub_resource type="Resource" id="Resource_1un5b"]
+script = ExtResource("1_6d6e3")
 kind = 2
 citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.654 (n_alpha; gem peridot RI 1.654-1.690, GIA Gem Encyclopedia / globalgemology.com) and B-G dispersion 0.020; UV pole 0.025 um^2 + constant term. Biaxial, approximated uniaxial(+) with delta-n 0.036 (lit. 0.035-0.038). Mohs 6.5 (GIA: 6.5-7)."
 method = "Two-target empirical dispersion fit; see citation for assumptions"
 
+[sub_resource type="Resource" id="Resource_wfv1q"]
+script = ExtResource("2_hg258")
+b = PackedFloat64Array(0.665901256845411, 1.0181583696664627, 0)
+c_um2 = PackedFloat64Array(0.025, 0, 0)
+evidence = SubResource("Resource_1un5b")
+
 [resource]
-script = ExtResource("3_hg258")
+script = ExtResource("4_ji4l0")
 species_id = &"olivine"
 display_name = "Olivine (Mg,Fe)2SiO4 Fo90"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.654 (n_alpha; gem peridot RI 1.654-1.690, GIA Gem Encyclopedia / globalgemology.com) and B-G dispersion 0.020; UV pole 0.025 um^2 + constant term. Biaxial, approximated uniaxial(+) with delta-n 0.036 (lit. 0.035-0.038). Mohs 6.5 (GIA: 6.5-7)."
-refraction_evidence = SubResource("Resource_pkakr")
-sellmeier_b = Vector3(0.6659013, 1.0181584, 0)
-sellmeier_c_um2 = Vector3(0.025, 0, 0)
-birefringence = 0.036
+ordinary = SubResource("Resource_wfv1q")
+extraordinary = SubResource("Resource_bkia7")
 base_scatter_per_mm = 0.002
 hardness_mohs = 6.5
-inclusions = Array[ExtResource("1_vc4jn")]([SubResource("Resource_6igl8"), SubResource("Resource_ji4l0")])
+inclusions = Array[ExtResource("3_6igl8")]([SubResource("Resource_tni74"), SubResource("Resource_l02n1")])

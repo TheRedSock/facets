@@ -7,13 +7,15 @@ struct Plane { vec4 n_d; vec4 aux; };          // aux: zone, polish (unused by k
 struct Light { vec4 dir_cos; vec4 spd_pow; };  // spd_pow: spectrum offset, power, cos_inner, role(0key..3bounce,4blocker)
 struct Stone {
 	vec4 sell_b_size;      // sellmeier B xyz, size_mm
-	vec4 sell_c_biref;     // sellmeier C xyz (um^2), signed birefringence dn
+	vec4 sell_c_biref;     // sellmeier C xyz (um^2), maximum visible |n_e-n_o|
 	vec4 scatter_zone;     // sigma_per_mm, hg_g, zoning_freq, zoning_contrast
 	vec4 zone_axis_phase;  // zoning axis xyz, phase
 	vec4 optic_fluor;      // optic axis xyz, fluorescence strength
 	vec4 misc;             // fluor_nm (disabled), absorb_scale, nested_volume_present, rough_present
 	ivec4 ranges0;         // plane_offset, plane_count, volume_field_offset, volume_field_count
-	ivec4 ranges1;         // absorb_offset, stone_flags (bit0 has_eray, bit1 dispersion_strong), pad, pad
+	ivec4 ranges1;         // absorb_offset, stone_flags, bvh_root, region_offset
+	vec4 extra_b_o_offset; // extraordinary Sellmeier B, ordinary index offset
+	vec4 extra_c_e_offset; // extraordinary Sellmeier C, extraordinary index offset
 };
 
 struct Inst {
@@ -99,7 +101,23 @@ float sellmeier(vec3 B, vec3 C, float wl_nm) {
 	float l2 = (wl_nm * 1e-3) * (wl_nm * 1e-3);
 	float s = 1.0;
 	for (int i=0; i<3; ++i) { if (B[i] != 0.0) { s += B[i] * l2 / (l2 - C[i]); } }
-	return sqrt(max(s, 1.0));
+	return sqrt(s); // CPU admission validates the complete visible model.
+}
+
+// Physical material inputs, independent of the chosen transport approximation.
+float principal_index(Stone st, float wavelength, bool extraordinary) {
+	return extraordinary ? sellmeier(st.extra_b_o_offset.xyz, st.extra_c_e_offset.xyz, wavelength) + st.extra_c_e_offset.w
+		: sellmeier(st.sell_b_size.xyz, st.sell_c_biref.xyz, wavelength) + st.extra_b_o_offset.w;
+}
+vec4 principal_indices(Stone st, vec4 wl, bool extraordinary) {
+	return vec4(principal_index(st, wl.x, extraordinary), principal_index(st, wl.y, extraordinary),
+		principal_index(st, wl.z, extraordinary), principal_index(st, wl.w, extraordinary));
+}
+// Phase index versus wave-normal angle; using this with a ray direction in
+// the scalar renderer remains an approximation (no walk-off/mode conversion).
+float n_e_phi(float n_o, float n_e, float ca) {
+	float c2 = clamp(ca * ca, 0.0, 1.0);
+	return inversesqrt(c2 / (n_o * n_o) + (1.0 - c2) / (n_e * n_e));
 }
 
 // ---------------------------------------------------------------- spectra

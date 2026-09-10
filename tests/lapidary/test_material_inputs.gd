@@ -60,7 +60,7 @@ func _import_units() -> void:
 func _validation() -> void:
 	var material: GemMaterial = load("res://data/lapidary/stones/ruby.tres").material.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	check(material.validate().is_empty(), "catalog material validates")
-	check(material.species.refraction_evidence.kind == GemOpticalEvidence.Kind.PUBLISHED_MODEL, "published refraction classification is explicit")
+	check(material.species.ordinary.evidence.kind == GemOpticalEvidence.Kind.PUBLISHED_MODEL, "published refraction classification is explicit")
 	check(material.chromophore.absorption_evidence.kind == GemOpticalEvidence.Kind.AUTHORED_APPROXIMATION, "authored absorption does not inherit refraction credibility")
 	material.chromophore.concentration = -1.0
 	check(not material.validate().is_empty(), "negative concentration rejected")
@@ -69,15 +69,15 @@ func _validation() -> void:
 	material.chromophore.concentration = 1e100
 	check(not material.validate().is_empty(), "float32 coefficient overflow rejected")
 	material.chromophore.concentration = 1.0
-	material.species.sellmeier_c_um2.x = 0.5 * 0.5
+	material.species.ordinary.c_um2[0] = 0.5 * 0.5
 	check(not material.validate().is_empty(), "visible Sellmeier pole rejected before geometry/transport")
-	material.species.sellmeier_c_um2 = Vector3.ZERO
-	material.species.sellmeier_b = Vector3(1.5, 0, -0.25)
+	material.species.ordinary.c_um2 = PackedFloat64Array([0, 0, 0])
+	material.species.ordinary.b = PackedFloat64Array([1.5, 0, -0.25])
 	check(absf(material.species.ior_at(500) - 1.5) < 1e-7, "signed Sellmeier terms are evaluated consistently")
-	material.species.sellmeier_b = Vector3(-2, 0, 0)
+	material.species.ordinary.b = PackedFloat64Array([-2, 0, 0])
 	check(not material.validate().is_empty(), "negative n squared is not clamped into a valid material")
-	material.species.sellmeier_b = Vector3(1.25, 0, 0)
-	material.species.refraction_range_nm = Vector2(500, 700)
+	material.species.ordinary.b = PackedFloat64Array([1.25, 0, 0])
+	material.species.ordinary.range_nm = Vector2(500, 700)
 	check(not material.validate().is_empty(), "out-of-domain refraction is rejected")
 
 func _resampling() -> void:

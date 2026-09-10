@@ -1,11 +1,25 @@
 [gd_resource type="Resource" script_class="GemSpecies" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_ylu0r"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_7i2jy"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="3_tpajj"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_7i2jy"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_tpajj"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_o1fb2"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_2toe6"]
 
-[sub_resource type="Resource" id="Resource_o1fb2"]
-script = ExtResource("1_ylu0r")
+[sub_resource type="Resource" id="Resource_pp0v8"]
+script = ExtResource("1_7i2jy")
+citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.80 (published RI range ~1.787-1.816) and ASSUMED B-G dispersion 0.018 (no published dispersion found; corundum-like oxide assumed). Uniaxial(-) delta-n 0.028. Mohs 8. Sparse literature — constants are best-effort, flagged for revisit."
+method = "Authored constant offset from the ordinary dispersion model"
+assumptions = "Extraordinary dispersion is unmeasured here. A constant index difference is an approximation; biaxial species additionally use an effective uniaxial model."
+
+[sub_resource type="Resource" id="Resource_gxyj0"]
+script = ExtResource("2_tpajj")
+b = PackedFloat64Array(0.6518299902047124, 1.5376051954498586, 0)
+c_um2 = PackedFloat64Array(0.025, 0, 0)
+index_offset = -0.028
+evidence = SubResource("Resource_pp0v8")
+
+[sub_resource type="Resource" id="Resource_11j8m"]
+script = ExtResource("3_o1fb2")
 archetype_id = &"painite_crystal"
 form = 4
 size_mm_range = Vector2(0.15, 0.45)
@@ -15,8 +29,8 @@ tint = Color(0.95, 0.93, 0.9, 1)
 weight = 1.5
 center_bias = 0.4
 
-[sub_resource type="Resource" id="Resource_2toe6"]
-script = ExtResource("1_ylu0r")
+[sub_resource type="Resource" id="Resource_korrq"]
+script = ExtResource("3_o1fb2")
 archetype_id = &"painite_feather"
 form = 2
 size_mm_range = Vector2(0.3, 0.9)
@@ -26,21 +40,24 @@ tint = Color(1, 0.97, 0.93, 1)
 weight = 2.0
 center_bias = 0.25
 
-[sub_resource type="Resource" id="Resource_pp0v8"]
-script = ExtResource("2_7i2jy")
+[sub_resource type="Resource" id="Resource_arif1"]
+script = ExtResource("1_7i2jy")
 citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.80 (published RI range ~1.787-1.816) and ASSUMED B-G dispersion 0.018 (no published dispersion found; corundum-like oxide assumed). Uniaxial(-) delta-n 0.028. Mohs 8. Sparse literature — constants are best-effort, flagged for revisit."
 method = "Two-target empirical dispersion fit; see citation for assumptions"
 
+[sub_resource type="Resource" id="Resource_3xvts"]
+script = ExtResource("2_tpajj")
+b = PackedFloat64Array(0.6518299902047124, 1.5376051954498586, 0)
+c_um2 = PackedFloat64Array(0.025, 0, 0)
+evidence = SubResource("Resource_arif1")
+
 [resource]
-script = ExtResource("3_tpajj")
+script = ExtResource("4_2toe6")
 species_id = &"painite"
 display_name = "Painite (CaZrAl9O15(BO3))"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.80 (published RI range ~1.787-1.816) and ASSUMED B-G dispersion 0.018 (no published dispersion found; corundum-like oxide assumed). Uniaxial(-) delta-n 0.028. Mohs 8. Sparse literature — constants are best-effort, flagged for revisit."
-refraction_evidence = SubResource("Resource_pp0v8")
-sellmeier_b = Vector3(0.65183, 1.5376052, 0)
-sellmeier_c_um2 = Vector3(0.025, 0, 0)
-birefringence = 0.028
-uniaxial_positive = false
+ordinary = SubResource("Resource_3xvts")
+extraordinary = SubResource("Resource_gxyj0")
 base_scatter_per_mm = 0.001
 hardness_mohs = 8.0
-inclusions = Array[ExtResource("1_ylu0r")]([SubResource("Resource_o1fb2"), SubResource("Resource_2toe6")])
+inclusions = Array[ExtResource("3_o1fb2")]([SubResource("Resource_11j8m"), SubResource("Resource_korrq")])

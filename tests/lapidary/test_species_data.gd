@@ -110,7 +110,7 @@ func _test_species(species: Dictionary) -> void:
 
 		_check(sp.ior_at(380.0) > sp.ior_at(780.0),
 			"%s: normal dispersion requires n(380) > n(780)" % label)
-		_check(sp.get("birefringence") >= 0.0, "%s: birefringence must be >= 0" % label)
+		_check(is_finite(sp.birefringence_at(589.3)), "%s: signed principal index difference must be finite" % label)
 		_check(sp.get("hardness_mohs") > 1.0 and sp.get("hardness_mohs") <= 10.0,
 			"%s: hardness_mohs out of range" % label)
 		_check(sp.get("source_note") != "", "%s: source_note (citation) required" % label)

@@ -1,11 +1,25 @@
 [gd_resource type="Resource" script_class="GemSpecies" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_tf1wg"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_vr0uu"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="3_3pe48"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_vr0uu"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_3pe48"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_4euib"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_7fpu2"]
 
-[sub_resource type="Resource" id="Resource_4euib"]
-script = ExtResource("1_tf1wg")
+[sub_resource type="Resource" id="Resource_hfkga"]
+script = ExtResource("1_vr0uu")
+citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.746 (GIA alexandrite page: RI 1.746-1.755) and B-G dispersion 0.015 (cigem.ca alexandrite report); UV pole 0.025 um^2 + constant term. Biaxial(+), approximated uniaxial(+) with delta-n 0.009 (lit. 0.008-0.010). Mohs 8.5."
+method = "Authored constant offset from the ordinary dispersion model"
+assumptions = "Extraordinary dispersion is unmeasured here. A constant index difference is an approximation; biaxial species additionally use an effective uniaxial model."
+
+[sub_resource type="Resource" id="Resource_tocyw"]
+script = ExtResource("2_3pe48")
+b = PackedFloat64Array(0.5266872550188699, 1.480971706077828, 0)
+c_um2 = PackedFloat64Array(0.025, 0, 0)
+index_offset = 0.009
+evidence = SubResource("Resource_hfkga")
+
+[sub_resource type="Resource" id="Resource_l8v2k"]
+script = ExtResource("3_4euib")
 archetype_id = &"chrysoberyl_silk"
 size_mm_range = Vector2(0.25, 1)
 aspect = 30.0
@@ -15,8 +29,8 @@ tint = Color(1, 0.97, 0.9, 1)
 weight = 3.0
 center_bias = 0.15
 
-[sub_resource type="Resource" id="Resource_7fpu2"]
-script = ExtResource("1_tf1wg")
+[sub_resource type="Resource" id="Resource_6iocq"]
+script = ExtResource("3_4euib")
 archetype_id = &"chrysoberyl_fingerprint"
 form = 5
 size_mm_range = Vector2(0.25, 0.65)
@@ -26,21 +40,25 @@ tint = Color(0.97, 1, 0.98, 1)
 weight = 2.0
 center_bias = 0.3
 
-[sub_resource type="Resource" id="Resource_hfkga"]
-script = ExtResource("2_vr0uu")
+[sub_resource type="Resource" id="Resource_5rb23"]
+script = ExtResource("1_vr0uu")
 kind = 2
 citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.746 (GIA alexandrite page: RI 1.746-1.755) and B-G dispersion 0.015 (cigem.ca alexandrite report); UV pole 0.025 um^2 + constant term. Biaxial(+), approximated uniaxial(+) with delta-n 0.009 (lit. 0.008-0.010). Mohs 8.5."
 method = "Two-target empirical dispersion fit; see citation for assumptions"
 
+[sub_resource type="Resource" id="Resource_axvsq"]
+script = ExtResource("2_3pe48")
+b = PackedFloat64Array(0.5266872550188699, 1.480971706077828, 0)
+c_um2 = PackedFloat64Array(0.025, 0, 0)
+evidence = SubResource("Resource_5rb23")
+
 [resource]
-script = ExtResource("3_3pe48")
+script = ExtResource("4_7fpu2")
 species_id = &"chrysoberyl"
 display_name = "Chrysoberyl (BeAl2O4)"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.746 (GIA alexandrite page: RI 1.746-1.755) and B-G dispersion 0.015 (cigem.ca alexandrite report); UV pole 0.025 um^2 + constant term. Biaxial(+), approximated uniaxial(+) with delta-n 0.009 (lit. 0.008-0.010). Mohs 8.5."
-refraction_evidence = SubResource("Resource_hfkga")
-sellmeier_b = Vector3(0.5266873, 1.4809717, 0)
-sellmeier_c_um2 = Vector3(0.025, 0, 0)
-birefringence = 0.009
+ordinary = SubResource("Resource_axvsq")
+extraordinary = SubResource("Resource_tocyw")
 base_scatter_per_mm = 0.001
 hardness_mohs = 8.5
-inclusions = Array[ExtResource("1_tf1wg")]([SubResource("Resource_4euib"), SubResource("Resource_7fpu2")])
+inclusions = Array[ExtResource("3_4euib")]([SubResource("Resource_l8v2k"), SubResource("Resource_6iocq")])

@@ -110,7 +110,7 @@ func _transport() -> void:
 	inst["size_mm"] = 1.0
 	inst["sellmeier_b"] = Vector3.ZERO
 	inst["sellmeier_c"] = Vector3.ZERO
-	inst["birefringence"] = 0.0
+	inst["extraordinary_refraction"] = {}
 	inst["absorption"].fill(0.2)
 	inst["absorption_eray"] = PackedFloat32Array()
 	inst["zoning"] = {}

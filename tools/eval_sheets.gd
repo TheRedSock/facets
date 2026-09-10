@@ -65,7 +65,7 @@ func _initialize() -> void:
 
 # ------------------------------------------------------------------ sheets
 
-## a) Every available stone (.tres ladder + in-code makers), gameplay rig,
+## a) Every catalog stone, gameplay rig,
 ##    raw row + print row. PREVIEW policy at 64 spp, 224 px tiles.
 func _sheet_contact() -> void:
 	print("== contact sheet ==")
@@ -124,11 +124,11 @@ func _sheet_condition() -> void:
 		"EXPLICIT CONDITION - RUBY - GAMEPLAY RIG - SPP128 - 176PX", axes, cols), "condition_sheet.png")
 
 
-## c) Ruby / diamond / sapphire makers x [gameplay raw, gameplay print,
+## c) Catalog ruby / diamond / sapphire x [gameplay raw, gameplay print,
 ##    reference raw, reference print]. 224 px, 64 spp, dispersion on diamond.
 func _sheet_lighting() -> void:
 	print("== lighting sheet ==")
-	var stones: Array = [["RUBY", _ruby_fine()], ["DIAMOND", _diamond_perfect()], ["SAPPHIRE", _sapphire_like()]]
+	var stones: Array = [["RUBY", _catalog("ruby")], ["DIAMOND", _catalog("diamond")], ["SAPPHIRE", _catalog("sapphire")]]
 	var rigs: Array = [["GAMEPLAY", _rig_gameplay]]
 	if _rig_reference != null:
 		rigs.append(["REFERENCE", _rig_reference])
@@ -159,11 +159,11 @@ func _sheet_lighting() -> void:
 	_save(sheet, "lighting_sheet.png")
 
 
-## d) Diamond + quartz makers x all 5 rungs at true policy res/spp/batch,
+## d) Catalog diamond + quartz x all 5 rungs at true policy res/spp/batch,
 ##    NEAREST-resized to 224 so rung resolution differences stay honest.
 func _sheet_rungs() -> void:
 	print("== rung sheet ==")
-	var stone_defs: Array = [["DIAMOND", _diamond_perfect()], ["QUARTZ", _quartz_low()]]
+	var stone_defs: Array = [["DIAMOND", _catalog("diamond")], ["QUARTZ", _catalog("quartz")]]
 	var instances := {}
 	for sd: Array in stone_defs:
 		instances[sd[0]] = LapidaryStoneCompiler.compile(sd[1])
@@ -232,7 +232,7 @@ func _measure_timings() -> void:
 	_timings["generated"] = Time.get_datetime_string_from_system()
 	_timings["hero_spp"] = _hero_spp
 
-	var stone := _ruby_fine()
+	var stone := _catalog("ruby")
 	var instance := LapidaryStoneCompiler.compile(stone)
 	var lights := GemRigCompiler.compile(_rig_gameplay)
 
@@ -269,8 +269,8 @@ func _measure_timings() -> void:
 
 	var policy_bl: Dictionary = GemRung.policy(GemRung.BOARD_LIVE)
 	var instances: Array = []
-	for maker: Callable in [_quartz_low, _ruby_fine, _diamond_perfect, _sapphire_like]:
-		instances.append(LapidaryStoneCompiler.compile(maker.call()))
+	for id in ["quartz", "ruby", "diamond", "sapphire"]:
+		instances.append(LapidaryStoneCompiler.compile(_catalog(id)))
 	var batch_out := {}
 	for grid_n: int in [1, 4, 8]:
 		var count := grid_n * grid_n
@@ -356,7 +356,7 @@ func _timing_table() -> String:
 
 func _summary_lines() -> PackedStringArray:
 	var lines := PackedStringArray()
-	lines.append("Contact sheet contains %d stones (%d authored and four diagnostic makers). Inspect images before judging appearance." % [_contact_count, _tres_count])
+	lines.append("Contact sheet contains %d stones (%d authored). Inspect images before judging appearance." % [_contact_count, _tres_count])
 	lines.append("Condition sheet varies explicit scattering and band contrast. Grade labels do not change transport. These are authored approximations, not measured specimens.")
 	if _timings.has("single_stone_ms_by_rung"):
 		var r: Dictionary = _timings["single_stone_ms_by_rung"]
@@ -393,8 +393,7 @@ func _render(tracer: GemTracer, instance: Dictionary, stone_seed: int, rig: GemL
 	return ms
 
 
-## All .tres stones from data/lapidary/stones (ladder order) + the 4 in-code
-## makers so the contact sheet is never empty. Bad resources skip with a warning.
+## All authored stones in ladder order. Missing/invalid data fails evaluation.
 func _collect_stones() -> Array:
 	var out: Array = []
 	var files: Array = []
@@ -404,24 +403,20 @@ func _collect_stones() -> Array:
 			if f.get_extension() == "tres":
 				files.append(f)
 	else:
-		_warn("stones dir missing (%s)" % STONES_DIR)
+		_fail("stones dir missing (%s)" % STONES_DIR)
 	files.sort_custom(func(a: String, b: String) -> bool: return _ladder_key(a) < _ladder_key(b))
 	for f: String in files:
 		var stone := ResourceLoader.load("%s/%s" % [STONES_DIR, f]) as GemStone
 		if stone == null:
-			_warn("stone %s failed to load - skipped" % f)
+			_fail("stone %s failed to load - skipped" % f)
 			continue
 		var why := _stone_invalid_reason(stone)
 		if not why.is_empty():
-			_warn("stone %s invalid (%s) - skipped" % [f, why])
+			_fail("stone %s invalid (%s) - skipped" % [f, why])
 			continue
 		var stone_name := String(stone.stone_id) if stone.stone_id != &"" else f.get_basename()
 		out.append({"name": stone_name, "seed": stone.seed, "instance": LapidaryStoneCompiler.compile(stone)})
 		_tres_count += 1
-	for maker: Array in [["quartz-low", _quartz_low], ["ruby-fine", _ruby_fine],
-			["diamond-perfect", _diamond_perfect], ["sapphire-like", _sapphire_like]]:
-		var stone: GemStone = (maker[1] as Callable).call()
-		out.append({"name": maker[0], "seed": stone.seed, "instance": LapidaryStoneCompiler.compile(stone)})
 	return out
 
 
@@ -458,88 +453,5 @@ func _save(img: Image, file_name: String) -> void:
 		print("  wrote %s/%s (%dx%d)" % [OUT_DIR, file_name, img.get_width(), img.get_height()])
 
 
-# ------------------------------------------------------------------ fallback stone makers
-# Mirrors tools/board_grid_check.gd exactly (same Sellmeier constants, grades,
-# seeds, sizes) so the harness is never empty while authored data lands.
-
-func _quartz_low() -> GemStone:
-	var sp := GemSpecies.new()
-	sp.sellmeier_b = Vector3(1.07044083, 1.10202242, 0.0)
-	sp.sellmeier_c_um2 = Vector3(0.0100585997, 100.0, 0.0)
-	sp.hardness_mohs = 7.0
-	var cloud := GemInclusionArchetype.new()
-	cloud.form = GemInclusionArchetype.Form.CLOUD
-	cloud.size_mm_range = Vector2(0.3, 0.9)
-	cloud.scatter_density = 6.0
-	sp.inclusions = [cloud]
-	return _stone(sp, null, [0.3, 0.3, 0.3, 0.4], 11, 5.0)
-
-
-func _ruby_fine() -> GemStone:
-	var sp := GemSpecies.new()
-	sp.sellmeier_b = Vector3(1.4313493, 0.65054713, 5.3414021)
-	sp.sellmeier_c_um2 = Vector3(0.00527993, 0.01423827, 325.01783)
-	sp.hardness_mohs = 9.0
-	sp.fluorescence_emission_nm = 693.0
-	sp.fluorescence_strength = 0.5
-	var ch := GemChromophore.new()
-	ch.absorption_mm = _band_curve(0.7, 0.22, 0.95, 0.25, 0.04)
-	return _stone(sp, ch, [0.92, 0.85, 0.9, 0.95], 7, 5.2)
-
-
-func _diamond_perfect() -> GemStone:
-	var sp := GemSpecies.new()
-	sp.sellmeier_b = Vector3(4.3356, 0.3306, 0.0)
-	sp.sellmeier_c_um2 = Vector3(0.011236, 0.030625, 0.0)
-	sp.hardness_mohs = 10.0
-	sp.base_polish_roughness = 0.004
-	return _stone(sp, null, [1.0, 1.0, 1.0, 1.0], 3, 5.5)
-
-
-func _sapphire_like() -> GemStone:
-	var sp := GemSpecies.new()
-	sp.sellmeier_b = Vector3(1.4313493, 0.65054713, 5.3414021)
-	sp.sellmeier_c_um2 = Vector3(0.00527993, 0.01423827, 325.01783)
-	sp.hardness_mohs = 9.0
-	var ch := GemChromophore.new()
-	var arr := PackedFloat32Array()
-	arr.resize(81)
-	for i in 81:
-		var wl := 380.0 + float(i) * 5.0
-		arr[i] = 0.06 if wl < 500.0 else lerpf(0.15, 1.1, clampf((wl - 500.0) / 180.0, 0.0, 1.0))
-	ch.absorption_mm = arr
-	return _stone(sp, ch, [0.85, 0.8, 0.85, 0.9], 5, 5.3)
-
-
-static func _stone(sp: GemSpecies, ch: GemChromophore, g: Array, stone_seed: int, size: float) -> GemStone:
-	var grade := GemGrade.new()
-	grade.cut = g[0]
-	grade.clarity = g[1]
-	grade.surface = g[2]
-	grade.crystal = g[3]
-	var st := GemStone.new()
-	st.cut = load("res://data/lapidary/cuts/brilliant.tres")
-	st.material.species = sp
-	st.material.chromophore = ch
-	st.grade = grade
-	st.seed = stone_seed
-	st.size_mm = size
-	return st
-
-
-static func _band_curve(a_uv: float, a_blue: float, a_green: float, a_orange: float, a_red: float) -> PackedFloat32Array:
-	var arr := PackedFloat32Array()
-	arr.resize(81)
-	for i in 81:
-		var wl := 380.0 + float(i) * 5.0
-		var a := a_red
-		if wl < 445.0:
-			a = a_uv
-		elif wl < 500.0:
-			a = a_blue
-		elif wl < 610.0:
-			a = a_green
-		elif wl < 640.0:
-			a = a_orange
-		arr[i] = a
-	return arr
+func _catalog(id: String) -> GemStone:
+	return load("res://data/lapidary/stones/" + id + ".tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)

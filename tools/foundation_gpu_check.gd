@@ -32,7 +32,7 @@ func _initialize() -> void:
 	# equilibrium radiance is one, regardless of repeated elastic scattering.
 	inst["absorption"].fill(0.0)
 	inst["absorption_eray"] = PackedFloat32Array()
-	inst["birefringence"] = 0.0
+	inst["extraordinary_refraction"] = {}
 	inst["zoning"] = {}
 	inst["scatter"] = {"sigma_per_mm": 0.6, "g": 0.0}
 	policy["max_bounces"] = 512
@@ -86,7 +86,7 @@ func _zoning_checks(tracer: GemTracer, source: Dictionary, lights: PackedFloat32
 	var specimen := source.duplicate(true)
 	specimen["sellmeier_b"] = Vector3.ZERO
 	specimen["sellmeier_c"] = Vector3.ZERO
-	specimen["birefringence"] = 0.0
+	specimen["extraordinary_refraction"] = {}
 	specimen["absorption"].fill(0.2)
 	specimen["absorption_eray"] = PackedFloat32Array()
 	specimen["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}

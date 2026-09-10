@@ -79,3 +79,16 @@ Completed farm output stores can be consolidated headlessly with
 source for multiple shards). Inspect its dry-run report before `--apply=true`.
 Use `--initialize-destination=true` for a new empty store. Conflicting payloads
 are refused by default; source precedence must be chosen explicitly.
+
+
+Principal refraction inputs use `GemIndexCurve` independently for ordinary and
+extraordinary axes. Null extraordinary means isotropic. Published quartz and
+sapphire curves retain per-axis source equations/evidence; constant index offsets
+in the other catalog models are labeled approximations. The GPU transport model
+is still approximate for anisotropy. `test_principal_indices.gd` verifies published
+numbers, crossing-spectrum admission and binary job identity;
+`principal_indices_gpu_check.gd` checks the actual 160B Stone wire format and
+GLSL at 0.25 nm intervals. Authoring rejects coefficient quantization exceeding
+1e-6 in index on the visible 1 nm grid; this is not a full transport error bound.
+Evaluation sheets and the batched board diagnostic now use the actual catalog,
+with no duplicate in-code gemstone material definitions.

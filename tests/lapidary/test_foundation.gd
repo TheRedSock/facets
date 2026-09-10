@@ -24,7 +24,7 @@ func _identity() -> void:
 	stone.material.chromophore.concentration *= 1.01
 	check(fingerprint != stone.fingerprint(), "chromophore content invalidates")
 	fingerprint = stone.fingerprint()
-	stone.material.species.sellmeier_b.x += 0.000001
+	stone.material.species.ordinary.b[0] += 0.000001
 	check(fingerprint != stone.fingerprint(), "species content invalidates")
 	fingerprint = stone.fingerprint()
 	stone.cut.table_ratio += 0.01

@@ -16,7 +16,7 @@ func _initialize() -> void:
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var inst := LapidaryStoneCompiler.compile(stone)
 	inst["size_mm"] = 2.0
-	inst["birefringence"] = 0.0
+	inst["extraordinary_refraction"] = {}
 	var lighting := GemLighting.analytic(PackedFloat32Array(), Vector4(1, 1, 1, 0))
 	var policy := GemRung.policy(GemRung.PREVIEW)
 	var planes := PackedFloat32Array()

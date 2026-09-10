@@ -1,11 +1,31 @@
 [gd_resource type="Resource" script_class="GemSpecies" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_3arvd"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_ejd13"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="3_ipch2"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_ejd13"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_ipch2"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_u55sg"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_ao17r"]
 
-[sub_resource type="Resource" id="Resource_u55sg"]
-script = ExtResource("1_3arvd")
+[sub_resource type="Resource" id="Resource_o7im7"]
+script = ExtResource("1_ejd13")
+kind = 1
+citation = "G. Ghosh, Opt. Commun. 163, 95-102 (1999), DOI 10.1016/S0030-4018(99)00091-7; refractiveindex.info SiO2/Ghosh-e"
+method = "Published principal dispersion transcribed from the CC0 refractiveindex.info database; formula-1 poles squared into um^2, formula-2 constant stored as C=0 term"
+source_record = {
+"coefficients": [0.28851804, 1.09509924, 0.0102101864, 1.15662475, 100],
+"formula": 2,
+"temperature": "room temperature; exact value unreported",
+"url": "https://raw.githubusercontent.com/polyanskiy/refractiveindex.info-database/master/database/data/main/SiO2/nk/Ghosh-e.yml"
+}
+
+[sub_resource type="Resource" id="Resource_um3of"]
+script = ExtResource("2_ipch2")
+b = PackedFloat64Array(1.09509924, 1.15662475, 0.28851804)
+c_um2 = PackedFloat64Array(0.0102101864, 100, 0)
+range_nm = Vector2(198, 2053.1)
+evidence = SubResource("Resource_o7im7")
+
+[sub_resource type="Resource" id="Resource_88ps0"]
+script = ExtResource("3_u55sg")
 archetype_id = &"quartz_milk_bank"
 form = 3
 size_mm_range = Vector2(0.08, 0.22)
@@ -13,8 +33,8 @@ aspect = 1.0
 scatter_density = 6.0
 weight = 4.0
 
-[sub_resource type="Resource" id="Resource_ao17r"]
-script = ExtResource("1_3arvd")
+[sub_resource type="Resource" id="Resource_s0r6y"]
+script = ExtResource("3_u55sg")
 archetype_id = &"quartz_milky_veil"
 form = 2
 size_mm_range = Vector2(0.3, 1)
@@ -24,21 +44,32 @@ tint = Color(1, 0.99, 0.97, 1)
 weight = 2.0
 center_bias = 0.15
 
-[sub_resource type="Resource" id="Resource_o7im7"]
-script = ExtResource("2_ejd13")
+[sub_resource type="Resource" id="Resource_kkvpk"]
+script = ExtResource("1_ejd13")
 kind = 1
-citation = "Sellmeier: G. Ghosh, Opt. Commun. 163, 95-102 (1999), alpha-quartz o-ray (refractiveindex.info SiO2/Ghosh-o; C already in um^2, constant 0.28604141 stored as B with C=0). Birefringence 0.009 uniaxial(+), Mohs 7, dispersion B-G 0.013: standard gemological values. Sector zoning (amethyst) approximated as planar banding, see docs/lapidary-spectra-sources.md."
-method = "Published Sellmeier coefficients"
+citation = "G. Ghosh, Opt. Commun. 163, 95-102 (1999), DOI 10.1016/S0030-4018(99)00091-7; refractiveindex.info SiO2/Ghosh-o"
+method = "Published principal dispersion transcribed from the CC0 refractiveindex.info database; formula-1 poles squared into um^2, formula-2 constant stored as C=0 term"
+source_record = {
+"coefficients": [0.28604141, 1.07044083, 0.0100585997, 1.10202242, 100],
+"formula": 2,
+"temperature": "room temperature; exact value unreported",
+"url": "https://raw.githubusercontent.com/polyanskiy/refractiveindex.info-database/master/database/data/main/SiO2/nk/Ghosh-o.yml"
+}
+
+[sub_resource type="Resource" id="Resource_mdsl1"]
+script = ExtResource("2_ipch2")
+b = PackedFloat64Array(1.07044083, 1.10202242, 0.28604141)
+c_um2 = PackedFloat64Array(0.0100585997, 100, 0)
+range_nm = Vector2(198, 2053.1)
+evidence = SubResource("Resource_kkvpk")
 
 [resource]
-script = ExtResource("3_ipch2")
+script = ExtResource("4_ao17r")
 species_id = &"quartz"
 display_name = "Quartz (SiO2)"
-source_note = "Sellmeier: G. Ghosh, Opt. Commun. 163, 95-102 (1999), alpha-quartz o-ray (refractiveindex.info SiO2/Ghosh-o; C already in um^2, constant 0.28604141 stored as B with C=0). Birefringence 0.009 uniaxial(+), Mohs 7, dispersion B-G 0.013: standard gemological values. Sector zoning (amethyst) approximated as planar banding, see docs/lapidary-spectra-sources.md."
-refraction_evidence = SubResource("Resource_o7im7")
-sellmeier_b = Vector3(1.0704409, 1.1020224, 0.2860414)
-sellmeier_c_um2 = Vector3(0.0100585995, 100, 0)
-birefringence = 0.009
+source_note = "Alpha-quartz principal dispersion: Ghosh (1999), ordinary and extraordinary curves; see per-axis evidence. Optic axis normal to the table. Mohs hardness is metadata; color and specimen scattering are separate authored inputs."
+ordinary = SubResource("Resource_mdsl1")
+extraordinary = SubResource("Resource_um3of")
 base_scatter_per_mm = 0.002
 scatter_anisotropy_g = 0.55
-inclusions = Array[ExtResource("1_3arvd")]([SubResource("Resource_u55sg"), SubResource("Resource_ao17r")])
+inclusions = Array[ExtResource("3_u55sg")]([SubResource("Resource_88ps0"), SubResource("Resource_s0r6y")])

@@ -1,11 +1,25 @@
 [gd_resource type="Resource" script_class="GemSpecies" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_4ktyr"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_l0ux1"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="3_0euto"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_l0ux1"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_0euto"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_25tgk"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_fa1np"]
 
-[sub_resource type="Resource" id="Resource_25tgk"]
-script = ExtResource("1_4ktyr")
+[sub_resource type="Resource" id="Resource_o3ngp"]
+script = ExtResource("1_l0ux1")
+citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.577 (natural emerald n_omega 1.575-1.600, geo.libretexts Gemology: Emerald) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Birefringence 0.006 uniaxial(-) (lit. 0.004-0.010). Mohs 7.75 (lit. 7.5-8)."
+method = "Authored constant offset from the ordinary dispersion model"
+assumptions = "Extraordinary dispersion is unmeasured here. A constant index difference is an approximation; biaxial species additionally use an effective uniaxial model."
+
+[sub_resource type="Resource" id="Resource_yarw7"]
+script = ExtResource("2_0euto")
+b = PackedFloat64Array(0.4440297227544856, 1.0084542826421186, 0)
+c_um2 = PackedFloat64Array(0.025, 0, 0)
+index_offset = -0.006
+evidence = SubResource("Resource_o3ngp")
+
+[sub_resource type="Resource" id="Resource_meors"]
+script = ExtResource("3_25tgk")
 archetype_id = &"beryl_jardin_veil"
 form = 2
 size_mm_range = Vector2(0.35, 1.1)
@@ -15,8 +29,8 @@ tint = Color(0.93, 1, 0.96, 1)
 weight = 3.5
 center_bias = 0.2
 
-[sub_resource type="Resource" id="Resource_fa1np"]
-script = ExtResource("1_4ktyr")
+[sub_resource type="Resource" id="Resource_oo06n"]
+script = ExtResource("3_25tgk")
 archetype_id = &"beryl_fingerprint"
 form = 5
 size_mm_range = Vector2(0.25, 0.7)
@@ -26,8 +40,8 @@ tint = Color(0.96, 1, 0.98, 1)
 weight = 2.0
 center_bias = 0.3
 
-[sub_resource type="Resource" id="Resource_o3ngp"]
-script = ExtResource("1_4ktyr")
+[sub_resource type="Resource" id="Resource_4ynsa"]
+script = ExtResource("3_25tgk")
 archetype_id = &"beryl_droplet_cloud"
 form = 3
 size_mm_range = Vector2(0.08, 0.28)
@@ -37,22 +51,25 @@ tint = Color(0.97, 0.99, 0.96, 1)
 weight = 1.8
 center_bias = 0.4
 
-[sub_resource type="Resource" id="Resource_yarw7"]
-script = ExtResource("2_l0ux1")
+[sub_resource type="Resource" id="Resource_fysio"]
+script = ExtResource("1_l0ux1")
 kind = 2
 citation = "2-term Sellmeier FIT (this file's generator): targets n_D=1.577 (natural emerald n_omega 1.575-1.600, geo.libretexts Gemology: Emerald) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Birefringence 0.006 uniaxial(-) (lit. 0.004-0.010). Mohs 7.75 (lit. 7.5-8)."
 method = "Two-target empirical dispersion fit; see citation for assumptions"
 
+[sub_resource type="Resource" id="Resource_sj7bw"]
+script = ExtResource("2_0euto")
+b = PackedFloat64Array(0.4440297227544856, 1.0084542826421186, 0)
+c_um2 = PackedFloat64Array(0.025, 0, 0)
+evidence = SubResource("Resource_fysio")
+
 [resource]
-script = ExtResource("3_0euto")
+script = ExtResource("4_fa1np")
 species_id = &"beryl"
 display_name = "Beryl (Be3Al2Si6O18)"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.577 (natural emerald n_omega 1.575-1.600, geo.libretexts Gemology: Emerald) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Birefringence 0.006 uniaxial(-) (lit. 0.004-0.010). Mohs 7.75 (lit. 7.5-8)."
-refraction_evidence = SubResource("Resource_yarw7")
-sellmeier_b = Vector3(0.4440297, 1.0084543, 0)
-sellmeier_c_um2 = Vector3(0.025, 0, 0)
-birefringence = 0.006
-uniaxial_positive = false
+ordinary = SubResource("Resource_sj7bw")
+extraordinary = SubResource("Resource_yarw7")
 base_scatter_per_mm = 0.002
 hardness_mohs = 7.75
-inclusions = Array[ExtResource("1_4ktyr")]([SubResource("Resource_25tgk"), SubResource("Resource_fa1np"), SubResource("Resource_o3ngp")])
+inclusions = Array[ExtResource("3_25tgk")]([SubResource("Resource_meors"), SubResource("Resource_oo06n"), SubResource("Resource_4ynsa")])

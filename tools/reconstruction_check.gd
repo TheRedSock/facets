@@ -13,7 +13,7 @@ func _initialize() -> void:
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	stone.grade.cut = 1.0
 	var inst := LapidaryStoneCompiler.compile(stone)
-	inst["birefringence"] = 0.0
+	inst["extraordinary_refraction"] = {}
 	inst["absorption_eray"] = PackedFloat32Array()
 	inst["absorption"].fill(0.01)
 	inst["zoning"] = {}

@@ -26,7 +26,7 @@ func _initialize() -> void:
 	var specimen := LapidaryStoneCompiler.compile(stone)
 	specimen["sellmeier_b"] = Vector3.ZERO
 	specimen["sellmeier_c"] = Vector3.ZERO
-	specimen["birefringence"] = 0.0
+	specimen["extraordinary_refraction"] = {}
 	specimen["absorption"].fill(0.0)
 	specimen["absorption_eray"] = PackedFloat32Array()
 	specimen["scatter"] = {"sigma_per_mm": 0.0, "g": 0.0}
