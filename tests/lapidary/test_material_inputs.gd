@@ -61,14 +61,14 @@ func _validation() -> void:
 	var material: GemMaterial = load("res://data/lapidary/stones/ruby.tres").material.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	check(material.validate().is_empty(), "catalog material validates")
 	check(material.species.ordinary.evidence.kind == GemOpticalEvidence.Kind.PUBLISHED_MODEL, "published refraction classification is explicit")
-	check(material.chromophore.absorption_evidence.kind == GemOpticalEvidence.Kind.AUTHORED_APPROXIMATION, "authored absorption does not inherit refraction credibility")
-	material.chromophore.concentration = -1.0
+	check(material.absorbers[0].chromophore.absorption_evidence.kind == GemOpticalEvidence.Kind.AUTHORED_APPROXIMATION, "authored absorption does not inherit refraction credibility")
+	material.absorbers[0].amount = -1.0
 	check(not material.validate().is_empty(), "negative concentration rejected")
-	material.chromophore.concentration = NAN
+	material.absorbers[0].amount = NAN
 	check(not material.validate().is_empty(), "nonfinite concentration rejected")
-	material.chromophore.concentration = 1e100
+	material.absorbers[0].amount = 1e100
 	check(not material.validate().is_empty(), "float32 coefficient overflow rejected")
-	material.chromophore.concentration = 1.0
+	material.absorbers[0].amount = 1.0
 	material.species.ordinary.c_um2[0] = 0.5 * 0.5
 	check(not material.validate().is_empty(), "visible Sellmeier pole rejected before geometry/transport")
 	material.species.ordinary.c_um2 = PackedFloat64Array([0, 0, 0])
@@ -83,12 +83,12 @@ func _validation() -> void:
 func _resampling() -> void:
 	var material := GemMaterial.new()
 	material.species = GemSpecies.new()
-	material.chromophore = GemChromophore.new()
-	material.chromophore.wavelength_step_nm = 200.0
-	material.chromophore.absorption_mm = PackedFloat32Array([0, 1, 0])
-	material.chromophore.absorption_eray_mm = PackedFloat32Array([0, 2, 0])
+	material.absorbers = [GemAbsorber.relative(GemChromophore.new())]
+	material.absorbers[0].chromophore.wavelength_step_nm = 200.0
+	material.absorbers[0].chromophore.absorption_mm = PackedFloat32Array([0, 1, 0])
+	material.absorbers[0].chromophore.absorption_eray_mm = PackedFloat32Array([0, 2, 0])
 	var result := GemMaterialCompiler.compile(material)
 	check(result["absorption"].size() == 401 and result["absorption_eray"].size() == 401, "bulk compiler emits the shared 1 nm grid")
 	check(result["absorption"][100] == 0.5 and result["absorption_eray"][100] == 1.0, "source-grid resampling preserves both axes")
-	material.chromophore.wavelength_start_nm = 400.0
+	material.absorbers[0].chromophore.wavelength_start_nm = 400.0
 	check(not material.validate().is_empty(), "source absorption never silently extrapolates")

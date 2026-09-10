@@ -9,6 +9,14 @@ orthographic camera looks down world −Z; instance quaternions rotate stone→w
 
 ## Geometry and material state
 
+The host compiler sums independent `GemAbsorber` terms before packing. Cross
+sections are float64 cm2 source data; multiplying active absorbers/cm3 and dividing
+by10 produces Napierian coefficients/mm. Total-atom ppma uses an explicitly
+declared atom density. Isotropic terms contribute to both principal axes of an
+anisotropic mixture. The final401-sample tables remain float32; no wire layout
+change or shader-side concentration conversion is needed. All terms share the
+host crystal frame; existing spatial concentration fields scale the whole sum.
+
 A Plane is two vec4s (32B): outward normal.xyz/offset d, then zone ID/reserved/
 facet-ID-bits/surface-slot-bits. Both aux.z and aux.w store **int32 bit patterns**;
 read them with `floatBitsToInt`, never numeric float conversion. Ordinary convex

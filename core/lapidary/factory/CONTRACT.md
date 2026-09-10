@@ -16,6 +16,13 @@ them retains expensive masters. `GemStone.fingerprint()` still tracks the comple
 authored record. Physical input changes retire masters through `transport_inputs()`.
 Pose quantization is explicit and the renderer uses the same canonical pose.
 
+Bulk absorption is a typed list of spectrum/amount/unit terms. Source spectra may
+be coefficient/mm or cross-section/cm2; the latter retain float64 precision until
+physical number-density conversion and summation produce the float32 GPU table.
+Binary resource bundles retain each term, its host compatibility and provenance.
+Changing composition invalidates optical masters; concentration is not a print
+parameter. Current spatial absorption fields scale the complete mixture.
+
 `GemRenderIdentity` separates scalar, polarized, crystal, print and geometry
 result dependencies from `worker_digest()`, the complete renderer inventory.
 Known crystal-only modules affect crystal masters; print implementation changes

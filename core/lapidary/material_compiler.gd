@@ -5,15 +5,20 @@ static func compile(material: GemMaterial) -> Dictionary:
 	assert(material != null and material.validate().is_empty(), "Invalid bulk material")
 	var species := material.species
 	var index := species.ordinary.packed()
-	var absorption := PackedFloat32Array()
-	absorption.resize(401)
-	var eray := PackedFloat32Array()
-	var chromo := material.chromophore
-	if chromo != null:
-		if not chromo.absorption_mm.is_empty():
-			absorption = _resample(chromo.absorption_mm, chromo)
-		if not chromo.absorption_eray_mm.is_empty():
-			eray = _resample(chromo.absorption_eray_mm, chromo)
+	var absorption:=PackedFloat32Array()
+	var eray:=PackedFloat32Array()
+	var has_parallel:=false
+	for term in material.absorbers:
+		has_parallel=has_parallel or (term.amount>0 and term.chromophore.has_parallel_curve())
+	for wavelength in range(380,781):
+		var ordinary:=0.0
+		var parallel:=0.0
+		for term in material.absorbers:
+			var scale:=term.coefficient_scale(material.atom_density_per_cm3)
+			ordinary+=term.chromophore.sample(wavelength)*scale
+			if has_parallel:parallel+=term.chromophore.sample(wavelength,true)*scale
+		absorption.append(ordinary)
+		if has_parallel:eray.append(parallel)
 	return {"absorption": absorption, "absorption_eray": eray,
 		"sellmeier_b": index.b, "sellmeier_c": index.c,
 		"index_offset": species.ordinary.index_offset,
@@ -21,15 +26,6 @@ static func compile(material: GemMaterial) -> Dictionary:
 		"optic_axis": species.optic_axis_stone.normalized(),
 		"scatter": {"sigma_per_mm": material.scatter_per_mm if material.scatter_per_mm >= 0.0 else species.base_scatter_per_mm,
 			"g": material.scatter_g if material.scatter_per_mm >= 0.0 else species.scatter_anisotropy_g}}
-
-
-static func _resample(values: PackedFloat32Array, chromo: GemChromophore) -> PackedFloat32Array:
-	var output := PackedFloat32Array()
-	for index in 401:
-		var position := (380.0 + index - chromo.wavelength_start_nm) / chromo.wavelength_step_nm
-		var first := clampi(int(position), 0, values.size() - 1)
-		output.append(lerpf(values[first], values[mini(first + 1, values.size() - 1)], position - first) * chromo.concentration)
-	return output
 
 
 ## Capability gate for the persistent polarized renderer. Axial dichroism is

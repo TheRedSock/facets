@@ -15,6 +15,12 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="13_3eois"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="14_negdc"]
 
+[ext_resource type="Script" path="res://resources/lapidary/gem_absorber.gd" id="absorber_script"]
+
+[sub_resource type="Resource" id="Absorber_host"]
+script = ExtResource("absorber_script")
+chromophore = ExtResource("10_3pqpm")
+
 [sub_resource type="Resource" id="Resource_2srb1"]
 script = ExtResource("1_5gpl4")
 method = "Authored sinusoidal concentration field"
@@ -48,7 +54,7 @@ assumptions = "Catalog look-development value; not a measured scattering populat
 [sub_resource type="Resource" id="Resource_xsc5j"]
 script = ExtResource("11_pfsha")
 species = ExtResource("12_5xen4")
-chromophore = ExtResource("10_3pqpm")
+absorbers = Array[ExtResource("absorber_script")]([SubResource("Absorber_host")])
 scatter_per_mm = 0.074191191
 scattering_evidence = SubResource("Resource_1vr5g")
 

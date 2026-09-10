@@ -17,13 +17,13 @@ func _initialize() -> void:
 		stone.material.scatter_per_mm = 0.0
 		if dichroic:
 			# Synthetic absorption tensor: a diagnostic, not measured fluorite.
-			stone.material.chromophore = GemChromophore.new()
-			stone.material.chromophore.source_note = "Synthetic two-band axial absorption diagnostic, not mineral data"
+			stone.material.absorbers = [GemAbsorber.relative(GemChromophore.new())]
+			stone.material.absorbers[0].chromophore.source_note = "Synthetic two-band axial absorption diagnostic, not mineral data"
 			stone.material.species.optic_axis_stone = Vector3(1, 0.3, 0.4).normalized()
 			for sample in 81:
 				var wavelength := 380.0 + sample * 5
-				stone.material.chromophore.absorption_mm.append(0.01 + 0.7 * exp(-pow((wavelength - 450) / 50, 2)))
-				stone.material.chromophore.absorption_eray_mm.append(0.01 + 0.7 * exp(-pow((wavelength - 610) / 65, 2)))
+				stone.material.absorbers[0].chromophore.absorption_mm.append(0.01 + 0.7 * exp(-pow((wavelength - 450) / 50, 2)))
+				stone.material.absorbers[0].chromophore.absorption_eray_mm.append(0.01 + 0.7 * exp(-pow((wavelength - 610) / 65, 2)))
 		var instance := LapidaryStoneCompiler.compile(stone)
 		for angle in [0.0, 0.3]:
 			var scalar_xyz := PackedFloat32Array()

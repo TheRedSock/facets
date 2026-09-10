@@ -42,5 +42,5 @@ func _initialize() -> void:
 		printerr("Cannot save imported absorption")
 		quit(1)
 		return
-	print("Imported ", resource.chromophore_id, ": 401 samples, Napierian /mm; raw SHA256 ", resource.absorption_evidence.dataset_sha256)
+	print("Imported ", resource.chromophore_id, ": 401 samples, ", "cross section cm2" if resource.basis==GemChromophore.SpectrumBasis.CROSS_SECTION_CM2 else "Napierian /mm", "; raw SHA256 ", resource.absorption_evidence.dataset_sha256)
 	quit()

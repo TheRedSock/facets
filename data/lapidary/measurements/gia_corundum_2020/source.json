@@ -1,0 +1,82 @@
+{
+  "source_url": "https://origin.prod.gia.edu/dam/jcr:6ec3f5fc-4c0c-4276-a81b-a9534b88d50b/sp20-corundum-chromophores-absorption-cross-section-data.xlsx",
+  "workbook_sha256": "26f9c90a90abba463478b44d390f2a725ec78a9c891a1ca1267f865a2f27a9da",
+  "citation": "https://www.gia.edu/gems-gemology/spring-2020-corundum-chromophores",
+  "quantity": "cross_section_cm2",
+  "optical_basis": "ordinary_extraordinary",
+  "host_species_id": "corundum",
+  "wavelength_nm": [
+    380,
+    780,
+    1
+  ],
+  "instrument_resolution_nm": 1.5,
+  "source_sheet": "Sheet1",
+  "source_rows": [
+    331,
+    731
+  ],
+  "spectra": {
+    "chromium": {
+      "file": "chromium.csv",
+      "sha256": "bfb653bef584e1226048259d15ae58e248b88d061092833a9296dc25c24a1b6c",
+      "columns": [
+        "B",
+        "C"
+      ]
+    },
+    "vanadium": {
+      "file": "vanadium.csv",
+      "sha256": "2e5944b639029722236f581b04de52f959179564685e5c06f52867456c3361a7",
+      "columns": [
+        "D",
+        "E"
+      ]
+    },
+    "iron_titanium": {
+      "file": "iron_titanium.csv",
+      "sha256": "a619358834a4a2fed9c1023deac886041138a68ccd03a2436efa82c8750a24f6",
+      "columns": [
+        "F",
+        "G"
+      ]
+    },
+    "hole_iron": {
+      "file": "hole_iron.csv",
+      "sha256": "ed28128ebc7eb677270d4e9e6cc797a73c97660dd96e2a20a56663e2c21d6350",
+      "columns": [
+        "H",
+        "I"
+      ]
+    },
+    "hole_chromium": {
+      "file": "hole_chromium.csv",
+      "sha256": "24b29f1319647a3118c2d6da7a0c67035b316ecfa81abae5e3860207711be519",
+      "columns": [
+        "J",
+        "K"
+      ]
+    },
+    "iron": {
+      "file": "iron.csv",
+      "sha256": "5146ff9666eb7bac1093aabebe1aef123a6f9671d0a35949203f9ee4aa1ec7b5",
+      "columns": [
+        "M",
+        "N"
+      ]
+    }
+  },
+  "review": {
+    "examples": [
+      "chromium",
+      "iron_titanium"
+    ],
+    "deferred": {
+      "iron": "Concentration-dependent clustering; one constant cross section cannot define a general concentration law.",
+      "vanadium": "Workbook 580nm ordinary value differs from the article peak statement; normalization requires further review.",
+      "hole_iron": "No independent numeric calibration completed.",
+      "hole_chromium": "No independent numeric calibration completed."
+    },
+    "color_appendix": "Concentration labels and stored multipliers do not consistently reproduce the listed Lab coordinates. Do not fit coefficient scales to those colors."
+  }
+}

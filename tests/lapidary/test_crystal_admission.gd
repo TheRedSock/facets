@@ -34,9 +34,9 @@ func _initialize() -> void:
 	stone.condition.volume_fields[0] = null
 	check(not GemJobValidator.validate(job).is_empty(), "malformed field fails before crystal model access")
 	stone.condition.volume_fields.clear()
-	stone.material.chromophore.concentration = 1e6
+	stone.material.absorbers[0].amount = 1e6
 	check(GemJobValidator.validate(job).contains("weak-loss"), "strong complex-index absorption is outside the model")
-	stone.material.chromophore.concentration = 1
+	stone.material.absorbers[0].amount = 1
 	var defect := GemDefect.new()
 	defect.filling = stone.material.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	defect.filling.scatter_per_mm = 0.1

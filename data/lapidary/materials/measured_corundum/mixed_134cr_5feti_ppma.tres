@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="GemMaterial" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_absorber.gd" id="1_30gda"]
+[ext_resource type="Resource" path="res://data/lapidary/materials/measured_corundum/chromium.tres" id="2_wsu2i"]
+[ext_resource type="Resource" path="res://data/lapidary/materials/measured_corundum/iron_titanium.tres" id="3_otb7b"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="4_em1yg"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="5_cpjqq"]
+[ext_resource type="Resource" path="res://data/lapidary/species/corundum.tres" id="6_aljk5"]
+
+[sub_resource type="Resource" id="Resource_jgc00"]
+script = ExtResource("1_30gda")
+chromophore = ExtResource("2_wsu2i")
+amount = 134.0
+unit = 2
+
+[sub_resource type="Resource" id="Resource_vmisg"]
+script = ExtResource("1_30gda")
+chromophore = ExtResource("3_otb7b")
+amount = 5.0
+unit = 2
+
+[sub_resource type="Resource" id="Resource_5wuma"]
+script = ExtResource("4_em1yg")
+method = "Explicit clear-medium example; no measured scattering coefficient supplied"
+
+[resource]
+script = ExtResource("5_cpjqq")
+material_id = &"mixed_134cr_5feti_ppma"
+species = ExtResource("6_aljk5")
+absorbers = Array[ExtResource("1_30gda")]([SubResource("Resource_jgc00"), SubResource("Resource_vmisg")])
+atom_density_per_cm3 = 1.178e+23
+scatter_per_mm = 0.0
+scattering_evidence = SubResource("Resource_5wuma")
+source_note = "Illustrative homogeneous active-absorber recipe using GIA2020 cross sections; total-atom ppma convention. Concentrations are inputs, not inferred from bulk chemistry. Separate from authored game catalog; not a calibrated specimen color or universal corundum chemistry model. https://www.gia.edu/gems-gemology/spring-2020-corundum-chromophores"

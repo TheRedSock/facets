@@ -36,7 +36,7 @@ static func compile(stone: GemStone, optimize_cleavage := true) -> Dictionary:
 		"index_offset": bulk["index_offset"],
 		"extraordinary_refraction": bulk["extraordinary_refraction"],
 		"optic_axis": stone.resolved_optic_axis(),
-		"fluorescence": _resolve_fluorescence(species, stone.material.chromophore),
+		"fluorescence": {}, # Absorption mixtures do not define emitted-light transport.
 		"dispersion_strong": dispersion_bg(species) >= 0.025,
 		"fingerprint": stone.fingerprint(),
 	}
@@ -52,19 +52,6 @@ static func compile(stone: GemStone, optimize_cleavage := true) -> Dictionary:
 
 static func dispersion_bg(species: GemSpecies) -> float:
 	return species.ior_at(WL_F) - species.ior_at(WL_C)
-
-
-## Fluorescence is chromophore-gated: the glow comes from the coloring ion
-## (Cr3+), and co-impurities quench it (Fe in blue sapphire).
-static func _resolve_fluorescence(species: GemSpecies, chromo: GemChromophore) -> Dictionary:
-	var nm := species.fluorescence_emission_nm
-	var strength := species.fluorescence_strength
-	if chromo != null:
-		if chromo.fluorescence_strength_override >= 0.0:
-			strength = chromo.fluorescence_strength_override
-		if chromo.fluorescence_emission_nm_override > 0.0:
-			nm = chromo.fluorescence_emission_nm_override
-	return {"nm": nm, "strength": strength}
 
 
 # ------------------------------------------------------------------ cut

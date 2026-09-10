@@ -180,3 +180,29 @@ use isotropic real refraction. For historical image/cost A/B, save the earlier
 and run `reconstruction_lookdev.gd` (or `-- --quick` for128px/512spp references).
 The normal comparison is256px/128spp against an independent2048spp raw reference;
 images, timings, errors and source hashes remain in that ignored directory.
+
+Absorption recipes use `GemMaterial.absorbers`, with a `GemAbsorber` per active
+coloring agent. Coefficient spectra take relative scales; cross sections take
+active absorbers/cm3 or total-atom ppma with an explicit host atom density.
+Independent terms add Napierian coefficients on both principal axes. This is a
+dilute independent-absorber model, not a chemical equilibrium calculation. Current
+spatial concentration fields multiply the whole mixture, not individual ions.
+
+For the reviewed GIA2020 corundum examples, run
+`python tools/extract_corundum_measurements.py <downloaded-workbook.xlsx>` followed
+by headless `tools/import_corundum_measurements.gd`. The extractor pins the original
+workbook SHA; the importer reads the retained CSVs and checks their hashes. Source
+URLs, column mappings, uncertainty scope and unresolved source questions remain
+in `data/lapidary/measurements/gia_corundum_2020/source.json` and resource evidence.
+Only chromium and iron-titanium examples are active build resources. Iron's
+concentration dependence and the other unreviewed curves are not generalized.
+
+`test_absorption_mixtures.gd` checks dimensions, mixtures, source precision,
+host admission and portable job serialization. `absorption_mixture_gpu_check.gd`
+renders 12 source-backed slabs; `python tools/check_absorption_mixtures.py`
+independently integrates raw spectra and normal-incidence reflection/transmission.
+Both are included in the GPU/reference suite. `absorption_mixture_lookdev.gd`
+compares scalar preview (left) and explicit crystal transport (right), with two
+crystal orientations per material, under ignored `artifacts/materials/lookdev/`.
+These are measured-spectrum examples, not calibrated specimen colors or updates
+to the authored game catalog. Fluorescence remains disabled.

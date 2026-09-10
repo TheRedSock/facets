@@ -20,10 +20,12 @@ $stages += @{ Name = 'test_volume_authoring'; Args = @('--headless', '--quit-aft
 $stages += @{ Name = 'test_geometry_factory'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_geometry_factory.gd') }
 $stages += @{ Name = 'test_render_dependencies'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_render_dependencies.gd') }
 $stages += @{ Name = 'test_finish_fields'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_finish_fields.gd') }
+$stages += @{ Name = 'test_absorption_mixtures'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_absorption_mixtures.gd') }
 if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'absorption_mixture_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/absorption_mixture_gpu_check.gd') }
 	$stages += @{ Name = 'reconstruction_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/reconstruction_gpu_check.gd') }
 	$stages += @{ Name = 'convex_surface_check'; Args = @('--quit-after', '600', '--script', 'res://tools/convex_surface_check.gd') }
 	$stages += @{ Name = 'cleavage_backend_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_backend_check.gd') }
@@ -59,7 +61,7 @@ foreach ($stage in $stages) {
 }
 if ($ReferencePython -and $failed.Count -eq 0) {
     $referenceChecks = @('check_mesh_predicates', 'check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')
-    if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference', 'check_finish_fields_reference') }
+    if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference', 'check_finish_fields_reference', 'check_absorption_mixtures') }
     foreach ($name in $referenceChecks) {
         $output = & $ReferencePython (Join-Path $projectRoot "tools/$name.py") 2>&1
         $code = $LASTEXITCODE

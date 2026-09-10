@@ -15,8 +15,14 @@ extends Resource
 @export var wavelength_start_nm := 380.0
 @export var wavelength_step_nm := 5.0
 @export var absorption_mm := PackedFloat32Array()
-## Concentration multiplier applied to the curve.
-@export var concentration := 1.0
+## A measured cross section is a different quantity from absorption /mm.
+## Exactly one basis is populated; concentrations belong to material terms.
+enum SpectrumBasis { COEFFICIENT_PER_MM, CROSS_SECTION_CM2 }
+@export var basis := SpectrumBasis.COEFFICIENT_PER_MM
+@export var cross_section_cm2 := PackedFloat64Array()
+@export var cross_section_parallel_cm2 := PackedFloat64Array()
+## Cross sections are specific to an absorber AND its host lattice.
+@export var host_species_id: StringName
 
 ## Optional principal parallel-axis absorption curve (same sampling).
 ## The polarized isotropic-real-index renderer propagates its weak-loss tensor
@@ -35,26 +41,50 @@ extends Resource
 
 
 func is_colorless() -> bool:
-	return absorption_mm.is_empty()
+	return absorption_mm.is_empty() and cross_section_cm2.is_empty()
 
 func validate() -> PackedStringArray:
 	var errors := PackedStringArray()
-	if not is_finite(concentration) or concentration < 0.0:
-		errors.append("Absorption concentration must be finite and nonnegative")
+	if basis not in [SpectrumBasis.COEFFICIENT_PER_MM, SpectrumBasis.CROSS_SECTION_CM2]:
+		errors.append("Unknown absorption spectrum basis")
+	if basis == SpectrumBasis.COEFFICIENT_PER_MM and (not cross_section_cm2.is_empty() or not cross_section_parallel_cm2.is_empty()):
+		errors.append("Coefficient spectra cannot also contain cross sections")
+	if basis == SpectrumBasis.CROSS_SECTION_CM2:
+		if not absorption_mm.is_empty() or not absorption_eray_mm.is_empty() or cross_section_cm2.is_empty() or host_species_id.is_empty():
+			errors.append("Cross sections require their host species and an exclusive nonempty cross-section basis")
 	if not is_finite(wavelength_start_nm) or not is_finite(wavelength_step_nm) or wavelength_step_nm <= 0.0:
 		errors.append("Invalid absorption wavelength grid")
-	for curve in [absorption_mm, absorption_eray_mm]:
+	for curve in [absorption_mm, absorption_eray_mm, cross_section_cm2, cross_section_parallel_cm2]:
 		if not curve.is_empty() and (curve.size() < 2 or curve.size() > 10000 or wavelength_start_nm > 380.0 or wavelength_start_nm + wavelength_step_nm * (curve.size() - 1) < 780.0):
 			errors.append("Absorption data must cover the complete 380..780 nm transport interval")
 		for value in curve:
 			if not is_finite(value) or value < 0.0:
 				errors.append("Absorption coefficients must be finite and nonnegative")
-			if value * concentration > 3.4028234e38:
-				errors.append("Scaled absorption exceeds the float32 transport range")
 	if not absorption_eray_mm.is_empty() and absorption_eray_mm.size() != absorption_mm.size():
 		errors.append("Ordinary and extraordinary absorption must share the same source grid")
+	if not cross_section_parallel_cm2.is_empty() and cross_section_parallel_cm2.size()!=cross_section_cm2.size():
+		errors.append("Principal cross sections must share the source grid")
 	if absorption_evidence == null:
 		errors.append("Absorption evidence descriptor is missing")
 	else:
 		errors.append_array(absorption_evidence.validate())
 	return errors
+
+## Principal absorption axes are aligned with the material's host crystal frame.
+func has_parallel_curve() -> bool:
+	return not (absorption_eray_mm.is_empty() if basis==SpectrumBasis.COEFFICIENT_PER_MM else cross_section_parallel_cm2.is_empty())
+
+func sample(wavelength_nm: float, parallel := false) -> float:
+	if not is_finite(wavelength_nm) or not is_finite(wavelength_step_nm) or wavelength_step_nm <= 0.0:
+		return NAN
+	var values: Variant
+	if basis==SpectrumBasis.COEFFICIENT_PER_MM:
+		values=absorption_eray_mm if parallel and not absorption_eray_mm.is_empty() else absorption_mm
+	else:
+		values=cross_section_parallel_cm2 if parallel and not cross_section_parallel_cm2.is_empty() else cross_section_cm2
+	if values.is_empty():return 0.0
+	var position: float=(wavelength_nm-wavelength_start_nm)/wavelength_step_nm
+	if position < 0.0 or position > values.size()-1:
+		return NAN # Explicit source domain: never silently extrapolate a spectrum.
+	var first:=clampi(int(position),0,values.size()-1)
+	return lerpf(values[first],values[mini(first+1,values.size()-1)],position-first)

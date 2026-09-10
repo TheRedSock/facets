@@ -134,7 +134,7 @@ func _test_chromophores(chromophores: Dictionary) -> void:
 		var label := path.get_file()
 		_check(chromo.get("chromophore_id") != &"", "%s: chromophore_id must be non-empty" % label)
 		_check(chromo.get("source_note") != "", "%s: source_note (citation) required" % label)
-		_check(chromo.get("concentration") > 0.0, "%s: concentration must be > 0" % label)
+		_check(chromo.validate().is_empty(), "%s: spectrum basis and data must validate" % label)
 		_check_curve(chromo.get("absorption_mm"), "%s absorption_mm" % label, false)
 		_check_curve(chromo.get("absorption_eray_mm"), "%s absorption_eray_mm" % label, true)
 		# Every shipped chromophore file exists to carry colour.
@@ -210,9 +210,9 @@ func _test_stones(stones: Dictionary) -> void:
 		var size_mm: float = stone.get("size_mm")
 		_check(size_mm >= 4.4 and size_mm <= 5.6, "%s: size_mm %.2f outside 4.5-5.5 band" % [label, size_mm])
 		if stone_id in COLORLESS_STONES:
-			_check(stone.material.chromophore == null, "%s: must be colorless (null chromophore)" % label)
+			_check(stone.material.absorbers.is_empty(), "%s: must be colorless (null chromophore)" % label)
 		else:
-			_check(stone.material.chromophore != null, "%s: colored stone needs a chromophore" % label)
+			_check(not stone.material.absorbers.is_empty(), "%s: colored stone needs a chromophore" % label)
 
 		# stone_id must be a real tile_id, and the filename must match it.
 		_check(label.trim_suffix(".tres") == String(stone_id),

@@ -336,7 +336,7 @@ func _build_chromophores() -> Dictionary:
 		"Cr3+ in corundum. o-ray (E⊥c): Y band ~410 nm, U band ~556 nm (GIA G&G Spring 2020 Dubinsky et al.), B-lines ~468-475 nm, ~480 nm transmission saddle, R-line 694 nm. e-ray (E∥c): ~420/~552 with weaker U band. Curves authored for the kernel's GIA polarisation mix. Concentration 0.40 for a 5.4 mm stone. Daylight fluorescence override 0.05 @ 693 nm.",
 		_curve(0.05, [[1.55, 410.0, 28.0], [1.72, 556.0, 38.0], [0.42, 478.0, 18.0], [0.22, 468.0, 8.0], [0.35, 380.0, 30.0], [0.05, 694.0, 6.0]]),
 		_curve(0.05, [[1.40, 420.0, 28.0], [1.35, 552.0, 34.0], [0.22, 478.0, 16.0], [0.30, 380.0, 30.0], [0.05, 694.0, 6.0]]),
-		Color(0.88, 0.11, 0.25), 0.05, 693.0, 0.40)
+		Color(0.88, 0.11, 0.25), 0.05, 693.0)
 
 	# Fe2+-Ti4+ IVCT: broad band ~580 nm reaching 700, blue window 440-480,
 	# weak Fe3+ features ~377/388/450.
@@ -544,7 +544,8 @@ func _build_stones(species: Dictionary, chromophores: Dictionary, grades: Dictio
 		var stone: Resource = StoneScript.new()
 		stone.stone_id = row[0]
 		stone.material.species = species[row[1]]
-		stone.material.chromophore = chromophores[row[2]] if row[2] != &"" else null
+		if row[2] != &"":
+			stone.material.absorbers.append(GemAbsorber.relative(chromophores[row[2]],0.4 if row[2]==&"ruby_cr" else 1.0))
 		stone.grade = grades[row[3]]
 		stone.shape = GemShape.faceted_outline(row[4])
 		stone.cut = cuts[row[5]]
@@ -586,15 +587,13 @@ func _archetype(id: StringName, form: int, size_range: Vector2, aspect: float,
 
 func _chromophore(id: StringName, display_name: String, note: String,
 		curve: PackedFloat32Array, eray: PackedFloat32Array, ui: Color,
-		fluor_strength_override := -1.0, fluor_nm_override := 0.0,
-		concentration := 1.0) -> Resource:
+		fluor_strength_override := -1.0, fluor_nm_override := 0.0) -> Resource:
 	var chromo: Resource = ChromophoreScript.new()
 	chromo.chromophore_id = id
 	chromo.display_name = display_name
 	chromo.source_note = note
 	chromo.absorption_mm = curve
 	chromo.absorption_eray_mm = eray
-	chromo.concentration = concentration
 	chromo.ui_color = ui
 	chromo.fluorescence_strength_override = fluor_strength_override
 	chromo.fluorescence_emission_nm_override = fluor_nm_override
@@ -701,14 +700,14 @@ const BL_KEYS := {
 func _print_beer_lambert(chromophores: Dictionary, stones: Array) -> void:
 	print("\nBeer-Lambert check, T2 = exp(-alpha * 2 * size_mm), T4 = 4×size TIR path:")
 	for stone: Resource in stones:
-		if stone.material.chromophore == null:
+		if stone.material.absorbers.is_empty():
 			continue
-		var chromo: Resource = stone.material.chromophore
+		var chromo: Resource = stone.material.absorbers[0].chromophore
 		var keys: Array = BL_KEYS.get(chromo.chromophore_id, [])
 		var parts := PackedStringArray()
 		for wl: float in keys:
 			var idx := clampi(int(round((wl - 380.0) / 5.0)), 0, 80)
-			var alpha: float = chromo.absorption_mm[idx] * chromo.concentration
+			var alpha: float = chromo.absorption_mm[idx] * stone.material.absorbers[0].amount
 			var t := exp(-alpha * 2.0 * stone.size_mm)
 			var t4 := exp(-alpha * 4.0 * stone.size_mm)
 			parts.append("%dnm a=%.3f T2=%.3f T4=%.3f" % [int(wl), alpha, t, t4])

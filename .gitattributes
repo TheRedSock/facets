@@ -2,3 +2,4 @@
 # bytes on Windows and Unix; newline conversion would break dataset validation.
 data/lapidary/standards/* -text
 data/lapidary/**/measurements/* -text
+data/lapidary/measurements/**/*.csv -text

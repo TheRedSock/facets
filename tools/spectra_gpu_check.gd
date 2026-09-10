@@ -84,10 +84,10 @@ func _initialize() -> void:
 func _absorption_band(tracer: GemTracer, specimen: Dictionary, policy: Dictionary) -> void:
 	var material := GemMaterial.new()
 	material.species = GemSpecies.new() # index-matched analytical slab
-	material.chromophore = GemChromophore.new()
-	material.chromophore.wavelength_step_nm = 1.0
-	material.chromophore.absorption_mm.resize(401)
-	material.chromophore.absorption_mm[182] = 1.0 # 562 nm: missed by the old 5 nm grid
+	material.absorbers = [GemAbsorber.relative(GemChromophore.new())]
+	material.absorbers[0].chromophore.wavelength_step_nm = 1.0
+	material.absorbers[0].chromophore.absorption_mm.resize(401)
+	material.absorbers[0].chromophore.absorption_mm[182] = 1.0 # 562 nm: missed by the old 5 nm grid
 	var bulk := GemMaterialCompiler.compile(material)
 	specimen["absorption"] = bulk["absorption"]
 	specimen["planes"] = PackedFloat32Array()

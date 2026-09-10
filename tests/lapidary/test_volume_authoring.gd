@@ -71,7 +71,7 @@ func _initialize() -> void:
 	var working: GemStone = atelier.call("_duplicate_stone", authored)
 	working.material.scatter_per_mm = 2
 	working.condition.banding.contrast = 1
-	working.material.chromophore.concentration = 0.01
+	working.material.absorbers[0].amount = 0.01
 	check(authored.fingerprint() == original_identity, "Atelier edits cannot mutate shared external material resources")
 	atelier.free()
 	print("Volume authoring: %d checks, %d failures" % [checks, failures])
