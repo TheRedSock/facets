@@ -254,3 +254,26 @@ See https://mitsuba.readthedocs.io/en/stable/src/key_topics/polarization.html an
 https://github.com/mitsuba-renderer/mitsuba3/tree/v3.9.1/include/mitsuba/render .
 This validates isotropic polarization operations; it does not validate anisotropic
 ray direction, birefringent retardation, biaxial materials or mineral measurements.
+
+
+## Uniaxial Maxwell reference (CPU only)
+
+`GemCrystalModes` solves ordinary/extraordinary wavevectors at a boundary from
+conserved tangential phase and the uniaxial dispersion metric. It stores complex
+E/H fields, wave-normal direction and Poynting energy direction separately.
+Evanescent modes decay into the selected half-space and carry no normal flux.
+`GemCrystalInterface` solves four tangential field-continuity equations for two
+reflected and two transmitted amplitudes. It is a forward flux operator for
+lossless smooth media, **not an enabled GPU/adjoint rendering BSDF**. Coherent
+isotropic mode recombination, anisotropic absorption and scattering, radiance
+measure conversion and GPU integration remain separate work.
+
+The modal construction is grounded in Thomson, Wilen & Wettlaufer (2009),
+[Light scattering from an isotropic layer between uniaxial crystals](https://arxiv.org/abs/0901.2558),
+and the rendering problem is discussed by
+[Weidlich & Wilkie, Realistic Rendering of Birefringency in Uniaxial Crystals](https://cgg.mff.cuni.cz/wp-content/uploads/2021/05/weidlich_2007_rrbuc-paper.pdf).
+The implementation uses dispersion tensors and a numerical complex boundary solve,
+not copied closed-form Fresnel expressions. Optional NumPy checks independently
+diagonalize the tangential Maxwell propagation matrix, then compare interface
+elimination to LAPACK. These validate the synthetic field solver, not catalog
+material measurements or a completed anisotropic gemstone renderer.

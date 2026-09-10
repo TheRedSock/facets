@@ -11,7 +11,7 @@ $stages = @(
     @{ Name = 'import'; Args = @('--headless', '--editor', '--quit') },
     @{ Name = 'source_check'; Args = @('--headless', '--quit-after', '600', 'res://tools/source_check.tscn') }
 )
-foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_store_transfer', 'test_spectra', 'test_material_inputs', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler', 'test_cut_design')) {
+foreach ($name in @('test_foundation', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_store_transfer', 'test_spectra', 'test_material_inputs', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_crystal_modes', 'test_crystal_interface', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler', 'test_cut_design')) {
     $stages += @{ Name = $name; Args = @('--headless', '--quit-after', '600', '--script', "res://tests/lapidary/$name.gd") }
 }
 if ($ReferencePython) {
@@ -39,7 +39,7 @@ foreach ($stage in $stages) {
     }
 }
 if ($ReferencePython -and $failed.Count -eq 0) {
-    $referenceChecks = @('check_polarization_reference')
+    $referenceChecks = @('check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference')
     if ($Gpu) { $referenceChecks += 'check_gpu_polarization_reference' }
     foreach ($name in $referenceChecks) {
         $output = & $ReferencePython (Join-Path $projectRoot "tools/$name.py") 2>&1
