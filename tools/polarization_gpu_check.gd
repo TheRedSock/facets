@@ -54,17 +54,20 @@ func _initialize() -> void:
 	var path := "res://artifacts/reference/polarized-slabs.json"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
 	FileAccess.open(path, FileAccess.WRITE).store_string(JSON.stringify(report, "\t"))
+	_dichroic_slabs(tracer, inst, lighting, policy)
 	_interface_probes(tracer.get("_rd"))
+	_interface_probes(tracer.get("_rd"), true)
 	tracer.release()
 	print("GPU polarization: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)
 
-func _interface_probes(rd: RenderingDevice) -> void:
+func _interface_probes(rd: RenderingDevice, dichroic := false) -> void:
 	var packed := PackedFloat32Array()
 	var cases := []
 	for index in 64:
 		var direction := Vector3(sin(0.25 + index * 0.014), 0, -cos(0.25 + index * 0.014))
 		var steps := []
+		var absorption := []
 		for step in 5:
 			var normal := Vector3.BACK
 			var before := 1.0 if step == 0 else 1.5
@@ -86,9 +89,14 @@ func _interface_probes(rd: RenderingDevice) -> void:
 				next = (eta * direction + (eta * ci - ct) * normal).normalized()
 			var values := PackedFloat32Array([direction.x, direction.y, direction.z, before, next.x, next.y, next.z, after, normal.x, normal.y, normal.z, float(transmission)])
 			packed.append_array(values)
+			var absorption_axis := Vector3(sin(index * 0.2 + step), cos(index * 0.3 - step), 0.7).normalized()
+			packed.append_array(PackedFloat32Array([absorption_axis.x, absorption_axis.y, absorption_axis.z, step + 1]))
+			absorption.append({"axis": absorption_axis, "ordinary": exp(-0.1 * (step + 1)), "extraordinary": exp(-0.3 * (step + 1))})
+			# JSON Vector3 would stringify; use explicit numeric arrays.
+			absorption[-1]["axis"] = [absorption_axis.x, absorption_axis.y, absorption_axis.z]
 			steps.append(Array(values))
 			direction = next
-		cases.append({"steps": steps})
+		cases.append({"steps": steps, "absorption": absorption if dichroic else []})
 	var source := RDShaderSource.new()
 	source.source_compute = "#version 450\n#define POLARIZED_TRANSPORT 1\n" + FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_common.glsl") + FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_polarization.glsl") + """
 layout(local_size_x=64) in;
@@ -96,16 +104,21 @@ layout(set=0,binding=7,std430) readonly buffer Steps { vec4 events[]; };
 layout(set=0,binding=16,std430) buffer Results { vec4 results[]; };
 void main() {
  int i=int(gl_GlobalInvocationID.x);
- PathWeight w=weight_initial(events[i*15].xyz);
+ PathWeight w=weight_initial(events[i*20].xyz);
  for(int step=0;step<5;step++) {
-  int base=i*15+step*3;
+  int base=i*20+step*4;
   vec4 a=events[base],b=events[base+1],n=events[base+2];
   w=interface_weight(w,a.xyz,b.xyz,n.xyz,vec4(a.w),vec4(b.w),n.w>0.5,1.0,vec4(1.0));
+  if(ENABLE_ABSORPTION) {
+   vec4 absorption=events[base+3];
+   w=absorption_weight(w,b.xyz,absorption.xyz,vec4(exp(-0.1*absorption.w)),vec4(exp(-0.3*absorption.w)));
+  }
  }
  results[i*2]=vec4(w.I.x,w.Q.x,w.U.x,w.V.x);
  results[i*2+1]=vec4(w.axis,0);
 }
 """
+	source.source_compute = source.source_compute.replace("ENABLE_ABSORPTION", "true" if dichroic else "false")
 	var spirv := rd.shader_compile_spirv_from_source(source)
 	check(spirv.compile_error_compute.is_empty(), "polarized interface probe compiles: " + spirv.compile_error_compute)
 	if not spirv.compile_error_compute.is_empty():
@@ -134,7 +147,7 @@ void main() {
 	for index in cases.size():
 		cases[index]["weight"] = Array(values.slice(index * 8, index * 8 + 4))
 		cases[index]["axis"] = Array(values.slice(index * 8 + 4, index * 8 + 7))
-	FileAccess.open("res://artifacts/reference/polarized-interface-chains.json", FileAccess.WRITE).store_string(JSON.stringify(cases, "\t"))
+	FileAccess.open("res://artifacts/reference/polarized-dichroic-chains.json" if dichroic else "res://artifacts/reference/polarized-interface-chains.json", FileAccess.WRITE).store_string(JSON.stringify(cases, "\t"))
 	for rid in [set, pipeline, shader, input, output, dummy]:
 		rd.free_rid(rid)
 
@@ -157,3 +170,39 @@ static func center_y(tracer: GemTracer) -> float:
 		for x in range(14, 18):
 			total += data[(y * 32 + x) * 4 + 1] / 16.0
 	return total
+
+func _dichroic_slabs(tracer: GemTracer, original: Dictionary, lighting: GemLighting, policy: Dictionary) -> void:
+	var inst := original.duplicate(true)
+	inst["sellmeier_b"] = Vector3(1.25, 0, 0)
+	inst["optic_axis"] = Vector3.RIGHT
+	inst["absorption"].fill(0.2)
+	inst["absorption_eray"] = PackedFloat32Array()
+	inst["absorption_eray"].resize(401)
+	inst["absorption_eray"].fill(1.3)
+	for angle in [0.0, 0.6, 1.2]:
+		tracer.configure_stone(inst, lighting, policy)
+		tracer.set_stone_orientation(Quaternion(Vector3.UP, angle))
+		tracer.accumulate(1024)
+		var ci := cos(angle)
+		var ct := sqrt(1 - pow(sin(angle) / 1.5, 2))
+		var rs := pow((ci - 1.5 * ct) / (ci + 1.5 * ct), 2)
+		var rp := pow((1.5 * ci - ct) / (1.5 * ci + ct), 2)
+		var alpha_p := (1 - ct * ct) * 0.2 + ct * ct * 1.3
+		var expected := 0.0
+		for pair in [[rs, 0.2], [rp, alpha_p]]:
+			var t := exp(-pair[1] * 2.0 / ct)
+			expected += 0.5 * (pair[0] + pow(1 - pair[0], 2) * t / (1 - pair[0] * t))
+		check(absf(center_y(tracer) - expected) < 0.0001, "dichroic slab with repeated internal reflection matches polarized Beer series")
+	# Same-index overlapping region adds geometry segments without a new optical
+	# interface. Absorption must carry its polarization through every segment.
+	inst["sellmeier_b"] = Vector3.ZERO
+	var boundaries := GemBoundarySet.new()
+	var box_tool := load("res://tests/lapidary/test_boundaries.gd")
+	boundaries.add(box_tool.box(Vector3(-2, -2, -1), Vector3(2, 2, 1)), 0)
+	boundaries.add(box_tool.box(Vector3(-2, -2, -0.3), Vector3(2, 2, 0.4)), 0)
+	inst["boundaries"] = boundaries
+	tracer.configure_stone(inst, lighting, policy)
+	tracer.set_stone_orientation(Quaternion.IDENTITY)
+	tracer.accumulate(128)
+	var expected := 0.5 * (exp(-0.4) + exp(-2.6))
+	check(absf(center_y(tracer) - expected) < 0.0001, "dichroic polarization survives irrelevant boundary segmentation")

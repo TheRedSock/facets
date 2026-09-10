@@ -31,6 +31,10 @@ it is a diagnostic, not a passing production acceptance profile. Add `--fp64`
 for the double-precision mathematical reference (requires GPU shaderFloat64).
 `check_engine.ps1 -CrystalPrecision` includes that explicit reference check.
 Crystal modes and coherent packets are still isolated from the production tracer.
+The isotropic-real-index polarized variant does support persistent axial weak-loss
+absorption. `polarization_lookdev.gd -- --dichroic` renders a labeled synthetic
+two-band diagnostic under `artifacts/polarization/dichroic/`; its coefficients
+must not be treated as measured fluorite data.
 
 Cut design uses explicit template proportions and `GemCondition.workmanship`
 angular/millimeter tolerances. Run windowed `tools/optimize_cut.gd -- --stone=quartz`

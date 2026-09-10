@@ -28,3 +28,35 @@ static func _resample(values: PackedFloat32Array, chromo: GemChromophore) -> Pac
 		var first := clampi(int(position), 0, values.size() - 1)
 		output.append(lerpf(values[first], values[mini(first + 1, values.size() - 1)], position - first) * chromo.concentration)
 	return output
+
+
+## Capability gate for the persistent polarized renderer. Axial dichroism is
+## a weak-loss approximation; it does not make a strongly absorbing boundary
+## behave like a complex-index dielectric. The bound is an admission policy,
+## not a universal error estimate, especially near critical angles.
+static func polarization_error(material: Dictionary) -> String:
+	if absf(material.get("birefringence", 0.0)) >= 1e-8:
+		return "polarization currently supports isotropic real refraction only"
+	var extraordinary: PackedFloat32Array = material.get("absorption_eray", PackedFloat32Array())
+	if extraordinary.is_empty():
+		return ""
+	var axis: Vector3 = material.get("optic_axis", Vector3.BACK)
+	if not axis.is_finite() or axis.length_squared() < 1e-12:
+		return "dichroic absorption requires a physical axis"
+	var ordinary: PackedFloat32Array = material.get("absorption", PackedFloat32Array())
+	if ordinary.size() != 401 or extraordinary.size() != 401:
+		return "dichroic spectra require the complete transport grid"
+	var peak: float = 1.0 + absf(material.get("zoning", {}).get("contrast", 0.0))
+	for field: GemVolumeField in material.get("volume_fields", []):
+		peak += field.absorption_concentration
+	peak *= material.get("absorb_scale", 1.0)
+	var species := GemSpecies.new()
+	species.sellmeier_b = material.sellmeier_b
+	species.sellmeier_c_um2 = material.sellmeier_c
+	for sample in 401:
+		var wavelength := 380.0 + sample
+		var index := species.ior_at(wavelength)
+		var ratio := maxf(ordinary[sample], extraordinary[sample]) * peak * wavelength * 1e-6 / (2 * TAU * index)
+		if not is_finite(ratio) or ratio < 0 or ratio > 0.001:
+			return "dichroic absorption exceeds the weak-loss domain (imaginary/real index > 0.001)"
+	return ""

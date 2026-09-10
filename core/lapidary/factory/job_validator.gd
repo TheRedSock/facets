@@ -61,7 +61,7 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 		return "missing specimen"
 	if not _between(stone.size_mm, 1e-4, 10000) or not stone.optic_axis_override.is_finite():
 		return "invalid physical size or optic axis"
-	var error := _material(stone.material, polarized)
+	var error := _material(stone.material, polarized, stone.optic_axis_override)
 	if not error.is_empty():
 		return error
 	if stone.grade != null:
@@ -93,12 +93,21 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 		if not mesh.validate().is_empty():
 			return "invalid procedural shape topology: %s" % mesh.validate()
 	var condition := stone.condition
+	if condition != null and not condition.validate_volume_fields().is_empty():
+		return "; ".join(condition.validate_volume_fields())
+	if polarized:
+		var bulk := GemMaterialCompiler.compile(stone.material)
+		bulk["volume_fields"] = condition.volume_fields if condition != null else []
+		bulk["zoning"] = {"contrast": stone.material.species.zoning_contrast}
+		if stone.optic_axis_override != Vector3.ZERO:
+			bulk["optic_axis"] = stone.optic_axis_override
+		error = GemMaterialCompiler.polarization_error(bulk)
+		if not error.is_empty():
+			return error
 	if condition == null:
 		return ""
 	if condition.workmanship != null and not condition.workmanship.validate().is_empty():
 		return "; ".join(condition.workmanship.validate())
-	if not condition.validate_volume_fields().is_empty():
-		return "; ".join(condition.validate_volume_fields())
 	if condition.finish != null and not condition.finish.validate().is_empty():
 		return "; ".join(condition.finish.validate())
 	var count := 0
@@ -128,14 +137,17 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 			return "defect geometry degenerates at the requested physical scale"
 	return ""
 
-static func _material(material: GemMaterial, polarized: bool) -> String:
+static func _material(material: GemMaterial, polarized: bool, axis_override := Vector3.ZERO) -> String:
 	if material == null:
 		return "missing material"
 	var errors := material.validate()
 	if not errors.is_empty():
 		return "; ".join(errors)
-	if polarized and (absf(material.species.birefringence) >= 1e-8 or (material.chromophore != null and not material.chromophore.absorption_eray_mm.is_empty())):
-		return "polarization currently supports isotropic refraction and absorption only"
+	if polarized:
+		var bulk := GemMaterialCompiler.compile(material)
+		if axis_override != Vector3.ZERO:
+			bulk["optic_axis"] = axis_override
+		return GemMaterialCompiler.polarization_error(bulk)
 	return ""
 
 static func _rig(rig: GemLightRig) -> String:

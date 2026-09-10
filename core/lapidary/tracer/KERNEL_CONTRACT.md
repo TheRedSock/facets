@@ -231,9 +231,10 @@ raw/reconstructed low-SPP renders to high-SPP transport at multiple poses.
 
 Policy `polarization=true` lazily compiles a separate variant of the same boundary
 transport source. It forces independent wavelength geometry. The scalar variant
-compiles away the extra state. The variant currently requires isotropic refraction
-and absorption in every host/filling; anisotropic material input is rejected by
-its precondition. Existing catalog policies remain scalar pending broader
+compiles away the extra state. The variant currently requires isotropic **real
+refraction** in every host/filling. Axial weak-loss absorption is supported with
+persistent polarization; birefringent refraction remains rejected by its
+precondition. Existing catalog policies remain scalar pending broader
 anisotropic transport. The REFERENCE rung alone does not enable polarization.
 
 Per-wavelength camera importance is a row of a Mueller product plus an explicit
@@ -244,6 +245,17 @@ path; radiance eta-squared factors remain explicit. The shared boundary solver
 still handles priority regions, cavities, GGX finish and deterministic escape.
 The effective scalar HG model is explicitly treated as an ideal depolarizer; this
 is not a prediction of a particle population's polarized scattering matrix.
+
+For axial absorption, the ordinary transverse direction is perpendicular to the
+optic-axis/ray plane. The other transverse component has
+`alpha_k=cos(phi)^2*alpha_o+sin(phi)^2*alpha_e` for the supported isotropic real
+index. Each segment applies the rotated diattenuation Mueller operator to the
+existing importance state. It never resets that state to an equal mixture.
+Zoning and compact absorption fields use their exact integrated optical columns.
+Admission limits peak `kappa/n` to 0.001 for this dichroic approximation, including
+a conservative sum of field concentrations and zoning amplitude. This bound is
+an implementation policy, not a guaranteed error near all critical angles.
+Complex-index interface changes and causally coupled dispersion are not modeled.
 
 `GemPolarization` supplies float64 CPU reference mathematics. The optional tooling
 pins Mitsuba3.9.1/DrJit1.5.0 and compares elementary and rotated matrices, plus actual
@@ -272,8 +284,13 @@ apply a sampled branch's weight once. `GemCrystalMeasure` implements curvature
 of the wavevector ellipsoid and forward/camera radiance conversions from
 [Lax & Nelson (1975)](https://doi.org/10.1364/JOSA.65.000668).
 The camera factor reduces to `(n_current/n_next)^2` in isotropic media.
-Anisotropic absorption, scattering and GPU transport integration remain separate
-work; these mathematical components do not constitute a completed adjoint BSDF.
+`GemCrystalLoss` derives weak-loss eigenmode attenuation from Poynting dissipation
+and the principal imaginary permittivity tensor. An independent full complex
+4x4 Maxwell eigenproblem checks its rate, including decreasing-loss convergence.
+General birefringent absorption/scattering and GPU transport integration remain
+separate work; these mathematical components do not constitute a completed
+anisotropic adjoint BSDF. Only the isotropic-real-index dichroic subset above is
+connected to production transport.
 
 The modal construction is grounded in Thomson, Wilen & Wettlaufer (2009),
 [Light scattering from an isotropic layer between uniaxial crystals](https://arxiv.org/abs/0901.2558),

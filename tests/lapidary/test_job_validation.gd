@@ -113,6 +113,23 @@ func _initialize() -> void:
 	job.stone = load("res://data/lapidary/stones/diamond.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	job.quality.polarization = true
 	check(GemJobValidator.validate(job).is_empty(), "isotropic polarized diamond accepted")
+	var dichroic := job.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
+	dichroic.stone.material.chromophore = GemChromophore.new()
+	dichroic.stone.material.chromophore.absorption_mm.resize(81)
+	dichroic.stone.material.chromophore.absorption_eray_mm = dichroic.stone.material.chromophore.absorption_mm.duplicate()
+	dichroic.stone.material.chromophore.absorption_eray_mm.fill(1.3)
+	check(GemJobValidator.validate(dichroic).is_empty(), "weak axial absorption with isotropic real index is accepted")
+	dichroic.stone.material.species.optic_axis_stone = Vector3.ZERO
+	reject(dichroic, "physical axis")
+	dichroic.stone.optic_axis_override = Vector3.RIGHT
+	check(GemJobValidator.validate(dichroic).is_empty(), "specimen optical axis overrides a missing material axis")
+	dichroic.stone.material.chromophore.absorption_eray_mm.fill(1000)
+	reject(dichroic, "weak-loss domain")
+	dichroic.stone.material.chromophore.absorption_eray_mm.fill(1.3)
+	var dense := GemVolumeField.new()
+	dense.absorption_concentration = 1000
+	dichroic.stone.condition.volume_fields.append(dense)
+	reject(dichroic, "weak-loss domain")
 	defect = GemDefect.new()
 	defect.filling = base.stone.material
 	job.stone.condition.defects.append(defect)

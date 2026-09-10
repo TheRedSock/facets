@@ -34,8 +34,10 @@ merge service are not yet validated. Do not confuse a prepared ZIP with that wor
 bundle creation. It checks finite physical inputs, supported optical modes,
 spectral normalization, camera transforms, procedural topology, known quality
 keys and film/payload bounds before GPU setup. Explicit polarization currently
-requires isotropic refraction and absorption in the host and every enabled
-filling. Invalid jobs return a field-specific error instead of silently selecting
+requires isotropic real refraction in the host and every enabled filling.
+Axial dichroic absorption requires a valid optical axis and a peak weak-loss
+ratio `kappa/n <= 0.001`; spatial concentration bounds participate in admission.
+Invalid jobs return a field-specific error instead of silently selecting
 another transport model. Film budgets do not include all driver allocations.
 
 Exploratory disabled defects are ignored; missing array entries are errors.

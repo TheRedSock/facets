@@ -351,7 +351,7 @@ static func _pack_volume_fields(instance: Dictionary, packed: PackedFloat32Array
 func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 		a_off: int, stone_flags: int) -> void:
 	if _polarized:
-		assert(absf(inst.get("birefringence", 0.0)) < 1e-8 and inst.get("absorption_eray", PackedFloat32Array()).is_empty(), "Polarized transport currently requires isotropic refraction and absorption")
+		assert(GemMaterialCompiler.polarization_error(inst).is_empty(), GemMaterialCompiler.polarization_error(inst))
 	var sb: Vector3 = inst["sellmeier_b"]
 	var sc: Vector3 = inst["sellmeier_c"]
 	var scat: Dictionary = inst.get("scatter", {})

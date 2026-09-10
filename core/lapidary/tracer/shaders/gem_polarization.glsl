@@ -61,6 +61,31 @@ mat4 polarized_dielectric(float ci, float eta, bool transmission) {
 }
 #endif
 
+// Persistent axial dichroism for an isotropic REAL refractive index. This is
+// the weak-loss transverse absorption tensor, not anisotropic refraction.
+PathWeight absorption_weight(PathWeight w, vec3 camera_direction, vec3 optic_axis,
+        vec4 ordinary_transmittance, vec4 extraordinary_transmittance) {
+#ifdef POLARIZED_TRANSPORT
+    vec3 propagation=-camera_direction;
+    vec3 axis=cross(optic_axis,propagation);
+    axis=dot(axis,axis)>1e-12?normalize(axis):w.axis;
+    float c=clamp(dot(axis,w.axis),-1.0,1.0);
+    float s=dot(propagation,cross(axis,w.axis));
+    vec4 Q=w.Q*(c*c-s*s)-w.U*(2.0*c*s);
+    vec4 U=w.Q*(2.0*c*s)+w.U*(c*c-s*s);
+    vec4 a=0.5*(ordinary_transmittance+extraordinary_transmittance);
+    vec4 b=0.5*(ordinary_transmittance-extraordinary_transmittance);
+    vec4 coherence=sqrt(max(vec4(0),ordinary_transmittance*extraordinary_transmittance));
+    w.Q=b*w.I+a*Q;
+    w.I=a*w.I+b*Q;
+    w.U=coherence*U; w.V*=coherence;
+    w.axis=axis;
+#else
+    w.I*=0.5*(ordinary_transmittance+extraordinary_transmittance);
+#endif
+    return w;
+}
+
 PathWeight interface_weight(PathWeight w, vec3 previous_dir, vec3 next_dir,
 		vec3 normal, vec4 index_before, vec4 index_after, bool transmission,
 		float geometry_weight, vec4 scalar_weight) {

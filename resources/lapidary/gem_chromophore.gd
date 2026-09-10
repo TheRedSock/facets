@@ -18,8 +18,10 @@ extends Resource
 ## Concentration multiplier applied to the curve.
 @export var concentration := 1.0
 
-## Pleochroism: optional e-ray absorption curve (same sampling). Mixed by
-## ray angle against the optic axis. Empty = isotropic absorption.
+## Optional principal parallel-axis absorption curve (same sampling).
+## The polarized isotropic-real-index renderer propagates its weak-loss tensor
+## with persistent polarization; scalar transport uses the legacy directional
+## mixture. Empty = isotropic absorption. Authored curves are not measurements.
 @export var absorption_eray_mm := PackedFloat32Array()
 
 ## Fluorescence belongs to the coloring ion, not the lattice: Cr3+ glows red

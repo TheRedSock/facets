@@ -98,16 +98,18 @@ float zoning_column(Stone st, vec3 position, vec3 direction, float distance) {
 
 // Beer-Lambert. pol_mode: UNPOL = 0.5 To + 0.5 Tk; O = pure o-ray; K = mixed k-ray.
 // alpha_k = cos^2(phi) alpha_o + sin^2(phi) alpha_e  (GIA G&G Spring 2021).
-vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl, int pol_mode) {
+void segment_beer(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl,
+        out vec4 ordinary, out vec4 extraordinary) {
 	float size_mm = st.sell_b_size.w;
 	float L = (zoning_column(st, pos, dir, t) + field_columns(st, pos, dir, t).x) * st.misc.y * size_mm;
 	if (!has_eray) {
 		vec4 alpha = vec4(absorb_at(a_off, wl.x), absorb_at(a_off, wl.y),
 			absorb_at(a_off, wl.z), absorb_at(a_off, wl.w));
-		return exp(-alpha * L);
+		ordinary=exp(-alpha*L); extraordinary=ordinary;
+		return;
 	}
 	float ca = abs(dot(dir, st.optic_fluor.xyz));
-	float c2 = ca * ca;
+	float c2 = clamp(ca * ca, 0.0, 1.0);
 	float s2 = 1.0 - c2;
 	vec4 alpha_o, alpha_e, alpha_k;
 	for (int i = 0; i < 4; i++) {
@@ -115,9 +117,26 @@ vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray
 		alpha_e[i] = absorb_at(a_off + 401, wl[i]);
 		alpha_k[i] = c2 * alpha_o[i] + s2 * alpha_e[i];
 	}
-	if (pol_mode == POL_O) { return exp(-alpha_o * L); }
-	if (pol_mode == POL_K) { return exp(-alpha_k * L); }
-	return 0.5 * exp(-alpha_o * L) + 0.5 * exp(-alpha_k * L);
+	ordinary=exp(-alpha_o*L); extraordinary=exp(-alpha_k*L);
+}
+
+vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray, vec4 wl, int pol_mode) {
+    vec4 ordinary,extraordinary;
+    segment_beer(st,pos,dir,t,a_off,has_eray,wl,ordinary,extraordinary);
+    if(pol_mode==POL_O) return ordinary;
+    if(pol_mode==POL_K) return extraordinary;
+    return 0.5*(ordinary+extraordinary);
+}
+
+PathWeight segment_weight(PathWeight w, Stone st, vec3 pos, vec3 dir, float t, vec4 wl, int pol_mode) {
+#ifdef POLARIZED_TRANSPORT
+    vec4 ordinary,extraordinary;
+    segment_beer(st,pos,dir,t,st.ranges1.x,(st.ranges1.y&1)!=0,wl,ordinary,extraordinary);
+    return absorption_weight(w,dir,st.optic_fluor.xyz,ordinary,extraordinary);
+#else
+    weight_scale(w,segment_att(st,pos,dir,t,st.ranges1.x,(st.ranges1.y&1)!=0,wl,pol_mode));
+    return w;
+#endif
 }
 
 // ---------------------------------------------------------------- surfaces
@@ -177,7 +196,7 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
 			Stone medium = stones[before_medium];
 			float free_flight = use_volume ? scatter_distance(medium, pos, dir, distance, -log(max(1e-7, 1.0 - rnd(rng)))) : INF;
 			float segment = min(free_flight, distance);
-			weight_scale(throughput, segment_att(medium, pos, dir, segment, medium.ranges1.x, (medium.ranges1.y & 1) != 0, wl, pol_mode));
+			throughput=segment_weight(throughput,medium,pos,dir,segment,wl,pol_mode);
 			if (free_flight < distance) {
 				pos += dir * free_flight;
 				dir = hg_sample_u(dir, medium.scatter_zone.y, vec2(rnd(rng), rnd(rng)));
