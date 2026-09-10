@@ -264,9 +264,16 @@ E/H fields, wave-normal direction and Poynting energy direction separately.
 Evanescent modes decay into the selected half-space and carry no normal flux.
 `GemCrystalInterface` solves four tangential field-continuity equations for two
 reflected and two transmitted amplitudes. It is a forward flux operator for
-lossless smooth media, **not an enabled GPU/adjoint rendering BSDF**. Coherent
-isotropic mode recombination, anisotropic absorption and scattering, radiance
-measure conversion and GPU integration remain separate work.
+lossless smooth media, **not an enabled GPU/adjoint rendering BSDF**.
+`GemCrystalPacket` recombines coincident isotropic modes as complex fields and
+keeps separated crystal modes distinct. Its field amplitudes and normal-flux
+probabilities are different quantities; a renderer must normalize its state and
+apply a sampled branch's weight once. `GemCrystalMeasure` implements curvature
+of the wavevector ellipsoid and forward/camera radiance conversions from
+[Lax & Nelson (1975)](https://doi.org/10.1364/JOSA.65.000668).
+The camera factor reduces to `(n_current/n_next)^2` in isotropic media.
+Anisotropic absorption, scattering and GPU transport integration remain separate
+work; these mathematical components do not constitute a completed adjoint BSDF.
 
 The modal construction is grounded in Thomson, Wilen & Wettlaufer (2009),
 [Light scattering from an isotropic layer between uniaxial crystals](https://arxiv.org/abs/0901.2558),
@@ -283,6 +290,22 @@ material measurements or a completed anisotropic gemstone renderer.
 `tools/crystal_gpu_check.gd` compares actual GPU outputs against float64 CPU fields
 for rotated boundaries, including evanescent output modes. It is currently an
 isolated mathematical module, not called by the production path tracer. Input
-coverage does not yet establish accuracy arbitrarily close to every critical or
-optic-axis degeneracy. Full transport integration and critical-angle stress tests
-must precede promotion of a new rendering mode.
+stress cases now include near-critical and optic-axis degeneracy. Comparing
+arbitrary basis amplitudes there is insufficient: the probe supplies the same
+incident complex field to both solvers and also checks summed boundary fields
+and reflected/transmitted power. The float32 variant **fails** the current stress
+gate (up to about 0.0015 side-power error and 0.0028 field-component error on the
+tested device). `--stress --fp64` runs a diagnostic double-precision variant of
+the same source, retaining float32 wire inputs/outputs; it passes all 616 cases.
+This is an explicit test requiring shaderFloat64, not a new game requirement or
+an enabled production renderer. Selective precision and full transport validation
+must precede promotion. Near-axis basis labels alone are not accuracy metrics.
+
+CPU packet tests independently differentiate the ray solid-angle map, check
+modal reciprocity, and export 64 five-interface chains with elliptical input and
+three oriented TIR events. `check_crystal_packet_reference.py` checks all four
+Stokes components against Mitsuba, separately for raw electric fields and
+normal-flux normalization. The export's circular-polarization convention is
+`V=2*Im(Eu*conj(Ev))`. This catches phase loss during coherent recombination; it
+does not validate a complete birefringent render or coherent interference of
+spatially separated paths that later overlap.

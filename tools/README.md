@@ -26,6 +26,12 @@ with `tools/reference-requirements.txt`. Pass its Python executable as
 interface products. Mitsuba is a validation dependency only. Keep environments,
 comparison JSON and rendered reference images under ignored `artifacts/`.
 
+`crystal_gpu_check.gd -- --stress` exposes known float32 critical-angle failures;
+it is a diagnostic, not a passing production acceptance profile. Add `--fp64`
+for the double-precision mathematical reference (requires GPU shaderFloat64).
+`check_engine.ps1 -CrystalPrecision` includes that explicit reference check.
+Crystal modes and coherent packets are still isolated from the production tracer.
+
 Cut design uses explicit template proportions and `GemCondition.workmanship`
 angular/millimeter tolerances. Run windowed `tools/optimize_cut.gd -- --stone=quartz`
 (or `--quick`) for a bounded pavilion/table/crown search. It writes exact candidate
