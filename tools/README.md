@@ -300,3 +300,11 @@ that sampling noise is included. Comparison outputs stay in ignored artifacts.
 
 Rounding lookdev accepts `--output=res://artifacts/NAME` to preserve comparison
 runs. `test_patch_bounds.gd` checks clipped-surface extrema independently of rays.
+
+
+Custom polygon checks: `test_polygon.gd` exports its encoded cap corpus to ignored
+`artifacts/polygon/corpus.json`; run `python tools/check_polygon_reference.py` for
+independent exact rational area and topology checks. `polygon_gpu_check.gd` checks
+collinear-boundary optical equivalence in all three solvers and concave-host
+energy conservation. The standard runner includes CPU/GPU checks and runs the
+Python oracle when `-ReferencePython` is supplied.

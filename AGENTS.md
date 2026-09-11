@@ -501,3 +501,18 @@ establish image convergence or a physical wear calibration.
 tolerance included. Near-parallel unresolved configurations retain enclosing
 quadric bounds. `test_patch_bounds.gd` checks independent cap extrema and feasible
 sphere/circle samples; the accelerated GPU ray corpus checks actual packing.
+
+
+### Custom polygon outlines
+`GemPolygon` admits simple counterclockwise binary32 outlines with 3..512 unique
+vertices, using filtered/exact orientation signs. It rejects self-contact,
+overlap and adjacent backtracking. Ear clipping retains every collinear boundary
+vertex, so loft caps share the side-wall edge partition. No area epsilon,
+recentring or silent point removal is used. Candidate blocker dependencies keep
+construction quadratic; a 16-entry/64 KiB index-payload cache avoids repeating
+admission and triangulation for identical outlines and returns detached indices.
+`GemShapeCompiler.loft` uses this cap construction. Invalid non-faceted hosts
+return a stone compilation error. Exact predicate signs do not make subsequent
+float32 vertex construction or GPU intersections arbitrarily precise.
+`test_polygon.gd`, `check_polygon_reference.py` and `polygon_gpu_check.gd` cover
+translated/concave/collinear caps, rational area/topology and optical equivalence.

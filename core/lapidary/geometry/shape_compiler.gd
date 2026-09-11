@@ -142,26 +142,11 @@ static func compile(shape: GemShape) -> GemMesh:
 
 static func loft(points: PackedVector2Array, sections: PackedVector2Array) -> GemMesh:
 	var mesh := GemMesh.new()
-	if points.size() < 3 or sections.size() < 2:
+	if sections.size() < 2:
 		return mesh
-	for i in points.size():
-		var next := (i + 1) % points.size()
-		if not points[i].is_finite() or points[i].distance_squared_to(points[next]) < 1.0e-14:
-			return mesh
-		for j in range(i + 1, points.size()):
-			var j_next := (j + 1) % points.size()
-			if j == next or j_next == i:
-				continue
-			if Geometry2D.segment_intersects_segment(points[i], points[next], points[j], points[j_next]) != null:
-				return mesh
-	var polygon_area := 0.0
-	for i in points.size():
-		polygon_area += points[i].cross(points[(i + 1) % points.size()])
-	if polygon_area <= 1.0e-10:
-		return mesh # CCW, simple outline required
-	var cap := Geometry2D.triangulate_polygon(points)
-	if cap.is_empty():
-		return mesh
+	var polygon := GemPolygon.triangulate(points)
+	if not polygon.error.is_empty():return mesh
+	var cap: PackedInt32Array = polygon.indices
 	var rings: Array[PackedInt32Array] = []
 	var last_height := -INF
 	for section in sections:

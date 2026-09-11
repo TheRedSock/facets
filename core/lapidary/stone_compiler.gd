@@ -76,7 +76,8 @@ static func compile_geometry(stone: GemStone) -> Dictionary:
 			"analytic_shape": Vector4(1.0, 1.0 / stone.shape.aspect_ratio, stone.shape.dome_height, -0.04)}
 	if stone.shape.mode != "faceted":
 		var mesh := GemShapeCompiler.compile(stone.shape)
-		assert(mesh.validate().is_empty(), "Invalid procedural shape: %s" % mesh.validate())
+		var errors := mesh.validate()
+		if not errors.is_empty():return {"planes":PackedFloat32Array(),"compilation_error":"Invalid procedural shape: %s" % errors}
 		return {"planes": PackedFloat32Array(), "mesh": mesh, "outline": GemShapeCompiler.outline(stone.shape)}
 	assert(ResourceLoader.exists(CUT_COMPILER_PATH),
 		"LapidaryStoneCompiler: cut compiler missing at %s" % CUT_COMPILER_PATH)

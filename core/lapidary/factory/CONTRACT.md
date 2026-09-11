@@ -388,3 +388,29 @@ maximum opaque RGB RMS change was 0.0123 LSB, with isolated differences up to
 support this acceleration change at the tested scales, not arbitrary precision
 or physical-wear calibration. The bounds include clipping tolerance and retain
 full-quadric enclosures for numerically unresolved configurations.
+
+
+## Custom polygon cap admission
+
+Lofts use `GemPolygon` for simple counterclockwise outlines of 3..512 unique
+vertices. Exact signs for the stored binary32 coordinates decide orientation,
+segment contact and ear containment. Self-touching, crossing, overlapping,
+clockwise and backtracking outlines fail admission; repeated closing vertices
+are not part of this implicitly closed representation. Collinear boundary
+vertices remain in the triangulation to match the side-wall topology.
+
+The algorithm follows [ear clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
+with a blocker matrix that accounts for every remaining vertex, including points
+on a candidate diagonal. Only two candidate triangles change when an ear is
+removed; other blocker counts lose that removed point. Time and temporary
+blocker storage are quadratic, bounded by 512 vertices (262,144 blocker bytes).
+A 16-entry LRU retains at most 64 KiB of index payloads, keyed by exact outline
+content. Detached return values cannot alter the cache. Keys/container overhead
+and temporary construction storage are additional.
+
+Rational-reference tests check positive triangle areas, exact polygon-area
+conservation and oriented boundary cancellation. GPU checks compare unsplit and
+128-segment collinear boundaries under scalar, Mueller and crystal transport,
+and check a concave dielectric furnace. This fixes a translated-square failure
+at coordinates around 10,000; it does not certify arbitrarily small features
+after float32 loft construction, or arbitrary translated GPU ray precision.

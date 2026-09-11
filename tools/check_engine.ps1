@@ -23,6 +23,7 @@ $stages += @{ Name = 'test_finish_fields'; Args = @('--headless', '--quit-after'
 $stages += @{ Name = 'test_absorption_mixtures'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_absorption_mixtures.gd') }
 $stages += @{ Name = 'test_spatial_composition'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_spatial_composition.gd') }
 $stages += @{ Name = 'test_work_claims'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_work_claims.gd') }
+$stages += @{ Name = 'test_polygon'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_polygon.gd') }
 $stages += @{ Name = 'test_rounding'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_rounding.gd') }
 $stages += @{ Name = 'test_packed_geometry_cache'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_packed_geometry_cache.gd') }
 $stages += @{ Name = 'test_patch_bounds'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_patch_bounds.gd') }
@@ -32,6 +33,7 @@ if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'polygon_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/polygon_gpu_check.gd') }
 	$stages += @{ Name = 'continuous_transport_check'; Args = @('--quit-after', '600', '--script', 'res://tools/continuous_transport_check.gd') }
 	$stages += @{ Name = 'analytic_bvh_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/analytic_patch_gpu_check.gd', '--', '--stress', '--bvh') }
 	$stages += @{ Name = 'analytic_patch_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/analytic_patch_gpu_check.gd', '--', '--stress') }
@@ -77,7 +79,7 @@ foreach ($stage in $stages) {
     }
 }
 if ($ReferencePython -and $failed.Count -eq 0) {
-    $referenceChecks = @('check_mesh_predicates', 'check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')
+    $referenceChecks = @('check_polygon_reference', 'check_mesh_predicates', 'check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')
     if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference', 'check_finish_fields_reference', 'check_absorption_mixtures') }
     foreach ($name in $referenceChecks) {
         $output = & $ReferencePython (Join-Path $projectRoot "tools/$name.py") 2>&1
