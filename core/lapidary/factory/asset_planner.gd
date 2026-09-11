@@ -33,9 +33,15 @@ static func plan(batch: GemAssetBatch) -> Dictionary:
 			var realized := GemSpecimenFactory.realize(request.recipe, request.preset_id, request.specimen_seed)
 			if not realized.error.is_empty(): return {"error": String(request.asset_id) + ": " + realized.error}
 			stone = realized.stone
+		var policy := GemRung.policy(GemRung.rung_from_name(request.rung))
+		policy.merge(request.policy_overrides, true)
+		var specimen_error := GemJobValidator.specimen_error(stone, policy.get("polarization", false) == true)
+		if not specimen_error.is_empty(): return {"error": String(request.asset_id) + ": " + specimen_error}
 		specimens[String(request.asset_id)] = stone.fingerprint()
 		for clip in request.clips:
 			var frames := GemFramePlan.animation(stone, clip, request.rig, request.print_style, GemRung.rung_from_name(request.rung))
+			var framing := GemPresentationCompiler.prepare(stone, request.presentation, GemClipBaker.frame_orientation(clip, 0.0))
+			if not framing.error.is_empty(): return {"error": framing.error}
 			var ids := []
 			for job in frames:
 				job.game_style = request.game_style
@@ -43,6 +49,8 @@ static func plan(batch: GemAssetBatch) -> Dictionary:
 				if request.resolution != Vector2i.ZERO: job.resolution = request.resolution
 				if request.output_size != Vector2i.ZERO: job.output_size = request.output_size
 				if request.samples != 0: job.samples = request.samples
+				var pose := GemPresentationCompiler.sample(framing, job.orientation, job.resolution, job.ortho_half)
+				job.orientation = pose.orientation; job.camera_offset = pose.camera_offset
 				var error := GemJobValidator.validate(job)
 				if error.is_empty() and batch.geometry_coverage_side > 0:
 					error = GemGeometryPlan.validate(job, batch.geometry_coverage_side)
@@ -73,6 +81,7 @@ static func _request_error(request: GemAssetRequest) -> String:
 	for key in ["res", "out", "spp"]:
 		if request.policy_overrides.has(key): return "Use explicit dimensions/samples instead of policy " + key
 	if request.game_style != null and not request.game_style.validate().is_empty(): return request.game_style.validate()
+	if request.presentation != null and not request.presentation.validate().is_empty(): return request.presentation.validate()
 	return ""
 
 static func _identifier(value: StringName) -> bool:

@@ -31,7 +31,7 @@ void main() {
         // Match the tracer's pixel-center convention: pixel+sample-0.5.
         vec2 offset=(vec2(x,y)+0.5)/float(pc.coverage_side)-0.5;
         vec2 ndc=(pixel+offset)/vec2(pc.cell_px)*2.0-1.0;
-        vec3 origin=quat_rot(qc,vec3(ndc.x*inst.rig.y,-ndc.y*inst.rig.y,inst.rig2.z));
+        vec3 origin=quat_rot(qc,camera_origin(inst,ndc));
         float distance; int surface; uvec4 after;
         if(!physical_boundary(st,origin,direction,uvec4(0),distance,surface,after)) continue;
         hits+=1.0;

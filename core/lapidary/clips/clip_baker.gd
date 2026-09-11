@@ -19,9 +19,11 @@ const ORTHO_HALF := 1.25
 ## `shared_tracer`: optional pre-created tracer whose size matches the rung's
 ## internal resolution; caller keeps ownership (amortizes shader compiles).
 static func bake(stone: GemStone, clip: GemClip, rung: int, lights: GemLighting,
-		shared_tracer: GemTracer = null) -> Dictionary:
+		shared_tracer: GemTracer = null, presentation: GemPresentation = null) -> Dictionary:
 	if stone == null or clip == null or stone.material.species == null or lights == null:
 		return {}
+	var framing := GemPresentationCompiler.prepare(stone, presentation if presentation != null else GemPresentation.new(), frame_orientation(clip, 0.0))
+	if not framing.error.is_empty(): push_error(framing.error); return {}
 	var instance := LapidaryStoneCompiler.compile(stone)
 	var policy := GemRung.policy(rung)
 	var res: int = policy["res"]
@@ -49,8 +51,9 @@ static func bake(stone: GemStone, clip: GemClip, rung: int, lights: GemLighting,
 		var t := clip.frame_time(i)
 		if i > 0:
 			tracer.reset_accumulation()
-		tracer.set_clip_sample(frame_orientation(clip, t), frame_rig_yaw_rad(clip, t),
-			frame_role_mult(clip, t), ORTHO_HALF)
+		var pose := GemPresentationCompiler.sample(framing, frame_orientation(clip, t), Vector2i(res, res), ORTHO_HALF)
+		tracer.set_clip_sample(pose.orientation, frame_rig_yaw_rad(clip, t),
+			frame_role_mult(clip, t), ORTHO_HALF, pose.camera_offset)
 		var accumulate_wall_ms := 0.0
 		var done := 0
 		while done < spp:

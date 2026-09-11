@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v21)
+# Lapidary kernel contract (v22)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. Wire floats
@@ -6,6 +6,24 @@ are float32, std430; the optional crystal kernel computes fields and intersectio
 in float64. Stone space has the girdle at z=0, crown toward +Z, and unit
 girdle radius. `size_mm` converts one stone-space unit into millimeters. The
 orthographic camera looks down world −Z; instance quaternions rotate stone→world.
+
+## Camera and presentation
+
+An Inst remains 64 bytes. `which.x` is the int32 stone index; `which.y/z` now
+store **float32 bit patterns** for the orthographic camera center in world X/Y,
+normalized stone units. Decode with `intBitsToFloat`; `which.w` remains reserved.
+Zero offsets preserve native camera rays. Optical and primary-geometry passes
+share the same camera-origin helper, including batch instances. Normals, crystal
+axes, condition fields and geometry remain in their original coordinate systems.
+
+`GemFrameJob.camera_offset` is resolved presentation state, included in optical
+and geometry identities and instance/checkpoint state. Presentation shifts the
+camera rays; it does not rotate an already-lit sprite or move the culet inside
+the cut. A framing change requires new masters/geometry. Old source bundles must
+be rebuilt; matching buffer byte counts alone do not establish compatibility.
+
+See the factory contract for rest-pose bounds, native shape orientation, pivots
+and the explicit pixel-center correction for centered presentation jobs.
 
 ## Geometry and material state
 
@@ -274,7 +292,7 @@ printing. Output is straight-alpha RGBA8. Raw masters remain associated XYZ+cove
 ## Instance (64B)
 
 vec4 quaternion; vec4(rig yaw radians, ortho half-width, key mult, fill mult);
-vec4(rim mult, bounce mult, camera distance,0); ivec4(stone index,0,0,0).
+vec4(rim mult, bounce mult, camera distance,0); ivec4(stone index,camera offset X bits,camera offset Y bits,0).
 Camera distance encloses all host/defect geometry under rotation. Framing is
 separate. An equal-cell grid maps pixels to instances; 1×1 is a single specimen.
 

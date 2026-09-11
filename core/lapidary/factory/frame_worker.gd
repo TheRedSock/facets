@@ -66,7 +66,7 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 		if not tracer.configure_stone(compiled, lighting, job.quality):
 			return _fail(tracer.configuration_error)
 		tracer.set_seed(job.sample_seed)
-		tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), GemFramePlan.canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half)
+		tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), GemFramePlan.canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half, job.camera_offset)
 	var checkpoint_key := GemContentIdentity.digest(["checkpoint-v1", master_key])
 	if master == null:
 		var saved := store.read(checkpoint_key)

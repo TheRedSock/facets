@@ -21,7 +21,7 @@ func _initialize() -> void:
 	if GemResourceBundle.save(batch, output.path_join("request.res")) != OK: _fail("Cannot save inspection request"); return
 	var report := {"schema": 1, "status": "planned", "options": opts, "rig": RIG_PATH,
 		"game_style": "none", "print": "house", "rest_tilt_deg": [-12, 0, 0], "axis": [0, 1, 0],
-		"turn_degrees": 360, "duplicate_endpoint": false, "estimate": planned.estimate,
+		"presentation": "shape_default / rest_bounds / rest_frame_pivot", "turn_degrees": 360, "duplicate_endpoint": false, "estimate": planned.estimate,
 		"effective_policy": planned.jobs[0].quality, "effective_samples": planned.jobs[0].samples,
 		"specimens": planned.specimens, "worker_engine": GemRenderIdentity.worker_digest(), "clips": planned.clips, "results": []}
 	if not _report(output, report): _fail("Cannot save plan"); return
@@ -55,7 +55,8 @@ func _initialize() -> void:
 			var path := directory.path_join("frame_%04d.png" % frame)
 			if image.save_png(path) != OK: worker.release(); _fail("Cannot save PNG"); return
 			stone_report.frames.append({"index": frame, "display": key, "master": result.master,
-				"png_sha256": FileAccess.get_sha256(path), "wall_ms": Time.get_ticks_msec() - frame_start})
+				"orientation": [job.orientation.x, job.orientation.y, job.orientation.z, job.orientation.w],
+				"camera_offset": [job.camera_offset.x, job.camera_offset.y], "png_sha256": FileAccess.get_sha256(path), "wall_ms": Time.get_ticks_msec() - frame_start})
 			report.status = "rendering"; report.counters = worker.counters.duplicate()
 			if not _report(output, report): worker.release(); _fail("Cannot update progress"); return
 			print("TURN_GIFS FRAME %s %d/%d  %.2fs  total %.1fmin" % [id, frame + 1, int(opts.frames),

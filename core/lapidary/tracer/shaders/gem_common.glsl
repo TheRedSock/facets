@@ -22,8 +22,13 @@ struct Inst {
 	vec4 quat;         // stone->world
 	vec4 rig;          // rig_yaw (radians), ortho_half, key_mult, fill_mult
 	vec4 rig2;         // rim_mult, bounce_mult, outside-bound camera distance, pad
-	ivec4 which;       // stone_index, pad x3
+	ivec4 which;       // stone_index, float32 camera_offset.x/y bits, reserved
 };
+
+vec3 camera_origin(Inst inst, vec2 ndc) {
+	vec2 offset = vec2(intBitsToFloat(inst.which.y), intBitsToFloat(inst.which.z));
+	return vec3(ndc.x * inst.rig.y + offset.x, -ndc.y * inst.rig.y + offset.y, inst.rig2.z);
+}
 
 layout(set = 0, binding = 0, std430) restrict readonly buffer Planes  { Plane planes[]; };
 layout(set = 0, binding = 1, std430) restrict readonly buffer Lights  { Light lights[]; };

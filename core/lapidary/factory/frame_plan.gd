@@ -21,7 +21,7 @@ static func master_key(job: GemFrameJob) -> String:
 	return GemContentIdentity.digest(["linear-master-v3", master_engine(job),
 		job.stone.transport_inputs(), lighting.lights, lighting.spectra, lighting.background, policy,
 		job.resolution, job.samples, job.sample_seed, canonical_orientation(job.orientation),
-		canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half])
+		canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half, job.camera_offset])
 
 static func print_key(job: GemFrameJob) -> String:
 	return GemContentIdentity.digest(["display-v2", GemRenderIdentity.pipeline_digest("print"), master_key(job), job.print_style,

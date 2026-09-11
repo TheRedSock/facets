@@ -89,7 +89,7 @@ var _camera_distance := 5.0
 # Cached single-instance state (grid 1x1 convenience path).
 var _inst_state := {
 	"quat": Quaternion.IDENTITY, "rig_yaw": 0.0, "ortho_half": 1.25,
-	"role_mult": [1.0, 1.0, 1.0, 1.0], "stone_index": 0,
+	"role_mult": [1.0, 1.0, 1.0, 1.0], "stone_index": 0, "camera_offset": Vector2.ZERO,
 }
 
 
@@ -451,7 +451,7 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	_instance_bytes = PackedByteArray()
 	_update_instance_buffer(insts.data_array)
 	_inst_state = {"quat": Quaternion.IDENTITY, "rig_yaw": 0.0, "ortho_half": 1.25,
-		"role_mult": [1.0, 1.0, 1.0, 1.0], "stone_index": 0}
+		"role_mult": [1.0, 1.0, 1.0, 1.0], "stone_index": 0, "camera_offset": Vector2.ZERO}
 
 	_build_uniform_sets()
 	reset_accumulation()
@@ -550,13 +550,13 @@ func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 
 
 func _pack_inst(b: StreamPeerBuffer, quat: Quaternion, rig_yaw: float, ortho_half: float,
-		role_mult: Array, stone_index: int) -> void:
+		role_mult: Array, stone_index: int, camera_offset := Vector2.ZERO) -> void:
 	for v: float in [quat.x, quat.y, quat.z, quat.w,
 			rig_yaw, ortho_half, role_mult[0], role_mult[1],
 			role_mult[2], role_mult[3], _camera_distance, 0.0]:
 		b.put_float(v)
-	for v: int in [stone_index, 0, 0, 0]:
-		b.put_32(v)
+	b.put_32(stone_index)
+	b.put_float(camera_offset.x); b.put_float(camera_offset.y); b.put_32(0)
 
 
 func _build_uniform_sets() -> void:
@@ -615,11 +615,12 @@ func set_stone_orientation(q: Quaternion) -> void:
 
 
 ## Clip sample: orientation, rig yaw, per-role power multipliers, framing.
-func set_clip_sample(q: Quaternion, rig_yaw: float, role_mult := Vector4.ONE, ortho_half := 1.25) -> void:
+func set_clip_sample(q: Quaternion, rig_yaw: float, role_mult := Vector4.ONE, ortho_half := 1.25, camera_offset := Vector2.ZERO) -> void:
 	_inst_state["quat"] = q
 	_inst_state["rig_yaw"] = rig_yaw
 	_inst_state["role_mult"] = [role_mult.x, role_mult.y, role_mult.z, role_mult.w]
 	_inst_state["ortho_half"] = ortho_half
+	_inst_state["camera_offset"] = camera_offset
 	_push_inst_state()
 
 
@@ -628,7 +629,7 @@ func _push_inst_state() -> void:
 		return
 	var b := StreamPeerBuffer.new()
 	_pack_inst(b, _inst_state["quat"], _inst_state["rig_yaw"], _inst_state["ortho_half"],
-		_inst_state["role_mult"], _inst_state["stone_index"])
+		_inst_state["role_mult"], _inst_state["stone_index"], _inst_state["camera_offset"])
 	_update_instance_buffer(b.data_array)
 
 
@@ -638,7 +639,7 @@ func set_instances(states: Array) -> void:
 	for s: Dictionary in states:
 		var rm: Vector4 = s.get("role_mult", Vector4.ONE)
 		_pack_inst(b, s.get("quat", Quaternion.IDENTITY), s.get("rig_yaw", 0.0),
-			s.get("ortho_half", 1.25), [rm.x, rm.y, rm.z, rm.w], s.get("stone_index", 0))
+			s.get("ortho_half", 1.25), [rm.x, rm.y, rm.z, rm.w], s.get("stone_index", 0), s.get("camera_offset", Vector2.ZERO))
 	_update_instance_buffer(b.data_array)
 
 

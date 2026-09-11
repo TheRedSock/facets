@@ -484,7 +484,7 @@ GemTracer accepts these patches in a mixed primitive BVH, including nested
 triangle defects, scalar/Mueller/crystal transport and primary geometry AOVs.
 StoneCompiler selects this representation for positive authored rounding radii,
 including portable optical/geometry jobs and subsequent cleavage/defect regions.
-No automatic grade or catalog specimen enables rounding. See kernel contract v21 for packing and numerical limits.
+No automatic grade or catalog specimen enables rounding. See kernel contract v22 for packing and numerical limits.
 `test_rounded_solid.gd` covers independent distance/volume/ray checks;
 `analytic_patch_gpu_check.gd -- --stress` covers packed GPU camera, seam and
 secondary rays in both arithmetic precisions. See the factory contract for
@@ -552,3 +552,8 @@ IDs remain unchanged. Aliases share optical results and lighting variants share
 geometry. No seed/grade/lighting Cartesian product is generated. See the factory
 contract for limits and override rules. Tests: `test_asset_planner.gd` and
 `asset_batch_check.gd` (portable workers, headless reuse, selective texture loads).
+
+
+### Presentation and frame alignment
+
+Asset requests default to `GemPresentation`: built-in pears point down; the manufactured host's projected rest bounds are centered; its rest-frame center is the rotation pivot. Orientation, camera centering and pivot are independent choices (native/custom alternatives). No per-frame silhouette chasing or changes to the physical cut/crystal frame. Bounds include workmanship/rounding but do not follow internal features or chips. `GemPresentationCompiler` resolves portable `GemFrameJob.orientation` and `camera_offset`; the offset enters optical/geometry keys and the shared camera-ray mapping. Low-level numerical fixtures retain native camera defaults. `test_presentation.gd` and `presentation_check.gd` verify pivots, raster coverage and transport/geometry parity. See current factory/kernel contracts.

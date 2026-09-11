@@ -14,7 +14,7 @@ static func source_digest() -> String:
 static func key(job: GemFrameJob, coverage_side: int) -> String:
 	return GemContentIdentity.digest(["primary-geometry-v1", source_digest(),
 		specimen_inputs(job.stone), job.resolution, GemFramePlan.canonical_orientation(job.orientation),
-		job.ortho_half, coverage_side])
+		job.ortho_half, job.camera_offset, coverage_side])
 
 static func specimen_inputs(stone: GemStone) -> Dictionary:
 	var defects := []

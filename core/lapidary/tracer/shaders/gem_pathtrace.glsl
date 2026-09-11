@@ -411,7 +411,7 @@ void main() {
 
 		vec2 r2 = qmc2(n, 0u, 1u, pix_rot);
 		vec2 ndc = (cell_uv + (r2 - 0.5) / vec2(pc.cell_px)) * 2.0 - 1.0;
-		vec3 ro_w = vec3(ndc.x * ortho_half, -ndc.y * ortho_half, inst.rig2.z);
+		vec3 ro_w = camera_origin(inst, ndc);
 		vec3 ro = quat_rot(qc, ro_w);
 		vec3 rd = quat_rot(qc, vec3(0.0, 0.0, -1.0));
 

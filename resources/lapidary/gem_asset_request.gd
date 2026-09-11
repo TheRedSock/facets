@@ -11,6 +11,7 @@ extends Resource
 @export var rig: GemLightRig
 @export var print_style: GemPrint
 @export var game_style: GemStyle
+@export var presentation: GemPresentation = GemPresentation.new()
 @export_enum("interact", "preview", "board_live", "clip_bake", "hero", "reference") var rung := "clip_bake"
 ## Zero uses the quality rung. Output size is independent of render resolution.
 @export var resolution := Vector2i.ZERO

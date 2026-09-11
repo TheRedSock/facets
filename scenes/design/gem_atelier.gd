@@ -39,6 +39,7 @@ var _stone: GemStone
 var _rig: GemLightRig
 var _fingerprint := ""
 var _clip_exposure := 1.0
+var _presentation := GemPresentation.new()
 
 var _configured := false
 var _rebuild_at_ms := 0
@@ -288,7 +289,11 @@ func _apply_pose() -> void:
 	else:
 		quat = Quaternion(Vector3.RIGHT, deg_to_rad((_c["tilt"] as HSlider).value)) \
 			* Quaternion(Vector3.UP, deg_to_rad((_c["turn"] as HSlider).value))
-	_tracer.set_clip_sample(quat, rig_yaw, role, GemClipBaker.ORTHO_HALF)
+	var rest := GemClipBaker.frame_orientation(clip, 0.0) if clip != null else Quaternion(Vector3.RIGHT, deg_to_rad((_c["tilt"] as HSlider).value))
+	var framing := GemPresentationCompiler.prepare(_stone, _presentation, rest)
+	if not framing.error.is_empty(): push_error(framing.error); return
+	var pose := GemPresentationCompiler.sample(framing, quat, Vector2i(RENDER_SIZE, RENDER_SIZE), GemClipBaker.ORTHO_HALF)
+	_tracer.set_clip_sample(pose.orientation, rig_yaw, role, GemClipBaker.ORTHO_HALF, pose.camera_offset)
 	_tracer.reset_accumulation()
 	_update_status()
 

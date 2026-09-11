@@ -1,5 +1,51 @@
 # Asset factory and delivery contract
 
+## Presentation, framing and rotation pivots
+
+`GemAssetRequest.presentation` defaults to `GemPresentation`: built-in pears
+point down, projected rest-pose bounds are centered, and the rest-frame center
+is the rotation pivot. Shape-default orientation rotates the native pear apex
+from +X toward screen down before the clip motion/rest tilt. All physical cut,
+culet, inclusion and crystal-frame coordinates remain unchanged. A newly authored
+pear receives the same default without a stone-ID special case.
+
+Orientation may instead remain native or use custom Euler angles. Camera centering
+may use rest bounds, native origin or a custom camera-plane point. The pivot is
+independent: rest-frame center, native origin, 3D body-bounds center, or a custom
+stone-space point. Coordinates are normalized stone units; they are not millimeters
+or pixel offsets. Null presentation on a request explicitly retains native jobs.
+
+Rest bounds come from the manufactured host after workmanship and rounding, via
+exact vertex extrema or analytic support functions. They deliberately do not
+follow illumination, optical opacity, internal features or removed chips. This
+is stable nominal-shape framing, not a claim that arbitrary damaged CSG silhouettes
+are recentered by their surviving pixels. Custom centering handles an intentionally
+asymmetric damaged specimen. No per-frame bounding-box fitting or brightness
+centroid is performed; pivot motion can naturally change the occupied bounds.
+
+The compiler resolves Q(t)=Qclip(t)*Qbase, a rest camera center C and native pivot p.
+The camera XY offset is C + (Q(t)*p - Q(0)*p).
+Pivot compensation is projected into camera XY; AOV depth remains the distance
+from the renderer's outside-bound camera plane. This rotates around the chosen pivot
+while holding the rest framing fixed. Centered jobs add (+half/width,-half/height)
+to align with the renderer's existing integer-centered sample grid and the image
+center ((width-1)/2,(height-1)/2). Native-origin mode adds no pixel correction.
+Bounds are geometric, so raster extrema may differ by at most a boundary pixel.
+
+`GemPresentationCompiler` retains one manufactured geometry and up to 64 prepared
+bounds, avoiding recompilation during pose edits. Factory jobs serialize only the
+resolved orientation and `camera_offset`; those values drive both optical rays
+and primary AOVs and enter their independent cache keys. Presentation resources
+and compilation are authoring-only dependencies. Low-level numerical fixtures
+can keep native identity quaternions/zero offsets. Atelier and synchronous clip
+baking apply the same default presentation as the asset planner.
+
+Camera construction follows the standard raster-to-origin orthographic model
+([PBRT](https://www.pbr-book.org/4ed/Cameras_and_Film/Projective_Camera_Models)).
+`test_presentation.gd` checks pivots, physical-data isolation and cache identity;
+`presentation_check.gd` measures actual catalog coverage and independent pixel
+translations, and saves upright optical pear examples.
+
 ## Explicit delivery requests
 
 `GemAssetBatch` lists `GemAssetRequest` resources, each with a unique delivery ID,

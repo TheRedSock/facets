@@ -6,7 +6,10 @@
 optical policy, reconstruction, house print and content cache as asset builds.
 It requests a linear 360-degree turn around local Y with a -12-degree rest tilt,
 a fixed gameplay studio rig, and **no game stylizer**. The loop excludes its
-duplicate endpoint. Catalog discovery includes every authored stone resource.
+duplicate endpoint. Shape-default presentation points pears down and centers
+the manufactured silhouette bounds at the initial pose; rotation uses that rest
+frame center. A request's `GemPresentation` independently controls orientation,
+centering and pivot (including native origin or custom coordinates). Catalog discovery includes every authored stone resource.
 
 ```powershell
 & 'C:/Godot/Godot_v4.6.1-stable_win64_console.exe' --path . `

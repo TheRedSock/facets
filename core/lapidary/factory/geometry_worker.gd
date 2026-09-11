@@ -47,7 +47,7 @@ func _run_active(job: GemFrameJob, coverage_side: int) -> Dictionary:
 		last_error = "Geometry generation needs a supported GPU/display environment"
 		return {}
 	tracer.configure_stone(_compiled, GemLighting.analytic(PackedFloat32Array(), Vector4.ZERO), GemRung.policy(GemRung.INTERACT))
-	tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), 0.0, Vector4.ONE, job.ortho_half)
+	tracer.set_clip_sample(GemFramePlan.canonical_orientation(job.orientation), 0.0, Vector4.ONE, job.ortho_half, job.camera_offset)
 	var begin := Time.get_ticks_usec()
 	var geometry := tracer.geometry_aov(coverage_side)
 	if geometry == null:

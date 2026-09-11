@@ -44,6 +44,8 @@ static func validate(job: GemFrameJob) -> String:
 		return "Estimated film buffers exceed the job's device memory budget"
 	if not _rotation(job.orientation) or not _between(job.ortho_half, 1e-4, 10000) or not is_finite(job.rig_yaw):
 		return "Camera needs a unit quaternion, finite yaw, and positive finite framing"
+	if not job.camera_offset.is_finite() or job.camera_offset.length() > 10000:
+		return "Camera offset must be finite and within 10000 stone units"
 	for axis in 4:
 		if not _between(job.role_multipliers[axis], 0, 1e10):
 			return "Light role multipliers must be finite and nonnegative"
