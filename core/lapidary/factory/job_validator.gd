@@ -60,6 +60,8 @@ static func validate(job: GemFrameJob) -> String:
 		return "Rig: " + error
 	if job.print_style == null:
 		return "Print is missing"
+	if job.game_style != null and not job.game_style.validate().is_empty():
+		return job.game_style.validate()
 	return "; ".join(job.print_style.validate())
 
 static func _stone(stone: GemStone, polarized: bool) -> String:

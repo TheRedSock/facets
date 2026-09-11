@@ -44,8 +44,8 @@ func _initialize() -> void:
 	var unrelated := "unrelated".sha256_text()
 	first.publish(unrelated, "not requested".to_utf8_buffer(), {"kind": "test"})
 	var manifest := {"schema": 1, "engine": "worker-build".sha256_text(), "jobs": {
-		d1: {"master": m1, "engine": engine_id, "print_engine": print_id},
-		d2: {"master": m2, "engine": engine_id, "print_engine": print_id}}}
+		d1: {"master": m1, "engine": engine_id, "display_engine": print_id},
+		d2: {"master": m2, "engine": engine_id, "display_engine": print_id}}}
 	var transfer := GemStoreTransfer.new()
 	var inputs := PackedStringArray([first.root, second.root])
 	var preview := transfer.merge(destination.root, inputs, manifest)
@@ -74,7 +74,7 @@ func _initialize() -> void:
 	wrong.jobs[d1].engine = "incompatible-pipeline".sha256_text()
 	check(transfer.merge(destination.root, inputs, wrong).is_empty() and transfer.last_error.contains("engine"), "wrong optical pipeline rejected")
 	wrong = manifest.duplicate(true)
-	wrong.jobs[d1].print_engine = "incompatible-print".sha256_text()
+	wrong.jobs[d1].display_engine = "incompatible-print".sha256_text()
 	check(transfer.merge(destination.root, inputs, wrong).is_empty() and transfer.last_error.contains("engine"), "wrong print pipeline rejected")
 	var corrupt: Dictionary = first.read(d1).metadata
 	GemArtifactStore.atomic_write(first.root.path_join(corrupt.object), "truncated".to_utf8_buffer())

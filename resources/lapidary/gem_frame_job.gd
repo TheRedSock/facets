@@ -5,6 +5,7 @@ extends Resource
 @export var stone: GemStone
 @export var rig: GemLightRig
 @export var print_style: GemPrint
+@export var game_style: GemStyle
 @export var quality: Dictionary = {}
 @export var resolution := Vector2i(256, 256)
 @export var output_size := Vector2i(128, 128)

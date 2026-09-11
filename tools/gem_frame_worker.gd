@@ -70,7 +70,7 @@ func _initialize() -> void:
 			printerr("Job rejected before identity evaluation: " + admission_error)
 			failures += 1
 			continue
-		if record.get("engine") != GemFramePlan.master_engine(job) or record.get("print_engine") != GemRenderIdentity.pipeline_digest("print"):
+		if record.get("engine") != GemFramePlan.master_engine(job) or record.get("display_engine") != GemFramePlan.display_engine(job):
 			printerr("Job pipeline identity differs from request: " + key)
 			failures += 1
 			continue

@@ -10,6 +10,13 @@ func _initialize() -> void:
 	var output: String = args.get("out", "res://generated/gem-job-bundle")
 	var rig: GemLightRig = load("res://data/lapidary/rigs/gameplay_studio.tres")
 	var print_style := GemPrint.load_house()
+	var game_style: GemStyle = null
+	if args.has("style"):
+		if not ResourceLoader.exists(args.style):
+			printerr("Style resource does not exist"); quit(1); return
+		game_style = load(args.style) as GemStyle
+		if game_style == null or not game_style.validate().is_empty():
+			printerr("Invalid GemStyle resource"); quit(1); return
 	var rung := GemRung.rung_from_name(args.get("rung", "clip_bake"))
 	if rung < 0:
 		printerr("Unknown quality rung")
@@ -36,12 +43,17 @@ func _initialize() -> void:
 			var frames := GemFramePlan.animation(stone, clip, rig, print_style, rung)
 			var ids := []
 			for job in frames:
+				job.game_style = game_style
 				if args.has("resolution"):
 					job.resolution = Vector2i.ONE * int(args["resolution"])
 					job.output_size = job.resolution
 				if args.has("samples"):
 					job.samples = int(args["samples"])
 				ids.append(GemFramePlan.display_key(job))
+				if game_style != null and not game_style.is_identity() and args.get("retain-prints", "false") == "true":
+					var unstyled: GemFrameJob = job.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
+					unstyled.game_style = null
+					jobs.append(unstyled)
 			jobs.append_array(frames)
 			clips[String(stone.stone_id) + "/" + name] = {"frames": ids, "fps": clip.fps, "loop": clip.loop}
 	if jobs.is_empty():

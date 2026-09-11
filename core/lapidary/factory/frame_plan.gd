@@ -23,9 +23,19 @@ static func master_key(job: GemFrameJob) -> String:
 		job.resolution, job.samples, job.sample_seed, canonical_orientation(job.orientation),
 		canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half])
 
-static func display_key(job: GemFrameJob) -> String:
+static func print_key(job: GemFrameJob) -> String:
 	return GemContentIdentity.digest(["display-v2", GemRenderIdentity.pipeline_digest("print"), master_key(job), job.print_style,
 		job.exposure, job.output_size, GemRigCompiler.compile(job.rig).white_xyz])
+
+static func display_key(job: GemFrameJob) -> String:
+	if job.game_style == null or job.game_style.is_identity():
+		return print_key(job)
+	return GemContentIdentity.digest(["styled-display-v1", display_engine(job), print_key(job), job.game_style.inputs()])
+
+static func display_engine(job: GemFrameJob) -> String:
+	if job.game_style == null or job.game_style.is_identity():
+		return GemRenderIdentity.pipeline_digest("print")
+	return GemContentIdentity.digest([GemRenderIdentity.pipeline_digest("print"), GemRenderIdentity.pipeline_digest("style")])
 
 static func master_engine(job: GemFrameJob) -> String:
 	return GemRenderIdentity.pipeline_digest(GemRenderIdentity.transport_domain(job.quality))

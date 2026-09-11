@@ -6,7 +6,7 @@ var store: GemArtifactStore
 var tracer: GemTracer
 var compiled_key := ""
 var compiled: Dictionary = {}
-var counters := {"rendered": 0, "reprinted": 0, "display_hits": 0, "resumed_samples": 0}
+var counters := {"rendered": 0, "reprinted": 0, "restyled": 0, "display_hits": 0, "resumed_samples": 0}
 var last_error := ""
 
 func _init(output_root := "res://generated/gemfactory") -> void:
@@ -32,9 +32,14 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 	var display_key := GemFramePlan.display_key(job)
 	var master_key := GemFramePlan.master_key(job)
 	var existing := store.read(display_key)
-	if not existing.is_empty() and existing["metadata"].get("kind") == "display" and existing.metadata.get("engine") == GemRenderIdentity.pipeline_digest("print") and existing.metadata.get("master") == master_key:
+	if _display_image(existing, job, GemFramePlan.display_engine(job)) != null:
 		counters["display_hits"] += 1
 		return existing["metadata"]
+	var print_key := GemFramePlan.print_key(job)
+	if display_key != print_key:
+		var cached_print := _display_image(store.read(print_key), job, GemRenderIdentity.pipeline_digest("print"))
+		if cached_print != null:
+			return _publish_styled(job, cached_print)
 	var master_record := store.read(master_key)
 	var master: Image = null
 	if not master_record.is_empty() and master_record["metadata"].get("kind") == "linear_master" and master_record.metadata.get("engine") == GemFramePlan.master_engine(job):
@@ -103,9 +108,39 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 	var display := tracer.finalize_print(job.print_style, false, job.exposure, job.output_size, false)
 	var metadata := {"kind": "display", "master": master_key, "engine": GemRenderIdentity.pipeline_digest("print"), "width": display.get_width(), "height": display.get_height(),
 		"codec": "webp_lossless", "space": "srgb_straight_alpha", "status": "complete"}
-	if not store.publish(display_key, display.save_webp_to_buffer(false), metadata):
-		return _fail("Cannot publish display frame")
-	return store.read(display_key).get("metadata", {})
+	if not store.publish(print_key, display.save_webp_to_buffer(false), metadata):
+		return _fail("Cannot publish mastered print")
+	if display_key != print_key:
+		return _publish_styled(job, display)
+	return store.read(print_key).get("metadata", {})
+
+func _publish_styled(job: GemFrameJob, mastered: Image) -> Dictionary:
+	var display := GemStylePipeline.apply(mastered, job.game_style)
+	if display == null:
+		return _fail("Cannot process display style")
+	var metadata := {"kind": "display", "master": GemFramePlan.master_key(job), "print": GemFramePlan.print_key(job),
+		"engine": GemFramePlan.display_engine(job), "width": display.get_width(), "height": display.get_height(),
+		"codec": "webp_lossless", "space": "srgb_straight_alpha", "status": "complete", "styling": "game_display"}
+	var key := GemFramePlan.display_key(job)
+	if not store.publish(key, display.save_webp_to_buffer(false), metadata):
+		return _fail("Cannot publish styled display frame")
+	counters["restyled"] += 1
+	return store.read(key).get("metadata", {})
+
+static func _display_image(record: Dictionary, job: GemFrameJob, engine: String) -> Image:
+	var metadata: Dictionary = record.get("metadata", {})
+	if metadata.get("kind") != "display" or metadata.get("engine") != engine or metadata.get("master") != GemFramePlan.master_key(job):
+		return null
+	if metadata.get("status") != "complete" or metadata.get("codec") != "webp_lossless" or metadata.get("space") != "srgb_straight_alpha":
+		return null
+	if Vector2i(int(metadata.get("width", 0)), int(metadata.get("height", 0))) != job.output_size:
+		return null
+	var decoded := Image.new()
+	if decoded.load_webp_from_buffer(record.get("payload", PackedByteArray())) != OK or decoded.get_size() != job.output_size:
+		return null
+	# RGB-only lossless WebP may decode as RGB8 when every pixel is opaque.
+	decoded.convert(Image.FORMAT_RGBA8)
+	return decoded
 
 func _checkpoint(key: String) -> bool:
 	var raw := var_to_bytes(tracer.checkpoint())

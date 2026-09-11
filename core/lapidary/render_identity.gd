@@ -3,6 +3,7 @@ extends RefCounted
 ## Result compatibility is distinct from the complete renderer inventory.
 ## Unknown/new files are shared conservatively until explicitly classified.
 const EXCLUSIVE := {
+	"style": ["core/lapidary/style_pipeline.gd", "resources/lapidary/gem_style.gd"],
 	"frame_execution": ["core/lapidary/factory/frame_worker.gd"],
 	"crystal": ["core/lapidary/tracer/crystal_shader.gd", "core/lapidary/tracer/shaders/gem_crystal.glsl", "core/lapidary/tracer/shaders/gem_crystal_path.glsl"],
 	"print": ["core/lapidary/tracer/shaders/gem_print.glsl", "resources/lapidary/gem_print.gd"],
@@ -10,7 +11,7 @@ const EXCLUSIVE := {
 	"transport": ["core/lapidary/tracer/shaders/gem_pathtrace.glsl", "core/lapidary/tracer/shaders/gem_surface.glsl",
 		"core/lapidary/tracer/shaders/gem_volume.glsl", "core/lapidary/tracer/shaders/gem_polarization.glsl", "core/lapidary/tracer/shaders/gem_denoise.glsl", "core/lapidary/microsurface/smith_walk.glsl"]
 }
-const DOMAINS := ["worker", "scalar", "polarized", "crystal", "print", "geometry"]
+const DOMAINS := ["worker", "scalar", "polarized", "crystal", "print", "geometry", "style"]
 static var _inventory: Dictionary = {}
 static var _digests: Dictionary = {}
 
@@ -32,6 +33,7 @@ static func inventory() -> Dictionary:
 		for root in ["res://core/lapidary/cut", "res://core/lapidary/geometry", "res://core/lapidary/lighting", "res://core/lapidary/tracer", "res://resources/lapidary"]:
 			_collect(root, files)
 		files.append_array(["res://core/lapidary/stone_compiler.gd", "res://core/lapidary/material_compiler.gd",
+			"res://core/lapidary/style_pipeline.gd",
 			"res://core/lapidary/render_identity.gd", "res://core/lapidary/factory/frame_worker.gd",
 			"res://core/lapidary/factory/frame_plan.gd", "res://core/lapidary/microsurface/smith_walk.glsl", GemStandardSpectra.CMF_FILE, GemStandardSpectra.D65_FILE])
 		for path in files:

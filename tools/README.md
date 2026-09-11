@@ -2,7 +2,18 @@
 
 Run `tools/check_engine.ps1 -Gpu` for source parsing, CPU contracts and windowed
 GPU acceptance checks. GPU scripts require a local RenderingDevice; headless
-execution is supported only for CPU planning, validation and packaging.
+execution supports CPU planning, validation, packaging, cached results and styling
+from cached unstyled prints.
+
+Optional game art direction: `build_gem_assets.ps1 -Style
+res://data/lapidary/styles/illustrative_sprite.tres -RetainPrints`. Unstyled prints
+remain offline inputs; only clip-referenced styled frames ship. Omit `-Style` for
+the physical baseline. The preset is illustrative, not a grading model.
+`test_style.gd` checks color/coverage/cache isolation; `style_factory_check.gd`
+checks an actual GPU print followed by portable headless styling and farm transfer.
+`style_lookdev.gd` saves a four-species physical/mild/banded comparison and timings
+under ignored `artifacts/style-lookdev`. Hard tonal bands amplify noise and remain
+off in the preset.
 
 `tools/build_gem_assets.ps1` prepares explicit frame jobs, renders missing masters,
 prints and packs referenced assets, then collects unneeded factory cache entries.

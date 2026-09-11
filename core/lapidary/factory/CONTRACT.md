@@ -6,6 +6,35 @@ into explicit frame jobs; there is no implicit rotation×cell×lighting lattice.
 Equivalent poses reuse one optical master, and exposure/output-size changes reprint
 that master. Artist style belongs after linear optical output.
 
+`GemStyle` is optional game art direction after the mastered print has been
+filtered to its requested output size. Tint and saturation operate in linear
+sRGB; contrast, optional luminance bands and an inner silhouette contour operate
+in encoded sRGB. The contour uses square alpha erosion, at most four pixels,
+and preserves every coverage byte. It cannot reveal refracted inclusions or
+simulate damage. Geometry AOVs are not interpreted as internal-defect visibility.
+Null/identity styles preserve exact bytes and share the unstyled print recipe.
+Nonidentity styles have an independent source digest and content identity;
+changing their settings or implementation retains optics and unstyled prints.
+
+Use `prepare_gem_jobs.gd --style=res://data/lapidary/styles/illustrative_sprite.tres`
+or `build_gem_assets.ps1 -Style ...`. The example is an opt-in illustrative preset,
+not a final game aesthetic. Tonal bands are off: hard thresholds can amplify
+sampling noise and cause temporal popping. No automatic grade mapping is supplied.
+The physical baseline remains the default for the catalog and game build.
+
+Linear luminance weights and the independent sRGB test conversion follow the
+[W3C relative-luminance definition](https://www.w3.org/WAI/WCAG21/Understanding/relative-luminance.html).
+The subsequent encoded tonal-band operator is an artistic mapping, not radiometry.
+
+Workers cache the unstyled print before styling. Cached prints can be restyled
+headlessly, without tracing or GPU mastering; a missing print is regenerated from
+the optical master on a GPU. The styled display's `print` key is provenance, not
+a mandatory retained/transferred dependency. Add `--retain-prints=true` (build
+switch `-RetainPrints`) to request unstyled frames explicitly for retention and
+farm transfer. They have no clip references and therefore do not enter shipping
+pages. Otherwise collection may discard these intermediate prints. This trades
+small additional offline storage for continued headless art iteration.
+
 Design-time microstructure recipes freeze into ordinary `GemStone` conditions:
 closed crystal habits, physical centers, uniform scales, independent crystal
 frames and material fillings. Workers never invent grade-dependent geometry.
@@ -33,7 +62,7 @@ parameter. Spatial fields can scale the complete mixture or add explicit local a
 terms. Their profile, physical dimensions and spectra participate in optical
 identity, while geometry companions remain independent of these coefficients.
 
-`GemRenderIdentity` separates scalar, polarized, crystal, print and geometry
+`GemRenderIdentity` separates scalar, polarized, crystal, print, style and geometry
 result dependencies from `worker_digest()`, the complete renderer inventory.
 Known crystal-only modules affect crystal masters; print implementation changes
 affect displays; primary-AOV code affects geometry companions. Shared host,
@@ -45,12 +74,13 @@ an edit only changes scheduling; geometry uses its separate executor digest.
 This is not automatic
 call-graph analysis; move code between passes only with dependency tests.
 
-Master recipe v3 includes its transport digest. Display recipe v2 includes the
-print digest and master key. Geometry includes its own pipeline and planner/worker
+Master recipe v3 includes its transport digest. Unstyled display recipe v2 includes
+the print digest and master key. Styled display v1 adds the style pipeline and
+active settings; its engine combines print and style digests. Geometry includes its own pipeline and planner/worker
 digests. Each result's `engine` means that result pipeline, not a worker revision.
 Producer metadata retains the original `source_engine`; cache hits never relabel
 old producers. Bundle-level `engine` and `source_sha256` still require an exact
-worker source match. Job records additionally declare `engine`/`print_engine`, and
+worker source match. Job records additionally declare `engine`/`display_engine`, and
 geometry records declare `engine`. Transfer checks these requested result engines,
 so compatible completed assets can cross worker revisions. Conflicting master
 pipeline declarations are rejected. Older manifests without pipeline declarations

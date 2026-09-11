@@ -2,6 +2,8 @@ param(
     [string]$Godot = 'C:/Godot/Godot_v4.6.1-stable_win64_console.exe',
     [string]$Stone = '',
     [string]$Specimen = '',
+    [string]$Style = '',
+    [switch]$RetainPrints,
     [string]$Clip = '',
     [ValidateSet('interact', 'preview', 'board_live', 'clip_bake', 'hero', 'reference')]
     [string]$Rung = 'clip_bake',
@@ -37,6 +39,8 @@ $prepare = @('--headless', '--path', $projectRoot, '--quit-after', '600', '--scr
 $prepare += "--geometry-coverage=$GeometryCoverage"
 if ($Stone) { $prepare += "--stone=$Stone" }
 if ($Specimen) { $prepare += "--specimen=$Specimen" }
+if ($Style) { $prepare += "--style=$Style" }
+if ($RetainPrints) { $prepare += '--retain-prints=true' }
 if ($Clip) { $prepare += "--clip=$Clip" }
 if ($Resolution -gt 0) { $prepare += "--resolution=$Resolution" }
 if ($Samples -gt 0) { $prepare += "--samples=$Samples" }

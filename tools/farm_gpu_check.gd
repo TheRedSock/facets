@@ -17,7 +17,7 @@ func _initialize() -> void:
 			job.output_size = Vector2i(24, 24)
 			job.samples = 16
 			jobs.append(job)
-			manifest.jobs[GemFramePlan.display_key(job)] = {"master": GemFramePlan.master_key(job), "engine": GemFramePlan.master_engine(job), "print_engine": GemRenderIdentity.pipeline_digest("print")}
+			manifest.jobs[GemFramePlan.display_key(job)] = {"master": GemFramePlan.master_key(job), "engine": GemFramePlan.master_engine(job), "display_engine": GemFramePlan.display_engine(job)}
 			if worker.run(job).is_empty():
 				failures += 1
 		if worker.counters.rendered != 1:

@@ -50,7 +50,7 @@ static func write(root: String, jobs: Array[GemFrameJob], clips: Dictionary, geo
 		if GemResourceBundle.save(job, root.path_join(relative)) != OK:
 			return {}
 		records[key] = {"path": relative, "master": GemFramePlan.master_key(job), "engine": GemFramePlan.master_engine(job),
-			"print_engine": GemRenderIdentity.pipeline_digest("print"), "sha256": FileAccess.get_sha256(root.path_join(relative))}
+			"display_engine": GemFramePlan.display_engine(job), "sha256": FileAccess.get_sha256(root.path_join(relative))}
 		if geometry_coverage_side > 0:
 			var geometry_key := GemGeometryPlan.key(job, geometry_coverage_side)
 			records[key]["geometry"] = geometry_key
@@ -62,7 +62,7 @@ static func write(root: String, jobs: Array[GemFrameJob], clips: Dictionary, geo
 		return {}
 	var manifest := {"schema": 1, "engine": GemRenderIdentity.worker_digest(), "godot": Engine.get_version_info(),
 		"source_sha256": checksums, "jobs": records, "geometry": geometry, "clips": clips, "estimate": GemFramePlan.estimate(jobs),
-		"worker": {"gpu_required": true, "headless_supported": false,
+		"worker": {"gpu_required_for": ["transport", "mastering", "primary_geometry"], "headless_operations": ["cached_results", "style_cached_print"],
 			"import_args": ["--headless", "--editor", "--quit"],
 			"run_args": ["--audio-driver", "Dummy", "--script", "res://tools/gem_frame_worker.gd", "--", "--manifest=res://manifest.json", "--output=res://output"]}}
 	if not _prune_generated(absolute, checksums, records):

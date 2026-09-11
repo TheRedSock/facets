@@ -358,6 +358,7 @@ Designed but excluded from current scaffold. See `plans/deferred-systems-referen
 | Regenerate data layer | `tools/generate_lapidary_data.gd` (headless) |
 | Trace/shading logic | `core/lapidary/tracer/shaders/gem_pathtrace.glsl` (+ `gem_common.glsl`) + `gem_tracer.gd` host |
 | Mastering / print | `core/lapidary/tracer/shaders/gem_print.glsl` + `GemPrint` resource; white balance in `core/lapidary/lighting/colorimetry.gd` |
+| Optional game style | `GemStyle` / `core/lapidary/style_pipeline.gd`; build `-Style ... -RetainPrints` keeps unstyled offline inputs for headless restyling; automatic grade mapping and default catalog styling remain off |
 | GPU buffer formats | `core/lapidary/tracer/KERNEL_CONTRACT.md` (update when packing changes) |
 | Stone -> kernel packing | `core/lapidary/stone_compiler.gd` |
 | Quality rung policy | `core/lapidary/tracer/rung.gd` — `GemRung.TABLE` |

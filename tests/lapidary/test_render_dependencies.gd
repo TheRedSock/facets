@@ -18,6 +18,10 @@ func identities(hashes: Dictionary, jobs: Array[GemFrameJob]) -> Dictionary:
 		var domain := GemRenderIdentity.transport_domain(jobs[i].quality)
 		result[domain] = GemFramePlan.master_key(jobs[i])
 		result[domain + "_display"] = GemFramePlan.display_key(jobs[i])
+		var styled: GemFrameJob = jobs[i].duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
+		styled.game_style = GemStyle.new()
+		styled.game_style.saturation = 0.5
+		result[domain + "_styled"] = GemFramePlan.display_key(styled)
 	return result
 
 func _initialize() -> void:
@@ -45,6 +49,13 @@ func _initialize() -> void:
 		"core/lapidary/render_identity.gd": baseline.keys(),
 		"core/lapidary/tracer/new_unknown_pass.glsl": baseline.keys()
 	}
+	# Styled outputs inherit the mastered print's dependencies, plus only style.
+	for path: String in cases:
+		for domain in ["scalar", "polarized", "crystal"]:
+			if cases[path].has(domain + "_display") and not cases[path].has(domain + "_styled"):
+				cases[path].append(domain + "_styled")
+	for path in ["core/lapidary/style_pipeline.gd", "resources/lapidary/gem_style.gd"]:
+		cases[path] = ["worker", "scalar_styled", "polarized_styled", "crystal_styled"]
 	for path: String in cases:
 		var edited := inventory.duplicate()
 		edited[path] = "changed source".sha256_text()

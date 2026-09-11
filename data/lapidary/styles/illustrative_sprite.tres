@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="GemStyle" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_style.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+saturation = 1.08
+contrast = 1.04
+contour_pixels = 1
+contour_opacity = 0.22
+contour_color = Color(0.06, 0.075, 0.10, 1)

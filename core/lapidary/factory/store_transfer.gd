@@ -125,8 +125,8 @@ static func _expected(manifest: Dictionary) -> Dictionary:
 			return {}
 		var master := str(manifest.jobs[key].get("master", ""))
 		var engine := str(manifest.jobs[key].get("engine", ""))
-		var print_engine := str(manifest.jobs[key].get("print_engine", ""))
-		if not GemArtifactStore.valid_key(engine) or not GemArtifactStore.valid_key(print_engine):
+		var display_engine := str(manifest.jobs[key].get("display_engine", ""))
+		if not GemArtifactStore.valid_key(engine) or not GemArtifactStore.valid_key(display_engine):
 			return {}
 		if not GemArtifactStore.valid_key(master) or key == master:
 			return {}
@@ -134,7 +134,7 @@ static func _expected(manifest: Dictionary) -> Dictionary:
 			return {}
 		if expected.has(master) and (expected[master].kind != "linear_master" or expected[master].engine != engine):
 			return {}
-		expected[key] = {"kind": "display", "master": master, "engine": print_engine}
+		expected[key] = {"kind": "display", "master": master, "engine": display_engine}
 		expected[master] = {"kind": "linear_master", "engine": engine}
 	return expected
 
