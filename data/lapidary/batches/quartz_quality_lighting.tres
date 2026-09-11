@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="GemAssetBatch" load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_asset_batch.gd" id="1"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_asset_request.gd" id="2"]
+[ext_resource type="Resource" path="res://data/lapidary/recipes/quartz_condition_study.tres" id="3"]
+[ext_resource type="Resource" path="res://data/lapidary/rigs/gameplay_studio.tres" id="4"]
+[ext_resource type="Resource" path="res://data/lapidary/rigs/reference_daylight.tres" id="5"]
+[ext_resource type="Resource" path="res://data/lapidary/print/house_print.tres" id="6"]
+[ext_resource type="Resource" path="res://data/lapidary/clips/idle.tres" id="7"]
+[ext_resource type="Resource" path="res://data/lapidary/clips/turn.tres" id="8"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_clip.gd" id="9"]
+
+[sub_resource type="Resource" id="clear_studio"]
+script = ExtResource("2")
+asset_id = &"quartz_reference"
+recipe = ExtResource("3")
+preset_id = &"reference"
+specimen_seed = 17
+clips = Array[ExtResource("9")]([ExtResource("7"), ExtResource("8")])
+rig = ExtResource("4")
+print_style = ExtResource("6")
+
+[sub_resource type="Resource" id="polish_studio"]
+script = ExtResource("2")
+asset_id = &"quartz_softened"
+clips = Array[ExtResource("9")]([ExtResource("7"), ExtResource("8")])
+recipe = ExtResource("3")
+preset_id = &"softened_polish"
+specimen_seed = 17
+rig = ExtResource("4")
+print_style = ExtResource("6")
+
+[sub_resource type="Resource" id="clear_daylight"]
+script = ExtResource("2")
+asset_id = &"quartz_reference_daylight"
+clips = Array[ExtResource("9")]([ExtResource("7"), ExtResource("8")])
+recipe = ExtResource("3")
+preset_id = &"reference"
+specimen_seed = 17
+rig = ExtResource("5")
+print_style = ExtResource("6")
+
+[sub_resource type="Resource" id="polish_daylight"]
+script = ExtResource("2")
+asset_id = &"quartz_softened_daylight"
+clips = Array[ExtResource("9")]([ExtResource("7"), ExtResource("8")])
+recipe = ExtResource("3")
+preset_id = &"softened_polish"
+specimen_seed = 17
+rig = ExtResource("5")
+print_style = ExtResource("6")
+
+[resource]
+script = ExtResource("1")
+requests = Array[ExtResource("2")]([SubResource("clear_studio"), SubResource("polish_studio"), SubResource("clear_daylight"), SubResource("polish_daylight")])
+frame_budget = 64
+geometry_coverage_side = 2

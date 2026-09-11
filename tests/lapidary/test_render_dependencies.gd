@@ -35,6 +35,9 @@ func _initialize() -> void:
 		jobs.append(job)
 	var baseline := identities(inventory, jobs)
 	var cases := {
+		"core/lapidary/factory/asset_planner.gd": ["worker"],
+		"resources/lapidary/gem_asset_request.gd": ["worker"],
+		"resources/lapidary/gem_asset_batch.gd": ["worker"],
 		"core/lapidary/tracer/shaders/gem_crystal.glsl": ["worker", "crystal", "crystal_display"],
 		"core/lapidary/tracer/crystal_shader.gd": ["worker", "crystal", "crystal_display"],
 		"core/lapidary/tracer/shaders/gem_print.glsl": ["worker", "scalar_display", "polarized_display", "crystal_display"],

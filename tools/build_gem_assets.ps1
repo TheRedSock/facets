@@ -2,6 +2,7 @@ param(
     [string]$Godot = 'C:/Godot/Godot_v4.6.1-stable_win64_console.exe',
     [string]$Stone = '',
     [string]$Specimen = '',
+    [string]$Batch = '',
     [string]$Recipe = '',
     [string]$Quality = '',
     [int]$SpecimenSeed = 1,
@@ -38,8 +39,14 @@ function Invoke-GemStage([string]$Name, [string[]]$Arguments) {
         throw "Asset stage $Name failed; see $log"
     }
 }
-$prepare = @('--headless', '--path', $projectRoot, '--quit-after', '600', '--script', 'res://tools/prepare_gem_jobs.gd', '--', "--rung=$Rung")
-$prepare += "--geometry-coverage=$GeometryCoverage"
+$prepare = @('--headless', '--path', $projectRoot, '--quit-after', '600', '--script', 'res://tools/prepare_gem_jobs.gd', '--')
+if ($Batch) {
+    foreach ($selector in @('Stone', 'Specimen', 'Recipe', 'Quality', 'SpecimenSeed', 'Style', 'RetainPrints', 'Clip', 'Rung', 'Resolution', 'Samples')) {
+        if ($PSBoundParameters.ContainsKey($selector)) { throw "Batch resources carry their own requests; cannot override $selector" }
+    }
+    $prepare += "--batch=$Batch"
+} else { $prepare += "--rung=$Rung" }
+if (-not $Batch -or $PSBoundParameters.ContainsKey('GeometryCoverage')) { $prepare += "--geometry-coverage=$GeometryCoverage" }
 if ($Stone) { $prepare += "--stone=$Stone" }
 if ($Specimen) { $prepare += "--specimen=$Specimen" }
 if ($Recipe) { $prepare += "--recipe=$Recipe"; $prepare += "--seed=$SpecimenSeed" }

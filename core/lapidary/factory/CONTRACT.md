@@ -1,5 +1,32 @@
 # Asset factory and delivery contract
 
+## Explicit delivery requests
+
+`GemAssetBatch` lists `GemAssetRequest` resources, each with a unique delivery ID,
+an explicit specimen or recipe/preset/seed, requested clips, rig, print, optional
+style and numerical quality settings. `GemAssetPlanner.plan` validates all names
+and frame counts before expansion, detaches authored inputs, realizes specimens,
+and returns the existing jobs/clips representation. Invalid input returns no
+partial plan. Catalog and single-specimen CLI convenience inputs use this same
+planner. Only explicitly listed variants are generated; no Cartesian product is
+inferred from board positions, grades, seeds or lighting bins.
+
+Delivery IDs and clip IDs contain 1..128 ASCII letters/digits/underscore/hyphen/dot
+(excluding dot and dot-dot alone). Each request has 1..256 uniquely named clips;
+each batch has 1..4096 requests and a configurable job budget of 1..65,536, default
+16,384. The budget counts pre-deduplication frame requests and retained prints.
+Larger productions can publish separate batches into a shared artifact store.
+Only implemented still/turntable motion and exposure/key/rim envelopes are
+admitted. Per-frame optical policy admission still runs after curve sampling.
+
+The library key is `asset_id/clip_id`; it never changes GemStone identity or
+transport. Equal physical jobs reuse masters/displays across delivery aliases,
+and different lighting requests reuse their shared geometry companions. Optional
+retained unstyled prints are offline jobs with no shipping clip references.
+`-Batch` carries its own request settings; conflicting convenience CLI overrides
+are rejected. Geometry coverage can be overridden explicitly. Batch/planner
+sources affect worker provenance but are excluded from optical result domains.
+
 ## Procedural specimen realization
 
 `GemSpecimenFactory.realize(recipe, preset_id, seed, source_override)` is a CPU

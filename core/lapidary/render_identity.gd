@@ -3,7 +3,7 @@ extends RefCounted
 ## Result compatibility is distinct from the complete renderer inventory.
 ## Unknown/new files are shared conservatively until explicitly classified.
 const EXCLUSIVE := {
-	"authoring": ["core/lapidary/factory/specimen_factory.gd", "resources/lapidary/gem_specimen_recipe.gd", "resources/lapidary/gem_quality_preset.gd", "resources/lapidary/gem_condition_variation.gd"],
+	"authoring": ["core/lapidary/factory/specimen_factory.gd", "resources/lapidary/gem_specimen_recipe.gd", "resources/lapidary/gem_quality_preset.gd", "resources/lapidary/gem_condition_variation.gd", "core/lapidary/factory/asset_planner.gd", "resources/lapidary/gem_asset_request.gd", "resources/lapidary/gem_asset_batch.gd"],
 	"style": ["core/lapidary/style_pipeline.gd", "resources/lapidary/gem_style.gd"],
 	"frame_execution": ["core/lapidary/factory/frame_worker.gd"],
 	"crystal": ["core/lapidary/tracer/crystal_shader.gd", "core/lapidary/tracer/shaders/gem_crystal.glsl", "core/lapidary/tracer/shaders/gem_crystal_path.glsl"],
@@ -35,6 +35,7 @@ static func inventory() -> Dictionary:
 			_collect(root, files)
 		files.append_array(["res://core/lapidary/stone_compiler.gd", "res://core/lapidary/material_compiler.gd",
 			"res://core/lapidary/factory/specimen_factory.gd",
+			"res://core/lapidary/factory/asset_planner.gd",
 			"res://core/lapidary/style_pipeline.gd",
 			"res://core/lapidary/render_identity.gd", "res://core/lapidary/factory/frame_worker.gd",
 			"res://core/lapidary/factory/frame_plan.gd", "res://core/lapidary/microsurface/smith_walk.glsl", GemStandardSpectra.CMF_FILE, GemStandardSpectra.D65_FILE])

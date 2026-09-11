@@ -539,3 +539,16 @@ geometry, cached replay and packing. `specimen_lookdev.gd` renders unstyled stat
 across poses/rigs and makes production-resolved sprite previews. See the factory
 contract for exact variation and graph limits. Automatic catalog grading remains
 off; physically explicit condition presets are available for inspection.
+
+### Multi-variant asset requests
+
+`GemAssetBatch` lists explicit `GemAssetRequest` variants: unique asset ID,
+specimen or recipe/preset/seed, clips, rig, print/style and quality settings.
+`GemAssetPlanner` validates frame budgets and names, detaches inputs and returns
+ordinary frozen jobs/clips. Catalog and single-specimen CLI modes use it too.
+Build `-Batch res://data/lapidary/batches/quartz_quality_lighting.tres` for the
+two-quality/two-rig example. Runtime keys use `asset_id/clip_id`; physical stone
+IDs remain unchanged. Aliases share optical results and lighting variants share
+geometry. No seed/grade/lighting Cartesian product is generated. See the factory
+contract for limits and override rules. Tests: `test_asset_planner.gd` and
+`asset_batch_check.gd` (portable workers, headless reuse, selective texture loads).

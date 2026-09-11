@@ -21,6 +21,7 @@ $stages += @{ Name = 'test_geometry_factory'; Args = @('--headless', '--quit-aft
 $stages += @{ Name = 'test_render_dependencies'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_render_dependencies.gd') }
 $stages += @{ Name = 'test_style'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_style.gd') }
 $stages += @{ Name = 'test_specimen_recipe'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_specimen_recipe.gd') }
+$stages += @{ Name = 'test_asset_planner'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_asset_planner.gd') }
 $stages += @{ Name = 'test_finish_fields'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_finish_fields.gd') }
 $stages += @{ Name = 'test_absorption_mixtures'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_absorption_mixtures.gd') }
 $stages += @{ Name = 'test_spatial_composition'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_spatial_composition.gd') }
@@ -37,6 +38,7 @@ if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'asset_batch_check'; Args = @('--quit-after', '600', '--script', 'res://tools/asset_batch_check.gd') }
 	$stages += @{ Name = 'specimen_factory_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/specimen_factory_check.gd') }
 	$stages += @{ Name = 'style_factory_check'; Args = @('--quit-after', '600', '--script', 'res://tools/style_factory_check.gd') }
 	$stages += @{ Name = 'microstructure_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/microstructure_gpu_check.gd') }

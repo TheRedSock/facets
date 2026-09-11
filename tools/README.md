@@ -48,6 +48,25 @@ checks standalone rendering, geometry, cached replay and packing.
 `--quality`, `--resolution`, `--samples`, `--seed` and `--sample-seed` select a study.
 Its 112px previews use production XYZ resolve and reuse the optical master.
 
+For multiple quality or lighting variants in one library, use an explicit
+`GemAssetBatch`: `build_gem_assets.ps1 -Batch
+res://data/lapidary/batches/quartz_quality_lighting.tres`. Each `GemAssetRequest`
+names its own asset ID, specimen or recipe/preset/seed, clips, rig, print and
+optional style. The example lists two quality states under two rigs, with idle
+and turn clips (52 requested frames). No additional grade/seed/light combinations
+are generated. Runtime keys are `asset_id/clip_id`, so
+`quartz_softened_daylight/turn` coexists with `quartz_reference/turn`.
+
+Request IDs do not change physical stone IDs or optical cache keys. Repeated
+aliases share optical/display results; lighting changes reuse geometry outputs.
+Requests may override render size, output size and samples independently. Batch
+budgets count requested jobs, including retained unstyled prints, before frame
+allocation. `-Batch` rejects per-specimen CLI overrides; edit the request resource
+instead. `-GeometryCoverage` may explicitly override its geometry setting.
+`test_asset_planner.gd` checks bounded planning and identities;
+`asset_batch_check.gd` exercises standalone workers, headless reuse and selective
+texture loading across quality/lighting variants and aliases.
+
 Physical diagnostics include `foundation_gpu_check.gd`, `surface_check.gd`,
 `spectra_gpu_check.gd`, and `reconstruction_check.gd`. Visual outputs and reports
 belong under ignored `artifacts/`; generated delivery libraries belong under
