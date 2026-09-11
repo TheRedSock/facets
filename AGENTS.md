@@ -492,3 +492,8 @@ Compiled patches reject mutation after construction; rebuild from the recipe.
 `continuous_transport_check.gd` cover numerical bounds, cache isolation, mixed
 batches, nested materials and all three optical backends. These checks do not
 establish image convergence or a physical wear calibration.
+
+`GemPatchBounds` tightens encoded curved-patch bounds with the renderer's clip
+tolerance included. Near-parallel unresolved configurations retain enclosing
+quadric bounds. `test_patch_bounds.gd` checks independent cap extrema and feasible
+sphere/circle samples; the accelerated GPU ray corpus checks actual packing.

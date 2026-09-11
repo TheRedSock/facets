@@ -293,3 +293,6 @@ condition authoring remains pending. Keep rounding defaults inactive.
 `compare_rounding.gd -- BEFORE_DIR AFTER_DIR OUTPUT_JSON` compares matching
 lookdev frames, records print-space errors and source timing reports, and states
 that sampling noise is included. Comparison outputs stay in ignored artifacts.
+
+Rounding lookdev accepts `--output=res://artifacts/NAME` to preserve comparison
+runs. `test_patch_bounds.gd` checks clipped-surface extrema independently of rays.

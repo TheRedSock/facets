@@ -7,6 +7,8 @@ func _initialize()->void:
 	var output:="res://artifacts/rounding/macro/" if macro else "res://artifacts/rounding/lookdev/"
 	if fine:output=output.trim_suffix("/")+"-fine/"
 	if continuous:output=output.trim_suffix("/")+"-continuous/"
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--output="):output=arg.trim_prefix("--output=").trim_suffix("/")+"/"
 	DirAccess.make_dir_recursive_absolute(output)
 	var tracer:=GemTracer.create(256,256)
 	if tracer==null:quit(1);return

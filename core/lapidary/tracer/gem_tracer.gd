@@ -367,10 +367,11 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			node_data.append_array(GemPackedGeometryCache.relocate_nodes(packed.nodes, node_data.size() / 48, triangle_data.size() / 64))
 			var primitive_bytes: PackedByteArray = packed.triangles
 			var clip_offset := planes.size()/8
-			for primitive in primitive_bytes.size()/64:
-				var meta := primitive*64+48
-				if (primitive_bytes.decode_s32(meta+4)&255) != 0:
-					primitive_bytes.encode_s32(meta+8,primitive_bytes.decode_s32(meta+8)+clip_offset)
+			if not packed.clips.is_empty() and clip_offset != 0:
+				for primitive in primitive_bytes.size()/64:
+					var meta := primitive*64+48
+					if (primitive_bytes.decode_s32(meta+4)&255) != 0:
+						primitive_bytes.encode_s32(meta+8,primitive_bytes.decode_s32(meta+8)+clip_offset)
 			triangle_data.append_array(primitive_bytes)
 			for clip in packed.clips.size()/16:
 				for k in 4: planes.append(packed.clips.decode_float(clip*16+k*4))

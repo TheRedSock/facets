@@ -16,12 +16,16 @@ static func pack(solid: GemRoundedSolid, mesh: GemMesh = null) -> Dictionary:
 	var encoded := GemAnalyticPacking.pack(solid)
 	var records: PackedByteArray = encoded.primitives
 	var tree := GemPrimitiveBvh.new()
-	for patch in solid.patches:
+	for index in solid.patches.size():
+		var patch := solid.patches[index]
+		var tight := GemPatchBounds.encoded(records,index,encoded.clips,CLIP_TOLERANCE)
 		var scale := 1.0
 		for axis in 3:
 			scale = maxf(scale, maxf(absf(patch.lower[axis]), absf(patch.upper[axis])))
 		var padding := CLIP_TOLERANCE * 16 * scale
-		tree.bounds.append({"min": V.subtract(patch.lower,V.vec(padding,padding,padding)), "max": V.add(patch.upper,V.vec(padding,padding,padding))})
+		var low: PackedFloat64Array = tight.get("min",patch.lower)
+		var high: PackedFloat64Array = tight.get("max",patch.upper)
+		tree.bounds.append({"min": V.subtract(low,V.vec(padding,padding,padding)), "max": V.add(high,V.vec(padding,padding,padding))})
 	if mesh != null and mesh.triangle_count() > 0:
 		var errors := mesh.validate()
 		if not errors.is_empty(): return {"error": "Invalid combined defect mesh: " + "; ".join(errors)}

@@ -377,3 +377,11 @@ at 0.12mm and 5.95/9.59 LSB at 0.6mm; sampling noise is included. Smooth curved
 highlights are visible, but those differences do not establish undetectable
 convergence, real specimen calibration or an automatic wear grade. Keep the
 rounding defaults inactive while improving bounds and completing authoring.
+
+Tighter clipped-patch bounds subsequently reduced the same 256px/128spp trace
+times to 3.56/4.69s (0.12mm) and 4.18/4.88s (0.6mm). Coverage was identical;
+maximum opaque RGB RMS change was 0.0123 LSB, with isolated differences up to
+3 LSB. The ray corpus still had zero missing/extra hits. These measurements
+support this acceleration change at the tested scales, not arbitrary precision
+or physical-wear calibration. The bounds include clipping tolerance and retain
+full-quadric enclosures for numerically unresolved configurations.

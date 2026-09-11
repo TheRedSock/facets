@@ -79,8 +79,12 @@ use a mixed hierarchy over region-zero analytic patches and defect triangles in
 regions 1..127. Relative clip offsets become absolute during instance packing.
 The cache retains canonical primitive/node/clip bytes and accounts for all three.
 
-Continuous patch bounds are constructed in float64 and rounded outward when
-packed. They include 16e-6 times the coordinate scale as numerical padding;
+Continuous patch bounds are constructed from encoded quadric/clip coefficients
+in float64 and rounded outward when packed. Clipped-sphere coordinate extrema
+use poles, clipping-circle stationary points and circle intersections. Cylinder
+bounds conservatively eliminate axial height, then bound the feasible radial
+circle. Both include the nonzero render clipping tolerance. Nearly parallel or
+unresolved domains retain enclosing-quadric bounds; render geometry is unchanged. They include 16e-6 times the coordinate scale as numerical padding;
 patch clipping uses a 1e-6 stone-space tolerance. These are tested numerical
 policies, not certified error intervals. The 76,400-ray stress corpus found no
 missing or extra intersections with acceleration enabled. Curved-host/triangle
