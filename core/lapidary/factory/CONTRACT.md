@@ -6,6 +6,14 @@ into explicit frame jobs; there is no implicit rotation×cell×lighting lattice.
 Equivalent poses reuse one optical master, and exposure/output-size changes reprint
 that master. Artist style belongs after linear optical output.
 
+Design-time microstructure recipes freeze into ordinary `GemStone` conditions:
+closed crystal habits, physical centers, uniform scales, independent crystal
+frames and material fillings. Workers never invent grade-dependent geometry.
+`realize_microstructure.gd` saves the explicit specimen plus recipe/source hashes;
+`prepare_gem_jobs.gd --specimen=...` and `build_gem_assets.ps1 -Specimen ...` accept
+that resource without catalog edits. The included diagnostic population is
+synthetic and opt-in; realization is not natural-inclusion calibration.
+
 `GemFrameJob` contains all authored inputs and render policy. `GemFramePlan` hashes
 physical resources, the selected transport pipeline, packed lighting, canonical pose, framing,
 resolution, sample seed/count and estimator policy. Display identity also hashes

@@ -154,6 +154,9 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 			return "; ".join(defect.finish.validate())
 		if defect.kind == "fracture" and (defect.fracture_profile == null or not defect.fracture_profile.validate().is_empty()):
 			return "fracture needs a valid aperture/contact profile"
+		if defect.kind=="crystal":
+			if defect.crystal_habit==null or not defect.crystal_habit.validate().is_empty() or not _between(defect.crystal_scale,1e-6,10000):
+				return "crystal needs valid physical habit supports and uniform scale"
 		if defect.filling != null:
 			error = _material(defect.filling, polarized)
 			if not error.is_empty():

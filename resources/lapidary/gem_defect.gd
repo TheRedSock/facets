@@ -5,8 +5,13 @@ extends Resource
 @export_enum("fracture", "chip", "crystal", "cleavage") var kind := "fracture"
 @export var center_mm := Vector3.ZERO
 @export var orientation := Quaternion.IDENTITY
-## Half-widths. For fractures, z is half the maximum physical aperture.
+## Half-widths for non-crystal defects. For fractures, z is half aperture.
 @export var half_extent_mm := Vector3(0.8, 0.5, 0.003)
+## Crystal geometry uses physical supports and uniform scale, never an affine
+## stretch that silently changes its face angles.
+@export var crystal_habit: GemCrystalHabit = GemCrystalHabit.new()
+@export var crystal_scale := 1.0
+## Filling's material axis is local to this defect, rotated by orientation.
 @export var filling: GemMaterial
 @export var finish: GemSurface = GemSurface.new()
 @export var fracture_profile: GemFractureProfile = GemFractureProfile.new()

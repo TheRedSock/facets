@@ -102,6 +102,51 @@ Automatic fracture grading remains disabled: topology validation alone does not
 establish convincing appearance or acceptable render cost. Meshing regularizes
 near-node sliver contours; admission rejects unresolved degenerate geometry.
 
+Resolved microstructure is authored with `GemMicrostructureRecipe` and named
+`GemInclusionPopulation` resources. Crystal habits use outward Cartesian support
+planes with millimeter distances, not generic stretched hexagons or inferred
+Miller indices. Uniform instance scaling preserves face angles. A filling's
+optical axis is local to the defect and rotates with its geometry; host and
+foreign crystal frames remain independent.
+
+Each population samples a common C2 ellipsoidal placement density in the host
+crystal frame, log-uniform sizes and declared orientation families with optional
+cone spread. Stable IDs isolate seed channels. Recutting or changing grade labels
+does not move inclusions. Conservative bounding-sphere separation applies within
+each population; it can reject arrangements that exact elongated shapes could
+fit. Failure returns no partial specimen and never shrinks features. Separate
+populations retain explicit region priority. Transport clips closed regions to
+the host; the report does not infer retained volume from inclusion centers.
+
+These are statistical morphology controls, not nucleation, exsolution or healing
+simulation. Grouping by crystal directions, growth zones and healed fractures
+has observational support ([GIA, 2022](https://www.gia.edu/gems-gemology/summer-2022-colored-stones-unearthed));
+the authored distributions here are not calibrated from that article. The cone
+sampler follows [PBRT's uniform solid-angle construction](https://www.pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multidimensional_Functions#SamplingWithinaCone).
+Resolved populations cannot also add effective scattering through their placement
+domain. Aligned silk, asterism and subwavelength scattering need other optical
+models; neither HG haze nor oversized visible needles is a substitute.
+
+Run headless `tools/realize_microstructure.gd` with optional `--stone=...`,
+`--recipe=...` and `--output=...res`. It saves the explicit specimen and a provenance
+JSON. Defaults use `data/lapidary/microstructures/diagnostic_crystal_layer.tres`,
+an explicitly synthetic n=1.8 / neutral 10-per-mm absorption fixture. Build it
+with `tools/build_gem_assets.ps1 -Specimen res://generated/microstructure/quartz.res`.
+`prepare_gem_jobs.gd -- --specimen=...` also accepts any explicit GemStone;
+`--specimen` and catalog `--stone` are mutually exclusive. Workers consume frozen
+physical inputs and require no population program or grading decisions.
+
+Windowed `microstructure_lookdev.gd` compares 0/6/18 members at three poses and
+light rotations, preserving physical sizes in both 256px and 112px outputs.
+The synthetic example remains opt-in. CPU `test_microstructure.gd`, windowed
+`microstructure_gpu_check.gd` and headless `microstructure_portable_check.gd`
+cover geometry, determinism, crystal frames, independent Beer attenuation,
+three-mode furnace behavior and isolated worker/cache delivery.
+`microstructure_noise_check.gd` compares fixed-geometry transport seeds at
+64/128/512 samples and 256/112px, reporting opaque-pixel RMS, p99 and peak
+differences. It does not infer invisibility from an average or certify natural
+appearance. This separate lookdev study is not part of every regression run.
+
 `GemGrade` is metadata: changing a label cannot alter transport. Author bulk
 scattering with `GemMaterial.scatter_per_mm` and `scatter_g`; use
 `GemCondition.banding` for physical band period, direction, phase and contrast,

@@ -17,10 +17,18 @@ func _initialize() -> void:
 		return
 	var jobs: Array[GemFrameJob] = []
 	var clips := {}
-	for filename in DirAccess.get_files_at("res://data/lapidary/stones"):
-		if not filename.ends_with(".tres") or (args.has("stone") and filename != args["stone"] + ".tres"):
-			continue
-		var stone: GemStone = load("res://data/lapidary/stones/" + filename)
+	var specimens:Array[GemStone]=[]
+	if args.has("specimen"):
+		if args.has("stone") or not ResourceLoader.exists(args.specimen):
+			printerr("Choose an existing --specimen resource or a catalog --stone, not both");quit(1);return
+		var specimen:=load(args.specimen) as GemStone
+		if specimen==null:printerr("Specimen resource must be a GemStone");quit(1);return
+		specimens.append(specimen)
+	else:
+		for filename in DirAccess.get_files_at("res://data/lapidary/stones"):
+			if filename.ends_with(".tres") and (not args.has("stone") or filename==args.stone+".tres"):
+				specimens.append(load("res://data/lapidary/stones/"+filename))
+	for stone in specimens:
 		for name in ["idle", "turn", "flash"]:
 			if args.has("clip") and name != args["clip"]:
 				continue

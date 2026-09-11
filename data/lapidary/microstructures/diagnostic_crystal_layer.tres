@@ -1,0 +1,85 @@
+[gd_resource type="Resource" script_class="GemMicrostructureRecipe" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_population.gd" id="1_mxktl"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_absorber.gd" id="2_bdugq"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="3_0j4qg"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="4_0yrtk"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="5_qwomb"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="6_82xvx"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="7_51j5s"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="8_bsd22"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="9_3xdb8"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_finish_field.gd" id="10_je3rt"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_surface.gd" id="11_botx6"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_crystal_habit.gd" id="12_qg5hh"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_microstructure_recipe.gd" id="13_8uh73"]
+
+[sub_resource type="Resource" id="Resource_nyb8m"]
+script = ExtResource("3_0j4qg")
+center_mm = Vector3(0.3, 0, -0.15)
+radius_mm = Vector3(2, 1.2, 0.6)
+orientation = Quaternion(0, 0.12467473, 0, 0.9921977)
+
+[sub_resource type="Resource" id="Resource_k8pts"]
+script = ExtResource("4_0yrtk")
+
+[sub_resource type="Resource" id="Resource_xqegs"]
+script = ExtResource("5_qwomb")
+absorption_evidence = SubResource("Resource_k8pts")
+wavelength_step_nm = 400.0
+absorption_mm = PackedFloat32Array(10, 10)
+cross_section_cm2 = PackedFloat64Array()
+cross_section_parallel_cm2 = PackedFloat64Array()
+absorption_eray_mm = PackedFloat32Array()
+
+[sub_resource type="Resource" id="Resource_mn4df"]
+script = ExtResource("2_bdugq")
+chromophore = SubResource("Resource_xqegs")
+
+[sub_resource type="Resource" id="Resource_p8rjn"]
+script = ExtResource("4_0yrtk")
+
+[sub_resource type="Resource" id="Resource_ei8wx"]
+script = ExtResource("4_0yrtk")
+
+[sub_resource type="Resource" id="Resource_xoqx8"]
+script = ExtResource("8_bsd22")
+b = PackedFloat64Array(0, 0, 0)
+c_um2 = PackedFloat64Array(0, 0, 0)
+index_offset = 0.8
+evidence = SubResource("Resource_ei8wx")
+
+[sub_resource type="Resource" id="Resource_lre4j"]
+script = ExtResource("9_3xdb8")
+ordinary = SubResource("Resource_xoqx8")
+
+[sub_resource type="Resource" id="Resource_eb0r6"]
+script = ExtResource("6_82xvx")
+species = SubResource("Resource_lre4j")
+absorbers = Array[ExtResource("2_bdugq")]([SubResource("Resource_mn4df")])
+scattering_evidence = SubResource("Resource_p8rjn")
+source_note = "Synthetic isotropic n=1.8, neutral absorption 10/mm. Geometry/transport diagnostic, not measured mineral data."
+
+[sub_resource type="Resource" id="Resource_nk2t6"]
+script = ExtResource("11_botx6")
+
+[sub_resource type="Resource" id="Resource_oisvm"]
+script = ExtResource("12_qg5hh")
+faces = Array[Plane]([Plane(1, 0, 0, 0.045), Plane(0.57357645, 0, -0.81915206, 0.12287281), Plane(0.57357645, 0, 0.81915206, 0.12287281), Plane(6.123032e-17, 1, 0, 0.045), Plane(3.512027e-17, 0.57357645, -0.81915206, 0.12287281), Plane(3.512027e-17, 0.57357645, 0.81915206, 0.12287281), Plane(-1, 1.2246064e-16, 0, 0.045), Plane(-0.57357645, 7.024054e-17, -0.81915206, 0.12287281), Plane(-0.57357645, 7.024054e-17, 0.81915206, 0.12287281), Plane(-1.8369095e-16, -1, 0, 0.045), Plane(-1.0536081e-16, -0.57357645, -0.81915206, 0.12287281), Plane(-1.0536081e-16, -0.57357645, 0.81915206, 0.12287281)])
+
+[sub_resource type="Resource" id="Resource_u8veb"]
+script = ExtResource("1_mxktl")
+population_id = &"layer"
+seed = 18
+count = 6
+domain = SubResource("Resource_nyb8m")
+habit = SubResource("Resource_oisvm")
+filling = SubResource("Resource_eb0r6")
+finish = SubResource("Resource_nk2t6")
+orientation_families = Array[Quaternion]([Quaternion(0, 0.38941833, 0, 0.921061), Quaternion(0.38941833, 0, 0, 0.921061)])
+angular_spread_deg = 4.0
+minimum_gap_mm = 0.02
+
+[resource]
+script = ExtResource("13_8uh73")
+populations = Array[ExtResource("1_mxktl")]([SubResource("Resource_u8veb")])

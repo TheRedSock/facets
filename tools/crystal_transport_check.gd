@@ -92,11 +92,11 @@ func _geometry_and_resume(stone: GemStone, lighting: GemLighting, policy: Dictio
 		elif kind == "nested":
 			var cavity := GemDefect.new()
 			cavity.kind = "crystal"
-			cavity.half_extent_mm = Vector3(0.8, 0.6, 0.45)
+			cavity.crystal_habit = GemCrystalHabit.prism(6,.6,.45)
 			cavity.irregularity = 0.1
 			stone.condition.defects.append(cavity)
 			var filling: GemDefect = cavity.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
-			filling.half_extent_mm *= 0.6
+			filling.crystal_scale = 0.6
 			filling.filling = stone.material.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 			stone.condition.defects.append(filling)
 		var instance := LapidaryStoneCompiler.compile(stone)

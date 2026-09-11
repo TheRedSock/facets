@@ -24,16 +24,21 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float,
 				return
 			descriptors.append(event.defect)
 	for defect in descriptors:
+		if defect==null:
+			compiled["compilation_error"]="Missing physical defect descriptor";return
 		if defect.enabled:
 			var surface := compile(defect, size_mm)
 			if defect.kind == "fracture" and surface.vertices.is_empty():
 				# A fully closed aperture contributes no separate material region.
 				continue
+			if not surface.validate().is_empty():
+				compiled["compilation_error"]="Invalid physical defect: %s"%surface.validate();return
 			enabled.append(defect)
 			geometries.append(surface)
 	if enabled.is_empty():
 		return
-	assert(enabled.size() < GemBoundarySet.MAX_REGIONS, "Too many resolved material regions; use effective media for subpixel populations")
+	if enabled.size()>=GemBoundarySet.MAX_REGIONS:
+		compiled["compilation_error"]="Too many resolved material regions";return
 	var boundaries := GemBoundarySet.new()
 	if compiled.has("rounded_solid"):
 		var added := boundaries.add_rounded(compiled.rounded_solid,0)
@@ -54,7 +59,9 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float,
 		var surface := geometries[index]
 		var material_id := -1
 		if defect.filling != null:
-			materials.append(GemMaterialCompiler.compile(defect.filling))
+			var material:=GemMaterialCompiler.compile(defect.filling)
+			material["optic_axis"]=(defect.orientation*material.optic_axis).normalized()
+			materials.append(material)
 			material_id = materials.size()
 		var added := boundaries.add(surface, material_id)
 		assert(added, "Invalid physical defect: %s" % surface.validate())
@@ -67,6 +74,11 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float,
 
 static func compile(defect: GemDefect, size_mm: float) -> GemMesh:
 	assert(is_finite(size_mm) and size_mm > 0.0 and defect.half_extent_mm.is_finite())
+	if defect.kind=="crystal":
+		if not is_finite(defect.crystal_scale) or defect.crystal_scale<=0:return GemMesh.new()
+		var crystal:=GemCrystalHabitCompiler.compile(defect.crystal_habit)
+		for i in crystal.vertices.size():crystal.vertices[i]=(defect.center_mm+defect.orientation*(crystal.vertices[i]*defect.crystal_scale))/size_mm
+		return crystal
 	var extent := defect.half_extent_mm
 	if extent.x <= 0.0 or extent.y <= 0.0 or extent.z <= 0.0:
 		return GemMesh.new()
@@ -86,23 +98,16 @@ static func compile(defect: GemDefect, size_mm: float) -> GemMesh:
 		var radius := 1.0 + defect.irregularity * (0.16 * sin(3.0 * angle + phase) + 0.07 * sin(7.0 * angle - phase))
 		points.append(Vector2(cos(angle), sin(angle)) * radius)
 	var sections := PackedVector2Array()
-	if defect.kind == "crystal":
-		points = PackedVector2Array()
-		for index in 6:
-			points.append(Vector2(cos(TAU * index / 6), sin(TAU * index / 6)))
-		sections = PackedVector2Array([Vector2(-1, 0), Vector2(-0.65, 1), Vector2(0.65, 1), Vector2(1, 0)])
-	else:
-		sections.append(Vector2(-1, 0))
-		for ring in range(1, defect.radial_rings * 2):
-			var angle := -PI * 0.5 + PI * ring / (defect.radial_rings * 2)
-			sections.append(Vector2(sin(angle), cos(angle)))
-		sections.append(Vector2(1, 0))
+	sections.append(Vector2(-1, 0))
+	for ring in range(1, defect.radial_rings * 2):
+		var angle := -PI * 0.5 + PI * ring / (defect.radial_rings * 2)
+		sections.append(Vector2(sin(angle), cos(angle)))
+	sections.append(Vector2(1, 0))
 	var mesh := GemShapeCompiler.loft(points, sections)
 	for index in mesh.vertices.size():
 		var p := mesh.vertices[index]
 		# Shared long-scale corrugation of the chip cavity.
-		if defect.kind != "crystal":
-			p.z += defect.irregularity * 0.7 * sin(4.5 * p.x + phase) * sin(3.2 * p.y - phase)
+		p.z += defect.irregularity * 0.7 * sin(4.5 * p.x + phase) * sin(3.2 * p.y - phase)
 		mesh.vertices[index] = (defect.center_mm + defect.orientation * (p * extent)) / size_mm
 	return mesh
 
