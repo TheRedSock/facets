@@ -1,8 +1,8 @@
 class_name GemGrade
 extends Resource
 ## Catalog quality labels, not physical properties or a gemological certificate.
-## None of these axes alter optics or geometry. A future accepted grade recipe
-## must first realize explicit material/condition/cut inputs for inspection.
+## None of these axes alter optics or geometry. GemSpecimenRecipe selects named
+## presets that realize explicit material/condition/cut inputs for inspection.
 ## Hardness, toughness, clarity and aesthetic rank must not be conflated.
 
 @export var grade_id: StringName

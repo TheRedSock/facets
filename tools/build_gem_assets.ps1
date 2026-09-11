@@ -2,6 +2,9 @@ param(
     [string]$Godot = 'C:/Godot/Godot_v4.6.1-stable_win64_console.exe',
     [string]$Stone = '',
     [string]$Specimen = '',
+    [string]$Recipe = '',
+    [string]$Quality = '',
+    [int]$SpecimenSeed = 1,
     [string]$Style = '',
     [switch]$RetainPrints,
     [string]$Clip = '',
@@ -39,6 +42,8 @@ $prepare = @('--headless', '--path', $projectRoot, '--quit-after', '600', '--scr
 $prepare += "--geometry-coverage=$GeometryCoverage"
 if ($Stone) { $prepare += "--stone=$Stone" }
 if ($Specimen) { $prepare += "--specimen=$Specimen" }
+if ($Recipe) { $prepare += "--recipe=$Recipe"; $prepare += "--seed=$SpecimenSeed" }
+if ($Quality) { $prepare += "--quality=$Quality" }
 if ($Style) { $prepare += "--style=$Style" }
 if ($RetainPrints) { $prepare += '--retain-prints=true' }
 if ($Clip) { $prepare += "--clip=$Clip" }

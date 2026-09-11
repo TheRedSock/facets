@@ -9,6 +9,9 @@ const INTEGER_POLICY := {"res": Vector2(1, 8192), "out": Vector2(1, 8192), "spp"
 	"device_memory_budget_mib": Vector2(1, 1048576)}
 const NUMBER_POLICY := {"denoise_phi": Vector2(0.1, 8), "throughput_epsilon": Vector2(1e-8, 0.01), "rad_clamp": Vector2(1e-12, 1e30)}
 const BOOLEAN_POLICY := ["dispersion", "birefringence", "volume", "polarization", "crystal_transport"]
+const SPECIMEN_CACHE_LIMIT := 128
+static var _specimen_cache: Dictionary = {}
+static var _specimen_order: Array[String] = []
 
 static func validate(job: GemFrameJob) -> String:
 	if job == null:
@@ -46,7 +49,7 @@ static func validate(job: GemFrameJob) -> String:
 			return "Light role multipliers must be finite and nonnegative"
 	if not _between(job.exposure, 0, 1e10):
 		return "Exposure must be finite and nonnegative"
-	var error := _stone(job.stone, job.quality.get("polarization", false))
+	var error := specimen_error(job.stone, job.quality.get("polarization", false))
 	if not error.is_empty():
 		return "Stone: " + error
 	if job.quality.get("crystal_transport", false):
@@ -64,7 +67,26 @@ static func validate(job: GemFrameJob) -> String:
 		return job.game_style.validate()
 	return "; ".join(job.print_style.validate())
 
-static func _stone(stone: GemStone, polarized: bool) -> String:
+static func specimen_error(stone: GemStone, polarized := false) -> String:
+	if stone == null: return "missing specimen"
+	var graph_error := GemContentIdentity.graph_error(stone)
+	if not graph_error.is_empty(): return graph_error
+	# Cache successful CPU admission by exact stored values AND schema source.
+	# Never by object identity: editing any resource must re-run admission.
+	# Labels are included because their range validation is part of this gate.
+	var key := GemContentIdentity.digest([stone, polarized])
+	if _specimen_cache.has(key):
+		_specimen_order.erase(key); _specimen_order.append(key)
+		return ""
+	var error := _specimen_error_uncached(stone, polarized)
+	if error.is_empty():
+		if _specimen_order.size() >= SPECIMEN_CACHE_LIMIT:
+			_specimen_cache.erase(_specimen_order.pop_front())
+		_specimen_cache[key] = true
+		_specimen_order.append(key)
+	return error
+
+static func _specimen_error_uncached(stone: GemStone, polarized: bool) -> String:
 	if stone == null:
 		return "missing specimen"
 	if not _between(stone.size_mm, 1e-4, 10000) or not stone.optic_axis_override.is_finite() or not _rotation(stone.crystal_to_stone):

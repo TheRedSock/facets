@@ -56,6 +56,8 @@ func _initialize() -> void:
 				cases[path].append(domain + "_styled")
 	for path in ["core/lapidary/style_pipeline.gd", "resources/lapidary/gem_style.gd"]:
 		cases[path] = ["worker", "scalar_styled", "polarized_styled", "crystal_styled"]
+	for path in GemRenderIdentity.EXCLUSIVE.authoring:
+		cases[path] = ["worker"]
 	for path: String in cases:
 		var edited := inventory.duplicate()
 		edited[path] = "changed source".sha256_text()

@@ -25,7 +25,17 @@ func _initialize() -> void:
 	var jobs: Array[GemFrameJob] = []
 	var clips := {}
 	var specimens:Array[GemStone]=[]
-	if args.has("specimen"):
+	if args.has("recipe"):
+		if args.has("specimen") or args.has("stone") or not ResourceLoader.exists(args.recipe) or not args.has("quality"):
+			printerr("Choose an existing --recipe with explicit --quality, or a specimen/catalog source"); quit(1); return
+		var seed_text: String = args.get("seed", "1")
+		if not seed_text.is_valid_int(): printerr("Specimen seed must be an integer"); quit(1); return
+		var realized := GemSpecimenFactory.realize(load(args.recipe) as GemSpecimenRecipe, StringName(args.quality), int(seed_text))
+		if not realized.error.is_empty(): printerr(realized.error); quit(1); return
+		specimens.append(realized.stone)
+	elif args.has("quality") or args.has("seed"):
+		printerr("--quality and --seed require an explicit specimen --recipe"); quit(1); return
+	elif args.has("specimen"):
 		if args.has("stone") or not ResourceLoader.exists(args.specimen):
 			printerr("Choose an existing --specimen resource or a catalog --stone, not both");quit(1);return
 		var specimen:=load(args.specimen) as GemStone

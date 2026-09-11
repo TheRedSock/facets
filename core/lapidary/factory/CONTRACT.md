@@ -1,5 +1,41 @@
 # Asset factory and delivery contract
 
+## Procedural specimen realization
+
+`GemSpecimenFactory.realize(recipe, preset_id, seed, source_override)` is a CPU
+authoring boundary. It deep-copies a base GemStone, replaces its full condition
+and quality labels, optionally selects a nominal cut, applies bounded physical
+variations and realizes a microstructure population. It validates the resulting
+material and boundary before returning the ordinary explicit GemStone. No camera,
+light, resolution or style enters this operation. No partial stone is returned on
+failure. Species restrictions are opt-in per preset and enforced when present.
+
+`GemConditionVariation` has a fixed target vocabulary: finish slope widths,
+rounding/cleavage millimeters, workmanship errors, pavilion angle/table ratio,
+bulk scattering coefficients/asymmetry and named population counts. Bounds and
+logarithmic/integer rules are checked before writes. Missing physical owners fail
+instead of silently constructing mechanisms. Stable named channels derive their
+quantile from the specimen seed; shared channels couple quantiles, while list
+ordering and unrelated channel insertion do not affect existing draws. This is
+bounded authored variability, not a simulation of growth or damage history.
+
+Changing supplied scattering parameters replaces their evidence with authored
+evidence retaining the parent evidence digest. The realization report records
+source, recipe, realized specimen, seed, parameter draws and realizer identity.
+It travels as resource metadata through binary bundles, excluded from transport
+identity. The authoring implementation changes worker provenance but does not
+invalidate optics for an identical already-realized specimen. Labels never
+modify transport. The opt-in quartz study is not a geological grading standard;
+automatic catalog degradation and unaccepted fracture grading remain disabled.
+
+Successful specimen admission uses a 128-entry LRU keyed by exact resource
+content, schema source and polarization policy. Edits invalidate the entry;
+job-specific policy, rig and output validation still runs. No specimen resources
+are retained by the cache. Graph preflight rejects resource cycles, unsupported
+objects, depth above 64 and expanded traversal above 262,144 nodes before hashing
+or realization. Shared DAG references count each expansion, matching canonical
+serialization. Packed numeric arrays are leaves; this is not a byte-size quota.
+
 The game is a consumer of a prebuilt library. Optical tracing belongs to authoring
 and offline jobs. A specimen, requested animation, rig and quality profile expand
 into explicit frame jobs; there is no implicit rotation×cell×lighting lattice.

@@ -25,6 +25,29 @@ The standalone stages are `prepare_gem_jobs.gd`, `gem_frame_worker.gd`, and
 collection while workers or publishers hold activity guards. See the tracked
 factory and kernel contracts for storage and transport interfaces.
 
+Named physical quality states use `GemSpecimenRecipe` and `GemQualityPreset`.
+Run `realize_specimen.gd -- --recipe=res://data/lapidary/recipes/quartz_condition_study.tres
+--quality=softened_polish --seed=17 --output=res://generated/specimens/quartz.res`
+to save an explicit binary specimen and its provenance report. Optional `--base`
+selects a different GemStone within the preset's species restrictions.
+`build_gem_assets.ps1 -Recipe res://data/lapidary/recipes/quartz_condition_study.tres
+-Quality softened_polish -SpecimenSeed 17` realizes and builds that state directly.
+Recipe selection is mutually exclusive with `-Stone` and `-Specimen`; quality is
+required with a recipe. Seeds are integers in 0..2147483647.
+
+The quartz study supplies reference, softened polish, cut tolerance, localized
+cloud and foreign-crystal states. These are authored engineering examples, not
+calibrated natural grades. Presets replace the base condition completely and can
+select a nominal cut and microstructure population. Explicit bounded variation
+channels preserve existing draws when unrelated channels are inserted; sharing a
+channel couples quantiles. Physical millimeter values do not scale with the gem.
+Workers consume the frozen GemStone, not the recipe. Style remains independent.
+`test_specimen_recipe.gd` checks realization and admission; `specimen_factory_check.gd`
+checks standalone rendering, geometry, cached replay and packing.
+`specimen_lookdev.gd` compares unstyled states under three poses and two rigs;
+`--quality`, `--resolution`, `--samples`, `--seed` and `--sample-seed` select a study.
+Its 112px previews use production XYZ resolve and reuse the optical master.
+
 Physical diagnostics include `foundation_gpu_check.gd`, `surface_check.gd`,
 `spectra_gpu_check.gd`, and `reconstruction_check.gd`. Visual outputs and reports
 belong under ignored `artifacts/`; generated delivery libraries belong under

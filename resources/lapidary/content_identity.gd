@@ -10,6 +10,43 @@ static func digest(value: Variant) -> String:
 	context.update(var_to_bytes(_canonical(value, [])))
 	return context.finish().hex_encode()
 
+## Admission preflight before hashing an unvalidated graph. In particular, a
+## Resource-typed cut slot can contain a cyclic or unsupported object graph.
+## Packed numeric arrays are leaves; this bounds recursive containers/resources.
+static func graph_error(value: Variant) -> String:
+	return _graph_error(value, 0, {}, [262144])
+
+static func _graph_error(value: Variant, depth: int, active: Dictionary, budget: Array) -> String:
+	budget[0] -= 1
+	if budget[0] < 0 or depth > 64: return "Resource graph exceeds admission traversal limits"
+	if value is Resource:
+		var id: int = value.get_instance_id()
+		if active.has(id): return "Cyclic resource graph"
+		# Count shared subgraphs each time: canonical serialization expands them.
+		# Memoizing only their first visit would admit exponential-size digests.
+		active[id] = true
+		for property: Dictionary in value.get_property_list():
+			if not _content_property(property): continue
+			var error := _graph_error(value.get(property.name), depth + 1, active, budget)
+			if not error.is_empty(): return error
+		active.erase(id)
+	elif value is Array:
+		for item: Variant in value:
+			var error := _graph_error(item, depth + 1, active, budget)
+			if not error.is_empty(): return error
+	elif value is Dictionary:
+		for key: Variant in value:
+			for item: Variant in [key, value[key]]:
+				var error := _graph_error(item, depth + 1, active, budget)
+				if not error.is_empty(): return error
+	elif value is Object:
+		return "Only resource objects may occur in a render recipe"
+	return ""
+
+static func _content_property(property: Dictionary) -> bool:
+	var name: String = property.name
+	return int(property.usage) & PROPERTY_USAGE_STORAGE != 0 and name not in ["script", "resource_path", "resource_name", "resource_local_to_scene"] and not name.begins_with("metadata/")
+
 
 static func _canonical(value: Variant, ancestors: Array) -> Variant:
 	if value is Resource:
@@ -21,9 +58,7 @@ static func _canonical(value: Variant, ancestors: Array) -> Variant:
 		entries.append(["class", value.get_class(), script.source_code if script else ""])
 		for property: Dictionary in value.get_property_list():
 			var name := String(property["name"])
-			if int(property["usage"]) & PROPERTY_USAGE_STORAGE == 0:
-				continue
-			if name in ["script", "resource_path", "resource_name", "resource_local_to_scene"] or name.begins_with("metadata/"):
+			if not _content_property(property):
 				continue
 			entries.append([name, _canonical(value.get(name), stack)])
 		entries.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])

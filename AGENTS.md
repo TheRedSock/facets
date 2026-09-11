@@ -518,3 +518,24 @@ return a stone compilation error. Exact predicate signs do not make subsequent
 float32 vertex construction or GPU intersections arbitrarily precise.
 `test_polygon.gd`, `check_polygon_reference.py` and `polygon_gpu_check.gd` cover
 translated/concave/collinear caps, rational area/topology and optical equivalence.
+
+### Named physical quality presets
+
+`GemSpecimenRecipe` combines a base stone with named `GemQualityPreset` states.
+`GemSpecimenFactory.realize` deep-copies the source, replaces the condition, applies
+bounded named variation channels, optionally selects a cut and realizes a physical
+microstructure population, then validates the result. `GemGrade` remains metadata.
+The quartz condition study is opt-in and authored, not a natural grading law.
+Changing scattering values also replaces measurement evidence with authored
+evidence retaining the parent digest. Realization provenance survives binary
+bundles as metadata without entering optical identity. Workers consume explicit
+GemStone resources, never authoring recipes. Style remains a separate layer.
+
+CLI: `realize_specimen.gd -- --recipe=... --quality=... --seed=17 --output=...res`;
+build: `build_gem_assets.ps1 -Recipe ... -Quality ... -SpecimenSeed 17`.
+`test_specimen_recipe.gd` covers deterministic realization, source isolation,
+provenance and admission; `specimen_factory_check.gd` covers standalone rendering,
+geometry, cached replay and packing. `specimen_lookdev.gd` renders unstyled states
+across poses/rigs and makes production-resolved sprite previews. See the factory
+contract for exact variation and graph limits. Automatic catalog grading remains
+off; physically explicit condition presets are available for inspection.

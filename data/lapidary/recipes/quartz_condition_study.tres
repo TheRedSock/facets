@@ -1,0 +1,148 @@
+[gd_resource type="Resource" script_class="GemSpecimenRecipe" load_steps=32 format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_specimen_recipe.gd" id="recipe"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_quality_preset.gd" id="preset"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_condition_variation.gd" id="variation"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_condition.gd" id="condition"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_grade.gd" id="grade"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_rounding.gd" id="rounding"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_surface.gd" id="surface"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="field"]
+[ext_resource type="Resource" path="res://data/lapidary/stones/quartz.tres" id="base"]
+[ext_resource type="Resource" path="res://data/lapidary/microstructures/diagnostic_crystal_layer.tres" id="population"]
+
+[sub_resource type="Resource" id="clear_bulk"]
+script = ExtResource("variation")
+channel_id = &"bulk"
+target = "material.scatter_per_mm"
+
+[sub_resource type="Resource" id="clean_condition"]
+script = ExtResource("condition")
+
+[sub_resource type="Resource" id="clean"]
+script = ExtResource("preset")
+preset_id = &"reference"
+condition = SubResource("clean_condition")
+variations = Array[ExtResource("variation")]([SubResource("clear_bulk")])
+allowed_species = Array[StringName]([&"quartz"])
+source_note = "Smooth, clear quartz counterfactual. Authored material input, not a certified flawless specimen."
+
+[sub_resource type="Resource" id="round_radius"]
+script = ExtResource("variation")
+channel_id = &"junction_radius"
+target = "rounding.radius_mm"
+minimum = 0.04
+maximum = 0.08
+
+[sub_resource type="Resource" id="polish_u"]
+script = ExtResource("variation")
+channel_id = &"polish"
+minimum = 0.004
+maximum = 0.008
+
+[sub_resource type="Resource" id="polish_v"]
+script = ExtResource("variation")
+channel_id = &"polish"
+target = "finish.alpha_v"
+minimum = 0.002
+maximum = 0.004
+
+[sub_resource type="Resource" id="rounded"]
+script = ExtResource("rounding")
+
+[sub_resource type="Resource" id="polish"]
+script = ExtResource("surface")
+multiple_scattering = true
+
+[sub_resource type="Resource" id="soft_condition"]
+script = ExtResource("condition")
+rounding = SubResource("rounded")
+finish = SubResource("polish")
+
+[sub_resource type="Resource" id="surface_labels"]
+script = ExtResource("grade")
+surface = 0.65
+
+[sub_resource type="Resource" id="softened"]
+script = ExtResource("preset")
+preset_id = &"softened_polish"
+condition = SubResource("soft_condition")
+labels = SubResource("surface_labels")
+variations = Array[ExtResource("variation")]([SubResource("clear_bulk"), SubResource("round_radius"), SubResource("polish_u"), SubResource("polish_v")])
+allowed_species = Array[StringName]([&"quartz"])
+source_note = "Authored continuous junction radius and anisotropic surface slope widths. Evaluates a softened, imperfectly polished state; not a wear-time or hardness model."
+
+[sub_resource type="Resource" id="polar_error"]
+script = ExtResource("variation")
+channel_id = &"facet_tolerance"
+target = "workmanship.polar_error_deg"
+minimum = 0.08
+maximum = 0.18
+
+[sub_resource type="Resource" id="azimuth_error"]
+script = ExtResource("variation")
+channel_id = &"facet_tolerance"
+target = "workmanship.azimuth_error_deg"
+minimum = 0.08
+maximum = 0.18
+
+[sub_resource type="Resource" id="cut_labels"]
+script = ExtResource("grade")
+cut = 0.75
+
+[sub_resource type="Resource" id="cut_tolerance"]
+script = ExtResource("preset")
+preset_id = &"cut_tolerance"
+condition = SubResource("clean_condition")
+labels = SubResource("cut_labels")
+variations = Array[ExtResource("variation")]([SubResource("clear_bulk"), SubResource("polar_error"), SubResource("azimuth_error")])
+allowed_species = Array[StringName]([&"quartz"])
+source_note = "Bounded facet-angle manufacturing deviations. Labels describe this study's selection categories, not measured cut grades."
+
+[sub_resource type="Resource" id="cloud_field"]
+script = ExtResource("field")
+center_mm = Vector3(0.3, 0, -0.2)
+radius_mm = Vector3(2.8, 1.6, 1.1)
+scatter_per_mm = 0.2
+
+[sub_resource type="Resource" id="cloud_condition"]
+script = ExtResource("condition")
+volume_fields = Array[ExtResource("field")]([SubResource("cloud_field")])
+
+[sub_resource type="Resource" id="clarity_labels"]
+script = ExtResource("grade")
+clarity = 0.65
+
+[sub_resource type="Resource" id="cloud"]
+script = ExtResource("preset")
+preset_id = &"cloud"
+condition = SubResource("cloud_condition")
+labels = SubResource("clarity_labels")
+variations = Array[ExtResource("variation")]([SubResource("clear_bulk")])
+allowed_species = Array[StringName]([&"quartz"])
+source_note = "Authored compact effective-medium scattering domain. Not a measured inclusion population, anisotropic silk or geological growth simulation."
+
+[sub_resource type="Resource" id="count"]
+script = ExtResource("variation")
+channel_id = &"population_size"
+target = "population.count"
+population_id = &"layer"
+minimum = 4.0
+maximum = 8.0
+
+[sub_resource type="Resource" id="crystals"]
+script = ExtResource("preset")
+preset_id = &"foreign_crystals"
+condition = SubResource("clean_condition")
+labels = SubResource("clarity_labels")
+microstructure = ExtResource("population")
+variations = Array[ExtResource("variation")]([SubResource("clear_bulk"), SubResource("count")])
+allowed_species = Array[StringName]([&"quartz"])
+source_note = "Synthetic habit/material diagnostic with 4..8 explicit crystal regions. No natural-mineral identification or gemological clarity calibration."
+
+[resource]
+script = ExtResource("recipe")
+recipe_id = &"quartz_condition_study"
+base = ExtResource("base")
+presets = Array[ExtResource("preset")]([SubResource("clean"), SubResource("softened"), SubResource("cut_tolerance"), SubResource("cloud"), SubResource("crystals")])
+source_note = "Opt-in engineering study. Presets separate physical mechanisms; not a monotonic grade-to-haze model or catalog default."
