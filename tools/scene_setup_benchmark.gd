@@ -16,6 +16,10 @@ func _initialize() -> void:
 	stone.condition.rounding.radius_mm = .12
 	var start := Time.get_ticks_usec()
 	var instance := LapidaryStoneCompiler.compile(stone)
+	if instance.has("rounded_solid"):
+		var reference:Dictionary=instance.rounded_solid.reference_mesh(6)
+		if not reference.error.is_empty():printerr(reference.error);quit(1);return
+		instance["mesh"]=reference.mesh;instance.erase("rounded_solid")
 	var compilation_ms := (Time.get_ticks_usec() - start) / 1000.0
 	if instance.has("compilation_error"): printerr(instance.compilation_error); quit(1); return
 	var tracer := GemTracer.create(64, 64)

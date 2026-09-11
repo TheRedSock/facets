@@ -245,25 +245,20 @@ Reprints do not rerun the surface model. No grade label enables this option.
 
 ## Explicit convex junction rounding
 
-`GemCondition.rounding` / `GemRounding` specify a physical radius in millimeters,
-an angular tessellation step and a maximum removed-volume fraction. Zero radius
-is inactive. This is a uniform spherical opening of a convex faceted host:
-inset its half-spaces by the radius, then offset that inset solid outward by
-the same sphere. It generates planar face patches, cylindrical edge strips and
-spherical corner patches with shared indexed boundaries. The result removes
-material, retains original planar facet IDs and assigns negative IDs to curved
-patches. It uses the ordinary mesh/BVH dielectric transport, including actual
-surface normals, refraction and silhouette. No normal-map or image overlay is
-involved. Radius is not the width of a worn line; dihedral angles determine that
-width.
+`GemCondition.rounding` / `GemRounding` specify a physical radius in millimeters
+and a maximum removed-volume fraction. Zero radius is inactive. This is a uniform
+spherical opening of a convex faceted host: inset its half-spaces by the radius,
+then offset that inset solid outward by the same sphere. `GemRoundedSolid`
+produces continuous planar face patches, cylindrical junction bands and spherical
+corner patches. These enter the mixed primitive BVH directly, with actual normals,
+refraction and silhouettes. Dihedral angles determine each band's width.
 
-The encoded mesh is inscribed in the ideal rounded solid. Reports identify its
-volume reference, removed volume, triangle count and a conservative chord-sag
-bound (excluding floating-point construction error). Angular resolution matters
-for specular response even when positional error is subpixel. The compiler checks
-closed topology and the removed-volume limit; it rejects collapsed inset solids,
-unsupported non-faceted inputs and excessive corner tessellation. Cached geometry
-has a bounded triangle/entry budget and returned buffers cannot mutate the cache.
+The exact convex parallel-body volume formula supplies the retained-volume report
+for the encoded inset core. Collapsed cores and excessive removal are rejected.
+Floating-point support planes, clip tolerances and unresolved tiny volume changes
+remain explicit numerical limits. `GemRoundingReference` can build an inscribed
+triangle approximation for comparison and cap-volume estimates; its angular step
+is a tool parameter, not physical authoring or optical-host state.
 
 Rounding precedes authored cleavage and other defect boundaries. Both condition
 reports survive composition. It affects optical and primary-geometry cache keys
@@ -278,14 +273,14 @@ The distinction between rounded junctions, polish quality and intentional girdle
 rounding is discussed by [GIA](https://www.gia.edu/gia-news-research-colored-stone-cut-quality-what-to-look-for).
 Neither source supplies a calibrated wear law for this operator.
 
-The mesh operator is experimental and is not accepted for automatic grading.
+The optional mesh reference is not accepted as the production optical host.
 At256px/128spp, halving angular step from6 to3degrees changed opaque RGB by
 3.1–5.9LSB RMS for a120um radius and11.2–15.9LSB for600um in the diagnostic
 quartz views. These differences include sampling noise and are not a strict
 bias bound. Subpixel positional agreement does not establish specular convergence.
 Dense triangulation also incurs CPU construction/admission, BVH packing/upload
-and trace cost. Continuous analytic patches are a prospective production backend;
-the current mesh remains available as explicit geometry and reference evidence.
+and trace cost. Continuous analytic patches are the authored production representation;
+the mesh remains available as an explicitly selected comparison reference.
 
 ## Geometry setup reuse
 
@@ -319,7 +314,7 @@ with adaptive float32 accumulation grouping. Cold/warm regression scenes have
 exact primary-geometry agreement across scalar, Mueller and crystal transport.
 No physical estimator or tessellation-convergence claim changes with this cache.
 
-## Continuous rounding development reference
+## Continuous rounding representation
 
 `GemRoundedSolid.compile` constructs the same convex spherical opening as the
 mesh experiment, using retained float64 vertices and continuous clipped planes,
@@ -329,7 +324,7 @@ and integrated mean curvature. The offset volume is
 `V(K) + r*A(K) + r*r*H(K) + 4*pi*r*r*r/3`, where
 `H(K) = sum(edge_length * exterior_angle)/2`. Small removed-volume differences
 that are below the reporting threshold are explicitly marked unresolved.
-The angular tessellation step is not used by the analytic construction.
+There is no angular tessellation setting in the physical recipe.
 
 `GemAnalyticPatch.intersect` is a float64 CPU reference. A separate closest-feature
 query validates its surface against distance to the inset core. The quadratic
@@ -354,9 +349,17 @@ possible sizes, grazing conditions or semantic tie behavior.
 GemTracer now supports a mixed primitive hierarchy with continuous region-zero
 patches and nested triangle defects. Scalar, Mueller and crystal transport,
 primary AOVs, camera bounds and packed-geometry caching use the same boundaries.
-The stone compiler and authored asset jobs still select the mesh experiment.
-Authoring/condition compilation and image convergence/performance evaluation
-remain pending. Directly constructed continuous instances are development inputs.
+The stone compiler and authored asset jobs select these continuous boundaries.
+Cleavage and ordinary defect regions preserve the host representation. The chip
+placement helper samples its actual cylinder junction bands with a deterministic
+exposure heuristic; it does not select artificial tessellation edges.
+
+Cleavage support uses the continuous solid. Its cap-volume report uses a 12-degree
+reference mesh and adds the whole-solid discretization gap to the removal estimate
+when enforcing the requested limit. Optical paths never use this reference mesh.
+The report labels the estimate and gap; these are not certified floating-point
+interval bounds. Very small caps or tight budgets can be rejected, and cap volumes
+exclude other defects. No adaptive reference refinement is currently performed.
 Automatic grading remains disabled. Neither the continuous geometry nor the
 spherical-opening radius is a calibrated abrasion, polishing or hardness law.
 
@@ -364,7 +367,7 @@ The volume construction follows the convex special case of the polyhedral
 [Steiner formula](https://cseweb.ucsd.edu/~alchern/teaching/DDG.pdf), section 4.7,
 and its [parallel-body decomposition](https://courses.cms.caltech.edu/cs177/notes_fa11/GeoMeasure.pdf).
 
-At 256px/128spp, explicit 0.12mm and 0.6mm radii on a 4mm quartz cut used
+At 256px/128spp, explicit 0.12mm and 0.6mm radii on quartz at 4mm per stone unit used
 530 and 330 patches. Construction took 237/217ms, first packing 42/29ms and
 repeated packing 18/12ms. Trace times were 4.30/5.69s at 0.12mm and 8.22/9.89s
 at 0.6mm for two poses. The earlier 3-degree meshes took 27.9/46.5s to construct
@@ -376,7 +379,7 @@ Continuous versus 3-degree mesh opaque RGB RMS differences were 1.62/3.80 LSB
 at 0.12mm and 5.95/9.59 LSB at 0.6mm; sampling noise is included. Smooth curved
 highlights are visible, but those differences do not establish undetectable
 convergence, real specimen calibration or an automatic wear grade. Keep the
-rounding defaults inactive while improving bounds and completing authoring.
+rounding defaults inactive pending physical calibration and grading acceptance.
 
 Tighter clipped-patch bounds subsequently reduced the same 256px/128spp trace
 times to 3.56/4.69s (0.12mm) and 4.18/4.88s (0.6mm). Coverage was identical;

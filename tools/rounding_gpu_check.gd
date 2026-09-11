@@ -8,8 +8,8 @@ func check(value:bool,label:String)->void:
 func _initialize()->void:
 	var planes:=PackedFloat32Array()
 	for n:Vector3 in [Vector3.RIGHT,Vector3.LEFT,Vector3.UP,Vector3.DOWN,Vector3.BACK,Vector3.FORWARD]:planes.append_array(PackedFloat32Array([n.x,n.y,n.z,1,0,0,0,0]))
-	var recipe:=GemRounding.new();recipe.radius_mm=.2;recipe.angular_step_deg=6
-	var rounded:=GemRoundingCompiler.compile(planes,PackedInt32Array(),1,recipe)
+	var recipe:=GemRounding.new();recipe.radius_mm=.2
+	var rounded:=GemRoundingReference.compile(planes,PackedInt32Array(),1,recipe)
 	check(rounded.has("mesh"),"rounded cube compiles")
 	if not rounded.has("mesh"):quit(1);return
 	var stone:GemStone=load("res://data/lapidary/stones/quartz.tres")

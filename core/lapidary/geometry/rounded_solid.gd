@@ -3,7 +3,7 @@ extends RefCounted
 ## Continuous convex spherical opening: (P eroded by r) + radius-r ball.
 ## Authored planes enter as float32; retained support-triple vertices and curve
 ## parameters use float64. The arbitrary clipping seed frame is not retained.
-## Opt-in compiled renderer input; authored condition selection is still pending.
+## The authored rounding backend; no angular tessellation enters optical transport.
 const V := preload("res://core/lapidary/geometry/geometry64.gd")
 var core: GemConvexCore
 var patches: Array[GemAnalyticPatch] = []
@@ -12,6 +12,9 @@ var tolerance := 0.0
 var report: Dictionary = {}
 var error := ""
 var _seal := ""
+var _source_planes := PackedFloat32Array()
+var _source_ids := PackedInt32Array()
+var _volume_units := 0.0
 
 static func compile(planes: PackedFloat32Array, identities: PackedInt32Array, size_mm: float, recipe: GemRounding) -> GemRoundedSolid:
 	var solid:=GemRoundedSolid.new()
@@ -23,6 +26,7 @@ func _compile(planes: PackedFloat32Array, identities: PackedInt32Array, size_mm:
 		error="Invalid continuous rounding radius or physical size";return
 	if planes.size()<32 or planes.size()%8!=0 or planes.size()>4096:
 		error="Continuous rounding needs 4..512 complete support planes";return
+	_source_planes=planes.duplicate();_source_ids=identities.duplicate()
 	var normalized:=PackedFloat64Array();normalized.resize(planes.size())
 	for i in planes.size()/8:
 		var n:=V.vec(planes[i*8],planes[i*8+1],planes[i*8+2])
@@ -51,6 +55,7 @@ func _compile(planes: PackedFloat32Array, identities: PackedInt32Array, size_mm:
 		"core_edges":core.edges.size(),"core_faces":core.faces.size(),"construction_residual_mm":core.construction_residual*size_mm,
 		"clip_tolerance_mm":tolerance*size_mm}
 
+	_volume_units = retained
 	_seal = fingerprint()
 
 func validation_error() -> String:
@@ -59,11 +64,30 @@ func validation_error() -> String:
 	return ""
 
 func fingerprint() -> String:
-	var inputs: Array = ["continuous-patches-v1"]
+	var inputs: Array = ["continuous-patches-v2",radius,tolerance,_source_planes,_source_ids,_volume_units]
 	for patch in patches:
 		if patch == null: inputs.append(null); continue
 		inputs.append([patch.kind,patch.center,patch.axis,patch.end,patch.radius,patch.offset,patch.facet,patch.clips,patch.lower,patch.upper])
 	return GemContentIdentity.digest(inputs)
+
+
+func volume_units() -> float:
+	return _volume_units
+
+func support(normal: Vector3) -> float:
+	var direction:=V.vec(normal.x,normal.y,normal.z)
+	var maximum:=-INF
+	for patch in patches:
+		if patch.kind==GemAnalyticPatch.Kind.SPHERE:maximum=maxf(maximum,V.dot(direction,patch.center))
+	return maximum+radius*sqrt(V.dot(direction,direction))
+
+## A diagnostic inscribed-mesh estimate for clipped volume calculations only.
+## Returned triangles never replace the continuous optical host.
+func reference_mesh(angular_step_deg:=12.0) -> Dictionary:
+	var invalid:=validation_error()
+	if not invalid.is_empty():return {"error":invalid}
+	var recipe:=GemRounding.new();recipe.radius_mm=radius;recipe.max_removed_fraction=.999999999
+	return GemRoundingReference.compile(_source_planes,_source_ids,1.0,recipe,angular_step_deg)
 
 func _build_patches() -> void:
 	for face:Dictionary in core.faces:

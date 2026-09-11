@@ -45,7 +45,9 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 		var stone_key := job.stone.fingerprint()
 		if stone_key != compiled_key:
 			compiled = LapidaryStoneCompiler.compile(job.stone)
-			if compiled.get("planes", PackedFloat32Array()).is_empty() and not compiled.has("mesh") and not compiled.has("analytic_shape"):
+			if compiled.has("compilation_error"):
+				return _fail(compiled.compilation_error)
+			if compiled.get("planes", PackedFloat32Array()).is_empty() and not compiled.has("mesh") and not compiled.has("analytic_shape") and not compiled.has("rounded_solid"):
 				return _fail("Specimen compiler produced no closed host geometry")
 			compiled_key = stone_key
 	if tracer == null or tracer.width != job.resolution.x or tracer.height != job.resolution.y or (master == null and tracer._print_only):

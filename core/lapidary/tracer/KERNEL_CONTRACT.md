@@ -94,9 +94,10 @@ recompiling the recipe. Camera bounds include the continuous host.
 
 `GemTracer` accepts an explicit compiled `rounded_solid`, or a boundary set
 created with `add_rounded`. All three transport backends and geometry AOVs share
-this representation. StoneCompiler still selects the triangulated rounding
-experiment; continuous authored-job selection and condition compilation remain
-pending. No automatic grade or catalog specimen enables rounding.
+this representation. StoneCompiler selects continuous patches for positive
+authored rounding radii. Subsequent cleavage and defect regions retain this host;
+only cleavage cap-volume estimates use a labeled mesh reference. No automatic
+grade or catalog specimen enables rounding.
 
 `GemMesh` validates finite coordinates, exact triangle nondegeneracy, oriented
 edge incidence per region, connected vertex fans, and global triangle contacts

@@ -19,7 +19,7 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float,
 			var other_enabled := false
 			for descriptor in descriptors:
 				other_enabled = other_enabled or (descriptor != null and descriptor.enabled)
-			if optimize_cleavage and not other_enabled and not compiled.has("mesh") and not compiled.has("analytic_shape") and not compiled.planes.is_empty():
+			if optimize_cleavage and not other_enabled and not compiled.has("mesh") and not compiled.has("analytic_shape") and not compiled.has("rounded_solid") and not compiled.planes.is_empty():
 				_apply_convex_cleavage(compiled, event, size_mm)
 				return
 			descriptors.append(event.defect)
@@ -35,7 +35,10 @@ static func apply(compiled: Dictionary, condition: GemCondition, size_mm: float,
 		return
 	assert(enabled.size() < GemBoundarySet.MAX_REGIONS, "Too many resolved material regions; use effective media for subpixel populations")
 	var boundaries := GemBoundarySet.new()
-	if compiled.has("analytic_shape"):
+	if compiled.has("rounded_solid"):
+		var added := boundaries.add_rounded(compiled.rounded_solid,0)
+		assert(added,"Invalid continuous host")
+	elif compiled.has("analytic_shape"):
 		var added := boundaries.add_cabochon(compiled["analytic_shape"], 0)
 		assert(added, "Invalid analytic host")
 	else:
@@ -113,6 +116,8 @@ static func sample(seed_value: int, dimension: int) -> float:
 ## intentionally absent: chipping depends on impact/toughness and cleavage,
 ## not the Mohs scratch scale. Species-specific fracture recipes follow later.
 static func edge_chip(compiled: Dictionary, size_mm: float, seed_value: int, radius_mm: float, depth_mm: float) -> GemDefect:
+	if compiled.has("rounded_solid"):
+		return _rounded_edge_chip(compiled.rounded_solid,size_mm,seed_value,radius_mm,depth_mm)
 	var mesh: GemMesh = compiled.get("mesh", null)
 	if mesh == null:
 		mesh = GemShapeCompiler.from_hull(compiled["planes"])
@@ -153,6 +158,9 @@ static func edge_chip(compiled: Dictionary, size_mm: float, seed_value: int, rad
 	var position := mesh.vertices[edge.x].lerp(mesh.vertices[edge.y], 0.2 + sample(seed_value, 2) * 0.6)
 	var normal: Vector3 = selected["normal"]
 	var along := (mesh.vertices[edge.y] - mesh.vertices[edge.x]).normalized()
+	return _chip_at(position,along,normal,size_mm,seed_value,radius_mm,depth_mm)
+
+static func _chip_at(position:Vector3,along:Vector3,normal:Vector3,size_mm:float,seed_value:int,radius_mm:float,depth_mm:float)->GemDefect:
 	var defect := GemDefect.new()
 	defect.kind = "chip"
 	defect.seed = seed_value
@@ -160,6 +168,33 @@ static func edge_chip(compiled: Dictionary, size_mm: float, seed_value: int, rad
 	defect.center_mm = position * size_mm + normal * depth_mm * 0.15
 	defect.orientation = Basis(along, normal.cross(along).normalized(), normal).orthonormalized().get_rotation_quaternion()
 	return defect
+
+## Choose actual cylindrical junction bands; tessellation edges are not physical
+## impact sites. The exposure weighting remains a procedural placement heuristic.
+static func _rounded_edge_chip(solid:GemRoundedSolid,size_mm:float,seed_value:int,radius_mm:float,depth_mm:float)->GemDefect:
+	if not solid.validation_error().is_empty():return null
+	var candidates:=[];var total:=0.0
+	for patch in solid.patches:
+		if patch.kind!=GemAnalyticPatch.Kind.CYLINDER:continue
+		var a:=Vector3(patch.center[0],patch.center[1],patch.center[2])
+		var b:=Vector3(patch.end[0],patch.end[1],patch.end[2])
+		var c:=Vector3(patch.clips[2][0],patch.clips[2][1],patch.clips[2][2])
+		var d:=Vector3(patch.clips[3][0],patch.clips[3][1],patch.clips[3][2])
+		var normal:=-(c+d)
+		if normal.length_squared()<1e-16 or a.distance_squared_to(b)<1e-16:continue
+		normal=normal.normalized()
+		var weight:=a.distance_to(b)*maxf(0,1+c.dot(d))/(.1+absf((a.z+b.z)*.5))
+		if weight<=0:continue
+		total+=weight
+		candidates.append({"a":a,"b":b,"normal":normal,"end":total})
+	if candidates.is_empty():return null
+	var target:=sample(seed_value,1)*total
+	var chosen:Dictionary=candidates[-1]
+	for candidate in candidates:
+		if target<=candidate.end:chosen=candidate;break
+	var position:Vector3=chosen.a.lerp(chosen.b,.2+sample(seed_value,2)*.6)+chosen.normal*solid.radius
+	var along:Vector3=(chosen.b-chosen.a).normalized()
+	return _chip_at(position,along,chosen.normal,size_mm,seed_value,radius_mm,depth_mm)
 
 ## Intersecting a convex body with one retained cleavage half-space remains
 ## convex. Keep the exact facet program and give the new face its own finish

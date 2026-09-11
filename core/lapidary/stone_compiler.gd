@@ -47,6 +47,8 @@ static func compile(stone: GemStone, optimize_cleavage := true) -> Dictionary:
 		compiled["compilation_error"]=geometry.compilation_error
 		return compiled
 	if geometry.has("condition_report"):compiled["condition_report"]=geometry.condition_report
+	if geometry.has("rounded_solid"):
+		compiled["rounded_solid"] = geometry.rounded_solid
 	if geometry.has("mesh"):
 		compiled["mesh"] = geometry["mesh"]
 	if geometry.has("analytic_shape"):
@@ -84,8 +86,8 @@ static func compile_geometry(stone: GemStone) -> Dictionary:
 		tolerances = stone.condition.workmanship.normalized_tolerances(stone.size_mm)
 	var geometry:Dictionary=compiler.call("compile", stone.cut, stone.shape, stone.seed, tolerances)
 	if rounding!=null and rounding.radius_mm>0:
-		var result:=GemRoundingCompiler.compile(geometry.planes,geometry.get("facet_ids",PackedInt32Array()),stone.size_mm,rounding)
+		var result:=GemRoundedSolid.compile(geometry.planes,geometry.get("facet_ids",PackedInt32Array()),stone.size_mm,rounding)
 		if not result.error.is_empty():return {"planes":PackedFloat32Array(),"compilation_error":result.error}
-		geometry["planes"]=PackedFloat32Array();geometry["mesh"]=result.mesh
+		geometry["planes"]=PackedFloat32Array();geometry["rounded_solid"]=result
 		geometry["condition_report"]={"rounding":result.report}
 	return geometry

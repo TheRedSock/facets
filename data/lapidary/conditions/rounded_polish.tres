@@ -6,7 +6,6 @@
 [sub_resource type="Resource" id="junctions"]
 script = ExtResource("rounding")
 radius_mm = 0.03
-angular_step_deg = 6.0
 max_removed_fraction = 0.25
 
 [resource]

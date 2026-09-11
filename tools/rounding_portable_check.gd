@@ -2,7 +2,6 @@ extends SceneTree
 func _initialize()->void:
 	var stone:GemStone=load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	stone.condition=load("res://data/lapidary/conditions/rounded_polish.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
-	stone.condition.rounding.angular_step_deg=12
 	var job:=GemFramePlan.animation(stone,load("res://data/lapidary/clips/idle.tres"),load("res://data/lapidary/rigs/gameplay_studio.tres"),GemPrint.load_house(),GemRung.INTERACT)[0]
 	job.resolution=Vector2i(32,32);job.output_size=Vector2i(24,24);job.samples=8
 	var jobs:Array[GemFrameJob]=[]
@@ -28,7 +27,7 @@ func _initialize()->void:
 	var most_hits:=0;var most_reuses:=0
 	for frame in jobs:
 		var master:=store.read(GemFramePlan.master_key(frame));var geometry:=store.read(GemGeometryPlan.key(frame,2))
-		if master.is_empty() or geometry.is_empty() or master.metadata.get("condition_report",{}).get("rounding",{}).get("removed_mm3",0)<=0:
+		if master.is_empty() or geometry.is_empty() or master.metadata.get("condition_report",{}).get("rounding",{}).get("removed_mm3",0)<=0 or master.metadata.get("condition_report",{}).get("rounding",{}).get("volume_reference","")!="convex_Steiner_formula":
 			printerr("FAIL: rounding physical outputs/report");quit(1);return
 		var stats:Dictionary=master.metadata.get("profile",{}).get("geometry_cache",{})
 		if stats.get("builds",0)!=1 or stats.get("buffer_uploads",0)!=2:

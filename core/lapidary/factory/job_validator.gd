@@ -124,12 +124,14 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 		return "; ".join(condition.workmanship.validate())
 	if condition.finish != null and not condition.finish.validate().is_empty():
 		return "; ".join(condition.finish.validate())
+	var geometry:Dictionary={}
 	if condition.rounding!=null and condition.rounding.radius_mm>0:
-		var rounded:=LapidaryStoneCompiler.compile_geometry(stone)
-		if rounded.has("compilation_error"):return rounded.compilation_error
+		geometry=LapidaryStoneCompiler.compile_geometry(stone)
+		if geometry.has("compilation_error"):return geometry.compilation_error
 	var descriptors: Array[GemDefect] = condition.defects.duplicate()
 	if condition.cleavage != null:
-		var event := GemCleavageCompiler.realize(LapidaryStoneCompiler.compile_geometry(stone),stone.shape,stone.size_mm,condition.cleavage,stone.crystal_to_stone)
+		if geometry.is_empty():geometry=LapidaryStoneCompiler.compile_geometry(stone)
+		var event := GemCleavageCompiler.realize(geometry,stone.shape,stone.size_mm,condition.cleavage,stone.crystal_to_stone)
 		if not event.error.is_empty():
 			return event.error
 		if event.has("defect"):
@@ -166,8 +168,8 @@ static func _stone(stone: GemStone, polarized: bool) -> String:
 			return "defect geometry invalid at the requested physical scale: %s" % mesh.validate()
 		combined.append_region(mesh, count)
 	if count > 0:
-		var geometry := LapidaryStoneCompiler.compile_geometry(stone)
-		if not geometry.has("analytic_shape"):
+		if geometry.is_empty():geometry=LapidaryStoneCompiler.compile_geometry(stone)
+		if not geometry.has("analytic_shape") and not geometry.has("rounded_solid"):
 			var host: GemMesh = geometry.get("mesh", null)
 			if host == null:
 				host = GemShapeCompiler.from_hull(geometry.planes, geometry.get("facet_ids", PackedInt32Array()))

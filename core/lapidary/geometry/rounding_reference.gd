@@ -1,5 +1,6 @@
-class_name GemRoundingCompiler
+class_name GemRoundingReference
 extends RefCounted
+## Tessellated comparison/volume reference, not the optical authoring backend.
 ## Convex spherical opening: planar faces, cylindrical edge strips, spherical
 ## vertex patches. Shared patch boundaries use the same indexed vertices.
 ## The mesh is inscribed in the ideal rounded solid; no shading-normal trick.
@@ -18,11 +19,11 @@ var step:=0.0
 var max_sag:=0.0
 var error:=""
 
-static func compile(planes:PackedFloat32Array,identities:PackedInt32Array,size_mm:float,recipe:GemRounding)->Dictionary:
-	var key:=GemContentIdentity.digest([planes,identities,size_mm,recipe])
+static func compile(planes:PackedFloat32Array,identities:PackedInt32Array,size_mm:float,recipe:GemRounding, angular_step_deg:=6.0)->Dictionary:
+	var key:=GemContentIdentity.digest([planes,identities,size_mm,recipe,angular_step_deg])
 	if _cache.has(key):return _copy(_cache[key])
-	var worker:=GemRoundingCompiler.new()
-	var result:=worker._compile(planes,identities,size_mm,recipe)
+	var worker:=GemRoundingReference.new()
+	var result:=worker._compile(planes,identities,size_mm,recipe,angular_step_deg)
 	if result.has("mesh"):
 		while not _cache.is_empty() and (_cache.size()>=16 or _cached_triangles+result.mesh.triangle_count()>MAX_TRIANGLES):
 			var oldest:String=_cache.keys()[0]
@@ -40,8 +41,9 @@ static func _copy(result:Dictionary)->Dictionary:
 	copy.mesh=target
 	return copy
 
-func _compile(planes:PackedFloat32Array,identities:PackedInt32Array,size_mm:float,recipe:GemRounding)->Dictionary:
+func _compile(planes:PackedFloat32Array,identities:PackedInt32Array,size_mm:float,recipe:GemRounding, angular_step_deg:=6.0)->Dictionary:
 	if recipe==null or not recipe.validate().is_empty() or not is_finite(size_mm) or size_mm<=0:return {"error":"Invalid rounding recipe or physical size"}
+	if not is_finite(angular_step_deg) or angular_step_deg<1 or angular_step_deg>20:return {"error":"Reference tessellation requires 1..20 degrees"}
 	if recipe.radius_mm<=0:return {"error":"Rounding requires a positive radius"}
 	if planes.size()<32 or planes.size()%8!=0:return {"error":"Rounding requires complete convex planes"}
 	for i in planes.size()/8:
@@ -49,7 +51,7 @@ func _compile(planes:PackedFloat32Array,identities:PackedInt32Array,size_mm:floa
 		if not n.is_finite() or n.length_squared()<1e-12 or not is_finite(planes[i*8+3]):return {"error":"Invalid rounding support plane"}
 	var original:=GemShapeCompiler.from_hull(planes,identities)
 	if not original.validate().is_empty():return {"error":"Rounding requires a valid convex host"}
-	radius=recipe.radius_mm/size_mm;step=deg_to_rad(recipe.angular_step_deg)
+	radius=recipe.radius_mm/size_mm;step=deg_to_rad(angular_step_deg)
 	var inset:=planes.duplicate()
 	for i in planes.size()/8:
 		var n:=Vector3(planes[i*8],planes[i*8+1],planes[i*8+2])
@@ -135,7 +137,7 @@ func _compile(planes:PackedFloat32Array,identities:PackedInt32Array,size_mm:floa
 	var before:=original.signed_volume()*pow(size_mm,3)
 	var after:=mesh.signed_volume()*pow(size_mm,3)
 	if after<=0 or after>before*(1+1e-6) or (before-after)/before>recipe.max_removed_fraction:return {"error":"Rounding exceeds the allowed removed volume"}
-	return {"error":"","mesh":mesh,"report":{"model":"convex_spherical_opening","volume_reference":"inscribed_triangle_mesh","before_other_defects":true,"radius_mm":recipe.radius_mm,"original_mm3":before,"retained_mm3":after,"removed_mm3":before-after,"triangles":mesh.triangle_count(),"angular_step_deg":recipe.angular_step_deg,"chord_sag_bound_mm":max_sag*size_mm}}
+	return {"error":"","mesh":mesh,"report":{"model":"convex_spherical_opening","volume_reference":"inscribed_triangle_mesh","before_other_defects":true,"radius_mm":recipe.radius_mm,"original_mm3":before,"retained_mm3":after,"removed_mm3":before-after,"triangles":mesh.triangle_count(),"angular_step_deg":angular_step_deg,"chord_sag_bound_mm":max_sag*size_mm}}
 
 func _corner_ring(vertex:int)->PackedInt32Array:
 	var adjacent:={}

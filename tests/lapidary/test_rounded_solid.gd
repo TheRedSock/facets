@@ -71,7 +71,7 @@ func _initialize()->void:
 				worst_support=maxf(worst_support,V.dot(hit.normal,V.subtract(vertex,core_point)))
 		check(missing==0 and worst_surface<1e-10,"all-outline hits agree with independent closest-feature distance")
 		check(worst_support<1e-10,"surface normal supports the convex offset body")
-		var mesh_reference:=GemRoundingCompiler.compile(geometry.planes,geometry.facet_ids,stone.size_mm,recipe)
+		var mesh_reference:=GemRoundingReference.compile(geometry.planes,geometry.facet_ids,stone.size_mm,recipe)
 		check(mesh_reference.error.is_empty(),"mesh comparison compiles")
 		if mesh_reference.has("mesh"):
 			var worst_deviation:=0.0

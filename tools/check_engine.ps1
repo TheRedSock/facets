@@ -46,6 +46,7 @@ if ($Gpu) {
 	$stages += @{ Name = 'convex_surface_check'; Args = @('--quit-after', '600', '--script', 'res://tools/convex_surface_check.gd') }
 	$stages += @{ Name = 'cleavage_backend_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_backend_check.gd') }
 	$stages += @{ Name = 'cleavage_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_gpu_check.gd') }
+	$stages += @{ Name = 'rounded_cleavage_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_gpu_check.gd', '--', '--rounded') }
 	$stages += @{ Name = 'cleavage_portable_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/cleavage_portable_check.gd') }
 	$stages += @{ Name = 'finish_fields_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/finish_fields_gpu_check.gd') }
 	$stages += @{ Name = 'finish_fields_render_check'; Args = @('--quit-after', '600', '--script', 'res://tools/finish_fields_render_check.gd') }

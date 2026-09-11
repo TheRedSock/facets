@@ -13,6 +13,11 @@ static func realize(geometry: Dictionary, shape: GemShape, size_mm: float, recip
 		return {"error":"", "report":{"host_cap_mm3":0.0,"host_cap_fraction":0.0}}
 	var mesh: GemMesh = geometry.get("mesh", null)
 	var analytic: bool = geometry.has("analytic_shape")
+	var continuous: GemRoundedSolid = geometry.get("rounded_solid",null)
+	if continuous != null:
+		var reference := continuous.reference_mesh()
+		if not reference.error.is_empty():return {"error":"Cleavage volume reference: "+reference.error}
+		mesh = reference.mesh
 	if mesh == null:
 		mesh = GemShapeCompiler.compile(shape) if analytic else GemShapeCompiler.from_hull(geometry.planes, geometry.get("facet_ids",PackedInt32Array()))
 	if not mesh.validate().is_empty():
@@ -29,15 +34,24 @@ static func realize(geometry: Dictionary, shape: GemShape, size_mm: float, recip
 		var radial := sqrt(pow(float(n.x)*q.x,2)+pow(float(n.y)*q.y,2))
 		var dome := sqrt(radial*radial+pow(float(n.z)*q.z,2)) if n.z >= 0 else radial
 		support = maxf(dome,radial+float(n.z)*q.w)
+	if continuous != null:
+		support = continuous.support(n)
+		for patch in continuous.patches:
+			var squared:=0.0
+			for k in 3:squared+=pow(maxf(absf(patch.lower[k]),absf(patch.upper[k])),2)
+			radius=maxf(radius,sqrt(squared))
 	var d := support-recipe.depth_mm/size_mm
-	var volume := mesh.signed_volume()
-	var retained := retained_volume(mesh,n,d)
-	var removed := volume-retained
+	var reference_volume := mesh.signed_volume()
+	var reference_retained := retained_volume(mesh,n,d)
+	var removed := reference_volume-reference_retained
+	var volume := continuous.volume_units() if continuous != null else reference_volume
+	var retained := volume-removed
+	var discretization_gap := maxf(0,volume-reference_volume)
 	if not is_finite(retained) or volume <= 0 or removed <= 0 or retained <= 0:
 		return {"error":"Cleavage must remove a positive cap and retain a solid host"}
 	var fraction := removed/volume
-	if fraction > recipe.max_removed_fraction:
-		return {"error":"Cleavage removes %.6f of the reference volume, above the authored limit %.6f" % [fraction,recipe.max_removed_fraction]}
+	if (removed+discretization_gap)/volume > recipe.max_removed_fraction:
+		return {"error":"Cleavage removal estimate plus discretization allowance %.6f exceeds limit %.6f" % [(removed+discretization_gap)/volume,recipe.max_removed_fraction]}
 	var along := n.cross(Vector3.RIGHT if absf(n.x)<0.8 else Vector3.UP).normalized()
 	var across := n.cross(along).normalized()
 	# The first local-z face is the cleavage plane; every other cutter face lies
@@ -53,7 +67,8 @@ static func realize(geometry: Dictionary, shape: GemShape, size_mm: float, recip
 	defect.source_note = recipe.source_note
 	return {"error":"", "defect":defect,"report":{"normal_index":index,"normal_stone":[n.x,n.y,n.z],"plane_offset_mm":d*size_mm,
 		"requested_depth_mm":recipe.depth_mm,"original_mm3":volume*pow(size_mm,3),"retained_mm3":retained*pow(size_mm,3),
-		"host_cap_mm3":removed*pow(size_mm,3),"host_cap_fraction":fraction,"volume_reference":"tessellated_analytic_host" if analytic else "encoded_host_mesh",
+		"host_cap_mm3":removed*pow(size_mm,3),"host_cap_fraction":fraction,"volume_reference":"tessellated_continuous_host" if continuous != null else ("tessellated_analytic_host" if analytic else "encoded_host_mesh"),
+		"volume_discretization_gap_mm3":discretization_gap*pow(size_mm,3),"limit_includes_discretization_gap":continuous!=null,
 		"volume_excludes_other_defects":true,
 		"reference_triangles":mesh.triangle_count(),"source_note":recipe.source_note}}
 

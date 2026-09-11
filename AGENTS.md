@@ -450,13 +450,17 @@ Spatial composition fields use64B binding7 records with exact int32 spectrum/pro
 
 
 Explicit junction rounding uses `GemCondition.rounding` / `GemRounding` and
-`core/lapidary/geometry/rounding_compiler.gd`. A convex spherical opening in mm
-produces shared planar/cylindrical/spherical patch geometry, triangulated for the
-ordinary mesh transport. It runs before cleavage/defects, preserves both reports,
+`core/lapidary/geometry/rounded_solid.gd`. A convex spherical opening in mm
+produces continuous planar/cylindrical/spherical patches for mixed-primitive
+transport. It runs before cleavage/defects, preserves both reports,
 and participates in optical/geometry/portable identities. Default radius is zero;
 the authored rounded-polish example is not applied to catalog grades. Radius is
 not a hardness/time wear law or a substitute for abrasion pits and roughness.
-See the factory contract for tessellation, removed-volume and performance limits.
+See the factory contract for removed-volume, numerical and performance limits.
+`GemRoundingReference` is an explicitly tessellated comparison/volume helper; its
+angular step is not part of the physical recipe. Rounded chips use actual cylinder
+junction bands. Cleavage retains the continuous optical host and identifies its
+reference-mesh cap-volume estimate and discretization allowance.
 
 ### Reusable geometry setup
 `GemPackedGeometryCache` retains canonical packed BVHs per tracer, with a 64 MiB
@@ -469,20 +473,20 @@ their final packed bytes match. Release clears CPU retention and GPU resources.
 budgets, mixed batches and all transport backends. See the factory contract for
 benchmark scope and temporary-memory limits.
 
-### Continuous rounding reference
+### Continuous rounding
 `GemRoundedSolid`, `GemConvexCore` and `GemAnalyticPatch` construct a convex
 spherical opening as continuous planar, cylindrical and spherical patches.
 Retained geometry uses float64; `GemGeometry64` avoids Vector3 arithmetic loss.
 The volume report uses the convex Steiner formula, independent of tessellation.
 GemTracer accepts these patches in a mixed primitive BVH, including nested
 triangle defects, scalar/Mueller/crystal transport and primary geometry AOVs.
-StoneCompiler still selects the experimental triangulated rounding path. No
-automatic grade, catalog specimen or authored asset job enables continuous
-rounding yet. See kernel contract v21 for packing and numerical limits.
+StoneCompiler selects this representation for positive authored rounding radii,
+including portable optical/geometry jobs and subsequent cleavage/defect regions.
+No automatic grade or catalog specimen enables rounding. See kernel contract v21 for packing and numerical limits.
 `test_rounded_solid.gd` covers independent distance/volume/ray checks;
 `analytic_patch_gpu_check.gd -- --stress` covers packed GPU camera, seam and
 secondary rays in both arithmetic precisions. See the factory contract for
-remaining integration and numerical limits; passing these probes is not optical
+remaining numerical limits; passing these probes is not optical
 image or grading acceptance.
 
 `GemPrimitiveBvh` and `GemPackedGeometryCache` pack and retain continuous patches

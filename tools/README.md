@@ -241,7 +241,7 @@ An existing maintenance lock is not recovered automatically. See the factory
 contract for filesystem assumptions and partial-recovery behavior.
 
 
-Convex junction rounding: `GemCondition.rounding` produces a closed mesh with
+Convex junction rounding: `GemCondition.rounding` produces continuous patches with
 physical material removal before subsequent cleavage/defects. Use the explicit
 `data/lapidary/conditions/rounded_polish.tres` example or author radius in mm.
 `test_rounding.gd` checks topology, analytic cube volume, all faceted outlines,
@@ -252,10 +252,12 @@ isolated worker and verifies its physical report and cached geometry. All three
 are registered in the check runner.
 
 `rounding_lookdev.gd` renders sharp/30um/120um quartz at two poses. Add `--macro`
-for sharp/120um/600um, or `--macro --fine` to halve the angular tessellation step.
+for sharp/120um/600um. `--mesh-reference` explicitly selects the triangle
+comparison; add `--fine` to halve that reference angular step. `--conditions`
+compares sharp, rounded, rounded chip and diagnostic plane separation at two poses.
 Generated comparisons remain under ignored `artifacts/rounding/`. This is an
-explicit geometry model, not a universal abrasion or grade simulator; mesh cost
-and specular convergence must be considered before using it in a large catalog.
+explicit geometry model, not a universal abrasion or grade simulator; performance
+and physical calibration must be considered before using it in a large catalog.
 
 Geometry setup reuse: `test_packed_geometry_cache.gd` checks byte-exact canonical
 packing/relocation, mutation invalidation and bounded LRU retention.
@@ -283,12 +285,14 @@ Continuous rounding development checks:
 - `continuous_transport_check.gd` covers mixed analytic/triangle batches, nested
   air and filled regions, cache relocation, AOVs, and scalar/Mueller/crystal
   furnace checks, including real uniaxial quartz.
-- `rounding_lookdev.gd -- --macro --continuous` renders the same explicit radii
-  using continuous boundaries for comparison with the tessellated experiment.
+- `rounding_lookdev.gd -- --macro` uses authored continuous boundaries.
+- `cleavage_gpu_check.gd -- --rounded` checks combined conditions across all three
+  optical solvers, primary geometry, interrupted-job resume and print reuse; it
+  is included in `check_engine.ps1 -Gpu`.
 
 These checks establish renderer admission evidence, not finished grading or
-reflection convergence. StoneCompiler still selects mesh rounding; continuous
-condition authoring remains pending. Keep rounding defaults inactive.
+physical wear calibration. StoneCompiler and portable jobs use continuous
+rounding; automatic grading and catalog defaults remain inactive.
 
 `compare_rounding.gd -- BEFORE_DIR AFTER_DIR OUTPUT_JSON` compares matching
 lookdev frames, records print-space errors and source timing reports, and states
