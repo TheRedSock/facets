@@ -71,8 +71,26 @@ must not be treated as measured fluorite data.
 Cut design uses explicit template proportions and `GemCondition.workmanship`
 angular/millimeter tolerances. Run windowed `tools/optimize_cut.gd -- --stone=quartz`
 (or `--quick`) for a bounded pavilion/table/crown search. It writes exact candidate
-resources, training and held-out metrics, and comparison images under artifacts/.
-The brightness objective is not a cut grade; no candidate is promoted automatically.
+resources, training and held-out metrics, and comparison images under
+`artifacts/cut-search/<stone>/multi/`. `GemCutPreference` declares return weights,
+relative-dark-area constraints, a contrast target and motion weight. Measurements
+use associated linear XYZ before print: coverage-normalized mean return,
+worst-view return, opaque-pixel luminance CV and darkness relative to that view's
+mean. Primary facet IDs match mean facet returns across a 2.5-degree motion;
+small/occluded facets are excluded and matched coverage is reported. A stationary
+second seed exposes noise. Subtracting this from motion is a conservative utility
+term, not an unbiased scintillation estimator. Soft observer masks are included
+in half the scenarios. Relative darkness is **not** measured leakage.
+
+The tool screens nondominated alternatives, confirms three at higher resolution
+and samples, includes the authored baseline, repeats confirmation with independent
+seeds, and evaluates held-out lighting/views without selecting on them. A changed
+leader is reported explicitly; two seed pairs are not a confidence interval.
+Preferences are illustrative engineering choices, not a gemological cut grade.
+Fire, rough-stock yield and calibrated observer judgments remain unmeasured; no
+candidate is promoted automatically. CPU `test_cut_metrics.gd` and windowed
+`cut_study_gpu_check.gd` cover formulas, eligibility, furnace invariance across
+all three transport modes, correspondence and failed-study rejection.
 
 Explicit fractures use `GemFractureProfile`: a correlated aperture and shared
 rough mid-surface, clipped into closed material regions. Wall closure creates

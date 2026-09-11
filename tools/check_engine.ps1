@@ -24,6 +24,7 @@ $stages += @{ Name = 'test_absorption_mixtures'; Args = @('--headless', '--quit-
 $stages += @{ Name = 'test_spatial_composition'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_spatial_composition.gd') }
 $stages += @{ Name = 'test_work_claims'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_work_claims.gd') }
 $stages += @{ Name = 'test_polygon'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_polygon.gd') }
+$stages += @{ Name = 'test_cut_metrics'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_cut_metrics.gd') }
 $stages += @{ Name = 'test_rounding'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_rounding.gd') }
 $stages += @{ Name = 'test_packed_geometry_cache'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_packed_geometry_cache.gd') }
 $stages += @{ Name = 'test_patch_bounds'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_patch_bounds.gd') }
@@ -33,6 +34,7 @@ if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'cut_study_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cut_study_gpu_check.gd') }
 	$stages += @{ Name = 'polygon_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/polygon_gpu_check.gd') }
 	$stages += @{ Name = 'continuous_transport_check'; Args = @('--quit-after', '600', '--script', 'res://tools/continuous_transport_check.gd') }
 	$stages += @{ Name = 'analytic_bvh_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/analytic_patch_gpu_check.gd', '--', '--stress', '--bvh') }
