@@ -474,11 +474,21 @@ benchmark scope and temporary-memory limits.
 spherical opening as continuous planar, cylindrical and spherical patches.
 Retained geometry uses float64; `GemGeometry64` avoids Vector3 arithmetic loss.
 The volume report uses the convex Steiner formula, independent of tessellation.
-This is a development reference and GPU admission experiment: StoneCompiler and
-GemTracer still use the experimental triangulated rounding path. No automatic
-grade, catalog specimen or asset job enables the continuous backend yet.
+GemTracer accepts these patches in a mixed primitive BVH, including nested
+triangle defects, scalar/Mueller/crystal transport and primary geometry AOVs.
+StoneCompiler still selects the experimental triangulated rounding path. No
+automatic grade, catalog specimen or authored asset job enables continuous
+rounding yet. See kernel contract v21 for packing and numerical limits.
 `test_rounded_solid.gd` covers independent distance/volume/ray checks;
 `analytic_patch_gpu_check.gd -- --stress` covers packed GPU camera, seam and
 secondary rays in both arithmetic precisions. See the factory contract for
 remaining integration and numerical limits; passing these probes is not optical
 image or grading acceptance.
+
+`GemPrimitiveBvh` and `GemPackedGeometryCache` pack and retain continuous patches
+plus nested defect triangles. `GemBoundarySet.add_rounded` establishes region 0.
+Compiled patches reject mutation after construction; rebuild from the recipe.
+`test_primitive_bvh.gd`, `analytic_patch_gpu_check.gd -- --stress --bvh` and
+`continuous_transport_check.gd` cover numerical bounds, cache isolation, mixed
+batches, nested materials and all three optical backends. These checks do not
+establish image convergence or a physical wear calibration.

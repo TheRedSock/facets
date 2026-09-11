@@ -3,7 +3,7 @@ extends RefCounted
 ## Continuous convex spherical opening: (P eroded by r) + radius-r ball.
 ## Authored planes enter as float32; retained support-triple vertices and curve
 ## parameters use float64. The arbitrary clipping seed frame is not retained.
-## Geometry reference only until GPU packing/intersection admission is supplied.
+## Opt-in compiled renderer input; authored condition selection is still pending.
 const V := preload("res://core/lapidary/geometry/geometry64.gd")
 var core: GemConvexCore
 var patches: Array[GemAnalyticPatch] = []
@@ -11,6 +11,7 @@ var radius := 0.0
 var tolerance := 0.0
 var report: Dictionary = {}
 var error := ""
+var _seal := ""
 
 static func compile(planes: PackedFloat32Array, identities: PackedInt32Array, size_mm: float, recipe: GemRounding) -> GemRoundedSolid:
 	var solid:=GemRoundedSolid.new()
@@ -49,6 +50,20 @@ func _compile(planes: PackedFloat32Array, identities: PackedInt32Array, size_mm:
 		"volume_difference_resolved":absf(removed)>original.volume*1e-12,"patches":patches.size(),"core_vertices":core.vertices.size(),
 		"core_edges":core.edges.size(),"core_faces":core.faces.size(),"construction_residual_mm":core.construction_residual*size_mm,
 		"clip_tolerance_mm":tolerance*size_mm}
+
+	_seal = fingerprint()
+
+func validation_error() -> String:
+	if not error.is_empty(): return error
+	if _seal.is_empty() or _seal != fingerprint(): return "Continuous host was modified after construction; recompile its recipe"
+	return ""
+
+func fingerprint() -> String:
+	var inputs: Array = ["continuous-patches-v1"]
+	for patch in patches:
+		if patch == null: inputs.append(null); continue
+		inputs.append([patch.kind,patch.center,patch.axis,patch.end,patch.radius,patch.offset,patch.facet,patch.clips,patch.lower,patch.upper])
+	return GemContentIdentity.digest(inputs)
 
 func _build_patches() -> void:
 	for face:Dictionary in core.faces:

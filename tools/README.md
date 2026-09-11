@@ -278,6 +278,18 @@ Continuous rounding development checks:
   in float32 and float64. `check_engine.ps1 -Gpu` includes the stress option.
   Reports remain ignored under `artifacts/rounded-solid/`.
 
-The continuous patches are not yet connected to production optical transport;
-these checks establish geometric admission evidence, not finished grading or
-rendered reflection convergence. Keep the existing rounding defaults inactive.
+- Add `--bvh` to the analytic patch probe to check the accelerated representation
+  against the same reference rays. Reports include primitive-test counts.
+- `continuous_transport_check.gd` covers mixed analytic/triangle batches, nested
+  air and filled regions, cache relocation, AOVs, and scalar/Mueller/crystal
+  furnace checks, including real uniaxial quartz.
+- `rounding_lookdev.gd -- --macro --continuous` renders the same explicit radii
+  using continuous boundaries for comparison with the tessellated experiment.
+
+These checks establish renderer admission evidence, not finished grading or
+reflection convergence. StoneCompiler still selects mesh rounding; continuous
+condition authoring remains pending. Keep rounding defaults inactive.
+
+`compare_rounding.gd -- BEFORE_DIR AFTER_DIR OUTPUT_JSON` compares matching
+lookdev frames, records print-space errors and source timing reports, and states
+that sampling noise is included. Comparison outputs stay in ignored artifacts.

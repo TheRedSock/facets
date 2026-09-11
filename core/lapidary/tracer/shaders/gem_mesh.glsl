@@ -1,8 +1,12 @@
-// Procedural triangle backend. Node and triangle layouts match GemBvh.
+// Boundary primitive backend: triangles and clipped continuous patches.
+// The 64B record is shared by GemBvh and GemPrimitiveBvh; see kernel v21.
 struct GemTriangle { vec4 a; vec4 b; vec4 c; ivec4 meta; };
 struct GemNode { vec4 low; vec4 high; ivec4 links; };
 layout(set = 0, binding = 11, std430) readonly buffer Triangles { GemTriangle triangles[]; };
 layout(set = 0, binding = 12, std430) readonly buffer Nodes { GemNode nodes[]; };
+
+#include "gem_analytic_patch.glsl"
+vec4 analytic_clip(int index) { return planes[index].n_d; }
 
 bool mesh_box(GemNode node, vec3 origin, vec3 direction, float closest) {
 	float lo = T_EPS, hi = closest;
@@ -51,7 +55,13 @@ bool mesh_hit(int root, vec3 origin, vec3 direction, out float closest, out int 
 		} else {
 			for (int i = 0; i < node.links.w; i++) {
 				int index = node.links.z + i;
-				float distance = mesh_triangle(triangles[index], origin, direction);
+				GemTriangle primitive = triangles[index];
+				float distance = INF;
+				if (primitive.meta.y == 0) { distance = mesh_triangle(primitive, origin, direction); }
+				else {
+					vec3 normal; float candidate;
+					if (analytic_patch_hit(GemAnalyticPrimitive(primitive.a,primitive.b,primitive.c,primitive.meta),origin,direction,T_EPS,closest,1e-6,candidate,normal)) { distance=candidate; }
+				}
 				if (distance > T_EPS && distance < closest) { closest = distance; triangle = index; }
 			}
 		}
@@ -59,8 +69,16 @@ bool mesh_hit(int root, vec3 origin, vec3 direction, out float closest, out int 
 	return triangle >= 0;
 }
 
-vec3 mesh_normal(int index) {
+vec3 mesh_normal(int index, vec3 position) {
 	GemTriangle triangle = triangles[index];
+	int kind = triangle.meta.y & 255;
+	if (kind != 0) {
+		vec3 axis = normalize(vec3(triangle.b.xyz));
+		if (kind == 1) { return axis; }
+		vec3 relative = position - vec3(triangle.a.xyz);
+		if (kind == 2) { relative -= axis * dot(relative,axis); }
+		return normalize(relative);
+	}
 	return normalize(cross(triangle.b.xyz - triangle.a.xyz, triangle.c.xyz - triangle.a.xyz));
 }
 
@@ -127,7 +145,7 @@ bool boundary_hit(Stone stone, vec3 origin, vec3 direction, out float distance, 
 
 vec3 boundary_normal(Stone stone, int surface, vec3 position) {
 	if (stone.ranges1.z == 0) { return planes[surface].n_d.xyz; }
-	if (surface >= 0) { return mesh_normal(surface); }
+	if (surface >= 0) { return mesh_normal(surface,position); }
 	if (surface == -3) { return vec3(0, 0, -1); }
 	vec3 axes = planes[stone.ranges0.x].n_d.xyz;
 	vec3 n = position / (axes * axes);

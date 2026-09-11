@@ -1,6 +1,6 @@
 class_name GemAnalyticPacking
 extends RefCounted
-## Candidate primitive representation for numerical admission experiments.
+## Continuous boundary record used by the renderer and admission probes.
 ## 64B: center/radius, normal/spare, cylinder-end/spare, ivec4 metadata.
 ## Metadata = facet, kind(1..3)|(clip_count<<8), clip_offset, local region.
 ## Clip vec4s use coordinates relative to the primitive center to reduce loss.

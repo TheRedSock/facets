@@ -25,7 +25,7 @@ static func geometry() -> String:
 	var pattern := RegEx.new()
 	pattern.compile("layout\\(set = 0, binding = 13[^\\n]*\\n")
 	source = pattern.sub(source, "", true)
-	for name in ["mesh_box", "mesh_triangle", "mesh_hit", "mesh_normal", "quadric_roots", "cabochon_hit", "boundary_hit", "boundary_normal", "boundary_surface_slot", "region_medium", "cross_region", "physical_boundary", "physical_hit"]:
+	for name in ["analytic_patch_hit", "mesh_box", "mesh_triangle", "mesh_hit", "mesh_normal", "quadric_roots", "cabochon_hit", "boundary_hit", "boundary_normal", "boundary_surface_slot", "region_medium", "cross_region", "physical_boundary", "physical_hit"]:
 		pattern.compile("\\b" + name + "\\b")
 		source = pattern.sub(source, "crystal_geo_" + name, true)
 	for pair in [["float", "double"], ["vec2", "dvec2"], ["vec3", "dvec3"], ["vec4", "dvec4"]]:
@@ -33,4 +33,6 @@ static func geometry() -> String:
 		source = pattern.sub(source, pair[1], true)
 	source = source.replace("T_EPS", "CRYSTAL_GEO_EPS")
 	source = source.replace("cross(triangle.b.xyz - triangle.a.xyz, triangle.c.xyz - triangle.a.xyz)", "cross(dvec3(triangle.b.xyz) - dvec3(triangle.a.xyz), dvec3(triangle.c.xyz) - dvec3(triangle.a.xyz))")
-	return "const double CRYSTAL_GEO_EPS=1e-10;\n" + source
+	var analytic := FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_analytic_patch.glsl")
+	analytic = analytic.replace("analytic_patch_hit", "crystal_geo_analytic_patch_hit").replace("analytic_clip", "crystal_geo_analytic_clip")
+	return "#define GEM_ANALYTIC_FP64\n" + analytic + "\n#undef GEM_ANALYTIC_FP64\nvec4 crystal_geo_analytic_clip(int i) { return planes[i].n_d; }\nconst double CRYSTAL_GEO_EPS=1e-10;\n" + source

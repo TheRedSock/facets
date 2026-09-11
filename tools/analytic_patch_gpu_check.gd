@@ -5,12 +5,13 @@ var reports:=[]
 
 func _initialize()->void:
 	var stress:=OS.get_cmdline_user_args().has("--stress")
+	var accelerated:=OS.get_cmdline_user_args().has("--bvh")
 	var rd:=RenderingServer.create_local_rendering_device()
 	if rd==null:quit(1);return
 	var shaders:=[];var pipelines:=[]
 	for fp64 in [false,true]:
 		var src:=RDShaderSource.new()
-		src.source_compute="#version 450\n"+("#extension GL_ARB_gpu_shader_fp64 : require\n#define GEM_ANALYTIC_FP64\n" if fp64 else "")+FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_analytic_patch.glsl")+BODY
+		src.source_compute="#version 450\n"+("#extension GL_ARB_gpu_shader_fp64 : require\n#define GEM_ANALYTIC_FP64\n" if fp64 else "")+FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_analytic_patch.glsl")+_body(accelerated)
 		var spirv:=rd.shader_compile_spirv_from_source(src)
 		if not spirv.compile_error_compute.is_empty():printerr(spirv.compile_error_compute);rd.free();quit(1);return
 		var shader:=rd.shader_create_from_spirv(spirv);shaders.append(shader);pipelines.append(rd.compute_pipeline_create(shader))
@@ -39,11 +40,18 @@ func _initialize()->void:
 			for i in queries.size()/8:
 				expected.append(solid.intersect(V.vec(queries[i*8],queries[i*8+1],queries[i*8+2]),V.vec(queries[i*8+4],queries[i*8+5],queries[i*8+6]),queries[i*8+3]))
 			var packed:=GemAnalyticPacking.pack(solid)
+			if accelerated:
+				var accelerated_data:=GemPrimitiveBvh.pack(solid)
+				if not accelerated_data.error.is_empty():printerr("FAIL: "+accelerated_data.error);failures+=1;continue
+				packed["primitives"]=accelerated_data.triangles
+				packed["nodes"]=accelerated_data.nodes
 			for precision in 2:
 				var raw:=_dispatch(rd,shaders[precision],pipelines[precision],packed,queries)
 				var missing:=0;var extra:=0;var mismatch:=0;var maximum_t:=0.0;var maximum_angle:=0.0
 				var anomalies:=[]
+				var primitive_tests:=0
 				for i in expected.size():
+					primitive_tests+=raw.decode_s32(i*48+40)
 					var hit:=raw.decode_s32(i*48+32)>=0
 					if expected[i].is_empty():
 						if hit:
@@ -61,16 +69,19 @@ func _initialize()->void:
 					if raw.decode_s32(i*48+36)!=expected[i].facet:mismatch+=1
 				var report:={"outline":outline,"radius_mm":radius,"precision":"float64" if precision else "float32","queries":expected.size(),"patches":solid.patches.size(),"compile_ms":compile_ms,"missing":missing,"extra":extra,"facet_mismatches":mismatch,"maximum_t_error":maximum_t,"maximum_normal_degrees":rad_to_deg(maximum_angle)}
 				report["anomalies"]=anomalies
+				report["accelerated"]=accelerated
+				report["mean_primitive_tests"]=float(primitive_tests)/expected.size()
 				reports.append(report);print(JSON.stringify(report,"",true,true))
 				if missing>0 or extra>0 or maximum_t>5e-6 or maximum_angle>1e-3:failures+=1
 	for rid in pipelines+shaders:rd.free_rid(rid)
 	rd.free()
-	GemArtifactStore.atomic_write("res://artifacts/rounded-solid/gpu-stress-report.json" if stress else "res://artifacts/rounded-solid/gpu-report.json",JSON.stringify(reports,"\t",true,true).to_utf8_buffer())
+	GemArtifactStore.atomic_write("res://artifacts/rounded-solid/gpu-bvh-report.json" if accelerated else ("res://artifacts/rounded-solid/gpu-stress-report.json" if stress else "res://artifacts/rounded-solid/gpu-report.json"),JSON.stringify(reports,"\t",true,true).to_utf8_buffer())
 	print("Analytic patch GPU: %d cases, %d failures"%[reports.size(),failures]);quit(1 if failures else 0)
 
 func _dispatch(rd:RenderingDevice,shader:RID,pipeline:RID,packed:Dictionary,queries:PackedFloat32Array)->PackedByteArray:
 	var zero:=PackedByteArray();zero.resize(queries.size()/8*48)
 	var blobs:=[packed.primitives,packed.clips,queries.to_byte_array(),zero]
+	if packed.has("nodes"):blobs.append(packed.nodes)
 	var uniforms:Array[RDUniform]=[];var buffers:=[]
 	for binding in blobs.size():
 		var bytes:PackedByteArray=blobs[binding]
@@ -118,6 +129,31 @@ func _probe(queries:PackedFloat32Array,point:PackedFloat64Array,normal:PackedFlo
 
 func _query(queries:PackedFloat32Array,o:PackedFloat64Array,d:PackedFloat64Array,min_t:float)->void:
 	queries.append_array(PackedFloat32Array([o[0],o[1],o[2],min_t,d[0],d[1],d[2],0]))
+
+func _body(accelerated:bool)->String:
+	if not accelerated: return BODY.replace("ivec4(winner,facet,0,0)","ivec4(winner,facet,params.counts.y,0)")
+	var body:=BODY.replace("void main() {",BVH+"\nvoid main() {")
+	body=body.replace("for(int p=0;p<int(params.counts.y);p++) {", "int tested=0; int pending=1; int stack[64]; stack[0]=0;\n    while(pending>0) {\n        Node node=nodes[stack[--pending]];\n        if(!box_hit(node,o,d,GP_REAL(queries[i*2].w),nearest)) continue;\n        if(node.links.w==0) { stack[pending++]=node.links.x;stack[pending++]=node.links.y;continue; }\n        for(int p=node.links.z;p<node.links.z+node.links.w;p++) { tested++;")
+	body=body.replace("    vec4 high=", "    }\n    vec4 high=")
+	return body.replace("ivec4(winner,facet,0,0)","ivec4(winner,facet,tested,0)")
+
+const BVH:="""
+struct Node { vec4 low; vec4 high; ivec4 links; };
+layout(set=0,binding=4,std430) readonly buffer Nodes { Node nodes[]; };
+bool box_hit(Node n,GP_VEC3 o,GP_VEC3 d,GP_REAL lo,GP_REAL hi) {
+    for(int axis=0;axis<3;axis++) {
+        if(abs(d[axis])<GP_REAL(1e-30)) {
+            if(o[axis]<GP_REAL(n.low[axis]) || o[axis]>GP_REAL(n.high[axis])) return false;
+        } else {
+            GP_REAL a=(GP_REAL(n.low[axis])-o[axis])/d[axis];
+            GP_REAL b=(GP_REAL(n.high[axis])-o[axis])/d[axis];
+            lo=max(lo,min(a,b));hi=min(hi,max(a,b));
+            if(lo>hi) return false;
+        }
+    }
+    return true;
+}
+"""
 
 const BODY:="""
 layout(local_size_x=64) in;

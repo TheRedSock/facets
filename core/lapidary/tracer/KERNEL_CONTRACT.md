@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v20)
+# Lapidary kernel contract (v21)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. Wire floats
@@ -44,8 +44,10 @@ distance-mm; vec4 incident-facing object-normal/coverage; ivec4 instance/facet/
 local-boundary-slot/global-material. The boundary slot is the region ID for meshes
 and the per-plane finish slot for convex hosts; it is not necessarily an active
 medium-state bit. A miss has zero geometry/coverage and IDs=-1.
-Analytic patch facet IDs are negative (-1 dome, -2 girdle, -3 base), disambiguated
-from misses by coverage. Full int32 facet IDs survive BVH and plane packing.
+Cabochon patch facet IDs are negative (-1 dome, -2 girdle, -3 base), disambiguated
+from misses by coverage. Continuous rounded faces retain cut facet IDs; edge and
+corner patches use negative IDs. Smooth seam ties may select either adjacent
+identity. Full int32 facet IDs survive BVH and plane packing.
 `physical_boundary` skips boundaries that do not change the active medium, so
 an exposed cavity wall replaces the clipped-away outer surface.
 
@@ -58,10 +60,39 @@ not refracted inclusions, internal optical contributions or a simulated grade.
 The portable frame factory optionally schedules and caches these companions;
 `tools/export_gem_aov.gd` also exports them independently for evaluation/stylizer work.
 
-A Triangle is four vec4s (64B): a/b/c vertices (w reserved), then ivec4
-(facet ID, reserved, reserved, local region ID). BVH Node (48B): vec4 low/high,
-ivec4 left/right/first/count. Count0 is an internal node. Absolute buffer indices,
-median split, four triangles per leaf, traversal stack64.
+Binding 11 contains 64B boundary primitives, using the existing a/b/c/meta
+record. Kind 0 is a triangle: a/b/c are vertices (w reserved), meta is
+(facet ID, 0, 0, local region ID). Kinds 1/2/3 are a clipped plane, cylinder and
+sphere: a=center.xyz/radius, b=independently stored axis.xyz/0, c=end.xyz/0,
+meta=(facet ID, kind | (clip_count<<8), absolute clip-plane offset, region ID).
+The cylinder axis must not be reconstructed from quantized endpoints.
+Clips use Plane.n_d in binding 0, relative to the primitive center, with
+zero auxiliary data. They are separate from the Stone convex-plane range.
+The plane patch passes through its encoded center. Curved normals are evaluated
+at the hit position, including in the float64 crystal path and primary AOVs.
+
+BVH Node (binding 12, 48B): vec4 low/high, ivec4 left/right/first/count.
+Count 0 is an internal node; first indexes the primitive buffer. Absolute buffer
+indices, median split, four primitives per leaf, traversal stack 64. Existing
+triangle-only payloads retain their wire representation. Continuous-host payloads
+use a mixed hierarchy over region-zero analytic patches and defect triangles in
+regions 1..127. Relative clip offsets become absolute during instance packing.
+The cache retains canonical primitive/node/clip bytes and accounts for all three.
+
+Continuous patch bounds are constructed in float64 and rounded outward when
+packed. They include 16e-6 times the coordinate scale as numerical padding;
+patch clipping uses a 1e-6 stone-space tolerance. These are tested numerical
+policies, not certified error intervals. The 76,400-ray stress corpus found no
+missing or extra intersections with acceleration enabled. Curved-host/triangle
+coincidence and arbitrarily small optical features remain outside this admission
+claim. Compiled continuous geometry is sealed by content; mutation requires
+recompiling the recipe. Camera bounds include the continuous host.
+
+`GemTracer` accepts an explicit compiled `rounded_solid`, or a boundary set
+created with `add_rounded`. All three transport backends and geometry AOVs share
+this representation. StoneCompiler still selects the triangulated rounding
+experiment; continuous authored-job selection and condition compilation remain
+pending. No automatic grade or catalog specimen enables rounding.
 
 `GemMesh` validates finite coordinates, exact triangle nondegeneracy, oriented
 edge incidence per region, connected vertex fans, and global triangle contacts
@@ -116,7 +147,7 @@ for visibility, but transport processes their segments to preserve optical lengt
 
 Flags: bit0 has_eray (including local spectra), bit1 dispersion_strong,
 bit2 nested_dichroism (persistent absorption state is required). BVH selector0 is convex planes,
--1 analytic host without mesh, positive root+1 supports triangle host/defects.
+-1 analytic host without mesh, positive root+1 supports mixed boundary primitives.
 Absorption concatenates 401-sample Napierian α/mm blocks, 380..780 nm at1nm. An e-ray
 block follows its o-ray block directly (offset+401). Source resources may use
 a different uniform grid, but must cover the transport interval. No implicit

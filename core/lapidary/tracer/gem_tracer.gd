@@ -141,7 +141,7 @@ func _compile_shader(path: String, name: String) -> bool:
 	if source.is_empty():
 		push_error("GemTracer: cannot read " + path)
 		return false
-	for include in ["gem_common.glsl", "gem_mesh.glsl", "gem_surface.glsl", "gem_volume.glsl", "gem_polarization.glsl"]:
+	for include in ["gem_common.glsl", "gem_mesh.glsl", "gem_surface.glsl", "gem_volume.glsl", "gem_polarization.glsl", "gem_analytic_patch.glsl"]:
 		source = source.replace('#include "%s"' % include, FileAccess.get_file_as_string(SHADER_DIR + include))
 	source = source.replace('#include "../../microsurface/smith_walk.glsl"', FileAccess.get_file_as_string("res://core/lapidary/microsurface/smith_walk.glsl"))
 	if name == "trace_crystal":
@@ -192,14 +192,38 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 	var lights := lighting.lights
 	assert(not instances.is_empty() and lights.size() % 8 == 0)
 	assert(lights.size() / 8 <= MAX_LIGHTS, "GemTracer: rig exceeds %d lights" % MAX_LIGHTS)
+	instances = instances.duplicate()
+	for index in instances.size():
+		var instance: Dictionary = instances[index]
+		if instance.has("boundaries") and instance.boundaries.rounded_solid != null:
+			if instance.has("rounded_solid") and instance.rounded_solid != instance.boundaries.rounded_solid:
+				configuration_error = "Conflicting continuous host and boundary set"
+				return false
+			instance = instance.duplicate()
+			instance["rounded_solid"] = instance.boundaries.rounded_solid
+			instances[index] = instance
 	var bound_radius := 0.0
 	for instance: Dictionary in instances:
 		if not str(instance.get("compilation_error", "")).is_empty():
 			configuration_error = instance.compilation_error
 			return false
+		if instance.has("rounded_solid"):
+			var continuous: GemRoundedSolid = instance.rounded_solid
+			if continuous == null or not continuous.validation_error().is_empty() or instance.has("analytic_shape"):
+				configuration_error = "Invalid or ambiguous continuous host"
+				return false
+			var defect_mesh: GemMesh = instance.boundaries.mesh if instance.has("boundaries") else instance.get("mesh",null)
+			if defect_mesh != null and defect_mesh.triangle_count() > 0:
+				if not instance.has("boundaries"):
+					configuration_error = "Continuous-host defect triangles need an explicit boundary region table"
+					return false
+				for region in defect_mesh.region_ids:
+					if region <= 0 or region >= instance.boundaries.materials.size():
+						configuration_error = "Continuous-host defect references an invalid region"
+						return false
 		var face_slots: PackedInt32Array = instance.get("plane_surface_ids", PackedInt32Array())
 		if instance.has("plane_surface_ids"):
-			if face_slots.size()*8 != instance.get("planes",PackedFloat32Array()).size() or instance.has("mesh") or instance.has("analytic_shape") or instance.has("boundaries"):
+			if face_slots.size()*8 != instance.get("planes",PackedFloat32Array()).size() or instance.has("mesh") or instance.has("analytic_shape") or instance.has("boundaries") or instance.has("rounded_solid"):
 				configuration_error="Per-plane finishes require a complete convex plane buffer"
 				return false
 			var finishes: Array=instance.get("surfaces",[])
@@ -331,9 +355,9 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 				inst["rough_present"] = 1.0
 				if finish.multiple_scattering:
 					_flags |= FLAG_DISPERSION | FLAG_FULL_SPECTRUM
-		if inst.has("mesh"):
-			var mesh: GemMesh = inst["mesh"]
-			var packed := _geometry_cache.packed(mesh)
+		if inst.has("mesh") or inst.has("rounded_solid"):
+			var mesh: GemMesh = inst.get("mesh",null)
+			var packed := _geometry_cache.packed(mesh,inst.get("rounded_solid",null))
 			if not packed.error.is_empty():
 				configuration_error = packed.error
 				return false
@@ -341,7 +365,17 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 			inst["bvh_root"] = node_data.size() / 48 + 1
 			@warning_ignore("integer_division")
 			node_data.append_array(GemPackedGeometryCache.relocate_nodes(packed.nodes, node_data.size() / 48, triangle_data.size() / 64))
-			triangle_data.append_array(packed.triangles)
+			var primitive_bytes: PackedByteArray = packed.triangles
+			var clip_offset := planes.size()/8
+			for primitive in primitive_bytes.size()/64:
+				var meta := primitive*64+48
+				if (primitive_bytes.decode_s32(meta+4)&255) != 0:
+					primitive_bytes.encode_s32(meta+8,primitive_bytes.decode_s32(meta+8)+clip_offset)
+			triangle_data.append_array(primitive_bytes)
+			for clip in packed.clips.size()/16:
+				for k in 4: planes.append(packed.clips.decode_float(clip*16+k*4))
+				planes.append_array(PackedFloat32Array([0,0,0,0]))
+				plane_facet_ids.append(0); plane_surface_ids.append(0)
 		var p: PackedFloat32Array = inst["planes"]
 		if inst.has("analytic_shape"):
 			var shape: Vector4 = inst["analytic_shape"]
@@ -427,6 +461,12 @@ func configure_stones(instances: Array, lighting: GemLighting, policy: Dictionar
 ## protruding beyond the host. Rotation preserves this enclosing sphere.
 static func _boundary_radius(instance: Dictionary) -> float:
 	var radius := 0.0
+	if instance.has("rounded_solid"):
+		var solid: GemRoundedSolid = instance.rounded_solid
+		for patch in solid.patches:
+			var squared := 0.0
+			for axis in 3: squared += pow(maxf(absf(patch.lower[axis]),absf(patch.upper[axis])),2)
+			radius = maxf(radius,sqrt(squared))
 	if instance.has("analytic_shape"):
 		var shape: Vector4 = instance["analytic_shape"]
 		radius = maxf(shape.z, sqrt(maxf(shape.x * shape.x, shape.y * shape.y) + shape.w * shape.w))

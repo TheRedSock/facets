@@ -1,10 +1,12 @@
 extends SceneTree
 ## Physical rounding only: sharp, 30um, 120um. No grade-to-damage mapping.
 func _initialize()->void:
+	var continuous:=OS.get_cmdline_user_args().has("--continuous")
 	var macro:=OS.get_cmdline_user_args().has("--macro")
 	var fine:=OS.get_cmdline_user_args().has("--fine")
 	var output:="res://artifacts/rounding/macro/" if macro else "res://artifacts/rounding/lookdev/"
 	if fine:output=output.trim_suffix("/")+"-fine/"
+	if continuous:output=output.trim_suffix("/")+"-continuous/"
 	DirAccess.make_dir_recursive_absolute(output)
 	var tracer:=GemTracer.create(256,256)
 	if tracer==null:quit(1);return
@@ -17,7 +19,15 @@ func _initialize()->void:
 	for column in 3:
 		stone.condition.rounding.radius_mm=([0.0,.12,.6] if macro else [0.0,.03,.12])[column]
 		var start:=Time.get_ticks_usec()
+		var requested_radius:=stone.condition.rounding.radius_mm
+		if continuous:stone.condition.rounding.radius_mm=0
 		var instance:=LapidaryStoneCompiler.compile(stone)
+		stone.condition.rounding.radius_mm=requested_radius
+		if continuous and requested_radius>0:
+			var solid:=GemRoundedSolid.compile(instance.planes,instance.facet_ids,stone.size_mm,stone.condition.rounding)
+			if not solid.error.is_empty():printerr(solid.error);tracer.release();quit(1);return
+			instance["rounded_solid"]=solid;instance["planes"]=PackedFloat32Array()
+			instance["condition_report"]={"rounding":solid.report}
 		var compile_ms:=(Time.get_ticks_usec()-start)/1000.0
 		if instance.has("compilation_error"):printerr(instance.compilation_error);tracer.release();quit(1);return
 		for row in 2:

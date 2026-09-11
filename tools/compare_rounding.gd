@@ -1,23 +1,40 @@
 extends SceneTree
-## Display-space convergence diagnostic; no automatic quality promotion.
-func _initialize()->void:
-	var reports:=[]
-	for column in 3:
-		for row in 2:
-			var file:="radius%d_pose%d.png"%[column,row]
-			var coarse:=Image.load_from_file("res://artifacts/rounding/macro/"+file)
-			var fine:=Image.load_from_file("res://artifacts/rounding/macro-fine/"+file)
-			if coarse==null or fine==null or coarse.get_size()!=fine.get_size():printerr("Missing matching convergence images");quit(1);return
-			var square:=0.0;var opaque_square:=0.0;var alpha_square:=0.0;var maximum:=0.0;var opaque:=0
-			for y in coarse.get_height():
-				for x in coarse.get_width():
-					var a:=coarse.get_pixel(x,y);var b:=fine.get_pixel(x,y)
-					var va:=Vector3(a.r,a.g,a.b);var vb:=Vector3(b.r,b.g,b.b)
-					square+=(va*a.a-vb*b.a).length_squared();alpha_square+=pow(a.a-b.a,2)
-					if minf(a.a,b.a)>.999:
-						var delta:=va-vb;opaque_square+=delta.length_squared();opaque+=1
-						maximum=maxf(maximum,maxf(absf(delta.x),maxf(absf(delta.y),absf(delta.z))))
-			var pixels:=coarse.get_width()*coarse.get_height()
-			reports.append({"file":file,"associated_rgb_rmse_lsb":255*sqrt(square/(3*pixels)),"opaque_rgb_rmse_lsb":255*sqrt(opaque_square/(3*maxi(opaque,1))),"opaque_max_channel_lsb":255*maximum,"alpha_rmse_lsb":255*sqrt(alpha_square/pixels)})
-			print(JSON.stringify(reports[-1]))
-	GemArtifactStore.atomic_write("res://artifacts/rounding/convergence.json",JSON.stringify(reports,"\t").to_utf8_buffer());quit()
+## Compare two rounding_lookdev folders. Print-space errors include path noise;
+## they are not a bias bound or an automatic physical-realism acceptance gate.
+func _initialize() -> void:
+	var args := OS.get_cmdline_user_args()
+	if args.size() != 3:
+		printerr("Usage: -- BEFORE_DIR AFTER_DIR OUTPUT_JSON");quit(1);return
+	var before: Variant = JSON.parse_string(FileAccess.get_file_as_string(args[0].path_join("report.json")))
+	var after: Variant = JSON.parse_string(FileAccess.get_file_as_string(args[1].path_join("report.json")))
+	if not before is Array or not after is Array or before.size()!=after.size():
+		printerr("Invalid comparison reports");quit(1);return
+	var rows := []
+	for i in before.size():
+		if before[i].file!=after[i].file or before[i].radius_mm!=after[i].radius_mm:
+			printerr("Frame/radius mismatch");quit(1);return
+		var a := Image.load_from_file(args[0].path_join(before[i].file))
+		var b := Image.load_from_file(args[1].path_join(after[i].file))
+		if a==null or b==null or a.get_size()!=b.get_size():
+			printerr("Image dimensions disagree");quit(1);return
+		a.convert(Image.FORMAT_RGBA8);b.convert(Image.FORMAT_RGBA8)
+		var x:=a.get_data();var y:=b.get_data()
+		var alpha2:=0.0;var rgb2:=0.0;var opaque2:=0.0;var opaque_count:=0;var peak:=0
+		for pixel in x.size()/4:
+			var j:=pixel*4
+			alpha2+=pow(float(x[j+3])-y[j+3],2)
+			for channel in 3:
+				var delta:=int(x[j+channel])-int(y[j+channel])
+				rgb2+=pow(float(x[j+channel])*x[j+3]/255.0-float(y[j+channel])*y[j+3]/255.0,2)
+				if x[j+3]==255 and y[j+3]==255:
+					opaque2+=delta*delta;opaque_count+=1;peak=maxi(peak,absi(delta))
+		var row:={"file":before[i].file,"radius_mm":before[i].radius_mm,
+			"associated_rgb_rmse_lsb":sqrt(rgb2/(x.size()/4.0*3)),"alpha_rmse_lsb":sqrt(alpha2/(x.size()/4.0)),
+			"opaque_rgb_rmse_lsb":sqrt(opaque2/maxi(1,opaque_count)),"opaque_peak_lsb":peak,
+			"before_trace_ms":before[i].profile.trace_wall_ms,"after_trace_ms":after[i].profile.trace_wall_ms,
+			"before_compile_ms":before[i].compile_ms,"after_compile_ms":after[i].compile_ms}
+		rows.append(row);print(JSON.stringify(row,"",true,true))
+	var result:={"before":args[0],"after":args[1],"sampling_noise_included":true,"frames":rows}
+	var saved:=GemArtifactStore.atomic_write(args[2],JSON.stringify(result,"\t",true,true).to_utf8_buffer())
+	if not saved:printerr("Cannot write comparison report");quit(1);return
+	quit()

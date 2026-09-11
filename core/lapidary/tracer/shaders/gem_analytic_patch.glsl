@@ -1,5 +1,7 @@
-// Experimental shared continuous-patch intersection, not active in production
-// transport. The host supplies analytic_clip(). Wire data is always binary32.
+// Shared continuous-patch intersection for optical transport and admission probes.
+// The host supplies analytic_clip(). Wire data is always binary32.
+#undef GP_REAL
+#undef GP_VEC3
 #ifdef GEM_ANALYTIC_FP64
 #define GP_REAL double
 #define GP_VEC3 dvec3
@@ -7,7 +9,10 @@
 #define GP_REAL float
 #define GP_VEC3 vec3
 #endif
+#ifndef GEM_ANALYTIC_STRUCT
+#define GEM_ANALYTIC_STRUCT
 struct GemAnalyticPrimitive { vec4 center_radius; vec4 normal; vec4 end; ivec4 meta; };
+#endif
 vec4 analytic_clip(int index);
 
 bool analytic_patch_hit(GemAnalyticPrimitive primitive, GP_VEC3 origin, GP_VEC3 direction,

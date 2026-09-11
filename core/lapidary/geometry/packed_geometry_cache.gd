@@ -1,6 +1,6 @@
 class_name GemPackedGeometryCache
 extends RefCounted
-## Per-consumer LRU of canonical, zero-offset BVH bytes. Actual mesh contents,
+## Per-consumer LRU of canonical, zero-offset BVH bytes. Actual boundary contents,
 ## including facet/region identities, determine reuse. No authoring ID is trusted.
 ## The budget counts retained packed payloads, not temporary build/copy memory.
 var budget_bytes := 64 * 1024 * 1024
@@ -10,24 +10,31 @@ var builds := 0
 var hits := 0
 var _entries: Dictionary = {}
 
-func packed(mesh: GemMesh) -> Dictionary:
+func packed(mesh: GemMesh, solid: GemRoundedSolid = null) -> Dictionary:
 	_trim()
-	if mesh == null:
+	if mesh == null and solid == null:
 		return {"error": "Missing boundary mesh"}
-	var key := mesh.fingerprint()
+	if solid != null and not solid.validation_error().is_empty():
+		return {"error":solid.validation_error()}
+	var key := mesh.fingerprint() if solid == null else GemContentIdentity.digest([solid.fingerprint(),mesh.fingerprint() if mesh != null else ""])
 	if _entries.has(key):
 		var entry: Dictionary = _entries[key]
 		_entries.erase(key)
 		_entries[key] = entry
 		hits += 1
 		return _copy(entry)
-	var errors := mesh.validate()
-	if not errors.is_empty():
-		return {"error": "Invalid packed boundary mesh: " + "; ".join(errors)}
-	var bvh := GemBvh.build(mesh)
-	var result := {"error": "", "nodes": bvh.pack_nodes(), "triangles": bvh.pack_triangles()}
+	var result: Dictionary
+	if solid != null:
+		result = GemPrimitiveBvh.pack(solid,mesh)
+		if not result.error.is_empty(): return result
+	else:
+		var errors := mesh.validate()
+		if not errors.is_empty():
+			return {"error": "Invalid packed boundary mesh: " + "; ".join(errors)}
+		var bvh := GemBvh.build(mesh)
+		result = {"error": "", "nodes": bvh.pack_nodes(), "triangles": bvh.pack_triangles(), "clips":PackedByteArray()}
 	builds += 1
-	var size: int = result.nodes.size() + result.triangles.size()
+	var size: int = result.nodes.size() + result.triangles.size() + result.clips.size()
 	if size <= maxi(0, budget_bytes) and entry_limit > 0:
 		while not _entries.is_empty() and (retained_bytes + size > budget_bytes or _entries.size() >= entry_limit):
 			_evict_oldest()
@@ -65,8 +72,8 @@ func _trim() -> void:
 func _evict_oldest() -> void:
 	var key: String = _entries.keys()[0]
 	var entry: Dictionary = _entries[key]
-	retained_bytes -= entry.nodes.size() + entry.triangles.size()
+	retained_bytes -= entry.nodes.size() + entry.triangles.size() + entry.clips.size()
 	_entries.erase(key)
 
 static func _copy(entry: Dictionary) -> Dictionary:
-	return {"error": "", "nodes": entry.nodes.duplicate(), "triangles": entry.triangles.duplicate()}
+	return {"error": "", "nodes": entry.nodes.duplicate(), "triangles": entry.triangles.duplicate(), "clips":entry.clips.duplicate()}

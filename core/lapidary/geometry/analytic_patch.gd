@@ -1,7 +1,7 @@
 class_name GemAnalyticPatch
 extends RefCounted
 ## Continuous quadric patch clipped by outward half-spaces. CPU binary64
-## reference for the procedural backend; not yet a GPU wire representation.
+## reference for the procedural backend; GemAnalyticPacking owns the GPU wire.
 const V := preload("res://core/lapidary/geometry/geometry64.gd")
 enum Kind { PLANE, CYLINDER, SPHERE }
 var kind := Kind.PLANE

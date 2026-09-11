@@ -337,10 +337,9 @@ solver uses closest approach, retaining small radii that would disappear in
 `dot(origin, origin) - radius*radius`. Clip tolerances and the minimum radius
 admission gate are numerical policies, not certified error intervals.
 
-`GemAnalyticPacking` and `gem_analytic_patch.glsl` define a candidate 64-byte
-primitive record and relative clipping planes. This representation is exercised
-by a standalone GPU probe in float32 and float64; it is not part of the v20
-production kernel contract. Cylinder direction must be stored independently:
+`GemAnalyticPacking` and `gem_analytic_patch.glsl` define a 64-byte primitive
+record and relative clipping planes. This representation is exercised by a
+standalone GPU probe in float32 and float64 and by GemTracer; see kernel v21. Cylinder direction must be stored independently:
 subtracting float32 endpoints of a very short edge caused false hits and large
 normal errors, even when the subsequent arithmetic used float64.
 
@@ -352,13 +351,29 @@ smooth-patch seam ties can choose different facet labels. These measurements use
 specific scales and a 1e-6 object-space clip tolerance; they do not certify all
 possible sizes, grazing conditions or semantic tie behavior.
 
-The production stone compiler, optical tracer and asset jobs do not select this
-backend yet. Integration still needs an accelerated primitive hierarchy, full
-region/finish semantics, scalar/Mueller/crystal transport and primary AOV support,
-condition composition, and image-level convergence/performance evaluation.
+GemTracer now supports a mixed primitive hierarchy with continuous region-zero
+patches and nested triangle defects. Scalar, Mueller and crystal transport,
+primary AOVs, camera bounds and packed-geometry caching use the same boundaries.
+The stone compiler and authored asset jobs still select the mesh experiment.
+Authoring/condition compilation and image convergence/performance evaluation
+remain pending. Directly constructed continuous instances are development inputs.
 Automatic grading remains disabled. Neither the continuous geometry nor the
 spherical-opening radius is a calibrated abrasion, polishing or hardness law.
 
 The volume construction follows the convex special case of the polyhedral
 [Steiner formula](https://cseweb.ucsd.edu/~alchern/teaching/DDG.pdf), section 4.7,
 and its [parallel-body decomposition](https://courses.cms.caltech.edu/cs177/notes_fa11/GeoMeasure.pdf).
+
+At 256px/128spp, explicit 0.12mm and 0.6mm radii on a 4mm quartz cut used
+530 and 330 patches. Construction took 237/217ms, first packing 42/29ms and
+repeated packing 18/12ms. Trace times were 4.30/5.69s at 0.12mm and 8.22/9.89s
+at 0.6mm for two poses. The earlier 3-degree meshes took 27.9/46.5s to construct
+and 9.69–15.38s / 10.39–12.07s to trace. These are historical same-machine
+comparisons, not a controlled GPU clock benchmark. Large-radius traversal still
+spends work in overlapping conservative full-cylinder/sphere bounds.
+
+Continuous versus 3-degree mesh opaque RGB RMS differences were 1.62/3.80 LSB
+at 0.12mm and 5.95/9.59 LSB at 0.6mm; sampling noise is included. Smooth curved
+highlights are visible, but those differences do not establish undetectable
+convergence, real specimen calibration or an automatic wear grade. Keep the
+rounding defaults inactive while improving bounds and completing authoring.

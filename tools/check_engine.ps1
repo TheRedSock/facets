@@ -25,11 +25,14 @@ $stages += @{ Name = 'test_spatial_composition'; Args = @('--headless', '--quit-
 $stages += @{ Name = 'test_work_claims'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_work_claims.gd') }
 $stages += @{ Name = 'test_rounding'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_rounding.gd') }
 $stages += @{ Name = 'test_packed_geometry_cache'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_packed_geometry_cache.gd') }
+$stages += @{ Name = 'test_primitive_bvh'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_primitive_bvh.gd') }
 $stages += @{ Name = 'test_rounded_solid'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_rounded_solid.gd') }
 if ($ReferencePython) {
     $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
 }
 if ($Gpu) {
+	$stages += @{ Name = 'continuous_transport_check'; Args = @('--quit-after', '600', '--script', 'res://tools/continuous_transport_check.gd') }
+	$stages += @{ Name = 'analytic_bvh_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/analytic_patch_gpu_check.gd', '--', '--stress', '--bvh') }
 	$stages += @{ Name = 'analytic_patch_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/analytic_patch_gpu_check.gd', '--', '--stress') }
 	$stages += @{ Name = 'geometry_cache_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/geometry_cache_gpu_check.gd') }
 	$stages += @{ Name = 'rounding_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/rounding_gpu_check.gd') }
