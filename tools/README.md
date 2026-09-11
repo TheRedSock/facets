@@ -1,5 +1,50 @@
 # Engine tools
 
+## Rotation inspection
+
+`turn_gifs.gd` uses `GemAssetPlanner` and `GemFrameWorker`, the same admission,
+optical policy, reconstruction, house print and content cache as asset builds.
+It requests a linear 360-degree turn around local Y with a -12-degree rest tilt,
+a fixed gameplay studio rig, and **no game stylizer**. The loop excludes its
+duplicate endpoint. Catalog discovery includes every authored stone resource.
+
+```powershell
+& 'C:/Godot/Godot_v4.6.1-stable_win64_console.exe' --path . `
+  --log-file C:/GIT/facets/artifacts/rotation-render.log `
+  --script res://tools/turn_gifs.gd -- `
+  --res=256 --frames=120 --fps=30 --rung=hero --spp=256 `
+  --output=res://artifacts/lookdev/rotation-256
+```
+
+The defaults are 256 pixels, 120 frames, 30 fps and HERO's sample count. Override
+`--rung=preview` or `--spp=128` for cheaper inspection; `--res` sets both render
+and output size without additional resampling. Rungs retain their defined optical
+limitations: even `reference` does not select exact crystal transport. Optional
+`--stones=quartz,ruby` restricts the catalog; `--python=PATH` selects Python.
+`--plan-only` validates and writes `request.res` / `report.json` without rendering.
+The saved request is a normal `GemAssetBatch` usable by `prepare_gem_jobs.gd
+--batch=...` for portable workers. Both `--name=value` and `--name value` work.
+
+Rerun the same command to reuse verified completed frames and worker checkpoints.
+Fully cached reruns can use `--headless`; missing optical work needs a windowed
+RenderingDevice. Use separate output directories for studies with different
+settings. The store and all source PNGs are retained for inspection and recovery;
+this tool does not overwrite the game's generated library or run cache collection.
+The report records exact output keys, physical specimen fingerprints, policy,
+sample count, source identity, PNG hashes and per-frame end-to-end wall times.
+
+The Python encoder needs Pillow (with WebP) and NumPy. It produces a GIF, a
+lossless full-color WebP, an encoding report and an `index.html` comparison gallery.
+GIF uses one shared palette and no dithering; use the WebP/PNG to distinguish
+palette banding from transport noise. Straight-alpha prints are composited in
+linear light onto sRGB (18,18,20) for both animations; PNGs retain original alpha.
+GIF's centisecond delays alternate 30/40 ms at 30 fps, totaling exactly 4 seconds
+for 120 frames; WebP uses 33/34 ms. Viewer scheduling can still vary. See the
+[GIF specification](https://giflib.sourceforge.net/gifstandard/GIF89a.html) and
+[Pillow animation options](https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#gif).
+`python tests/lapidary/test_turn_gifs_encode.py` checks the encoded files' timing,
+frame sequence, lossless colors, stale-tail exclusion and linear compositing.
+
 Run `tools/check_engine.ps1 -Gpu` for source parsing, CPU contracts and windowed
 GPU acceptance checks. GPU scripts require a local RenderingDevice; headless
 execution supports CPU planning, validation, packaging, cached results and styling
