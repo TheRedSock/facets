@@ -21,9 +21,9 @@ commands are in [the tools guide](tools/README.md), [factory contract](core/lapi
 and [kernel contract](core/lapidary/tracer/KERNEL_CONTRACT.md). Generated output is
 ignored under `generated/`; desktop delivery includes the generated gem-assets.pck.
 
-Run the project in Godot to access Play and the Gem Atelier. The Atelier is being
-expanded under the [readiness implementation plan](docs/lapidary-engine-readiness-plan-2026-09-13.md);
-[phase progress](docs/READINESS_PROGRESS.md) records what is actually accepted.
+Run the project in Godot to access Play and the Gem Atelier. The
+[engine readiness report](docs/ENGINE_READINESS_REPORT.md) records implemented
+authoring, cut design, appearance and desktop-delivery validation.
 Current documentation is indexed in [docs/README.md](docs/README.md). Superseded
 documents are preserved under the gitignored `docs/archive/`.
 

@@ -20,5 +20,5 @@ Core simulation smoke: `godot --headless --script tests/test_smoke.gd`.
 Cross-platform RNG corpus: `godot --headless --script tests/test_rng_cross_platform.gd`.
 Long-running balance experiments: `godot --headless res://tests/test_simulation.tscn`.
 
-Logs and artifacts are ignored under artifacts/. See docs/READINESS_PROGRESS.md
+Logs and artifacts are ignored under artifacts/. See docs/ENGINE_READINESS_REPORT.md
 for phase acceptance and core/lapidary/*/CONTRACT.md for detailed contracts.

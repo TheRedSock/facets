@@ -18,8 +18,3 @@ extends Resource
 ## As-shot neutral spectrum. Null leaves scene XYZ unadapted; otherwise its
 ## integrated XYZ is adapted to D65 by the print, independently of transport.
 @export var white_spectrum: GemSpectrum
-
-@export_group("Evaluation")
-## Secondary illuminant kelvin for color-change A/B views (0 = disabled).
-## This is an evaluation/phenomenon view, not a baked rig property.
-@export var dual_illuminant_kelvin := 0.0

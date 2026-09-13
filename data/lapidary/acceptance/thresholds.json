@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "config_sha256": "d73829edf902265fc28ef3307d267654c13054c108d2df2241e8ed7ff1232137",
+  "reviewer": "Codex native-size visual and numerical review, 2026-09-13",
+  "review_notes": {
+    "clear_faceted": "All 18 native-size chronological sheets: two rigs, 112/256/512 pixels, black/white/game backgrounds, four poses, reference/draft/detail. Synchronized browser motion and individual frame inspection supplement the sheets. Numerical comparisons include both candidate streams and stationary independent reference streams. Draft retains sharp facet boundaries, changing bright wedges, small blue/orange edge fringes and silhouette in all reviewed views. Daylight low contrast occurs in the reference too. No visible halo, missing flash or framing jump. Detail reduces already small residual noise without a material visual benefit in this diagnostic. Limits are bounded regression margins around this reviewed fixture, not universal perceptual limits.",
+    "strong_absorption": "All18 native-size chronological sheets: two rigs,112/256/512px, black/white/game backgrounds, four poses and reference/draft/detail. Browser synchronized gameplay112 comparison supplements the sheets. Both candidate sample streams and independent stationary reference stream are included in numerical comparisons. Draft preserves saturated pink/red facet planes, dark narrow wedges, moving gray reflections, fine bright lines and silhouette. Daylight produces dark burgundy interiors and broad gray upper reflections in the reference too. No visible added blur, halo, missing highlight or framing jump. Detail lowers already small residual noise without a material visual benefit for this diagnostic. Selected limits are bounded regression margins for this reviewed fixture, not universal perceptual limits.",
+    "rounded": "All18 native chronological sheets: two rigs,112/256/512 pixels,black/white/game backgrounds,four poses,reference/draft/detail. The12 previously reviewed sheets retain identical hashes. Remaining six daylight256/512 sheets inspected at native resolution. Synchronized browser inspection and frame stepping cover all four gameplay112 detail poses; no browser errors. Numerical comparisons include both candidate streams and independent stationary reference streams. Detail retains fine white/dark facet lines, narrow chromatic fringes, moving bright wedges and silhouette. Daylight gray planes and lower bright reflections match the reference. Draft remains recognizable but has higher edge/noise residual; detail approximately halves spatial and temporal error without visibly erasing highlights. Select detail for this rounded diagnostic and retain its measured extra cost. Limits are case-specific regression margins, not universal perceptual limits. Reference daylight256 pose1 was checkpoint-resumed; its recorded wall time is only the resumed attempt, not fresh total cost.",
+    "rough": "All18 native chronological sheets: two rigs,112/256/512px,black/white/game backgrounds,all four poses and reference/draft/detail/refined. Previous12 reviewed sheets retain exact hashes. Browser daylight112 refined stepping inspects all four poses including loop return; no browser errors. Numerical comparisons include both candidate streams and independent stationary16384-sample references. Select1024-sample one-pass refined. It retains central reflection gradients, narrow moving daylight streaks, edge transitions and bright wedges. Draft flattens gradients and alters/softens some highlights; unfiltered512-sample detail has conspicuous grain. Refined has modest residual grain at512 but preserves the changing structure much closer to the unfiltered reference. Small residual loss of motion amplitude is measured (gain about0.9964..0.9984), not hidden. Limits are bounded regression margins for this diagnostic, not a universal rough-surface quality claim or calibrated wear preset. Cost remains recorded separately.",
+    "localized_volume": "All18 full native chronological sheets: two rigs,112/256/512px,black/white/game backgrounds,four poses and reference/draft/detail. Ten additional native causal-mask/control sheets inspected across both rigs. Browser daylight112 draft stepping inspects all four poses and loop return; no browser errors. Numerical comparisons include both candidate streams and independent stationary references. Draft retains localized attenuation, central gradients, fine facet lines, changing reflections and narrow perimeter fringes. Causal control comparison makes the local effect and its reflected/refracted copies visible; the mask is an optical difference ROI, not the material spatial boundary. Draft feature gain is1.0165..1.0421 with maximum relative residual0.07841; this small measured increase is retained explicitly. Detail reduces residual grain but is unnecessary for this reviewed diagnostic. Case limits are regression margins, not a universal perceptual limit or automatic clarity grade.",
+    "resolved_inclusion": "All18 full native chronological sheets: two rigs,112/256/512px,black/white/game backgrounds,four poses and reference/draft/detail. Ten additional native causal-mask/control sheets inspected across both rigs. Browser gameplay112 draft/reference stepping covers all four poses including loop return with no warnings/errors. Both candidate streams and independent stationary references are included numerically. Draft retains the central dark crystal,its narrow faceted boundary,subtle interior planes and reflected/refracted copies. Changing bright facets,thin lower daylight highlights and perimeter fringes remain matched. Some residual grain is visible within the dark inclusion at512px; detail reduces it but draft retains its shape and optical signal. Feature gain1.00000..1.00107,minimum correlation0.998739 and maximum relative residual0.050331 explicitly bound the retained signal. The causal mask is an optical difference ROI,not a first-surface geometry mask. Limits are case-specific regression margins,not universal mineral realism or a clarity grade.",
+    "thin_boundary": "All18 full native chronological sheets: two rigs,112/256/512px,black/white/game backgrounds,four poses and reference/draft/detail. Ten additional native causal-mask/control sheets inspected across both rigs. Browser gameplay112 draft/reference stepping covers all four poses including loop return with no warnings/errors. Both candidate streams and independent stationary references are included numerically. Draft retains the faint rectangular cavity footprint,narrow interior lines,peripheral facet signals and their optical copies. Small moving daylight highlights and gray internal contrast remain matched. Fine grain is visible within the512px draft footprint; detail reduces it,but draft preserves the boundaries and causal signal at all inspected sizes and backgrounds. The causal mask is an optical difference ROI,not a first-surface geometry mask or a claim that the physical gap thickness is spatially resolved at112pixels. These are case-specific regression margins,not universal mineral realism or calibrated fracture morphology."
+  },
+  "selected_profiles": {
+    "clear_faceted": "draft",
+    "strong_absorption": "draft",
+    "rounded": "detail",
+    "rough": "refined",
+    "localized_volume": "draft",
+    "resolved_inclusion": "draft",
+    "thin_boundary": "draft"
+  },
+  "limits": {
+    "clear_faceted": {
+      "spatial_rmse_lsb": 1.25,
+      "mean_bias_lsb": 0.1,
+      "temporal_residual_lsb": 1.5,
+      "loop_seam_residual_lsb": 1.5,
+      "reference_noise_lsb": 0.25
+    },
+    "strong_absorption": {
+      "spatial_rmse_lsb": 1.0,
+      "mean_bias_lsb": 0.05,
+      "temporal_residual_lsb": 1.2,
+      "loop_seam_residual_lsb": 1.2,
+      "reference_noise_lsb": 0.25
+    },
+    "rounded": {
+      "spatial_rmse_lsb": 1.0,
+      "mean_bias_lsb": 0.05,
+      "temporal_residual_lsb": 1.4,
+      "loop_seam_residual_lsb": 1.4,
+      "reference_noise_lsb": 0.3
+    },
+    "rough": {
+      "spatial_rmse_lsb": 3.0,
+      "mean_bias_lsb": 0.15,
+      "temporal_residual_lsb": 3.8,
+      "loop_seam_residual_lsb": 3.8,
+      "reference_noise_lsb": 1.1
+    },
+    "localized_volume": {
+      "spatial_rmse_lsb": 1.25,
+      "mean_bias_lsb": 0.1,
+      "temporal_residual_lsb": 1.6,
+      "loop_seam_residual_lsb": 1.6,
+      "reference_noise_lsb": 0.25
+    },
+    "resolved_inclusion": {
+      "spatial_rmse_lsb": 1.25,
+      "mean_bias_lsb": 0.1,
+      "temporal_residual_lsb": 1.6,
+      "loop_seam_residual_lsb": 1.6,
+      "reference_noise_lsb": 0.25
+    },
+    "thin_boundary": {
+      "spatial_rmse_lsb": 1.25,
+      "mean_bias_lsb": 0.1,
+      "temporal_residual_lsb": 1.6,
+      "loop_seam_residual_lsb": 1.6,
+      "reference_noise_lsb": 0.25
+    }
+  }
+}

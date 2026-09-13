@@ -71,5 +71,4 @@ bg_zenith = 0.28
 bg_horizon = 0.18
 bg_below = 0.08
 background_spectrum = SubResource("spd_0_0")
-dual_illuminant_kelvin = 2856.0
 white_spectrum = SubResource("spd_6500_0")

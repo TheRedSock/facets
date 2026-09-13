@@ -260,9 +260,9 @@ external package probes and release UI acceptance are documented in
 
 ## Lapidary contracts and current work
 
-The active readiness scope is `docs/lapidary-engine-readiness-plan-2026-09-13.md`;
-phase acceptance is recorded in `docs/READINESS_PROGRESS.md`. P0–P5 are not complete
-until their individual gates and final exported-game acceptance pass. Historical
+Current readiness results and validation limits are recorded in
+`docs/ENGINE_READINESS_REPORT.md`; the completed scope and working journal are
+preserved in the ignored archive. Historical
 audits/reports are in `docs/archive/`; never treat their old behavior as a current
 requirement. Keep `docs/` current and archive superseded Markdown with verified
 checksums. The archive and local documentation remain gitignored.

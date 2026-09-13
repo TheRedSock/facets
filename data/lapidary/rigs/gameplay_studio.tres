@@ -121,4 +121,3 @@ bg_horizon = 0.09
 bg_below = 0.03
 background_spectrum = SubResource("spd_5600_0")
 white_spectrum = SubResource("spd_5600_0")
-dual_illuminant_kelvin = 0.0
