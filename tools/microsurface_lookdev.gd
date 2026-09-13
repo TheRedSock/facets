@@ -37,7 +37,7 @@ func _initialize() -> void:
 		tracer.set_seed(8123)
 		var low_ms := tracer.accumulate(128)
 		var low := tracer.finalize_print(GemPrint.load_house())
-		var low_raw := tracer.finalize_print(GemPrint.load_house(), false, 1.0, Vector2i.ZERO, false)
+		var low_raw := tracer.finalize_print(GemPrint.load_house(), GemPrint.View.HOUSE_PRINT, 1.0, Vector2i.ZERO, false)
 		if not tracer.transport_error().is_empty():
 			printerr("FAIL: " + tracer.transport_error())
 			quit(1)
@@ -45,7 +45,7 @@ func _initialize() -> void:
 		tracer.reset_accumulation()
 		tracer.set_seed(8591)
 		var high_ms := tracer.accumulate(2048)
-		var high := tracer.finalize_print(GemPrint.load_house(), false, 1.0, Vector2i.ZERO, false)
+		var high := tracer.finalize_print(GemPrint.load_house(), GemPrint.View.HOUSE_PRINT, 1.0, Vector2i.ZERO, false)
 		if not tracer.transport_error().is_empty():
 			printerr("FAIL: " + tracer.transport_error())
 			quit(1)

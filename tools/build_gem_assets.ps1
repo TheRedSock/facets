@@ -9,7 +9,7 @@ param(
     [string]$Style = '',
     [switch]$RetainPrints,
     [string]$Clip = '',
-    [ValidateSet('interact', 'preview', 'board_live', 'clip_bake', 'hero', 'reference')]
+    [ValidateSet('interact', 'preview', 'clip_bake', 'hero', 'reference')]
     [string]$Rung = 'clip_bake',
     [ValidateSet('webp_lossless', 'bc7', 'astc4x4')]
     [string]$Codec = 'webp_lossless',

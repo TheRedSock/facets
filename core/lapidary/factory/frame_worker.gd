@@ -105,7 +105,7 @@ func _run_active(job: GemFrameJob, sample_limit: int) -> Dictionary:
 	# All prints use the same normalized stored master, including the first one.
 	if not tracer.load_linear_master(master):
 		return _fail("Invalid master dimensions/format")
-	var display := tracer.finalize_print(job.print_style, false, job.exposure, job.output_size, false)
+	var display := tracer.finalize_print(job.print_style, job.display_view, job.exposure, job.output_size, false)
 	var metadata := {"kind": "display", "master": master_key, "engine": GemRenderIdentity.pipeline_digest("print"), "width": display.get_width(), "height": display.get_height(),
 		"codec": "webp_lossless", "space": "srgb_straight_alpha", "status": "complete"}
 	if not store.publish(print_key, display.save_webp_to_buffer(false), metadata):

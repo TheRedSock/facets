@@ -1,12 +1,8 @@
 class_name GemPrint
 extends Resource
-## The house print: publishing/mastering transform applied to finished frames
-## (baked clips AND live draws — same print). It is not the gem, not the
-## grade, not the lighting. Grade cues must survive it; the evaluation
-## harness A/Bs raw vs print on every sheet.
-##
-## Sprite readability policies (edge rounding, env filter) live on GemRung,
-## not here. Bloom is not implemented — do not author bloom_* fields.
+## Display mastering settings, independent of transport and grade labels.
+## LINEAR XYZ is read through GemTracer.read_xyz/read_linear_master, not encoded.
+enum View { HOUSE_PRINT, DISPLAY_PREVIEW }
 
 const HOUSE_PATH := "res://data/lapidary/print/house_print.tres"
 
@@ -23,7 +19,7 @@ const HOUSE_PATH := "res://data/lapidary/print/house_print.tres"
 @export var black_point := 0.0
 
 @export_group("Chroma")
-## OKLCh-space chroma ceiling with soft rolloff (forbidden-neon governor).
+## Oklab chroma ceiling before hue/lightness-preserving sRGB gamut mapping.
 @export var chroma_ceiling := 0.34
 @export var chroma_soft := 0.10
 ## Desaturate only where luminance clips (keeps fire from going white mush).

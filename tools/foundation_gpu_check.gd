@@ -284,11 +284,11 @@ func _print_checks(tracer: GemTracer) -> void:
 	var buffers: Dictionary = tracer.get("_bufs")
 	rd.buffer_update(buffers["accum"], 0, values.to_byte_array().size(), values.to_byte_array())
 	tracer.samples_accumulated = 1
-	for raw in [false, true]:
-		var image := tracer.finalize_print(GemPrint.load_house(), raw)
+	for view in [GemPrint.View.HOUSE_PRINT, GemPrint.View.DISPLAY_PREVIEW]:
+		var image := tracer.finalize_print(GemPrint.load_house(), view)
 		var a := image.get_pixel(5, 5)
 		var b := image.get_pixel(25, 5)
-		check(absf(a.r - b.r) < 0.005 and absf(a.g - b.g) < 0.005 and absf(a.b - b.b) < 0.005, "straight RGB independent of coverage, raw=%s" % raw)
+		check(absf(a.r - b.r) < 0.005 and absf(a.g - b.g) < 0.005 and absf(a.b - b.b) < 0.005, "straight RGB independent of coverage, view=%s" % view)
 		check(a.a == 1.0 and absf(b.a - 0.5) < 0.005, "coverage preserved")
 	# Reduce a mix of opaque black and opaque white before the print.
 	for i in 32 * 32:
@@ -298,7 +298,7 @@ func _print_checks(tracer: GemTracer) -> void:
 		values[i * 4 + 2] = 1.08883 * power
 		values[i * 4 + 3] = 1.0
 	rd.buffer_update(buffers["accum"], 0, values.to_byte_array().size(), values.to_byte_array())
-	var reduced := tracer.finalize_print(null, true, 1.0, Vector2i(16, 16))
+	var reduced := tracer.finalize_print(null, GemPrint.View.DISPLAY_PREVIEW, 1.0, Vector2i(16, 16))
 	var pixel := reduced.get_pixel(5, 5)
 	var expected := Color(1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0).linear_to_srgb()
 	check(absf(pixel.r - expected.r) < 0.006, "linear resolve precedes nonlinear print")

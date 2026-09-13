@@ -67,7 +67,7 @@ func _initialize() -> void:
 				var n := mini(16, remaining)
 				tracer.accumulate(n)
 				remaining -= n
-			var img := tracer.finalize_print(GemPrint.load_house(), false, 1.0)
+			var img := tracer.finalize_print(GemPrint.load_house(), GemPrint.View.HOUSE_PRINT, 1.0)
 			row.blend_rect(img, Rect2i(0, 0, res, res), Vector2i(col * res, 0))
 			var st := _print_stats(img)
 			print("  %-22s %-12s %6.0f ms   mean %.2f  p10 %.2f  p90 %.2f  clipped %4.1f%%  dark %4.1f%%" % [

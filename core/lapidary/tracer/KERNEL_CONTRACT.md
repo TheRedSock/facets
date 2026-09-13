@@ -315,7 +315,7 @@ row_origin, background SPD offset, throughput_epsilon. Flags bit0 dispersion,
 bit1 approximate birefringence, bit2 volume, bit4 reserved,
 bit5 full four-wavelength geometry. The rejected SH prepass has been removed.
 
-Print push112B: output size,inv_samples,exposure,raw,white_point,contrast,
+Print push112B: output size,inv_samples,exposure,display_preview,white_point,contrast,
 black_point,chroma_ceiling,chroma_soft,highlight_desat,pad; XYZ→linear-sRGB matrix
 as three vec4 columns; source size and padding. Reconstruction push32B:
 resolution,step,sample_count,phi,normal_exponent,padding2; bindings0 input,

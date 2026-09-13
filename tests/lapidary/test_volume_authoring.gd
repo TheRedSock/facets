@@ -65,14 +65,13 @@ func _initialize() -> void:
 	bands.period_mm = 0.7
 	bands.axis = Vector3.ZERO
 	check(GemJobValidator.validate(job).contains("Banding needs"), "invalid band direction rejected before rendering")
-	var atelier: Control = load("res://scenes/design/gem_atelier.gd").new()
+	var document:=GemAuthoringDocument.new()
 	var authored: GemStone = load("res://data/lapidary/stones/amethyst.tres")
 	var original_identity := authored.fingerprint()
-	var working: GemStone = atelier.call("_duplicate_stone", authored)
-	working.material.scatter_per_mm = 2
-	working.condition.banding.contrast = 1
-	working.material.absorbers[0].amount = 0.01
-	check(authored.fingerprint() == original_identity, "Atelier edits cannot mutate shared external material resources")
-	atelier.free()
+	document.create(authored)
+	check(document.edit(["material","scatter_per_mm"],2.0).is_empty(),"Document edits explicit scattering")
+	check(document.edit(["condition","banding","contrast"],1.0).is_empty(),"Document edits explicit band contrast")
+	check(document.edit(["material","absorbers",0,"amount"],0.01).is_empty(),"Document edits absorber amount")
+	check(authored.fingerprint() == original_identity, "Authoring edits cannot mutate shared external material resources")
 	print("Volume authoring: %d checks, %d failures" % [checks, failures])
 	print("CHECK_COMPLETE: test_volume_authoring"); quit(1 if failures else 0)

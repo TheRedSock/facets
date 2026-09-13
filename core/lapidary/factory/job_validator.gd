@@ -63,6 +63,10 @@ static func validate(job: GemFrameJob) -> String:
 	error = _rig(job.rig)
 	if not error.is_empty():
 		return "Rig: " + error
+	if job.display_view not in GemPrint.View.values():
+		return "Unknown display view"
+	if job.display_view == GemPrint.View.DISPLAY_PREVIEW and job.game_style != null and not job.game_style.is_identity():
+		return "Display preview cannot apply game style; choose house print"
 	if job.print_style == null:
 		return "Print is missing"
 	if job.game_style != null and not job.game_style.validate().is_empty():

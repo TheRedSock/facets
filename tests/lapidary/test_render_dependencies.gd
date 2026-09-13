@@ -41,6 +41,7 @@ func _initialize() -> void:
 		"core/lapidary/tracer/shaders/gem_crystal.glsl": ["worker", "crystal", "crystal_display"],
 		"core/lapidary/tracer/crystal_shader.gd": ["worker", "crystal", "crystal_display"],
 		"core/lapidary/tracer/shaders/gem_print.glsl": ["worker", "scalar_display", "polarized_display", "crystal_display"],
+		"core/lapidary/tracer/print_pass.gd": ["worker", "scalar_display", "polarized_display", "crystal_display"],
 		"resources/lapidary/gem_print.gd": ["worker", "scalar_display", "polarized_display", "crystal_display"],
 		"core/lapidary/tracer/shaders/gem_volume.glsl": ["worker", "scalar", "polarized", "crystal", "scalar_display", "polarized_display", "crystal_display"],
 		"core/lapidary/microsurface/smith_walk.glsl": ["worker", "scalar", "polarized", "crystal", "scalar_display", "polarized_display", "crystal_display"],

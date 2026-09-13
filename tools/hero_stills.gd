@@ -61,7 +61,7 @@ func _initialize() -> void:
 			var n := mini(chunk, remaining)
 			ms += tracer.accumulate(n)
 			remaining -= n
-		var img := tracer.finalize_print(print_res, false, EXPOSURE)
+		var img := tracer.finalize_print(print_res, GemPrint.View.HOUSE_PRINT, EXPOSURE)
 		var path := OUT_DIR + "/%s.png" % tile_id
 		img.save_png(ProjectSettings.globalize_path(path))
 		var sheet_tile := img.duplicate()

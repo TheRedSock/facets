@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "cases": [
+    "clear_faceted",
+    "strong_absorption",
+    "rounded",
+    "rough",
+    "localized_volume",
+    "resolved_inclusion",
+    "thin_boundary"
+  ],
+  "feature_controls": {
+    "localized_volume": "clear_faceted",
+    "resolved_inclusion": "clear_faceted",
+    "thin_boundary": "clear_faceted"
+  },
+  "rigs": [
+    "gameplay_studio",
+    "reference_daylight"
+  ],
+  "sizes": [
+    112,
+    256,
+    512
+  ],
+  "frames": 4,
+  "fps": 8,
+  "specimen_seed": 71231,
+  "profiles": {
+    "draft": {
+      "samples": 128,
+      "passes": 3,
+      "bounces": 128,
+      "seeds": [
+        191,
+        91711
+      ],
+      "rung": "clip_bake"
+    },
+    "detail": {
+      "samples": 512,
+      "passes": 0,
+      "bounces": 256,
+      "seeds": [
+        191,
+        91711
+      ],
+      "rung": "hero"
+    },
+    "reference": {
+      "samples": 2048,
+      "passes": 0,
+      "bounces": 512,
+      "seeds": [
+        43117,
+        83177
+      ],
+      "rung": "reference"
+    }
+  },
+  "backgrounds": {
+    "black": [
+      0,
+      0,
+      0
+    ],
+    "white": [
+      1,
+      1,
+      1
+    ],
+    "game": [
+      0.025,
+      0.032,
+      0.05
+    ]
+  },
+  "status": "unaccepted; evaluate saved references before setting acceptance thresholds"
+}

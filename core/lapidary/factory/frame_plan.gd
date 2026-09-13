@@ -25,7 +25,7 @@ static func master_key(job: GemFrameJob) -> String:
 
 static func print_key(job: GemFrameJob) -> String:
 	return GemContentIdentity.digest(["display-v2", GemRenderIdentity.pipeline_digest("print"), master_key(job), job.print_style,
-		job.exposure, job.output_size, GemRigCompiler.compile(job.rig).white_xyz])
+		job.display_view, job.exposure, job.output_size, GemRigCompiler.compile(job.rig).white_xyz])
 
 static func display_key(job: GemFrameJob) -> String:
 	if job.game_style == null or job.game_style.is_identity():

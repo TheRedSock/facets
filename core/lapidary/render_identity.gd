@@ -7,7 +7,7 @@ const EXCLUSIVE := {
 	"style": ["core/lapidary/style_pipeline.gd", "resources/lapidary/gem_style.gd"],
 	"frame_execution": ["core/lapidary/factory/frame_worker.gd"],
 	"crystal": ["core/lapidary/tracer/crystal_shader.gd", "core/lapidary/tracer/shaders/gem_crystal.glsl", "core/lapidary/tracer/shaders/gem_crystal_path.glsl"],
-	"print": ["core/lapidary/tracer/shaders/gem_print.glsl", "resources/lapidary/gem_print.gd"],
+	"print": ["core/lapidary/tracer/print_pass.gd", "core/lapidary/tracer/shaders/gem_print.glsl", "resources/lapidary/gem_print.gd"],
 	"geometry": ["core/lapidary/tracer/geometry_aov.gd", "core/lapidary/tracer/shaders/gem_geometry_aov.glsl"],
 	"transport": ["core/lapidary/tracer/shaders/gem_pathtrace.glsl", "core/lapidary/tracer/shaders/gem_surface.glsl",
 		"core/lapidary/tracer/shaders/gem_volume.glsl", "core/lapidary/tracer/shaders/gem_polarization.glsl", "core/lapidary/tracer/shaders/gem_denoise.glsl", "core/lapidary/microsurface/smith_walk.glsl"]

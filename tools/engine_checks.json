@@ -1178,6 +1178,42 @@
         "res://tools/facet_program_gpu_check.gd"
       ],
       "completion": "CHECK_COMPLETE: facet_program_gpu_check"
+    },
+    {
+      "name": "print_gpu_check",
+      "args": [
+        "--script",
+        "res://tools/print_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: print_gpu_check",
+      "analysis": [
+        {
+          "name": "check_print_color",
+          "script": "tools/check_print_color.py",
+          "completion": "CHECK_COMPLETE: check_print_color"
+        }
+      ]
+    },
+    {
+      "name": "appearance_corpus",
+      "args": [
+        "--script",
+        "res://tools/appearance_corpus.gd"
+      ],
+      "mode": "gpu",
+      "timeout_seconds": 21600,
+      "completion": "CHECK_COMPLETE: appearance_corpus"
+    },
+    {
+      "name": "test_atelier_document_ui",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/lapidary/test_atelier_document_ui.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_atelier_document_ui"
     }
   ]
 }

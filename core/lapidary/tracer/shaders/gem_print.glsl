@@ -1,16 +1,6 @@
 #version 450
-// Lapidary print pass: XYZ accumulation -> display-ready sprite pixels.
-// Two modes:
-//   raw   — honest display transform (exposure + Reinhard + sRGB), for physics judgment
-//   print — the HOUSE PRINT: hue-preserving sprite tonescale, highlight desat,
-//           OKLCh chroma governor, optional black floor. Applied identically
-//           to baked clips and live draws. It publishes; it never fakes grade
-//           or lighting.
-//
-// The tonescale acts on the maximum RGB component and rescales the pixel, so
-// chromaticity (hue AND saturation) survives compression. Per-channel curves
-// desaturate toward white as they compress — the "washed out" look.
-
+// Both live preview and offline master reprints use this one display transform.
+// Linear XYZ is separate data, never this encoded image. See PRINT_CONTRACT.md.
 layout(local_size_x = 8, local_size_y = 8) in;
 
 layout(set = 0, binding = 0, std430) restrict readonly buffer Accum { vec4 accum[]; };
@@ -20,7 +10,7 @@ layout(push_constant, std430) uniform P {
 	ivec2 resolution;      // 0
 	float inv_samples;     // 8
 	float exposure;        // 12
-	uint raw;              // 16
+	uint display_preview;              // 16
 	float white_point;     // 20
 	float contrast;        // 24
 	float black_point;     // 28
@@ -44,9 +34,9 @@ vec3 srgb_to_oklab(vec3 c) {
 	float l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
 	float m = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
 	float s = 0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b;
-	l = pow(max(l, 0.0), 1.0 / 3.0);
-	m = pow(max(m, 0.0), 1.0 / 3.0);
-	s = pow(max(s, 0.0), 1.0 / 3.0);
+	l = sign(l) * pow(abs(l), 1.0 / 3.0);
+	m = sign(m) * pow(abs(m), 1.0 / 3.0);
+	s = sign(s) * pow(abs(s), 1.0 / 3.0);
 	return vec3(
 		0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
 		1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
@@ -64,6 +54,25 @@ vec3 oklab_to_srgb(vec3 lab) {
 		4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
 		-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
 		-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
+}
+
+// Constant Oklab lightness/hue, reduce chroma to the sRGB boundary.
+// Signed RGB reaches this stage intact. Only a final roundoff clamp is allowed.
+bool in_gamut(vec3 rgb) {
+    return all(greaterThanEqual(rgb, vec3(0.0))) && all(lessThanEqual(rgb, vec3(1.0)));
+}
+vec3 gamut_map(vec3 rgb) {
+    if (in_gamut(rgb)) return rgb;
+    vec3 lab = srgb_to_oklab(rgb);
+    if (lab.x <= 0.0) return vec3(0.0);
+    if (lab.x >= 1.0) return vec3(1.0);
+    float lo = 0.0, hi = 1.0;
+    for (int i = 0; i < 20; ++i) {
+        float t = (lo + hi) * 0.5;
+        if (in_gamut(oklab_to_srgb(vec3(lab.x, lab.yz * t)))) lo = t;
+        else hi = t;
+    }
+    return clamp(oklab_to_srgb(vec3(lab.x, lab.yz * lo)), 0.0, 1.0);
 }
 
 // Extended Reinhard with white point, then contrast about mid-grey.
@@ -95,10 +104,11 @@ void main() {
 	float cov = clamp(acc.w * pc.inv_samples, 0.0, 1.0);
 
 	mat3 xyz_to_rgb = mat3(pc.m0.xyz, pc.m1.xyz, pc.m2.xyz);
-	vec3 rgb = max(xyz_to_rgb * xyz, vec3(0.0)) * pc.exposure;
+	vec3 rgb = (xyz_to_rgb * xyz) * pc.exposure;
 
-	if (pc.raw != 0u) {
-		rgb = rgb / (1.0 + rgb);
+	if (pc.display_preview != 0u) {
+		float peak = max(0.0, max(rgb.r, max(rgb.g, rgb.b)));
+		rgb /= 1.0 + peak;
 	} else {
 		// Highlight desaturation: clipped energy goes white-ish smoothly
 		// (sensor-like) instead of turning neon.
@@ -119,12 +129,13 @@ void main() {
 			float over = chroma - pc.chroma_ceiling;
 			float newc = pc.chroma_ceiling + over * pc.chroma_soft / (pc.chroma_soft + over);
 			lab.yz *= newc / max(chroma, 1e-5);
-			rgb = clamp(oklab_to_srgb(lab), vec3(0.0), vec3(1.0));
+			rgb = oklab_to_srgb(lab);
 		}
-		// Optional black floor (0 = none).
-		rgb = pc.black_point + rgb * (1.0 - pc.black_point);
+
 	}
 
+	rgb = gamut_map(rgb);
+	if (pc.display_preview == 0u) rgb = pc.black_point + rgb * (1.0 - pc.black_point);
 	vec3 enc = vec3(srgb_encode(clamp(rgb.r, 0.0, 1.0)),
 		srgb_encode(clamp(rgb.g, 0.0, 1.0)),
 		srgb_encode(clamp(rgb.b, 0.0, 1.0)));

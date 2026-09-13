@@ -145,9 +145,9 @@ func _showcase(stone: GemStone, out: String) -> void:
 		tracer.set_clip_sample(Quaternion(Vector3.RIGHT, deg_to_rad(-12.0)), 0.0, Vector4.ONE, 1.25)
 		var time_low := tracer.accumulate(128)
 		var low := tracer.finalize_print(GemPrint.load_house())
-		var low_raw := tracer.finalize_print(GemPrint.load_house(), false, 1.0, Vector2i.ZERO, false)
+		var low_raw := tracer.finalize_print(GemPrint.load_house(), GemPrint.View.HOUSE_PRINT, 1.0, Vector2i.ZERO, false)
 		var time_high := tracer.accumulate(2048 - 128)
-		var reference := tracer.finalize_print(GemPrint.load_house(), false, 1.0, Vector2i.ZERO, false)
+		var reference := tracer.finalize_print(GemPrint.load_house(), GemPrint.View.HOUSE_PRINT, 1.0, Vector2i.ZERO, false)
 		sheet.blit_rect(low, Rect2i(0, 0, 256, 256), Vector2i(column * 256, 0))
 		sheet.blit_rect(reference, Rect2i(0, 0, 256, 256), Vector2i(column * 256, 256))
 		metrics.append({"alpha": stone.condition.finish.alpha_u, "low_spp": 128, "reference_spp": 2048,

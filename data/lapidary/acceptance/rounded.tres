@@ -1,0 +1,347 @@
+[gd_resource type="Resource" script_class="GemStone" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_r2suw"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_banding.gd" id="2_m57vt"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_defect.gd" id="3_vly48"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_finish_field.gd" id="4_eiihi"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_surface.gd" id="5_q286g"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_rounding.gd" id="6_j81s7"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_condition.gd" id="7_j6hjl"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="8_w2pvm"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_workmanship.gd" id="9_gi6t3"]
+[ext_resource type="Script" path="res://core/lapidary/cut/facet_group.gd" id="10_ug44h"]
+[ext_resource type="Script" path="res://core/lapidary/cut/facet_directions.gd" id="11_uk3l8"]
+[ext_resource type="Script" path="res://core/lapidary/cut/cut_template.gd" id="12_d8w0w"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_grade.gd" id="13_sg87r"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_absorber.gd" id="14_oe5uj"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="15_ug5u6"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="16_e1msu"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="17_p27o4"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_stone.gd" id="18_n037b"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_shape.gd" id="19_sfm1e"]
+
+[sub_resource type="Resource" id="Resource_vov2n"]
+script = ExtResource("1_r2suw")
+
+[sub_resource type="Resource" id="Resource_34nxa"]
+script = ExtResource("2_m57vt")
+evidence = SubResource("Resource_vov2n")
+
+[sub_resource type="Resource" id="Resource_pksx4"]
+script = ExtResource("5_q286g")
+
+[sub_resource type="Resource" id="Resource_2hnja"]
+script = ExtResource("6_j81s7")
+radius_mm = 0.06
+
+[sub_resource type="Resource" id="Resource_g8tdp"]
+script = ExtResource("9_gi6t3")
+
+[sub_resource type="Resource" id="Resource_khkhf"]
+script = ExtResource("7_j6hjl")
+rounding = SubResource("Resource_2hnja")
+finish = SubResource("Resource_pksx4")
+workmanship = SubResource("Resource_g8tdp")
+banding = SubResource("Resource_34nxa")
+
+[sub_resource type="Resource" id="Resource_hg72b"]
+script = ExtResource("11_uk3l8")
+set_id = &"main"
+divisions = 8
+indices = PackedFloat64Array(0, 1, 2, 3, 4, 5, 6, 7)
+
+[sub_resource type="Resource" id="Resource_vfoig"]
+script = ExtResource("10_ug44h")
+group_id = &"crown"
+directions = SubResource("Resource_hg72b")
+inclination = "p.crown * p.crown_scale"
+height = "p.girdle"
+meet_groups = PackedStringArray()
+
+[sub_resource type="Resource" id="Resource_o2vr2"]
+script = ExtResource("11_uk3l8")
+set_id = &"halves"
+divisions = 16
+indices = PackedFloat64Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+phase_degrees = 11.25
+
+[sub_resource type="Resource" id="Resource_d4iep"]
+script = ExtResource("10_ug44h")
+group_id = &"upper"
+directions = SubResource("Resource_o2vr2")
+inclination = "p.upper * p.crown_scale"
+height = "p.girdle"
+meet_groups = PackedStringArray()
+zone = 2
+
+[sub_resource type="Resource" id="Resource_q56dk"]
+script = ExtResource("11_uk3l8")
+set_id = &"star_0"
+divisions = 8
+indices = PackedFloat64Array(0)
+phase_degrees = 22.5
+
+[sub_resource type="Resource" id="Resource_uoq44"]
+script = ExtResource("10_ug44h")
+group_id = &"star_0"
+directions = SubResource("Resource_q56dk")
+inclination = "p.star * p.crown_scale"
+scale = "p.table + 0.5 * (1-p.table)"
+height = "meet"
+meet_groups = PackedStringArray("crown", "upper")
+
+[sub_resource type="Resource" id="Resource_m525d"]
+script = ExtResource("11_uk3l8")
+set_id = &"star_1"
+divisions = 8
+indices = PackedFloat64Array(1)
+phase_degrees = 22.5
+
+[sub_resource type="Resource" id="Resource_up4vj"]
+script = ExtResource("10_ug44h")
+group_id = &"star_1"
+directions = SubResource("Resource_m525d")
+inclination = "p.star * p.crown_scale"
+scale = "p.table + 0.5 * (1-p.table)"
+height = "meet"
+meet_groups = PackedStringArray("crown", "upper", "star_0")
+
+[sub_resource type="Resource" id="Resource_47f8v"]
+script = ExtResource("11_uk3l8")
+set_id = &"star_2"
+divisions = 8
+indices = PackedFloat64Array(2)
+phase_degrees = 22.5
+
+[sub_resource type="Resource" id="Resource_ardjs"]
+script = ExtResource("10_ug44h")
+group_id = &"star_2"
+directions = SubResource("Resource_47f8v")
+inclination = "p.star * p.crown_scale"
+scale = "p.table + 0.5 * (1-p.table)"
+height = "meet"
+meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1")
+
+[sub_resource type="Resource" id="Resource_askj1"]
+script = ExtResource("11_uk3l8")
+set_id = &"star_3"
+divisions = 8
+indices = PackedFloat64Array(3)
+phase_degrees = 22.5
+
+[sub_resource type="Resource" id="Resource_fcg40"]
+script = ExtResource("10_ug44h")
+group_id = &"star_3"
+directions = SubResource("Resource_askj1")
+inclination = "p.star * p.crown_scale"
+scale = "p.table + 0.5 * (1-p.table)"
+height = "meet"
+meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1", "star_2")
+
+[sub_resource type="Resource" id="Resource_mvoog"]
+script = ExtResource("11_uk3l8")
+set_id = &"star_4"
+divisions = 8
+indices = PackedFloat64Array(4)
+phase_degrees = 22.5
+
+[sub_resource type="Resource" id="Resource_dm8bs"]
+script = ExtResource("10_ug44h")
+group_id = &"star_4"
+directions = SubResource("Resource_mvoog")
+inclination = "p.star * p.crown_scale"
+scale = "p.table + 0.5 * (1-p.table)"
+height = "meet"
+meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1", "star_2", "star_3")
+
+[sub_resource type="Resource" id="Resource_l47wx"]
+script = ExtResource("11_uk3l8")
+set_id = &"star_5"
+divisions = 8
+indices = PackedFloat64Array(5)
+phase_degrees = 22.5
+
+[sub_resource type="Resource" id="Resource_1rvir"]
+script = ExtResource("10_ug44h")
+group_id = &"star_5"
+directions = SubResource("Resource_l47wx")
+inclination = "p.star * p.crown_scale"
+scale = "p.table + 0.5 * (1-p.table)"
+height = "meet"
+meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1", "star_2", "star_3", "star_4")
+
+[sub_resource type="Resource" id="Resource_spphq"]
+script = ExtResource("11_uk3l8")
+set_id = &"star_6"
+divisions = 8
+indices = PackedFloat64Array(6)
+phase_degrees = 22.5
+
+[sub_resource type="Resource" id="Resource_grdw5"]
+script = ExtResource("10_ug44h")
+group_id = &"star_6"
+directions = SubResource("Resource_spphq")
+inclination = "p.star * p.crown_scale"
+scale = "p.table + 0.5 * (1-p.table)"
+height = "meet"
+meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1", "star_2", "star_3", "star_4", "star_5")
+
+[sub_resource type="Resource" id="Resource_8rhac"]
+script = ExtResource("11_uk3l8")
+set_id = &"star_7"
+divisions = 8
+indices = PackedFloat64Array(7)
+phase_degrees = 22.5
+
+[sub_resource type="Resource" id="Resource_cx6m3"]
+script = ExtResource("10_ug44h")
+group_id = &"star_7"
+directions = SubResource("Resource_8rhac")
+inclination = "p.star * p.crown_scale"
+scale = "p.table + 0.5 * (1-p.table)"
+height = "meet"
+meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1", "star_2", "star_3", "star_4", "star_5", "star_6")
+
+[sub_resource type="Resource" id="Resource_apb0f"]
+script = ExtResource("11_uk3l8")
+set_id = &"axis"
+divisions = 1
+indices = PackedFloat64Array(0)
+
+[sub_resource type="Resource" id="Resource_droxx"]
+script = ExtResource("10_ug44h")
+group_id = &"table"
+directions = SubResource("Resource_apb0f")
+inclination = "0"
+scale = "0"
+height = "p.girdle + (1-p.table) * s.main.mean_support * tan(deg_to_rad(p.crown * p.crown_scale))"
+meet_groups = PackedStringArray()
+zone = 0
+
+[sub_resource type="Resource" id="Resource_nylgb"]
+script = ExtResource("10_ug44h")
+group_id = &"pavilion"
+directions = SubResource("Resource_hg72b")
+inclination = "p.pavilion"
+side = -1
+height = "-p.girdle"
+meet_groups = PackedStringArray()
+zone = 4
+
+[sub_resource type="Resource" id="Resource_1d0uh"]
+script = ExtResource("10_ug44h")
+group_id = &"lower"
+directions = SubResource("Resource_o2vr2")
+inclination = "p.pavilion + p.lower_delta"
+side = -1
+height = "-p.girdle"
+meet_groups = PackedStringArray()
+zone = 5
+
+[sub_resource type="Resource" id="Resource_kwl36"]
+script = ExtResource("10_ug44h")
+group_id = &"culet"
+directions = SubResource("Resource_apb0f")
+inclination = "0"
+side = -1
+scale = "0"
+height = "meet * p.culet"
+meet_groups = PackedStringArray("pavilion", "lower")
+zone = 6
+
+[sub_resource type="Resource" id="Resource_wkccs"]
+script = ExtResource("12_d8w0w")
+cut_id = &"brilliant"
+parameters = {
+"crown": 34.5,
+"crown_scale": 1.0,
+"culet": 0.96,
+"girdle": 0.03,
+"lower_delta": 6.0,
+"pavilion": 41.0,
+"star": 19.0,
+"table": 0.56,
+"upper": 42.5
+}
+groups = Array[ExtResource("10_ug44h")]([SubResource("Resource_vfoig"), SubResource("Resource_d4iep"), SubResource("Resource_uoq44"), SubResource("Resource_up4vj"), SubResource("Resource_ardjs"), SubResource("Resource_fcg40"), SubResource("Resource_dm8bs"), SubResource("Resource_1rvir"), SubResource("Resource_grdw5"), SubResource("Resource_cx6m3"), SubResource("Resource_droxx"), SubResource("Resource_nylgb"), SubResource("Resource_1d0uh"), SubResource("Resource_kwl36")])
+
+[sub_resource type="Resource" id="Resource_y7llj"]
+script = ExtResource("13_sg87r")
+grade_id = &"t1"
+cut = 0.62
+clarity = 0.58
+surface = 0.62
+crystal = 0.66
+
+[sub_resource type="Resource" id="Resource_kqde4"]
+script = ExtResource("1_r2suw")
+method = "Authored homogeneous HG coefficient"
+assumptions = "Catalog look-development value; not a measured scattering population or grade law."
+
+[sub_resource type="Resource" id="Resource_h8yri"]
+script = ExtResource("1_r2suw")
+kind = 1
+citation = "G. Ghosh, Opt. Commun. 163, 95-102 (1999), DOI 10.1016/S0030-4018(99)00091-7; refractiveindex.info SiO2/Ghosh-e"
+method = "Published principal dispersion transcribed from the CC0 refractiveindex.info database; formula-1 poles squared into um^2, formula-2 constant stored as C=0 term"
+source_record = {
+"coefficients": [0.28851804, 1.09509924, 0.0102101864, 1.15662475, 100],
+"formula": 2,
+"temperature": "room temperature; exact value unreported",
+"url": "https://raw.githubusercontent.com/polyanskiy/refractiveindex.info-database/master/database/data/main/SiO2/nk/Ghosh-e.yml"
+}
+
+[sub_resource type="Resource" id="Resource_5qph0"]
+script = ExtResource("16_e1msu")
+b = PackedFloat64Array(1.09509924, 1.15662475, 0.28851804)
+c_um2 = PackedFloat64Array(0.0102101864, 100, 0)
+range_nm = Vector2(198, 2053.1)
+evidence = SubResource("Resource_h8yri")
+
+[sub_resource type="Resource" id="Resource_juy62"]
+script = ExtResource("1_r2suw")
+kind = 1
+citation = "G. Ghosh, Opt. Commun. 163, 95-102 (1999), DOI 10.1016/S0030-4018(99)00091-7; refractiveindex.info SiO2/Ghosh-o"
+method = "Published principal dispersion transcribed from the CC0 refractiveindex.info database; formula-1 poles squared into um^2, formula-2 constant stored as C=0 term"
+source_record = {
+"coefficients": [0.28604141, 1.07044083, 0.0100585997, 1.10202242, 100],
+"formula": 2,
+"temperature": "room temperature; exact value unreported",
+"url": "https://raw.githubusercontent.com/polyanskiy/refractiveindex.info-database/master/database/data/main/SiO2/nk/Ghosh-o.yml"
+}
+
+[sub_resource type="Resource" id="Resource_y3odm"]
+script = ExtResource("16_e1msu")
+b = PackedFloat64Array(1.07044083, 1.10202242, 0.28604141)
+c_um2 = PackedFloat64Array(0.0100585997, 100, 0)
+range_nm = Vector2(198, 2053.1)
+evidence = SubResource("Resource_juy62")
+
+[sub_resource type="Resource" id="Resource_81h63"]
+script = ExtResource("17_p27o4")
+species_id = &"quartz"
+display_name = "Quartz (SiO2)"
+source_note = "Alpha-quartz principal dispersion: Ghosh (1999), ordinary and extraordinary curves; see per-axis evidence. Optic axis normal to the table. Mohs hardness is metadata; color and specimen scattering are separate authored inputs."
+ordinary = SubResource("Resource_y3odm")
+extraordinary = SubResource("Resource_5qph0")
+
+[sub_resource type="Resource" id="Resource_8s1hh"]
+script = ExtResource("15_ug5u6")
+species = SubResource("Resource_81h63")
+scatter_g = 0.55
+scattering_evidence = SubResource("Resource_kqde4")
+
+[sub_resource type="Resource" id="Resource_f88a1"]
+script = ExtResource("19_sfm1e")
+outline_points = PackedVector2Array()
+loft_sections = PackedVector2Array(-0.65, 0.05, -0.04, 1, 0.04, 1, 0.35, 0.55)
+
+[resource]
+script = ExtResource("18_n037b")
+stone_id = &"rounded"
+material = SubResource("Resource_8s1hh")
+condition = SubResource("Resource_khkhf")
+cut = SubResource("Resource_wkccs")
+shape = SubResource("Resource_f88a1")
+grade = SubResource("Resource_y7llj")
+seed = 71231
+size_mm = 2.5

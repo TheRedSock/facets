@@ -4,7 +4,7 @@ extends RefCounted
 ##
 ## Consumes StoneInstance dictionaries from LapidaryStoneCompiler plus a light
 ## rig, dispatches the spectral path tracer, and finalizes through the GPU
-## print pass (house print or raw display transform). Batch-ready: stones are
+## print pass (house print or exposure-adjusted display preview). Batch-ready: stones are
 ## ranges in shared buffers, instances sit on a pixel grid (1x1 = single stone).
 ##
 ## Requires a RenderingDevice-capable context (NOT --headless).
@@ -792,45 +792,10 @@ func _dispatch_trace(row_origin: int, rows: int, spp_now: int) -> float:
 
 # ------------------------------------------------------------------ output
 
-## GPU print pass. print_res is required for house print; raw bypasses mastering.
-func finalize_print(print_res: GemPrint = null, raw := false, exposure := 1.0, output_size := Vector2i.ZERO, reconstruct := true) -> Image:
-	var start := Time.get_ticks_usec()
-	var target := Vector2i(width, height) if output_size == Vector2i.ZERO else output_size
-	assert(target.x > 0 and target.y > 0)
-	_create_print_target(target, reconstruct_linear() if reconstruct and _denoise_passes > 0 else _bufs["accum"])
-	var pcb := StreamPeerBuffer.new()
-	pcb.put_32(target.x)
-	pcb.put_32(target.y)
-	pcb.put_float(1.0 / maxf(1.0, float(samples_accumulated)))
-	pcb.put_float(exposure * (print_res.exposure if print_res != null else 1.0))
-	pcb.put_u32(1 if raw else 0)
-	pcb.put_float(3.2 if print_res == null else 1.0 + 3.0 * print_res.shoulder_strength)
-	pcb.put_float(print_res.contrast if print_res != null else 1.0)
-	pcb.put_float(print_res.black_point if print_res != null else 0.0)
-	pcb.put_float(print_res.chroma_ceiling if print_res != null else 10.0)
-	pcb.put_float(print_res.chroma_soft if print_res != null else 0.1)
-	pcb.put_float(print_res.highlight_desat if print_res != null else 0.0)
-	pcb.put_float(0.0)
-	# XYZ -> linear sRGB with the rig's as-shot white balance, as mat3 columns.
-	for col: Vector3 in [_xyz_to_rgb.x, _xyz_to_rgb.y, _xyz_to_rgb.z]:
-		for v: float in [col.x, col.y, col.z, 0.0]:
-			pcb.put_float(v)
-	for value in [width, height, 0, 0]:
-		pcb.put_32(value)
-	assert(pcb.data_array.size() == PRINT_PUSH_SIZE)
-
-	var cl := _rd.compute_list_begin()
-	_rd.compute_list_bind_compute_pipeline(cl, _pipelines["print"])
-	_rd.compute_list_bind_uniform_set(cl, _sets["print"], 0)
-	_rd.compute_list_set_push_constant(cl, pcb.data_array, PRINT_PUSH_SIZE)
-	@warning_ignore("integer_division")
-	_rd.compute_list_dispatch(cl, (target.x + 7) / 8, (target.y + 7) / 8, 1)
-	_rd.compute_list_end()
-	_rd.submit()
-	_rd.sync()
-	var data := _rd.texture_get_data(_print_tex, 0)
-	last_print_ms = float(Time.get_ticks_usec() - start) / 1000.0
-	return Image.create_from_data(target.x, target.y, false, Image.FORMAT_RGBA8, data)
+## Encoded display view. Linear XYZ remains available through data readback.
+func finalize_print(print_res: GemPrint = null, view: GemPrint.View = GemPrint.View.HOUSE_PRINT, exposure := 1.0, output_size := Vector2i.ZERO, reconstruct := true) -> Image:
+	assert(view != GemPrint.View.HOUSE_PRINT or print_res != null, "House print requires a GemPrint")
+	return GemPrintPass.render(self, print_res, view, exposure, output_size, reconstruct)
 
 
 ## Reconstruction never overwrites the reference accumulation. It is cached

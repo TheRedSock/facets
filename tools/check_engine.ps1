@@ -3,6 +3,7 @@ param(
     [switch]$Gpu,
     [switch]$CrystalPrecision,
     [string]$ReferencePython = '',
+    [string]$AnalysisPython = 'python',
     [string[]]$Only = @(),
     [switch]$List
 )
@@ -52,6 +53,17 @@ foreach ($stage in $stages) {
         Write-Output "FAIL $($stage.name): completed=$($result.completed), exit=$code, environment_errors=$($result.environment_errors.Count)"
         Write-Output $output
     } else { Write-Output "PASS $($stage.name)" }
+    if ($result.passed -and $stage.analysis) {
+        foreach ($analysis in $stage.analysis) {
+            $analysisStarted = Get-Date
+            $execution = Invoke-BoundedCheckProcess -Executable $AnalysisPython -Arguments @((Join-Path $projectRoot $analysis.script)) -TimeoutSeconds 1800
+            $execution.output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot ($analysis.name + '.log'))
+            $analysisResult = Get-GodotCheckResult -ExitCode $execution.exit_code -Output $execution.output -Completion $analysis.completion
+            $results += [ordered]@{ name = $analysis.name; result = $analysisResult; elapsed_seconds = ((Get-Date) - $analysisStarted).TotalSeconds }
+            if ($analysisResult.passed) { Write-Output "PASS $($analysis.name)" }
+            else { $failed += $analysis.name; Write-Output "FAIL $($analysis.name)"; Write-Output $execution.output }
+        }
+    }
     $results | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot 'results.json')
 }
 if ($ReferencePython -and $failed.Count -eq 0 -and $Only.Count -eq 0) {
