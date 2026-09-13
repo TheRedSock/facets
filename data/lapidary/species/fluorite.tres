@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="Resource_nirht"]
 script = ExtResource("2_c4cyc")
 kind = 1
-citation = "Sellmeier: I. H. Malitson, Appl. Opt. 2, 1103-1107 (1963) (refractiveindex.info CaF2/Malitson); published poles 0.050263605/0.1003909/34.649040 um SQUARED to um^2. n_D~1.4338, dispersion 0.007 (low). Cubic: birefringence 0. Mohs 4 — the wear model scratches it honestly. Blue fluorescence ~425 nm (Eu2+ activator; the word 'fluorescence' comes from this mineral). Strong colour banding (zoning)."
+citation = "Sellmeier: I. H. Malitson, Appl. Opt. 2, 1103-1107 (1963) (refractiveindex.info CaF2/Malitson); published poles 0.050263605/0.1003909/34.649040 um SQUARED to um^2. n_D~1.4338, dispersion 0.007 (low). Cubic: birefringence 0. Mohs 4 — hardness is metadata only. Blue fluorescence ~425 nm (Eu2+ activator; the word 'fluorescence' comes from this mineral). Strong colour banding (zoning)."
 method = "Published Sellmeier coefficients"
 
 [sub_resource type="Resource" id="Resource_8i562"]
@@ -20,6 +20,6 @@ evidence = SubResource("Resource_nirht")
 script = ExtResource("4_j4883")
 species_id = &"fluorite"
 display_name = "Fluorite (CaF2)"
-source_note = "Sellmeier: I. H. Malitson, Appl. Opt. 2, 1103-1107 (1963) (refractiveindex.info CaF2/Malitson); published poles 0.050263605/0.1003909/34.649040 um SQUARED to um^2. n_D~1.4338, dispersion 0.007 (low). Cubic: birefringence 0. Mohs 4 — the wear model scratches it honestly. Blue fluorescence ~425 nm (Eu2+ activator; the word 'fluorescence' comes from this mineral). Strong colour banding (zoning)."
+source_note = "Sellmeier: I. H. Malitson, Appl. Opt. 2, 1103-1107 (1963) (refractiveindex.info CaF2/Malitson); published poles 0.050263605/0.1003909/34.649040 um SQUARED to um^2. n_D~1.4338, dispersion 0.007 (low). Cubic: birefringence 0. Mohs 4 — hardness is metadata only. Blue fluorescence ~425 nm (Eu2+ activator; the word 'fluorescence' comes from this mineral). Strong colour banding (zoning)."
 ordinary = SubResource("Resource_8i562")
 hardness_mohs = 4.0

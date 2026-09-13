@@ -6,6 +6,7 @@ var generation := -1
 var _heartbeat := ""
 var _heartbeat_at := 0
 var _sequence := 0
+var _message_cache: Dictionary = {}
 func _initialize()->void:_run.call_deferred()
 func _run()->void:
 	var store := ""
@@ -111,9 +112,8 @@ func _attach_image(response:Dictionary,image:Image)->bool:
 	response.image=filename;response.image_sha256=FileAccess.get_sha256(session.path_join(filename));return true
 func _message()->Dictionary:
 	var path:=session.path_join("request.json")
-	if not FileAccess.file_exists(path):return {}
-	var value:Variant=JSON.parse_string(FileAccess.get_file_as_string(path))
-	return value if value is Dictionary else {}
+	_message_cache=GemAtelierSessionFiles.read_message(path,_message_cache)
+	return _message_cache
 func _current()->bool:
 	var current:=_message()
 	return int(current.get("generation",-1))==generation and current.get("action") not in ["stop","cancel"]

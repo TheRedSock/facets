@@ -14,9 +14,14 @@ requests remain untouched. The client reads and hashes one immutable byte buffer
 if collection overtakes a read, it retries the latest response. Session logs,
 completed delivery directories and the resumable optical store are retained.
 
+Readers retain the last complete JSON message during a transient mailbox
+replacement/read failure. An incomplete read cannot consume a response or
+cancel the worker's current generation. A later valid cancel or stop still
+supersedes that generation through the same mailbox.
+
 The inspector exposes stored, active resource fields and named enum values. Curves use explicit normalized-time/value/incoming-slope/outgoing-slope entries. Orientations are edited as Euler degrees and stored as unit quaternions. Named effect curves can be created and removed from their typed dictionary. Generic orientation keys and time curves use the shared clip sampler; see `core/lapidary/clips/CONTRACT.md`. Facet inspection shows the manufactured declarative hull before rounding/cleavage, with stable IDs, meets, dimensions and top/front sections. Native-size output is shown separately from the enlarged preview.
 
-Device reports identify allocator buffer/texture ownership, relevant limits and timestamp availability. Plan/unit/elapsed times are wall-clock values. Driver internal memory is not VRAM capacity. Responsiveness and final clip controls are still under P4 acceptance; no interactive frame budget has yet been certified.
+Device reports identify allocator buffer/texture ownership, relevant limits and timestamp availability. Plan/unit/elapsed times are wall-clock values. Driver internal memory is not VRAM capacity.
 
 The selected desktop budget is at most 100 ms from an edit through request
 submission to the next UI draw. `atelier_latency_check.gd` measures that path
@@ -24,6 +29,16 @@ and separately reports cold initialization and first-image/completion latency
 for material, geometry, pose and print changes. Print changes must reuse the
 optical master. Run this gate with no concurrent optical worker before accepting
 its measurements; its presence alone is not responsiveness acceptance.
+
+The 2026-09-13 uncontended RTX4060 Laptop/Godot4.6.1 gate passed all20 edits:
+material/geometry/pose/print acknowledgement p95 was51.82/49.13/46.46/49.22 ms.
+This workload uses224px internal/112px output,64samples and five distinct edits
+per category. Material/geometry/pose changes each produced a new optical master;
+print changes reused it. Completion p95 was2.27/2.32/2.20/0.284 seconds.
+Cold initialization is a separate one-run observation: first image1.62 seconds,
+completion3.52 seconds. Evidence: `artifacts/atelier-latency/1177815/report.json`.
+These measurements do not promise identical completion times for larger or
+more complex specimens.
 
 Atelier frame telemetry uses successive monotonic microsecond timestamps, not
 Godot's potentially smoothed/clamped delta. Sampling a contended GPU session is

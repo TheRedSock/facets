@@ -7,7 +7,7 @@ const EXCLUDED := {
 	"cut_template.gd": ["cut_id"],
 	"gem_species.gd": ["display_name", "hardness_mohs"],
 	"gem_material.gd": ["material_id"],
-	"gem_chromophore.gd": ["chromophore_id", "display_name", "ui_color"],
+	"gem_chromophore.gd": ["chromophore_id", "display_name"],
 }
 
 static func inputs(value: Variant) -> Variant:

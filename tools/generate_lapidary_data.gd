@@ -258,49 +258,42 @@ func _build_chromophores() -> Dictionary:
 	out[&"ruby_cr"] = _chromophore(&"ruby_cr", "Chromium (ruby, corundum)",
 		"Cr3+ in corundum. o-ray (E⊥c): Y band ~410 nm, U band ~556 nm (GIA G&G Spring 2020 Dubinsky et al.), B-lines ~468-475 nm, ~480 nm transmission saddle, R-line 694 nm. e-ray (E∥c): ~420/~552 with weaker U band. Curves authored for the kernel's GIA polarisation mix. Concentration 0.40 for a 5.4 mm stone. Fluorescence is not modeled.",
 		_curve(0.05, [[1.55, 410.0, 28.0], [1.72, 556.0, 38.0], [0.42, 478.0, 18.0], [0.22, 468.0, 8.0], [0.35, 380.0, 30.0], [0.05, 694.0, 6.0]]),
-		_curve(0.05, [[1.40, 420.0, 28.0], [1.35, 552.0, 34.0], [0.22, 478.0, 16.0], [0.30, 380.0, 30.0], [0.05, 694.0, 6.0]]),
-		Color(0.88, 0.11, 0.25))
+		_curve(0.05, [[1.40, 420.0, 28.0], [1.35, 552.0, 34.0], [0.22, 478.0, 16.0], [0.30, 380.0, 30.0], [0.05, 694.0, 6.0]]))
 
 	# Fe2+-Ti4+ IVCT: broad band ~580 nm reaching 700, blue window 440-480,
 	# weak Fe3+ features ~377/388/450.
 	out[&"sapphire_fe_ti"] = _chromophore(&"sapphire_fe_ti", "Iron-titanium (blue sapphire)",
-		"Fe2+-Ti4+ intervalence charge transfer in corundum: broad band ~580 nm extending toward 700 nm (GIA G&G Spring 2020; Molecules 27:4716 FORS ~570 nm), blue window 440-480 nm, weak Fe3+ bands 377/388/450 nm. Isotropic approximation (no e-ray curve). Fluorescence override 0: iron QUENCHES the corundum Cr glow (blue sapphire is inert).",
+		"Fe2+-Ti4+ intervalence charge transfer in corundum: broad band ~580 nm extending toward 700 nm (GIA G&G Spring 2020; Molecules 27:4716 FORS ~570 nm), blue window 440-480 nm, weak Fe3+ bands 377/388/450 nm. Isotropic approximation (no e-ray curve). Fluorescence is not modeled.",
 		_curve(0.05, [[0.75, 580.0, 55.0], [0.55, 700.0, 80.0], [0.12, 450.0, 12.0], [0.35, 388.0, 10.0], [0.20, 377.0, 8.0]]),
-		PackedFloat32Array(),
-		Color(0.15, 0.35, 0.85))
+		PackedFloat32Array())
 
 	# Cr3+ in beryl: bands ~430 and ~615 nm, green window 500-550, partial deep
-	# red return (Chelsea-filter red flash). Fluorescence override: Cr3+ glows
-	# in beryl too, but far weaker than in corundum (0.06 @ 683 nm R-line).
+	# red return (Chelsea-filter red flash). Fluorescence is not modeled.
 	out[&"emerald_cr"] = _chromophore(&"emerald_cr", "Chromium (emerald, beryl)",
 		"Cr3+ in beryl: bands ~430 nm and ~600-630 nm (o-ray 430/610, Minerals 13:1260 Kagem; Cryst. Res. Technol. 2300052 keeps ~500 nm transmission), green window 500-550 nm, partial deep-red transmission (Chelsea filter). Isotropic approximation. Weak Cr3+ R-line fluorescence 683 nm.",
 		_curve(0.05, [[1.10, 430.0, 30.0], [1.00, 615.0, 40.0], [0.28, 380.0, 25.0]]),
-		PackedFloat32Array(),
-		Color(0.10, 0.72, 0.45))
+		PackedFloat32Array())
 
 	# Fe4+ hole centre in irradiated quartz: broad band centred ~545 nm;
 	# transmits violet-blue and some red -> purple.
 	out[&"amethyst_fe_quartz"] = _chromophore(&"amethyst_fe_quartz", "Iron colour centre (amethyst)",
 		"O2- -> Fe4+ charge transfer in irradiated quartz, centred in the yellow-green ~545 nm (GIA G&G 24(1) Fritsch & Rossman part 2; Cox 1977). Transmits violet-blue and some red -> purple. UV shoulder toward the ~357 nm band.",
 		_curve(0.04, [[0.85, 545.0, 50.0], [0.30, 380.0, 28.0]]),
-		PackedFloat32Array(),
-		Color(0.62, 0.35, 0.92))
+		PackedFloat32Array())
 
 	# Fe2+ in olivine: narrow bands 453/477/497 nm plus the tail of the broad
 	# Fe2+ band near 1000 nm rising past 700 nm; window 520-600 green-yellow.
 	out[&"peridot_fe2"] = _chromophore(&"peridot_fe2", "Iron (peridot, olivine)",
 		"Fe2+ in olivine: diagnostic bands 453/477/497 nm (GIA Gem Encyclopedia; globalgemology.com), UV charge-transfer edge, and the visible tail of the broad Fe2+ band near ~1000 nm (modelled as a Gaussian at 900 nm) warming the deep red. Green-yellow window 520-600 nm.",
 		_curve(0.06, [[0.55, 453.0, 10.0], [0.50, 477.0, 9.0], [0.55, 497.0, 11.0], [1.20, 395.0, 38.0], [0.22, 900.0, 160.0]]),
-		PackedFloat32Array(),
-		Color(0.62, 0.78, 0.20))
+		PackedFloat32Array())
 
 	# Imperial topaz: colour centres + Cr3+ give a gentle absorption rise from
 	# red toward blue; golden-orange body with a pink hint.
 	out[&"topaz_imperial"] = _chromophore(&"topaz_imperial", "Imperial topaz centres",
 		"Imperial (precious) topaz: colour centres plus Cr3+ (Ouro Preto type is Cr-bearing, gemsociety.org) produce a smooth absorption rise from red toward violet-blue; no sharp visible bands. Authored as two broad blue-green Gaussians + UV edge for a golden-orange body.",
 		_curve(0.03, [[0.34, 415.0, 52.0], [0.16, 500.0, 50.0], [0.30, 380.0, 20.0]]),
-		PackedFloat32Array(),
-		Color(0.95, 0.62, 0.25))
+		PackedFloat32Array())
 
 	# ---- Alternate-ladder chromophores ------------------------------------
 
@@ -309,39 +302,34 @@ func _build_chromophores() -> Dictionary:
 	out[&"fluorite_green"] = _chromophore(&"fluorite_green", "Green fluorite centres",
 		"Green fluorite: absorption in violet-blue and orange-red leaving a green window (colour centres / REE, variable by locality — authored broad-band, not a single verified ion). Band strengths tuned at 4.5 mm Beer-Lambert path: earlier 0.10/0.13 amps were too weak/broad to carve the window and the stone read neutral blue-grey.",
 		_curve(0.015, [[0.45, 435.0, 40.0], [0.35, 630.0, 45.0], [0.20, 380.0, 22.0]]),
-		PackedFloat32Array(),
-		Color(0.55, 0.85, 0.55))
+		PackedFloat32Array())
 
 	# Smoky quartz: Al3+ + irradiation hole colour centre (O- adjacent to
 	# substitutional Al). Smooth absorption rising toward UV -> brown-grey.
 	out[&"smoky_al_hole"] = _chromophore(&"smoky_al_hole", "Smoky quartz (Al hole centre)",
 		"Al-O- hole colour centre in irradiated quartz (minsocam.org Color in Minerals: substitutional Al3+ + ionizing radiation; heat-bleachable). Smooth featureless absorption strongest toward violet/UV -> smoky brown-grey. No sharp visible bands.",
 		_curve(0.02, [[0.45, 380.0, 55.0], [0.18, 480.0, 80.0], [0.08, 620.0, 100.0]]),
-		PackedFloat32Array(),
-		Color(0.45, 0.38, 0.32))
+		PackedFloat32Array())
 
 	# Verdelite (green Fe-bearing elbaite): Fe2+ Y/Z-site band ~720 nm with
 	# ~670 shoulder, weak Mn3+/Fe3+ 415/470 nm, weak 583 nm, window 510-550.
 	out[&"verdelite_fe"] = _chromophore(&"verdelite_fe", "Iron (verdelite, green tourmaline)",
 		"Fe2+ in elbaite: broad Y/Z-octahedra band ~720 nm + 670 nm shoulder (Crystals 13:1461; BJGEO Serido elbaites 720-730 nm), weak 415/470 (Mn3+/Fe3+), weak 583 nm, UV edge 300-400. Green window 510-550 nm; red end closes -> deep bottle green.",
 		_curve(0.03, [[0.75, 720.0, 55.0], [0.30, 670.0, 28.0], [0.28, 415.0, 25.0], [0.18, 470.0, 25.0], [0.12, 583.0, 25.0], [0.55, 380.0, 30.0]]),
-		PackedFloat32Array(),
-		Color(0.20, 0.65, 0.40))
+		PackedFloat32Array())
 
 	# Rhodolite (pyrope-almandine): Fe2+ triplet 504/520/573 + weak lines.
 	out[&"rhodolite_fe2"] = _chromophore(&"rhodolite_fe2", "Iron (rhodolite garnet)",
 		"Fe2+ in pyrope-almandine: diagnostic bands 504/520/573 nm with weak 423/460/610/685 nm (Wikipedia rhodolite; Chemija 32:4549; GIA G&G 21(4) garnet classification). Transmits violet-blue and red -> purplish raspberry red.",
 		_curve(0.025, [[0.55, 504.0, 12.0], [0.60, 520.0, 12.0], [0.70, 573.0, 18.0], [0.15, 423.0, 10.0], [0.12, 460.0, 12.0], [0.10, 610.0, 12.0], [0.12, 685.0, 12.0], [0.40, 380.0, 25.0]]),
-		PackedFloat32Array(),
-		Color(0.78, 0.30, 0.45))
+		PackedFloat32Array())
 
 	# Aquamarine: Fe2+ NIR band ~820 nm tailing into deep red, Fe2+-Fe3+ IVCT
 	# ~620 nm (the blue maker), weak Fe3+ 427 nm. Pale by nature.
 	out[&"aquamarine_fe"] = _chromophore(&"aquamarine_fe", "Iron (aquamarine, beryl)",
 		"Fe in beryl: dominant Fe2+ band ~820-825 nm (NIR, visible tail past 700; GIA G&G 44(3) Adamo et al.), Fe2+-Fe3+ IVCT ~620-640 nm absorbing orange-red (blue maker; Sci. Rep. 12:11916), weak Fe3+ 427 nm (slight yellow), UV Fe3+ edge. Blue window 460-500 nm. Amplitudes kept low: aquamarine is pale.",
 		_curve(0.012, [[0.15, 820.0, 80.0], [0.14, 620.0, 60.0], [0.06, 427.0, 10.0], [0.25, 380.0, 25.0]]),
-		PackedFloat32Array(),
-		Color(0.55, 0.80, 0.92))
+		PackedFloat32Array())
 
 	# Alexandrite: Cr3+ in chrysoberyl. Blue-violet band ~415, yellow-green
 	# ~580; windows green ~520 and red > 640 -> colour change with the rig.
@@ -349,23 +337,20 @@ func _build_chromophores() -> Dictionary:
 	out[&"alexandrite_cr"] = _chromophore(&"alexandrite_cr", "Chromium (alexandrite)",
 		"Cr3+ in chrysoberyl: bands ~415 nm (blue-violet 410-450) and ~580 nm yellow-green (GIA alexandrite page: 580 nm band drives the colour change; cigem.ca), transmission windows ~520 green and >640 red. Pleochroic: e-ray band shifted/weakened (green vs red axes). Weak Cr red fluorescence ~680 nm.",
 		_curve(0.035, [[0.70, 415.0, 30.0], [0.65, 580.0, 30.0], [0.25, 380.0, 25.0]]),
-		_curve(0.035, [[0.62, 425.0, 30.0], [0.48, 560.0, 32.0], [0.25, 380.0, 25.0]]),
-		Color(0.35, 0.70, 0.55))
+		_curve(0.035, [[0.62, 425.0, 30.0], [0.48, 560.0, 32.0], [0.25, 380.0, 25.0]]))
 
 	# Painite: V3+/Cr3+ bearing borate — orange-red to brownish red body.
 	out[&"painite_v_cr"] = _chromophore(&"painite_v_cr", "Vanadium-chromium (painite)",
 		"Painite body colour orange-red to brownish (V3+/Cr3+ reported as chromophores; literature sparse). Authored: blue-green absorption bands ~440/560 nm + UV edge, red open -> deep orange-red. Best-effort curve, flagged for revisit with published spectra.",
 		_curve(0.03, [[0.55, 440.0, 45.0], [0.40, 560.0, 45.0], [0.50, 380.0, 30.0]]),
-		PackedFloat32Array(),
-		Color(0.85, 0.35, 0.20))
+		PackedFloat32Array())
 
 	# Colour-change pyrope-spessartine ("blue garnet", Bekily type): merged
 	# 407-430 bands -> 435 nm cutoff + broadened strengthened V3+ 573 nm band.
 	out[&"bluegarnet_v"] = _chromophore(&"bluegarnet_v", "Vanadium (colour-change garnet)",
 		"Colour-change pyrope-spessartine: 435 nm cutoff from merged 407/411/421/430 bands, broad strengthened ~573 nm band (V3+ ~0.6 wt%; GIA G&G 21(4); Caltech mineral spectra GRR 2225 Tunduru), weak 504/520. Windows blue-green 460-500 and red >640 -> teal-blue in daylight, purple-red under warm light.",
 		_curve(0.03, [[1.20, 405.0, 18.0], [0.80, 421.0, 10.0], [0.70, 430.0, 8.0], [0.55, 573.0, 45.0], [0.15, 504.0, 10.0], [0.15, 520.0, 10.0], [0.45, 380.0, 20.0]]),
-		PackedFloat32Array(),
-		Color(0.35, 0.50, 0.85))
+		PackedFloat32Array())
 
 	return out
 
@@ -493,14 +478,13 @@ func _build_stones(species: Dictionary, chromophores: Dictionary, grades: Dictio
 # ------------------------------------------------------------------ helpers
 
 func _chromophore(id: StringName, display_name: String, note: String,
-		curve: PackedFloat32Array, eray: PackedFloat32Array, ui: Color) -> Resource:
+		curve: PackedFloat32Array, eray: PackedFloat32Array) -> Resource:
 	var chromo: Resource = ChromophoreScript.new()
 	chromo.chromophore_id = id
 	chromo.display_name = display_name
 	chromo.source_note = note
 	chromo.absorption_mm = curve
 	chromo.absorption_eray_mm = eray
-	chromo.ui_color = ui
 	_save(chromo, DIR_CHROMO + String(id) + ".tres")
 	return chromo
 

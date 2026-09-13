@@ -1,5 +1,18 @@
 class_name GemAtelierSessionFiles
 extends RefCounted
+
+## A replace can briefly make a mailbox unreadable on Windows. Keep the last
+## complete message until another complete object is visible, never interpret
+## that gap as cancellation or consume it as a response.
+static func read_message(path: String, previous: Dictionary = {}) -> Dictionary:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null: return previous
+	var content := file.get_as_text();file.close()
+	if content.is_empty(): return previous
+	var parser := JSON.new()
+	if parser.parse(content) != OK or not parser.data is Dictionary: return previous
+	return parser.data
+
 ## Only the render owner collects transient protocol files. Delivery stays durable.
 static func collect(session: String, consumed_generation: int) -> String:
 	var directory := DirAccess.open(session)

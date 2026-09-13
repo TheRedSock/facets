@@ -53,7 +53,6 @@ const float WL_RANGE = 400.0;
 #define FLAG_DISPERSION  ((pc.flags & 1u) != 0u)
 #define FLAG_BIREF       ((pc.flags & 2u) != 0u)
 #define FLAG_VOLUME      ((pc.flags & 4u) != 0u)
-#define FLAG_FLUOR       ((pc.flags & 16u) != 0u)
 
 // Polarisation modes for Beer-Lambert.
 const int POL_UNPOL = 0;

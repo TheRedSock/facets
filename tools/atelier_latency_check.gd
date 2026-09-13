@@ -34,7 +34,7 @@ func _run() -> void:
 			var value: Variant
 			match kind:
 				"material": path = ["stone","material","scatter_per_mm"];value = .005*(index+1)
-				"geometry": path = ["stone","cut","parameters","table"];value = .54+.01*index
+				"geometry": path = ["stone","cut","parameters","table"];value = .48+.01*index
 				"pose": path = ["presentation","orientation_deg"];value = Vector3(2.0*(index+1),0,0)
 				"print": path = ["print_style","exposure"];value = 1.1+.05*index
 			await _measure(kind, path, value, Time.get_ticks_usec())
@@ -81,6 +81,8 @@ func _measure(kind: String, path: Array, value: Variant, started: int) -> void:
 	for key in after: delta[key] = int(after[key])-int(before.get(key,0))
 	if kind=="print" and (int(delta.get("rendered",0))!=0 or int(delta.get("reprinted",0))!=1):
 		failures.append("Print-only edit did not reuse its optical master")
+	if kind in ["material","geometry","pose"] and int(delta.get("rendered",0))!=1:
+		failures.append("%s benchmark edit did not render one new optical master"%kind)
 	records.append({"kind":kind,"acknowledgement_ms":acknowledgement_ms,
 		"first_image_ms":_first_image_ms,"complete_ms":(Time.get_ticks_usec()-started)/1000.0,
 		"submit_ms":client.submit_ms,"counter_delta":delta,"worker":client.last_report.duplicate(true)})

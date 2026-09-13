@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "cases": [
     "clear_faceted",
     "strong_absorption",
@@ -56,6 +56,26 @@
         83177
       ],
       "rung": "reference"
+    },
+    "refined": {
+      "samples": 1024,
+      "passes": 1,
+      "bounces": 256,
+      "seeds": [
+        191,
+        91711
+      ],
+      "rung": "hero"
+    },
+    "rough_reference": {
+      "samples": 16384,
+      "passes": 0,
+      "bounces": 512,
+      "seeds": [
+        43117,
+        83177
+      ],
+      "rung": "reference"
     }
   },
   "backgrounds": {
@@ -75,5 +95,52 @@
       0.05
     ]
   },
-  "status": "unaccepted; evaluate saved references before setting acceptance thresholds"
+  "status": "unaccepted; evaluate saved references before setting acceptance thresholds",
+  "case_profiles": {
+    "clear_faceted": [
+      "draft",
+      "detail",
+      "reference"
+    ],
+    "strong_absorption": [
+      "draft",
+      "detail",
+      "reference"
+    ],
+    "rounded": [
+      "draft",
+      "detail",
+      "reference"
+    ],
+    "rough": [
+      "draft",
+      "detail",
+      "refined",
+      "rough_reference"
+    ],
+    "localized_volume": [
+      "draft",
+      "detail",
+      "reference"
+    ],
+    "resolved_inclusion": [
+      "draft",
+      "detail",
+      "reference"
+    ],
+    "thin_boundary": [
+      "draft",
+      "detail",
+      "reference"
+    ]
+  },
+  "references": {
+    "clear_faceted": "reference",
+    "strong_absorption": "reference",
+    "rounded": "reference",
+    "rough": "rough_reference",
+    "localized_volume": "reference",
+    "resolved_inclusion": "reference",
+    "thin_boundary": "reference"
+  }
 }

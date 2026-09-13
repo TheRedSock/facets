@@ -2,6 +2,7 @@ extends SceneTree
 ## Production-worker spatial/motion corpus. Output records are content-checked on resume.
 ## --cases=... --sizes=112,256,512 --profiles=draft,detail,reference --frames=0,1,2,3
 ## --plan-only freezes every selected immutable job without a GPU.
+## --output=res://artifacts/NAME isolates diagnostic plans/pilots.
 const CONFIG := "res://data/lapidary/acceptance/corpus.json"
 var out := "res://artifacts/appearance-corpus"
 var report := {"schema":1,"records":{}}
@@ -9,23 +10,33 @@ var failed := false
 func _initialize() -> void: _run.call_deferred()
 func _run() -> void:
 	var config:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(CONFIG))
-	var options := {"cases":",".join(config.cases),"sizes":"112,256,512","profiles":",".join(config.profiles.keys()),"frames":"0,1,2,3","rigs":",".join(config.rigs)}
+	if config.get("schema")!=2 or not config.get("case_profiles") is Dictionary or not config.get("references") is Dictionary:
+		_fail("Corpus needs schema 2 with explicit per-case profiles and references");return
+	for case_name in config.cases:
+		if not config.case_profiles.has(case_name) or not config.references.has(case_name) or config.references[case_name] not in config.case_profiles[case_name]:
+			_fail("Case lacks its explicit profile/reference selection: "+case_name);return
+	var options := {"cases":",".join(config.cases),"sizes":"112,256,512","profiles":",".join(config.profiles.keys()),"frames":"0,1,2,3","rigs":",".join(config.rigs),"output":out}
 	var plan_only := false
 	for arg in OS.get_cmdline_user_args():
 		if arg=="--plan-only":plan_only=true;continue
 		var pair:=arg.trim_prefix("--").split("=",true,1)
 		if pair.size()!=2 or not options.has(pair[0]):_fail("Unknown option "+arg);return
 		options[pair[0]]=pair[1]
+	out=options.output
+	if out.is_empty():_fail("Output directory is required");return
 	DirAccess.make_dir_recursive_absolute(out.path_join("jobs"));DirAccess.make_dir_recursive_absolute(out.path_join("images"))
 	var report_path:=out.path_join("report.json")
 	if FileAccess.file_exists(report_path):
 		var previous:Variant=JSON.parse_string(FileAccess.get_file_as_string(report_path))
 		if not previous is Dictionary or previous.get("schema")!=1:_fail("Invalid existing corpus report");return
 		report=previous
+	if plan_only and not report.records.is_empty():_fail("Use a separate --output directory for a plan; existing render evidence is immutable during planning");return
+	report["mode"]="plan" if plan_only else "render"
 	report["config_sha256"]=FileAccess.get_sha256(CONFIG)
 	report["source_inventory"]=GemRenderIdentity.inventory()
 	report["source_engine"]=GemRenderIdentity.worker_digest()
 	var worker:=GemFrameWorker.new(out.path_join("store"))
+	var selected_jobs := 0
 	for case_name in String(options.cases).split(",",false):
 		if case_name not in config.cases:_fail("Unknown case "+case_name);return
 		var stone:GemStone=load("res://data/lapidary/acceptance/%s.tres"%case_name)
@@ -39,10 +50,12 @@ func _run() -> void:
 					var frame:=int(frame_text)
 					for profile_name in String(options.profiles).split(",",false):
 						if not config.profiles.has(profile_name):_fail("Unknown profile");return
+						if profile_name not in config.case_profiles[case_name]:continue
 						var profile:Dictionary=config.profiles[profile_name]
 						for stream in 2:
 							# A second high-SPP stationary reference estimates reference uncertainty.
-							if profile_name=="reference" and stream==1 and frame!=0:continue
+							if profile_name==config.references[case_name] and stream==1 and frame!=0:continue
+							selected_jobs += 1
 							var job:=GemFrameJob.new();job.stone=stone
 							job.rig=load("res://data/lapidary/rigs/%s.tres"%rig_name);job.print_style=GemPrint.load_house()
 							job.quality=GemRung.policy(GemRung.rung_from_name(profile.rung))
@@ -79,6 +92,7 @@ func _run() -> void:
 							if not GemArtifactStore.atomic_write(report_path,JSON.stringify(report,"\t").to_utf8_buffer()):worker.release();_fail("Cannot save report");return
 							print("Corpus ",id," ",record.wall_ms," ms");await process_frame
 	worker.release()
+	if selected_jobs == 0:_fail("Selection contains no jobs; choose a profile assigned to the selected case");return
 	if not GemArtifactStore.atomic_write(report_path,JSON.stringify(report,"\t").to_utf8_buffer()):_fail("Cannot save corpus verification");return
 	print("CHECK_COMPLETE: appearance_corpus");quit()
 func _evidence(record:Dictionary,job:GemFrameJob,profile:Dictionary)->void:

@@ -10,7 +10,7 @@ var status := "closed"
 var last_report: Dictionary = {}
 var stale_results := 0
 var submit_ms := 0.0
-var _last_response := ""
+var _last_response: Dictionary = {}
 var _heartbeat_at := 0
 var _last_image := ""
 var _closed := false
@@ -53,12 +53,10 @@ func _process(_delta:float)->void:
 	if worker_pid>0 and not OS.is_process_running(worker_pid):
 		status="error";updated.emit({"generation":generation,"status":"error","error":"Render worker exited; inspect "+session.path_join("worker.log")},null);set_process(false);return
 	var path:=session.path_join("response.json")
-	if not FileAccess.file_exists(path):return
-	var content:=FileAccess.get_file_as_string(path)
-	if content==_last_response:return
-	var response:Variant=JSON.parse_string(content)
-	if not response is Dictionary or int(response.get("generation",-1))!=generation:
-		_last_response=content;stale_results+=1;return
+	var response := GemAtelierSessionFiles.read_message(path)
+	if response.is_empty() or response==_last_response:return
+	if int(response.get("generation",-1))!=generation:
+		_last_response=response;stale_results+=1;return
 	var image:Image=null
 	var image_file:=str(response.get("image",""))
 	if not image_file.is_empty() and image_file!=_last_image:
@@ -75,7 +73,7 @@ func _process(_delta:float)->void:
 		# current response next frame instead of consuming an incomplete image.
 		if image.load_png_from_buffer(bytes)!=OK:return
 		_last_image=image_file
-	_last_response=content
+	_last_response=response
 	status=str(response.get("status","error"));last_report=response
 	updated.emit(response,image)
 func _write(value:Dictionary)->bool:

@@ -30,7 +30,6 @@ const MAX_LIGHTS := 8
 const FLAG_DISPERSION := 1
 const FLAG_BIREF := 2
 const FLAG_VOLUME := 4
-const FLAG_FLUOR := 16
 const FLAG_FULL_SPECTRUM := 32
 
 const STONE_FLAG_HAS_ERAY := 1

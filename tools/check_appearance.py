@@ -9,6 +9,19 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'artifacts/appearance-corpus'
 REQUIRED_LIMITS={'spatial_rmse_lsb','mean_bias_lsb','temporal_residual_lsb','loop_seam_residual_lsb','reference_noise_lsb'}
 
+def config_errors(config):
+    errors=[]
+    if config.get('schema')!=2:return ['Corpus needs explicit schema 2 profile/reference selections']
+    cases=set(config['cases'])
+    if not isinstance(config.get('case_profiles'),dict) or set(config['case_profiles'])!=cases:return ['Case profile selections must cover every case']
+    if not isinstance(config.get('references'),dict) or set(config['references'])!=cases:return ['Reference selections must cover every case']
+    for case,profiles in config['case_profiles'].items():
+        reference=config['references'][case]
+        if not isinstance(profiles,list) or len(profiles)<2 or any(not isinstance(name,str) or name not in config['profiles'] for name in profiles):errors.append(f'Invalid profiles for {case}');continue
+        if len(profiles)!=len(set(profiles)) or reference not in profiles or config['profiles'][reference]['rung']!='reference':errors.append(f'Invalid independent reference for {case}')
+        if any(config['profiles'][name]['rung']=='reference' and name!=reference for name in profiles):errors.append(f'Multiple references for {case}')
+    return errors
+
 def threshold_errors(config,thresholds,config_hash):
     if not isinstance(thresholds,dict):return ['Reference review and explicit selected profile thresholds are missing']
     errors=[];cases=set(config['cases'])
@@ -20,7 +33,7 @@ def threshold_errors(config,thresholds,config_hash):
     selected=thresholds.get('selected_profiles') if isinstance(thresholds.get('selected_profiles'),dict) else {}
     limits_by_case=thresholds.get('limits') if isinstance(thresholds.get('limits'),dict) else {}
     for case,profile in selected.items():
-        if not isinstance(profile,str) or profile not in config['profiles'] or profile=='reference':errors.append(f'Invalid selected production profile for {case}')
+        if not isinstance(profile,str) or profile not in config['case_profiles'].get(case,[]) or profile==config['references'].get(case):errors.append(f'Invalid selected production profile for {case}')
     for case,limits in limits_by_case.items():
         if not isinstance(limits,dict) or set(limits)!=REQUIRED_LIMITS:errors.append(f'{case} must declare every required numerical limit');continue
         if any(isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<0 for value in limits.values()):errors.append(f'{case} has an invalid numerical limit')
@@ -73,14 +86,16 @@ def review_sheet(case,rig,size,frames,backgrounds,fps):
         sheet.save(output/f'{case}-{rig}-{size}-{background}.png')
 def main():
     args=argparse.ArgumentParser();args.add_argument('--inspect',action='store_true');args.add_argument('--gallery',action='store_true');opt=args.parse_args()
-    config=json.loads((ROOT/'data/lapidary/acceptance/corpus.json').read_text())
-    report=json.loads((OUT/'report.json').read_text());records=report['records'];missing=[];results=[];failures=[]
+    config=json.loads((ROOT/'data/lapidary/acceptance/corpus.json').read_text(encoding='utf-8'))
+    configuration_errors=config_errors(config)
+    if configuration_errors:raise ValueError('; '.join(configuration_errors))
+    report=json.loads((OUT/'report.json').read_text(encoding='utf-8'));records=report['records'];missing=[];results=[];failures=[]
     threshold_path=ROOT/'data/lapidary/acceptance/thresholds.json'
-    thresholds=json.loads(threshold_path.read_text()) if threshold_path.exists() else None
-    candidates=[profile for profile in config['profiles'] if profile!='reference']
+    thresholds=json.loads(threshold_path.read_text(encoding='utf-8')) if threshold_path.exists() else None
     config_hash=hashlib.sha256((ROOT/'data/lapidary/acceptance/corpus.json').read_bytes()).hexdigest()
     review_errors=threshold_errors(config,thresholds,config_hash);failures.extend(review_errors)
     failures.extend(source_errors(report.get('source_inventory')))
+    if report.get('mode')!='render':failures.append('Corpus is not a rendered evidence report')
     if report.get('config_sha256')!=config_hash:failures.append('Corpus report configuration is stale')
     if not report.get('source_engine'):failures.append('Corpus source identity is missing')
     verified_inputs={}
@@ -100,21 +115,24 @@ def main():
         assert im.shape==(size,size,4),key
         return im
     for case in config['cases']:
+      candidates=[profile for profile in config['case_profiles'][case] if profile!=config['references'][case]]
+      reference_profile=config['references'][case]
       for rig in config['rigs']:
        for size in config['sizes']:
-        ref_images=[get(case,rig,size,f,'reference',0) for f in range(config['frames'])]
-        ref1=get(case,rig,size,0,'reference',1)
+        ref_images=[get(case,rig,size,f,reference_profile,0) for f in range(config['frames'])]
+        ref1=get(case,rig,size,0,reference_profile,1)
         if any(x is None for x in ref_images) or ref1 is None:continue
         ref_images=np.array(ref_images);mask=np.max(ref_images[...,3],axis=0)>.01
         if opt.gallery:
-            review={'reference':ref_images}
+            review={reference_profile:ref_images}
             for candidate in candidates:
                 candidate_images=[get(case,rig,size,f,candidate,0) for f in range(config['frames'])]
                 if not any(x is None for x in candidate_images):review[candidate]=np.array(candidate_images)
             if len(review)==len(candidates)+1:review_sheet(case,rig,size,review,config['backgrounds'],config['fps'])
         control_images=None
         if case in config['feature_controls']:
-            control_images=[get(config['feature_controls'][case],rig,size,f,'reference',0) for f in range(config['frames'])]
+            control_case=config['feature_controls'][case]
+            control_images=[get(control_case,rig,size,f,config['references'][control_case],0) for f in range(config['frames'])]
             if any(x is None for x in control_images):continue
             control_images=np.array(control_images)
         for profile in candidates:
@@ -151,16 +169,17 @@ def main():
     costs=[]
     for case in config['cases']:
       for size in config['sizes']:
-       for profile in config['profiles']:
+       for profile in config['case_profiles'][case]:
         selected=[r for r in records.values() if r['case']==case and r['size']==size and r['profile']==profile]
         if not selected:continue
         times=[r['wall_ms'] for r in selected]
         costs.append({'case':case,'size':size,'profile':profile,'recorded_frames':len(selected),'unique_masters':len({r['master'] for r in selected}),'wall_ms_median':float(np.median(times)),'wall_ms_p95':float(np.percentile(times,95)),'wall_ms_sum':float(sum(times)),'shared_master_with_smaller_output':sum(any(other['master']==r['master'] and other['size']<size for other in records.values()) for r in selected)})
     result={'status':'incomplete' if missing else ('failed' if failures else 'passed'),'missing_count':len(missing),'failures':failures,'results':results,'config_sha256':config_hash,'costs':costs,'cost_note':'Observed production-worker wall time includes concurrent validation and possible checkpoint resume. Outputs sharing a smaller-size master include reprint-only work. These are not uncontended GPU timings.'}
-    (OUT/'analysis.json').write_text(json.dumps(result,indent=2))
+    (OUT/'analysis.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     print(json.dumps({'status':result['status'],'complete_comparisons':len(results),'missing':len(missing),'failures':failures[:30]}))
     for case in config['cases']:
-      for profile in candidates:
+      for profile in config['case_profiles'][case]:
+        if profile==config['references'][case]:continue
         subset=[m for r in results if r['case']==case and r['profile']==profile for m in r['backgrounds'].values()]
         if subset:print(case,profile,json.dumps({key:max(m[key] for m in subset) for key in ['spatial_rmse_lsb','mean_bias_lsb','temporal_residual_lsb','reference_noise_lsb']}))
     print('CHECK_COMPLETE: check_appearance')

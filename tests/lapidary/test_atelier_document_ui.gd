@@ -94,6 +94,11 @@ func _run()->void:
 	var image:=Image.create(2,2,false,Image.FORMAT_RGBA8);image.fill(Color.RED)
 	var bytes:=image.save_png_to_buffer();var hash:=HashingContext.new();hash.start(HashingContext.HASH_SHA256);hash.update(bytes)
 	var response:={"generation":7,"status":"complete","image":"preview-7-4.png","image_sha256":hash.finish().hex_encode()}
+	for incomplete in ["", "{\"generation\":", "[]"]:
+		GemArtifactStore.atomic_write(transient.path_join("response.json"),incomplete.to_utf8_buffer())
+		retry.call("_process",0.0)
+		check(delivered.is_empty() and retry.stale_results==0,"Incomplete mailbox does not consume a response or log a parse error")
+		check(GemAtelierSessionFiles.read_message(transient.path_join("response.json"),submitted)==submitted,"Incomplete request preserves the worker's current action")
 	GemArtifactStore.atomic_write(transient.path_join("response.json"),JSON.stringify(response).to_utf8_buffer())
 	retry.call("_process",0.0);check(delivered.is_empty(),"Missing/superseded image is not accepted")
 	GemArtifactStore.atomic_write(transient.path_join(response.image),bytes)

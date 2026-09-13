@@ -6,7 +6,7 @@ enum View { HOUSE_PRINT, DISPLAY_PREVIEW }
 
 const HOUSE_PATH := "res://data/lapidary/print/house_print.tres"
 
-@export var print_version := 1
+@export var print_version := 4
 
 @export_group("Tone")
 @export var exposure := 1.0

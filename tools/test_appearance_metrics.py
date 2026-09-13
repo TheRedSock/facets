@@ -1,7 +1,7 @@
 """The acceptance metrics must reject stable blur, missing features and stale frames."""
 import numpy as np
 import copy
-from check_appearance import signals,feature_metrics,threshold_errors,REQUIRED_LIMITS,source_errors
+from check_appearance import signals,feature_metrics,threshold_errors,REQUIRED_LIMITS,source_errors,config_errors
 mask=np.ones((16,16),bool)
 ref=np.zeros((4,16,16,3));control=ref.copy()
 for frame,x in enumerate([3,6,9,6]):ref[frame,3:13,x:x+1]=100
@@ -18,7 +18,11 @@ biased=signals(ref,ref+3,mask);assert biased['mean_bias_lsb']==3
 noisy=ref+np.random.default_rng(137).normal(0,.1,ref.shape)
 f=feature_metrics(ref,noisy,control,mask)
 assert .99<f['gain']<1.01 and f['correlation']>.99
-config={'cases':['test'],'profiles':{'draft':{},'reference':{}}}
+config={'schema':2,'cases':['test'],'profiles':{'draft':{'rung':'clip_bake'},'reference':{'rung':'reference'}},'case_profiles':{'test':['draft','reference']},'references':{'test':'reference'}}
+assert not config_errors(config)
+for key,value in [('schema',1),('case_profiles',{}),('references',{}),('references',{'test':'draft'}),('case_profiles',{'test':['draft','draft','reference']})]:
+    invalid=copy.deepcopy(config);invalid[key]=value
+    assert config_errors(invalid),(key,value)
 valid={'schema':1,'config_sha256':'hash','reviewer':'test fixture','review_notes':{'test':'Explicit synthetic reference'},'selected_profiles':{'test':'draft'},'limits':{'test':{key:1 for key in REQUIRED_LIMITS}}}
 assert not threshold_errors(config,valid,'hash')
 assert threshold_errors(config,{},'hash')

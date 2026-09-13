@@ -29,9 +29,6 @@ enum SpectrumBasis { COEFFICIENT_PER_MM, CROSS_SECTION_CM2 }
 ## with persistent polarization; scalar transport maintains its supported directional absorption state. Empty = isotropic absorption. Authored curves are not measurements.
 @export var absorption_eray_mm := PackedFloat32Array()
 
-## UI chrome ONLY (tile tinting in menus etc.). Never enters transport.
-@export var ui_color := Color.WHITE
-
 
 func is_colorless() -> bool:
 	return absorption_mm.is_empty() and cross_section_cm2.is_empty()
