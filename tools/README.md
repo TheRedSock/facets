@@ -65,6 +65,10 @@ black, white and game backgrounds under `artifacts/appearance-corpus/review`.
 The generated `review/index.html` plays synchronized native-size reference and
 candidate crops, with pause, frame stepping, slower playback and background
 selection. It uses the same linear-light-composited sheets as the still review.
+For the volume, inclusion and thin-boundary cases, `review/features/` contains
+native-size sheets showing the exact causal metric mask beside the clear control,
+reference and candidates. Pixels outside the mask are gray; use the full sheets
+for context. These diagnostic sheets do not alter images or acceptance metrics.
 Inspection allows incomplete reports; the default analysis command fails until
 all required images and reviewed thresholds pass. `test_appearance_metrics.py`
 checks that frozen motion, blur, bias and removed features fail the metrics.

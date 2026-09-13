@@ -92,6 +92,24 @@ def review_gallery(entries,status,config):
     payload={'entries':entries,'status':status,'frames':config['frames'],'fps':config['fps']}
     template=Path(__file__).with_name('appearance_review.html').read_text(encoding='utf-8')
     (output/'index.html').write_text(template.replace('__CORPUS_REVIEW__',json.dumps(payload).replace('</','<\\/')),encoding='utf-8')
+
+def review_feature_sheet(case,rig,size,background,bg,frames,control,mask,fps):
+    """Show the exact causal metric ROI at native size beside its clear control."""
+    output=OUT/'review'/'features';output.mkdir(exist_ok=True)
+    columns={'clear control':control,**frames};count=len(control)
+    sheet=Image.new('RGB',(size*len(columns),48+count*(size+20)),(32,34,39))
+    draw=ImageDraw.Draw(sheet)
+    draw.text((4,3),f'{case} / {rig} / {size}px / {background}',fill='white')
+    draw.text((4,17),f'Causal ROI: {int(mask.sum())} pixels. Outside gray; see full sheets.',fill=(190,190,190))
+    for column,(profile,images) in enumerate(columns.items()):
+        draw.text((column*size+4,33),profile,fill='white')
+        for frame,im in enumerate(images):
+            pixels=np.uint8(np.clip(np.rint(composite(im,bg)),0,255))
+            pixels[~mask]=(32,34,39)
+            y=48+frame*(size+20)
+            sheet.paste(Image.fromarray(pixels),(column*size,y))
+            draw.text((column*size+4,y+size+2),f'{frame/fps:.3f}s',fill=(220,220,220))
+    sheet.save(output/f'{case}-{rig}-{size}-{background}.png')
 def main():
     args=argparse.ArgumentParser();args.add_argument('--inspect',action='store_true');args.add_argument('--gallery',action='store_true');opt=args.parse_args()
     config=json.loads((ROOT/'data/lapidary/acceptance/corpus.json').read_text(encoding='utf-8'))
@@ -162,6 +180,8 @@ def main():
                 strength=np.sqrt(np.mean((ref-control)**2,axis=(0,3)))
                 feature_mask=mask&(strength>max(8,6*metrics['reference_noise_lsb']))
                 metrics['feature']=feature_metrics(ref,cand,control,feature_mask) if feature_mask.any() else {'pixels':0}
+                if opt.gallery and profile==candidates[0] and stream==0 and len(review)==len(candidates)+1:
+                    review_feature_sheet(case,rig,size,name,bg,review,control_images,feature_mask,config['fps'])
             item['backgrounds'][name]=metrics
           results.append(item)
           if not review_errors and thresholds['selected_profiles'].get(case)==profile:
