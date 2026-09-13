@@ -13,8 +13,8 @@ param(
     [string]$Rung = 'clip_bake',
     [ValidateSet('webp_lossless', 'bc7', 'astc4x4')]
     [string]$Codec = 'webp_lossless',
-    [int]$Resolution = 0,
-    [int]$Samples = 0,
+    [ValidateRange(0, 2147483647)][int]$Resolution = 0,
+    [ValidateRange(0, 2147483647)][int]$Samples = 0,
     [int]$Page = 512,
     [ValidateSet(0, 1, 2, 4, 8)]
     [int]$GeometryCoverage = 0,
@@ -26,6 +26,9 @@ param(
 # Generated source bundle/ZIP, resumable store and shipping PCK stay ignored.
 # Copy generated/gem-assets.pck next to an exported game executable.
 $ErrorActionPreference = 'Stop'
+if ($PSBoundParameters.ContainsKey('SpecimenSeed') -and -not $Recipe) {
+    throw 'SpecimenSeed requires an explicit Recipe; a saved specimen already owns its seed'
+}
 $projectRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'check_result.ps1')
 $logRoot = Join-Path $projectRoot 'artifacts/build-assets'
