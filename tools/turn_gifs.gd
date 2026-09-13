@@ -81,7 +81,6 @@ func _options(args: PackedStringArray) -> Dictionary:
 	while i < args.size():
 		var argument := args[i]
 		if argument == "--plan-only": opts.plan_only = true; i += 1; continue
-		if argument == "--keep-frames": i += 1; continue
 		var pair := argument.trim_prefix("--").split("=", true, 1)
 		if not argument.begins_with("--") or not opts.has(pair[0]) or pair[0] == "plan_only":
 			_error = "Unknown option: " + argument; return opts
