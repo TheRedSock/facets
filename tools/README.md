@@ -1,5 +1,25 @@
 # Engine tools
 
+## Runtime delivery and desktop export
+
+`validate_gem_delivery.gd -- --library=... --catalog=...` checks every logical tile
+and declared semantic role without optical work. `create_delivery_test_pack.gd`
+creates explicit synthetic integration assets under `artifacts/export-audit/fixture`.
+Neither changes the production asset catalog.
+
+`fetch_export_templates.ps1` provisions and verifies pinned official Windows
+templates. `build_game_package.ps1 -AssetPack generated/gem-assets.pck -Probe`
+stages only runtime sources, exports into a new directory, and audits the exact
+PCKs. `-Output` selects an empty destination. Every shipped file and staged source
+is hashed; build evidence remains outside the shipped directory. See
+`core/delivery/CONTRACT.md` for memory, playback and package contracts.
+
+The package audit and optional playback probe use an external script with the
+editor binary's `--main-pack` support, from the clean output working directory.
+They reject visible source files and omitted/dead global classes. Standard export
+templates disable script overrides. Actual release-executable UI and uncontended
+performance must be validated separately; the probe labels its executable.
+
 ## Durable authoring and source candidates
 
 Facet programs and examples are documented in `core/lapidary/cut/CONTRACT.md`.

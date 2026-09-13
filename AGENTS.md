@@ -58,6 +58,7 @@ Never hardcode gravity direction.
 core/board/           Simulation: board, tiles, matching, effects, gravity, spawning
 core/rules/           Simulation: RNG, event logging, event timeline
 core/run/             Simulation: run lifecycle, turn pipeline
+core/delivery/        Runtime-only asset library, format and presentation mapping
 core/lapidary/        GPU gem pipeline (CPU side): stone compiler, cut language, lighting, clips, eval
 core/lapidary/tracer/ GPU tracer host + GLSL compute shaders (path trace, print pass)
 resources/            Resource class definitions (data schemas)
@@ -69,7 +70,7 @@ scenes/menu/          Main menu
 scenes/design/        Gem Atelier (progressive preview + clip scrub)
 scenes/run/           Run gameplay (wires simulation to rendering)
 scenes/board/         Board rendering, animation, input
-scenes/tile/          Tile visuals (GemForge clips + placeholder fallback)
+scenes/tile/          Tile visuals (required delivered semantic clips)
 scenes/main/          Run entry point
 scenes/debug/         Debug panel (F1)
 tools/                Design-time utilities (board validator, data generator, GPU checks, eval sheets)
@@ -241,13 +242,19 @@ Used by `SpawnResolver` (tile creation) and `EffectResolver` (merge chains). Bot
 
 Read-only game delivery service (`autoloads/gem_forge.gd`). It mounts the generated `gem-assets.pck`, reads library metadata, and uploads bounded texture pages on demand. No runtime optical baking.
 
-- `get_clip(tile_id, clip_id)` — frame count, fps and loop metadata only.
-- `get_frame(tile_id, clip_id, index)` — trimmed AtlasTexture preserving the original canvas size.
-- `ensure_required(tile_ids)` — warms the actual run's idle pages; animation pages remain lazy.
-- `delivery_report()` — metadata time, page loads and cache ownership bytes.
-- `open_library(path)` / `library_changed` — explicit library replacement for viewers/tools.
+- `get_clip(tile_id, role)` — frame count, fps and loop metadata only.
+- `get_frame(tile_id, role, index)` — trimmed AtlasTexture preserving the original canvas size.
+- `await prepare_required(tile_ids, roles)` — validates bindings and retains the declared upcoming pages before presentation.
+- `delivery_report()` — metadata time, page loads, cache ownership and live texture references outside the cache.
+- `open_library(path, catalog)` / `library_changed` — explicit library replacement for viewers/tools.
 
-Build with `tools/build_gem_assets.ps1`. Source jobs, resumable masters and delivery files stay ignored under `generated/`. Copy `generated/gem-assets.pck` beside an exported desktop executable. Project settings `lapidary/delivery/pack` and `lapidary/delivery/library` can select another pack/library. The PCK contains only the manifest's referenced pages; no optics, masters, checkpoints or stale pages. Missing assets use the debug tier tint.
+Build with `tools/build_gem_assets.ps1`. Source jobs, resumable masters and delivery files stay ignored under `generated/`. Copy `generated/gem-assets.pck` beside an exported desktop executable. Project settings `lapidary/delivery/pack` and `lapidary/delivery/library` can select another pack/library. The PCK contains only the manifest's referenced pages; no optics, masters, checkpoints or stale pages. Required missing/corrupt assets fail loading explicitly. There is no production tier tint. `data/presentation/default.tres` maps logical tile IDs to asset IDs and semantic rest/upgrade roles independently of GemStone identity. TileView exposes restart, interruption, completion and return-to-rest through `play_role`; ignored rotation arguments and duplicate palettes are removed. Tests use explicit synthetic delivery fixtures.
+
+`tools/build_game_package.ps1` stages runtime sources into a fresh project and
+audits both PCKs before reporting package completion. Provision pinned templates
+with `tools/fetch_export_templates.ps1`. Runtime cache and active-reference budgets,
+external package probes and release UI acceptance are documented in
+`core/delivery/CONTRACT.md`; package probes do not replace release-executable tests.
 
 ---
 

@@ -48,7 +48,7 @@ func _finish(ok: bool, detail: String) -> void:
 
 ## Configured, visible tile views only. BoardScene pre-creates spawn-pool
 ## views above the board with no tile assigned (tile_id empty, tier 0); those
-## legitimately sit on the fallback until a spawn configures them.
+## deliberately hold no texture until a spawn configures them.
 func _tile_views() -> Array:
 	var out: Array = []
 	_collect(self, out)
@@ -62,15 +62,10 @@ func _collect(node: Node, out: Array) -> void:
 		_collect(child, out)
 
 
-## Classify the delivered TextureRect versus the missing-asset tint.
+## Missing delivered frames fail this visual gate.
 func _classify(view: Node) -> String:
-	var bg: ColorRect = view.get("_background")
-	var rect: TextureRect = view.get("_clip_rect")
-	if bg != null and bg.visible:
-		return "fallback"
-	if rect != null and rect.visible and StringName(view.get("_clip_id")) != &"":
-		return "clip"
-	return "fallback"
+	var rect:TextureRect=view.get("_clip_rect")
+	return "clip" if rect!=null and rect.texture!=null and view.get("_role")!=&"" else "missing"
 
 
 func _count(kind: String) -> int:

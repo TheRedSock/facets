@@ -60,14 +60,6 @@ func _ready() -> void:
 	_add_slider("Removal→Gravity Overlap", 0.0, 0.3, AnimationSequencer.removal_gravity_overlap,
 		func(v: float): AnimationSequencer.removal_gravity_overlap = v)
 
-	_add_header("Gem Rendering")
-	_add_slider("Outline Width", 0.0, 4.0,
-		DebugFlags.gem_outline_width_override if DebugFlags.gem_outline_width_override >= 0 else 0.5,
-		func(v: float):
-			DebugFlags.gem_outline_width_override = v
-	)
-
-
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F1:

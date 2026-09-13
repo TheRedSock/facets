@@ -12,6 +12,9 @@ var _back_button: Button
 var _last_sim_ms := 0.0
 var _last_anim_ms := 0.0
 var _last_cascade_steps := 0
+var _delivery_error:=""
+var _delivery_loading:=false
+var _delivery_generation:=0
 
 
 func _ready() -> void:
@@ -19,6 +22,7 @@ func _ready() -> void:
 	run_controller.run_state_changed.connect(_on_run_state_changed)
 
 	board_scene.swap_requested.connect(_on_swap_requested)
+	board_scene.delivery_failed.connect(_show_delivery_error)
 
 	# Debug panel — toggle with F1 (full-screen overlay)
 	_debug_panel = DebugPanel.new()
@@ -42,19 +46,23 @@ func _ready() -> void:
 	call_deferred("_start_run")
 
 
-func _exit_tree() -> void:
-	# GemForge owns clip memory for now; nothing to release per-run.
-	pass
-
-
-
 func _process(_delta: float) -> void:
 	_update_hud()
 
 
 func _on_board_changed(board: BoardState) -> void:
+	_delivery_generation+=1;var generation:=_delivery_generation
+	_delivery_error="";_delivery_loading=true;board_scene.visible=false;board_scene._input_locked=true
+	var prepared:=await _prepare_forge_clips()
+	if generation!=_delivery_generation or not is_inside_tree():return
+	_delivery_loading=false
+	if not prepared:
+		var forge:=get_node_or_null("/root/GemForge")
+		_show_delivery_error(forge.last_error if forge!=null else "Gem delivery service is unavailable");return
 	board_scene.set_board_state(board)
-	_ensure_forge_clips()
+	await get_tree().process_frame
+	if generation!=_delivery_generation or not is_inside_tree() or not _delivery_error.is_empty():return
+	board_scene.visible=true;board_scene._input_locked=false
 
 
 func _on_run_state_changed(_run_state: RunState) -> void:
@@ -101,6 +109,8 @@ func _on_swap_requested(cell_a: Vector2i, cell_b: Vector2i) -> void:
 func _update_hud() -> void:
 	if hud_label == null:
 		return
+	if not _delivery_error.is_empty():hud_label.text="Cannot load gem assets: "+_delivery_error;return
+	if _delivery_loading:hud_label.text="Preparing gem assets…";return
 	var rs := run_controller.get_run_state()
 	var fps := "%d FPS" % Engine.get_frames_per_second()
 	var perf_detail := ""
@@ -115,20 +125,28 @@ func _on_back_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn")
 
 
-## Prefetches idle delivery pages for the run. Animation pages load on demand.
+## Prefetch the selected ladder and every reachable upgrade before presentation.
 ## Resolved by path, not identifier: compile-time autoload identifiers break
 ## --script tool mode and headless tests.
-func _ensure_forge_clips() -> void:
+func _prepare_forge_clips() -> bool:
 	var forge := get_node_or_null("/root/GemForge")
 	if forge == null:
-		return
+		return false
 	var rs := run_controller.get_run_state()
 	var ids: Array = []
 	for tier_key in rs.tier_tile_ids:
 		var tid: StringName = rs.tier_tile_ids[tier_key]
 		if tid != &"":
 			ids.append(tid)
-	forge.ensure_required(ids)
+	var registry:=get_node("/root/TileRegistry")
+	var cursor:=0
+	while cursor<ids.size():
+		var definition:TileDefinitionResource=registry.get_definition(ids[cursor]);cursor+=1
+		if definition!=null and definition.merge_target_id!=&"" and definition.merge_target_id not in ids:ids.append(definition.merge_target_id)
+	return await forge.prepare_required(ids)
+
+func _show_delivery_error(message:String)->void:
+	_delivery_error=message;_delivery_loading=false;board_scene.visible=false;board_scene._input_locked=true
 
 
 func _start_run() -> void:

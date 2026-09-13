@@ -54,13 +54,14 @@ func _ready() -> void:
 	play_btn.pressed.connect(_on_play)
 	vbox.add_child(play_btn)
 
-	# ---- Gem Atelier (lapidary designer) ----
-	var atelier_btn := Button.new()
-	atelier_btn.text = "Gem Atelier"
-	atelier_btn.custom_minimum_size = Vector2(300, 56)
-	atelier_btn.add_theme_font_size_override("font_size", 24)
-	atelier_btn.pressed.connect(_on_atelier)
-	vbox.add_child(atelier_btn)
+	if OS.has_feature("editor"):
+		# ---- Gem Atelier (lapidary designer) ----
+		var atelier_btn := Button.new()
+		atelier_btn.text = "Gem Atelier"
+		atelier_btn.custom_minimum_size = Vector2(300, 56)
+		atelier_btn.add_theme_font_size_override("font_size", 24)
+		atelier_btn.pressed.connect(_on_atelier)
+		vbox.add_child(atelier_btn)
 
 
 func _on_play() -> void:

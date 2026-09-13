@@ -7,5 +7,4 @@ script = ExtResource("1")
 tile_id = &"smoky_quartz"
 display_name = "Smoky Quartz"
 tier = 2
-debug_color = Color(0.39, 0.35, 0.31, 1)
 merge_target_id = &"tourmaline"

@@ -121,8 +121,8 @@ func _test_baker_sample_math() -> void:
 func _test_forge_service() -> void:
 	print("[delivery service]")
 	var forge: Node = (load("res://autoloads/gem_forge.gd") as GDScript).new()
-	_check(forge.get_clip(&"no_such_gem", &"idle").is_empty(), "missing specimen -> empty metadata")
-	_check(forge.get_frame(&"no_such_gem", &"idle", 0) == null, "missing frame -> null")
+	_check(forge.get_clip(&"no_such_gem", &"rest").is_empty(), "missing specimen -> empty metadata")
+	_check(forge.get_frame(&"no_such_gem", &"rest", 0) == null, "missing frame -> null")
 	_check(not forge.is_processing(), "delivery service has no runtime render loop")
 	forge.free()
 

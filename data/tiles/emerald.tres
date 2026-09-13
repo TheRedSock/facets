@@ -7,5 +7,4 @@ script = ExtResource("1")
 tile_id = &"emerald"
 display_name = "Emerald"
 tier = 6
-debug_color = Color(0.063, 0.725, 0.506, 1)
 merge_target_id = &"ruby"

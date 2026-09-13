@@ -70,6 +70,7 @@ func _init() -> void:
 	test_board_validator_portal_validation()
 
 	print("\n=== Results: %d passed, %d failed ===" % [_pass_count, _fail_count])
+	print("CHECK_COMPLETE: test_smoke")
 
 	if _fail_count > 0:
 		quit(1)

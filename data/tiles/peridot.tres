@@ -7,5 +7,4 @@ script = ExtResource("1")
 tile_id = &"peridot"
 display_name = "Peridot"
 tier = 3
-debug_color = Color(0.518, 0.8, 0.086, 1)
 merge_target_id = &"topaz"

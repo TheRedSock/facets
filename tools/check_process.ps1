@@ -1,8 +1,9 @@
 function Invoke-BoundedCheckProcess {
-    param([string]$Executable, [string[]]$Arguments, [int]$TimeoutSeconds = 900)
+    param([string]$Executable, [string[]]$Arguments, [int]$TimeoutSeconds = 900, [string]$WorkingDirectory = '')
     if ($TimeoutSeconds -lt 1) { throw 'Check timeout must be positive' }
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $Executable
+    if ($WorkingDirectory) { $startInfo.WorkingDirectory = $WorkingDirectory }
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true

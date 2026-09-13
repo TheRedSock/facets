@@ -51,10 +51,11 @@ func _init() -> void:
 	if values_match:
 		print("\nSame-run determinism: PASS")
 	else:
-		print("\nSame-run determinism: FAIL")
+		printerr("FAIL: Same-run RNG determinism")
 
 	print("\n=== Compare these values across platforms ===")
 	print("If INT_REFERENCE and PICK_REFERENCE match on all platforms,")
 	print("integer RNG is cross-platform deterministic.\n")
 
-	quit(0)
+	print("CHECK_COMPLETE: test_rng_cross_platform")
+	quit(0 if values_match else 1)

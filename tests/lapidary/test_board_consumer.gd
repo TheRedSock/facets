@@ -1,177 +1,71 @@
 extends SceneTree
-## Board-consumer tests: TileView driven by the GemForge autoload.
-## Headless-safe — the forge serves cached clips from disk when present and
-## degrades to {} otherwise; tiles without a lapidary stone always fall back
-## to the ColorRect tier tint.
-##
-## Run: godot --headless --path . --script res://tests/lapidary/test_board_consumer.gd
-
-const TILE_VIEW_SCENE := "res://scenes/tile/tile_view.tscn"
-
-## Fabricated tile_ids with NO stone in data/lapidary/stones/, so
-## GemForge.get_clip is guaranteed to return {} in every environment.
-## (Every real tile_id now has an authored stone — both ladders shipped —
-## so real ids can serve cached clips and defeat the fallback assertions.)
-const STONELESS_TILE := &"test_stoneless_gem"
-const STONELESS_TILE_TIER := 1
-const STONELESS_UPGRADE_TILE := &"test_stoneless_upgrade"
-const STONELESS_UPGRADE_TIER := 6
-
-var _pass := 0
-var _fail := 0
-var _started := false
-
-
-func _process(_delta: float) -> bool:
-	# Autoloads are not in the tree during _initialize; run on the first tick.
-	if _started:
-		return true
-	_started = true
-	print("\n=== Board consumer tests (TileView x GemForge) ===\n")
-	_run()
-	print("\n%d passed, %d failed" % [_pass, _fail])
-	print("CHECK_COMPLETE: test_board_consumer"); quit(1 if _fail > 0 else 0)
-	return true
-
-
-func _check(cond: bool, name: String) -> void:
-	if cond:
-		_pass += 1
-		print("  PASS %s" % name)
-	else:
-		_fail += 1
-		printerr("  FAIL %s" % name)
-
-
-func _run() -> void:
-	var forge: Node = root.get_node_or_null("GemForge")
-	_check(forge != null, "GemForge autoload present")
-	var registry: Node = root.get_node_or_null("TileRegistry")
-	_check(registry != null and registry.has_definitions(), "TileRegistry has definitions")
-	if forge == null or registry == null:
-		return
-
-	var view: TileView = (load(TILE_VIEW_SCENE) as PackedScene).instantiate()
-	root.add_child(view)
-	view.size = Vector2(112, 112)
-
-	_test_colorrect_fallback(view, registry)
-	_test_mouse_filters(view)
-	_test_play_clip_noop(view)
-	_test_upgrade_tier_color(view, registry)
-	_test_cached_clip_path(forge, registry)
-
-	view.queue_free()
-
-
-# ---- ColorRect fallback (forge returns {} for stoneless tiles) ----
-
-func _test_colorrect_fallback(view: TileView, registry: Node) -> void:
-	print("[colorrect fallback]")
-	view.configure_from_data(STONELESS_TILE, STONELESS_TILE_TIER, Vector2i.ZERO)
-	var bg := _visible_background(view)
-	_check(bg != null, "stoneless tile builds a visible ColorRect fallback")
-	if bg == null:
-		return
-	var expected: Color = registry.get_tier_color(STONELESS_TILE_TIER)
-	_check(bg.color.is_equal_approx(expected),
-		"fallback tinted via TileRegistry.get_tier_color(%d)" % STONELESS_TILE_TIER)
-	_check(not _has_visible_texture_rect(view), "no clip TextureRect shown on fallback")
-	_check(not view.is_processing(), "fallback costs zero per-frame work")
-
-
-# ---- Invariant #5: every node ignores mouse input ----
-
-func _test_mouse_filters(view: TileView) -> void:
-	print("[mouse filter invariant]")
-	var offenders: Array[String] = []
-	_collect_mouse_filter_offenders(view, offenders)
-	_check(offenders.is_empty(),
-		"TileView and all children use MOUSE_FILTER_IGNORE%s" %
-		("" if offenders.is_empty() else " (offenders: %s)" % ", ".join(offenders)))
-
-
-func _collect_mouse_filter_offenders(node: Node, offenders: Array[String]) -> void:
-	if node is Control and (node as Control).mouse_filter != Control.MOUSE_FILTER_IGNORE:
-		offenders.append(str(node.get_path()))
+## Deterministic real delivery fixtures; no generated-library skips or tint path.
+var failures:=0
+func _initialize()->void:_run.call_deferred()
+func check(ok:bool,label:String)->void:
+	if not ok:failures+=1;printerr("FAIL: "+label)
+func _run()->void:
+	var fixture:=GemDeliveryFixture.create("res://artifacts/board-consumer/%d"%Time.get_ticks_usec())
+	check(not fixture.is_empty(),"Explicit synthetic delivery builds")
+	if fixture.is_empty():_finish();return
+	var corrupt_library:=GemAssetLibrary.new();check(corrupt_library.open(fixture.library),"Page corruption fixture opens metadata")
+	var corrupt_key:String=corrupt_library.manifest.pages.keys()[0]
+	var corrupt_path:String=fixture.library.get_base_dir().path_join(corrupt_library.manifest.pages[corrupt_key].path)
+	var original_bytes:=FileAccess.get_file_as_bytes(corrupt_path)
+	var bad_bytes:=original_bytes.duplicate();bad_bytes[bad_bytes.size()-1]^=1
+	var bad_file:=FileAccess.open(corrupt_path,FileAccess.WRITE);bad_file.store_buffer(bad_bytes);bad_file.close()
+	check(corrupt_library.load_page(corrupt_key)==null and "checksum" in corrupt_library.last_error and corrupt_library.page_loads==0,"Corrupt delivery bytes fail before decoding/upload")
+	bad_file=FileAccess.open(corrupt_path,FileAccess.WRITE);bad_file.store_buffer(original_bytes.slice(0,4));bad_file.close()
+	check(corrupt_library.load_page(corrupt_key)==null and "truncated" in corrupt_library.last_error,"Truncated page is rejected with its path")
+	bad_file=FileAccess.open(corrupt_path,FileAccess.WRITE);bad_file.store_buffer(original_bytes);bad_file.close()
+	check(corrupt_library.load_page(corrupt_key)!=null,"Repaired fixture page can load")
+	corrupt_library=null
+	var forge:Node=root.get_node("GemForge")
+	check(forge.open_library(fixture.library,fixture.catalog),"Logical-to-physical presentation opens")
+	forge.library.cache_budget_bytes=0
+	forge.prefetch_budget_bytes=1
+	check(not await forge.prepare_required([&"logical_tile"]) and "budget" in forge.last_error and forge.library.page_loads==0,"Oversized working set fails before allocating pages")
+	forge.prefetch_budget_bytes=128*1024*1024
+	check(forge.presentation.resolve(&"logical_tile",&"upgrade")=="physical_asset/celebrate","Semantic binding does not parse logical names")
+	check(await forge.prepare_required([&"logical_tile",&"logical_upgrade"]),"Declared upcoming roles are prefetched")
+	check(forge.assets_ready and forge.delivery_report().prefetched_pages>0,"Readiness owns the complete upcoming page set")
+	var prefetch_loads:int=forge.library.page_loads
+	check(forge.delivery_report().memory.cache_owned_bytes==0 and forge.delivery_report().memory.outside_cache_bytes>0,"Prefetch references remain accounted outside a zero-budget LRU")
+	var invalid:GemDeliveryCatalog=fixture.catalog.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
+	invalid.bindings[0].roles.erase(&"upgrade")
+	check(not forge.open_library(fixture.library,invalid) and "upgrade" in forge.last_error,"Incomplete catalog fails admission with role reason")
+	check(not forge.get_clip(&"logical_tile",&"rest").is_empty(),"Rejected replacement preserves admitted binding")
+	var view:=load("res://scenes/tile/tile_view.tscn").instantiate() as TileView
+	root.add_child(view);view.size=Vector2(112,112)
+	var completed:Array[StringName]=[];var interrupted:Array[StringName]=[];var errors:Array[String]=[]
+	view.playback_completed.connect(func(role:StringName):completed.append(role))
+	view.playback_interrupted.connect(func(role:StringName):interrupted.append(role))
+	view.delivery_failed.connect(func(message:String):errors.append(message))
+	view.configure_from_data(&"logical_tile",1,Vector2i(2,3))
+	check(view._clip_rect.texture is AtlasTexture and not view.is_processing(),"Rest still uses delivered texture and no frame loop")
+	check(_mouse_ignored(view),"TileView and every child ignore mouse input")
+	check(view.play_role(&"upgrade"),"Semantic upgrade starts")
+	view._process(.11);check(view._frame==1,"Playback advances at authored timing")
+	view.play_role(&"upgrade",false);check(view._frame==1 and interrupted.is_empty(),"No-restart preserves active playback")
+	view.play_role(&"upgrade",true);check(view._frame==0 and interrupted==[&"upgrade"],"Explicit restart reports interruption and resets timing")
+	view._process(.35);check(view._role==&"rest" and completed==[&"upgrade"] and not view.is_processing(),"Natural completion returns to rest and emits once")
+	view.play_role(&"upgrade");view.show_upgrade_full(2,&"logical_upgrade")
+	check(view.tile_id==&"logical_upgrade" and view.tier==2 and interrupted.size()==2 and view._role==&"rest","Changing tile interrupts old playback and resolves new rest")
+	view.play_role(&"upgrade");view.return_to_rest();check(interrupted.size()==3 and view._role==&"rest","Explicit return to rest interrupts optical motion")
+	check(not view.play_role(&"missing") and view._clip_rect.texture==null and not errors.is_empty(),"Missing role clears display and emits an actionable error")
+	check(view.find_children("*","ColorRect",true,false).is_empty(),"There is no production tint substitution")
+	check(forge.library.page_loads==prefetch_loads,"Prefetched pages do not reload after LRU eviction")
+	view.return_to_rest()
+	var retained:AtlasTexture=view._clip_rect.texture
+	check(forge.open_library(fixture.library,fixture.catalog),"Explicit replacement admits a complete library")
+	check(forge.delivery_report().memory.resident_pages==2,"Library replacement accounts for textures still held by old consumers")
+	retained=null
+	check(forge.delivery_report().memory.resident_pages==1,"Released old consumers leave the resident ledger")
+	view.free();_finish()
+func _mouse_ignored(node:Node)->bool:
+	if node is Control and node.mouse_filter!=Control.MOUSE_FILTER_IGNORE:return false
 	for child in node.get_children():
-		_collect_mouse_filter_offenders(child, offenders)
-
-
-# ---- play_clip miss handling ----
-
-func _test_play_clip_noop(view: TileView) -> void:
-	print("[play_clip no-op]")
-	view.configure_from_data(STONELESS_TILE, STONELESS_TILE_TIER, Vector2i.ZERO)
-	view.play_clip(&"turn")
-	view.play_clip(&"flash")
-	view.play_clip(&"no_such_clip")
-	view.play_special_rotation_animation()
-	var bg := _visible_background(view)
-	_check(bg != null and not view.is_processing(),
-		"play_clip / play_special_rotation_animation no-op on forge miss")
-
-
-# ---- show_upgrade_full tier tint ----
-
-func _test_upgrade_tier_color(view: TileView, registry: Node) -> void:
-	print("[show_upgrade_full]")
-	view.configure_from_data(STONELESS_TILE, STONELESS_TILE_TIER, Vector2i.ZERO)
-	var before: Color = registry.get_tier_color(STONELESS_TILE_TIER)
-	var after: Color = registry.get_tier_color(STONELESS_UPGRADE_TIER)
-	_check(not before.is_equal_approx(after), "tier colors differ (test precondition)")
-	view.show_upgrade_full(STONELESS_UPGRADE_TIER, STONELESS_UPGRADE_TILE)
-	var bg := _visible_background(view)
-	_check(bg != null and bg.color.is_equal_approx(after),
-		"show_upgrade_full retints the fallback to the new tier color")
-	_check(view.tier == STONELESS_UPGRADE_TIER and view.tile_id == STONELESS_UPGRADE_TILE,
-		"show_upgrade_full updates tile_id/tier")
-
-
-# ---- Served clip path (cache-dependent; skips on fresh checkouts) ----
-
-func _test_cached_clip_path(forge: Node, _registry: Node) -> void:
-	print("[served clip path]")
-	var served: Dictionary = forge.get_clip(&"quartz", &"idle")
-	if served.is_empty():
-		print("  SKIP served clips (no delivery library — run tools/build_gem_assets.ps1)")
-		return
-	var view: TileView = (load(TILE_VIEW_SCENE) as PackedScene).instantiate()
-	root.add_child(view)
-	view.size = Vector2(112, 112)
-	view.configure_from_data(&"quartz", 1, Vector2i.ZERO)
-	_check(_has_visible_texture_rect(view), "cached idle clip shows the TextureRect path")
-	_check(not view.is_processing(), "1-frame idle does not process per-frame")
-	var turn_served: Dictionary = forge.get_clip(&"quartz", &"turn")
-	if turn_served.is_empty():
-		print("  SKIP turn oneshot (no generated turn animation)")
-	else:
-		view.play_clip(&"turn")
-		_check(view.is_processing(), "turn oneshot starts frame advancing")
-	view.show_upgrade_full(2, &"amethyst")
-	_check(view.tile_id == &"amethyst" and view.tier == 2,
-		"upgrade updates tile_id/tier")
-	var amethyst_idle: Dictionary = forge.get_clip(&"amethyst", &"idle")
-	if amethyst_idle.is_empty():
-		print("  SKIP upgrade clip swap (no packaged amethyst idle)")
-	else:
-		_check(_has_visible_texture_rect(view),
-			"upgrade swaps to the new tile's served visual")
-	view.queue_free()
-
-
-# ---- helpers ----
-
-func _visible_background(view: TileView) -> ColorRect:
-	for child in view.find_children("*", "ColorRect", true, false):
-		if (child as ColorRect).visible:
-			return child
-	return null
-
-
-func _has_visible_texture_rect(view: TileView) -> bool:
-	for child in view.find_children("*", "TextureRect", true, false):
-		var rect := child as TextureRect
-		if rect.visible and rect.texture != null:
-			return true
-	return false
+		if not _mouse_ignored(child):return false
+	return true
+func _finish()->void:
+	print("Board consumer failures: ",failures);print("CHECK_COMPLETE: test_board_consumer");quit(1 if failures else 0)

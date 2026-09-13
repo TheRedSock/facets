@@ -1214,6 +1214,36 @@
       ],
       "mode": "cpu",
       "completion": "CHECK_COMPLETE: test_atelier_document_ui"
+    },
+    {
+      "name": "test_run_delivery",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/lapidary/test_run_delivery.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_run_delivery"
+    },
+    {
+      "name": "test_smoke",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/test_smoke.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_smoke"
+    },
+    {
+      "name": "test_rng_cross_platform",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/test_rng_cross_platform.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_rng_cross_platform"
     }
   ]
 }

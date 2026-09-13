@@ -6,7 +6,6 @@ extends Resource
 @export_range(0, 99, 1) var tier: int = 1
 @export var match_group: StringName = &""  # Defaults to tile_id if empty
 @export var family_tags: Array[StringName] = []
-@export var debug_color: Color = Color.WHITE
 
 ## The tile_id of the gem this tile merges into (next tier in the chain).
 @export var merge_target_id: StringName = &""

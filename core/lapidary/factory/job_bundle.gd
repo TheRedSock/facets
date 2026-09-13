@@ -29,7 +29,7 @@ static func write(root: String, jobs: Array[GemFrameJob], clips: Dictionary, geo
 	if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(root.path_join("jobs"))) != OK:
 		return {}
 	var files: Array[String] = []
-	for source in ["res://core/lapidary", "res://resources/lapidary", "res://data/lapidary/standards"]:
+	for source in ["res://core/lapidary", "res://core/delivery", "res://resources/lapidary", "res://resources/delivery", "res://data/lapidary/standards"]:
 		_collect(source, files)
 	files.append("res://tools/gem_frame_worker.gd")
 	var checksums := {}
@@ -97,7 +97,7 @@ static func _prune_generated(root: String, sources: Dictionary, jobs: Dictionary
 	for record: Dictionary in jobs.values():
 		wanted[record.path] = true
 	var owned: Array[String] = []
-	for subtree in ["core/lapidary", "resources/lapidary", "data/lapidary/standards", "tools"]:
+	for subtree in ["core/lapidary", "core/delivery", "resources/lapidary", "resources/delivery", "data/lapidary/standards", "tools"]:
 		if not _inventory_generated(root, subtree, owned):
 			return false
 	if not GemStorePath.regular_path(root, "jobs"):
@@ -114,7 +114,7 @@ static func _prune_generated(root: String, sources: Dictionary, jobs: Dictionary
 	return true
 
 static func _safe_existing_tree(root: String) -> bool:
-	for relative in ["core/lapidary", "resources/lapidary", "data/lapidary/standards", "tools", "jobs"]:
+	for relative in ["core/lapidary", "core/delivery", "resources/lapidary", "resources/delivery", "data/lapidary/standards", "tools", "jobs"]:
 		var cursor := root
 		for component in relative.split("/"):
 			var directory := DirAccess.open(cursor)

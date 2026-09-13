@@ -65,6 +65,10 @@ foreach ($stage in $stages) {
         }
     }
     $results | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot 'results.json')
+    if (-not $result.passed -and $stage.name -in @('import', 'source_check')) {
+        Write-Output 'Stopping dependent checks after source initialization failure.'
+        break
+    }
 }
 if ($ReferencePython -and $failed.Count -eq 0 -and $Only.Count -eq 0) {
     $referenceChecks = @('check_polygon_reference', 'check_mesh_predicates', 'check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')

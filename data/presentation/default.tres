@@ -1,0 +1,104 @@
+[gd_resource type="Resource" script_class="GemDeliveryCatalog" load_steps=19 format=3]
+
+[ext_resource type="Script" path="res://resources/delivery/gem_delivery_catalog.gd" id="1"]
+[ext_resource type="Script" path="res://resources/delivery/gem_tile_presentation.gd" id="2"]
+
+[sub_resource type="Resource" id="Binding_0"]
+script = ExtResource("2")
+tile_id = &"alexandrite"
+asset_id = &"alexandrite"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_1"]
+script = ExtResource("2")
+tile_id = &"amethyst"
+asset_id = &"amethyst"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_2"]
+script = ExtResource("2")
+tile_id = &"aquamarine"
+asset_id = &"aquamarine"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_3"]
+script = ExtResource("2")
+tile_id = &"blue_garnet"
+asset_id = &"blue_garnet"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_4"]
+script = ExtResource("2")
+tile_id = &"diamond"
+asset_id = &"diamond"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_5"]
+script = ExtResource("2")
+tile_id = &"emerald"
+asset_id = &"emerald"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_6"]
+script = ExtResource("2")
+tile_id = &"fluorite"
+asset_id = &"fluorite"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_7"]
+script = ExtResource("2")
+tile_id = &"painite"
+asset_id = &"painite"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_8"]
+script = ExtResource("2")
+tile_id = &"peridot"
+asset_id = &"peridot"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_9"]
+script = ExtResource("2")
+tile_id = &"quartz"
+asset_id = &"quartz"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_10"]
+script = ExtResource("2")
+tile_id = &"rhodolite"
+asset_id = &"rhodolite"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_11"]
+script = ExtResource("2")
+tile_id = &"ruby"
+asset_id = &"ruby"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_12"]
+script = ExtResource("2")
+tile_id = &"sapphire"
+asset_id = &"sapphire"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_13"]
+script = ExtResource("2")
+tile_id = &"smoky_quartz"
+asset_id = &"smoky_quartz"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_14"]
+script = ExtResource("2")
+tile_id = &"topaz"
+asset_id = &"topaz"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[sub_resource type="Resource" id="Binding_15"]
+script = ExtResource("2")
+tile_id = &"tourmaline"
+asset_id = &"tourmaline"
+roles = Dictionary[StringName, StringName]({&"rest": &"idle", &"upgrade": &"turn"})
+
+[resource]
+script = ExtResource("1")
+bindings = Array[ExtResource("2")]([SubResource("Binding_0"), SubResource("Binding_1"), SubResource("Binding_2"), SubResource("Binding_3"), SubResource("Binding_4"), SubResource("Binding_5"), SubResource("Binding_6"), SubResource("Binding_7"), SubResource("Binding_8"), SubResource("Binding_9"), SubResource("Binding_10"), SubResource("Binding_11"), SubResource("Binding_12"), SubResource("Binding_13"), SubResource("Binding_14"), SubResource("Binding_15")])

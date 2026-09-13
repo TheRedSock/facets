@@ -1,7 +1,7 @@
 extends Node
 
 ## Registry for tile definitions. Loads all TileDefinitionResource files from data/tiles/
-## and provides lookup by tile_id, tier-to-id mapping, and fallback debug colours.
+## and provides lookup by tile_id and tier-to-id mapping.
 
 const TILE_DATA_PATH := "res://data/tiles/"
 
@@ -62,40 +62,16 @@ func create_tile_for_tier(tier: int, rng: SeededRng) -> TileState:
 	return create_tile(chosen_id)
 
 
-## Returns the debug color for a tier, from the definition or a fallback palette.
-func get_tier_color(tier: int) -> Color:
-	var ids := get_ids_for_tier(tier)
-	if not ids.is_empty():
-		var def := get_definition(ids[0])
-		if def != null:
-			return def.debug_color
-	# Fallback palette
-	var palette := {
-		1: Color("f8fafc"), 2: Color("a855f7"), 3: Color("84cc16"), 4: Color("f97316"),
-		5: Color("3b82f6"), 6: Color("10b981"), 7: Color("ef4444"), 8: Color("f0f0ff"),
-	}
-	return palette.get(tier, Color("94a3b8"))
-
-
 # ---- Internal ----
 
 
 func _load_definitions() -> void:
-	var dir := DirAccess.open(TILE_DATA_PATH)
-	if dir == null:
-		push_warning("TileRegistry: Could not open %s — no tile definitions loaded" % TILE_DATA_PATH)
-		return
-
-	dir.list_dir_begin()
-	var file_name := dir.get_next()
-	while file_name != "":
+	var files:=ResourceLoader.list_directory(TILE_DATA_PATH)
+	files.sort() # Stable tier ordering in both editor and exported packages.
+	for file_name in files:
 		if file_name.ends_with(".tres"):
-			var path := TILE_DATA_PATH + file_name
-			var resource = load(path)
-			if resource is TileDefinitionResource:
-				_register_definition(resource)
-		file_name = dir.get_next()
-	dir.list_dir_end()
+			var resource:=ResourceLoader.load(TILE_DATA_PATH.path_join(file_name))
+			if resource is TileDefinitionResource:_register_definition(resource)
 
 	_loaded = true
 	if _definitions.is_empty():

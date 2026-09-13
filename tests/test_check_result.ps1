@@ -8,10 +8,12 @@ $cases = @(
     @{ Code = 0; Text = "ERROR: Failed to read the root certificate store.`nCHECK_COMPLETE: fixture"; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },
     @{ Code = 0; Text = 'CHECK_COMPLETE: another_test'; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },
     @{ Code = 0; Text = 'CHECK_COMPLETE: fixture_suffix'; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },
-    @{ Code = 0; Text = 'Started first_scan_filesystem'; Marker = 'first_scan_filesystem'; Expected = $false }
+    @{ Code = 0; Text = 'Started first_scan_filesystem'; Marker = 'first_scan_filesystem'; Expected = $false },
+    @{ Code = 0; Text = "`e[92m[ DONE ]`e[39m `e[1msavepack`e[22m"; Marker = '[ DONE ] savepack'; Expected = $true },
+    @{ Code = 0; Text = "`e[31mERROR: failure`e[0m`nCHECK_COMPLETE: fixture"; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false }
 )
 foreach ($case in $cases) {
     $result = Get-GodotCheckResult -ExitCode $case.Code -Output $case.Text -Completion $case.Marker
     if ($result.passed -ne $case.Expected) { throw "Incorrect stage classification: $($case.Text)" }
 }
-Write-Output 'Check result: 8 cases passed (including incomplete, wrong-stage, exit-zero exception and environment error)'
+Write-Output "Check result: $($cases.Count) cases passed (including incomplete, wrong-stage, exit-zero exception, styled output and environment error)"

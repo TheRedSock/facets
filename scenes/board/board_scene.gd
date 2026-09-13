@@ -4,6 +4,7 @@ extends Control
 signal cell_pressed(cell: Vector2i)
 signal swap_requested(cell_a: Vector2i, cell_b: Vector2i)
 signal async_group_finished(group_id: int)
+signal delivery_failed(message:String)
 
 @export var tile_view_scene: PackedScene
 
@@ -776,7 +777,7 @@ func _play_match_remove_upgrade(
 				# Show the new gem visual immediately, then expand from zero
 				view.modulate = Color.WHITE
 				view.show_upgrade_full(new_tier, new_tile_id)
-				view.play_special_rotation_animation(upgrade_reset_delay, 1.0)
+				view.play_role(&"upgrade")
 				view.scale = Vector2.ZERO
 				if upgrade_pulse_duration <= 0.0:
 					view.scale = Vector2.ONE
@@ -1009,11 +1010,9 @@ func _ensure_pool(count: int) -> void:
 ## Creates a raw TileView node and adds it to the canvas.
 ## Only called during pool pre-population, never during gameplay.
 func _make_bare_view() -> TileView:
-	var view: TileView
-	if tile_view_scene != null:
-		view = tile_view_scene.instantiate()
-	else:
-		view = TileView.new()
+	assert(tile_view_scene!=null,"BoardScene requires its declared TileView scene")
+	var view:TileView=tile_view_scene.instantiate()
+	view.delivery_failed.connect(func(message:String)->void:delivery_failed.emit(message))
 	view.custom_minimum_size = Vector2(_cell_size)
 	view.size = Vector2(_cell_size)
 	tile_canvas.add_child(view)

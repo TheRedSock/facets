@@ -148,7 +148,7 @@ func _publish_page(source: Image, placement: Dictionary, index: Dictionary) -> b
 	var payload_hash := hash.finish().hex_encode()
 	# Raw block payloads do not encode dimensions: identical bytes can represent
 	# different page shapes. Include the interpretation in page identity.
-	var key := GemContentIdentity.digest(["delivery-page-v1", size, format, codec, bytes])
+	var key := GemDeliveryFormat.page_key(size,format,codec,bytes)
 	var relative := "pages/" + key + ".gpage"
 	if bytes.is_empty() or not GemArtifactStore.atomic_write(output.path_join(relative), bytes):
 		_fail("Cannot publish delivery page")
