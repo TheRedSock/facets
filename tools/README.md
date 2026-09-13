@@ -81,6 +81,11 @@ noise threshold or physical calibration. A fresh render requires a windowed GPU;
 Clip sampling uses `GemClipSampler`; all deliverable frames use planner/worker
 jobs. Reference transport checks remain direct numerical experiments.
 
+`build_gem_assets.ps1 -Stone quartz -Clip tilt_return -PlanOnly` selects an
+explicit catalog clip by its file stem; newly authored clips use the same path.
+Without `-Clip`, the convenience build uses idle, turn and flash. Saved batches
+carry their own complete clip selections and policies.
+
 ## Rotation inspection
 
 `turn_gifs.gd` uses `GemAssetPlanner` and `GemFrameWorker`, the same admission,

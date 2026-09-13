@@ -4,7 +4,12 @@ func _initialize() -> void:
 	var args := {}
 	for argument in OS.get_cmdline_user_args():
 		var pair := argument.trim_prefix("--").split("=", true, 1)
-		if pair.size() == 2: args[pair[0]] = pair[1]
+		if not argument.begins_with("--") or pair.size() != 2 or pair[0] not in ["out", "batch", "geometry-coverage", "rung", "style", "retain-prints", "resolution", "samples", "clip", "recipe", "quality", "seed", "specimen", "stone"]:
+			_fail("Unknown or malformed preparation argument: " + argument); return
+		if args.has(pair[0]): _fail("Duplicate preparation argument: " + pair[0]); return
+		args[pair[0]] = pair[1]
+	if args.has("retain-prints") and args["retain-prints"] not in ["true", "false"]:
+		_fail("--retain-prints needs true or false"); return
 	var output: String = args.get("out", "res://generated/gem-job-bundle")
 	var batch: GemAssetBatch
 	if args.has("batch"):
@@ -50,9 +55,14 @@ func _convenience_batch(args: Dictionary) -> GemAssetBatch:
 		template.resolution = Vector2i.ONE * int(args.resolution)
 		template.output_size = template.resolution
 	if args.has("samples"): template.samples = int(args.samples)
-	for name in ["idle", "turn", "flash"]:
-		if not args.has("clip") or name == args.clip:
-			template.clips.append(load("res://data/lapidary/clips/" + name + ".tres"))
+	var clip_names := [str(args.clip)] if args.has("clip") else ["idle", "turn", "flash"]
+	for name: String in clip_names:
+		var path := "res://data/lapidary/clips/" + name + ".tres"
+		if not GemAssetPlanner._identifier(StringName(name)) or not ResourceLoader.exists(path):
+			_fail("Unknown catalog clip: " + name); return null
+		var clip := load(path) as GemClip
+		if clip == null: _fail("Expected GemClip resource: " + path); return null
+		template.clips.append(clip)
 	if args.has("recipe"):
 		if args.has("specimen") or args.has("stone") or not args.has("quality") or not ResourceLoader.exists(args.recipe):
 			_fail("Choose an existing --recipe with explicit --quality, or a specimen/catalog source"); return null
