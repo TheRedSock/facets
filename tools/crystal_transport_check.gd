@@ -3,7 +3,7 @@ var failures := 0
 func _initialize() -> void:
 	var tracer := GemTracer.create(16, 16)
 	if tracer == null:
-		quit(1)
+		print("CHECK_COMPLETE: crystal_transport_check"); quit(1)
 		return
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	stone.material.scatter_per_mm = 0
@@ -39,7 +39,7 @@ func _initialize() -> void:
 			if not tracer.configure_stone(inst, lighting, policy):
 				printerr(tracer.configuration_error)
 				tracer.release()
-				quit(1)
+				print("CHECK_COMPLETE: crystal_transport_check"); quit(1)
 				return
 			tracer.set_stone_orientation(Quaternion(Vector3.UP, angle))
 			tracer.accumulate(128)
@@ -76,7 +76,7 @@ func _initialize() -> void:
 	_geometry_and_resume(stone, lighting, policy)
 	_compare_isotropic(stone, policy)
 	print("Crystal transport failures: ", failures)
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: crystal_transport_check"); quit(1 if failures else 0)
 
 func _geometry_and_resume(stone: GemStone, lighting: GemLighting, policy: Dictionary) -> void:
 	var tracer := GemTracer.create(16, 16)

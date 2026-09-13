@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_d55if"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_3j7tg"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_342en"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_tdq20"]
 
 [sub_resource type="Resource" id="Resource_mn171"]
@@ -24,28 +23,6 @@ b = PackedFloat64Array(1.5039759, 0.55069141, 6.5927379)
 c_um2 = PackedFloat64Array(0.005480263229440001, 0.014799428078409999, 402.89513977350396)
 range_nm = Vector2(200, 5000)
 evidence = SubResource("Resource_mn171")
-
-[sub_resource type="Resource" id="Resource_5sxkc"]
-script = ExtResource("3_342en")
-archetype_id = &"corundum_silk"
-size_mm_range = Vector2(0.3, 1.2)
-aspect = 25.0
-orientation_axes = Array[Vector3]([Vector3(1, 0, 0), Vector3(0.5, 0.866025, 0), Vector3(-0.5, 0.866025, 0)])
-scatter_density = 26.0
-tint = Color(1, 0.96, 0.88, 1)
-weight = 4.0
-center_bias = 0.15
-
-[sub_resource type="Resource" id="Resource_ekwfh"]
-script = ExtResource("3_342en")
-archetype_id = &"corundum_crystal"
-form = 4
-size_mm_range = Vector2(0.15, 0.45)
-aspect = 1.5
-scatter_density = 9.0
-tint = Color(0.94, 0.94, 0.98, 1)
-weight = 0.6
-center_bias = 0.5
 
 [sub_resource type="Resource" id="Resource_ci5mw"]
 script = ExtResource("1_d55if")
@@ -74,8 +51,4 @@ display_name = "Corundum (Al2O3)"
 source_note = "Synthetic sapphire ordinary and extraordinary dispersion: Dodge (1986), as transcribed by refractiveindex.info from Malitson/Dodge data; see per-axis evidence. Ruby/sapphire dopant effects on real refraction are not modeled."
 ordinary = SubResource("Resource_hu0bf")
 extraordinary = SubResource("Resource_likt1")
-base_scatter_per_mm = 0.001
-fluorescence_emission_nm = 693.0
-fluorescence_strength = 0.5
 hardness_mohs = 9.0
-inclusions = Array[ExtResource("3_342en")]([SubResource("Resource_5sxkc"), SubResource("Resource_ekwfh")])

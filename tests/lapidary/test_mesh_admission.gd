@@ -87,7 +87,7 @@ func _initialize() -> void:
 	_triangle_cases()
 	_predicate_reference()
 	print("Mesh admission: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_mesh_admission"); quit(1 if failures else 0)
 
 func _triangle_cases() -> void:
 	var a := Vector3(0, 0, 0)

@@ -18,10 +18,10 @@ func _initialize()->void:
 	recipe.populations.append(population)
 	var result:=GemMicrostructureCompiler.realize(source,recipe)
 	check(result.error.is_empty(),"furnace population realization")
-	if not result.error.is_empty():quit(1);return
+	if not result.error.is_empty():print("CHECK_COMPLETE: microstructure_gpu_check"); quit(1);return
 	var instance:=LapidaryStoneCompiler.compile(result.stone)
 	var tracer:=GemTracer.create(48,48)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: microstructure_gpu_check"); quit(1);return
 	var lighting:=GemLighting.analytic(PackedFloat32Array(),Vector4(1,1,1,0))
 	var policy:=GemRung.policy(GemRung.PREVIEW);policy.denoise_passes=0;policy.birefringence=false
 	for mode in ["scalar","polarized","crystal"]:
@@ -59,4 +59,4 @@ func _initialize()->void:
 			var expected:=exp(-.1*.2) if angle==0 else .5*(exp(-.1*.2)+exp(-.9*.2))
 			check(metric.error.is_empty() and absf(metric.mean_Y-expected)<.0003,mode+" local-axis Beer reference: "+str(metric.get("mean_Y")))
 			check(tracer.transport_error().is_empty(),mode+" valid rotated filling paths")
-	tracer.release();print("Microstructure GPU: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	tracer.release();print("Microstructure GPU: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: microstructure_gpu_check"); quit(1 if failures else 0)

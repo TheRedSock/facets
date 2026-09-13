@@ -57,7 +57,7 @@ func _initialize()->void:
 	check(is_nan(cross.sample(379)) and is_nan(cross.sample(781)) and is_nan(cross.sample(NAN)),"spectral sampling refuses extrapolation and nonfinite wavelengths")
 	_measured()
 	print("Absorption mixtures: %d checks, %d failures"%[checks,failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_absorption_mixtures"); quit(1 if failures else 0)
 
 func _measured()->void:
 	var path:="res://data/lapidary/materials/measured_corundum/"

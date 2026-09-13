@@ -26,15 +26,8 @@ enum SpectrumBasis { COEFFICIENT_PER_MM, CROSS_SECTION_CM2 }
 
 ## Optional principal parallel-axis absorption curve (same sampling).
 ## The polarized isotropic-real-index renderer propagates its weak-loss tensor
-## with persistent polarization; scalar transport uses the legacy directional
-## mixture. Empty = isotropic absorption. Authored curves are not measurements.
+## with persistent polarization; scalar transport maintains its supported directional absorption state. Empty = isotropic absorption. Authored curves are not measurements.
 @export var absorption_eray_mm := PackedFloat32Array()
-
-## Fluorescence belongs to the coloring ion, not the lattice: Cr3+ glows red
-## in corundum AND beryl; Fe quenches it (blue sapphire). Override < 0 =
-## inherit the species value; >= 0 replaces it. nm 0 = inherit.
-@export var fluorescence_strength_override := -1.0
-@export var fluorescence_emission_nm_override := 0.0
 
 ## UI chrome ONLY (tile tinting in menus etc.). Never enters transport.
 @export var ui_color := Color.WHITE

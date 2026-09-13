@@ -96,4 +96,4 @@ func _initialize() -> void:
 	manifest.geometry = {}
 	check(maintenance.collect(source.root, [manifest], 0, true).get("kept_recipes") == 0, "unrequested geometry is disposable")
 	print("Geometry factory: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_geometry_factory"); quit(1 if failures else 0)

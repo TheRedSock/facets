@@ -81,4 +81,4 @@ func _initialize() -> void:
 	GemRenderIdentity._digests.clear()
 	GemGeometryPlan._source_digest = ""
 	print("Render dependencies: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_render_dependencies"); quit(1 if failures else 0)

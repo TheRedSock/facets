@@ -2,109 +2,70 @@ param(
     [string]$Godot = 'C:/Godot/Godot_v4.6.1-stable_win64_console.exe',
     [switch]$Gpu,
     [switch]$CrystalPrecision,
-    [string]$ReferencePython = ''
+    [string]$ReferencePython = '',
+    [string[]]$Only = @(),
+    [switch]$List
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $logRoot = Join-Path $projectRoot 'artifacts/checks'
-New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
-$stages = @(
-    @{ Name = 'import'; Args = @('--headless', '--editor', '--quit') },
-    @{ Name = 'source_check'; Args = @('--headless', '--quit-after', '600', 'res://tools/source_check.tscn') }
-)
-foreach ($name in @('test_foundation', 'test_cleavage', 'test_convex_cleavage', 'test_mesh_admission', 'test_geometry', 'test_boundaries', 'test_factory', 'test_job_validation', 'test_store_maintenance', 'test_store_transfer', 'test_spectra', 'test_material_inputs', 'test_principal_indices', 'test_crystal_admission', 'test_optical_depth', 'test_volume_fields', 'test_polarization', 'test_crystal_modes', 'test_crystal_interface', 'test_crystal_packet', 'test_crystal_loss', 'test_species_data', 'test_pleochroism', 'test_clips', 'test_board_consumer', 'test_cut_compiler', 'test_cut_design')) {
-    $stages += @{ Name = $name; Args = @('--headless', '--quit-after', '600', '--script', "res://tests/lapidary/$name.gd") }
-}
-$stages += @{ Name = 'test_fracture'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_fracture.gd') }
-$stages += @{ Name = 'test_volume_authoring'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_volume_authoring.gd') }
-$stages += @{ Name = 'test_geometry_factory'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_geometry_factory.gd') }
-$stages += @{ Name = 'test_render_dependencies'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_render_dependencies.gd') }
-$stages += @{ Name = 'test_style'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_style.gd') }
-$stages += @{ Name = 'test_specimen_recipe'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_specimen_recipe.gd') }
-$stages += @{ Name = 'test_presentation'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_presentation.gd') }
-$stages += @{ Name = 'test_asset_planner'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_asset_planner.gd') }
-$stages += @{ Name = 'test_finish_fields'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_finish_fields.gd') }
-$stages += @{ Name = 'test_absorption_mixtures'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_absorption_mixtures.gd') }
-$stages += @{ Name = 'test_spatial_composition'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_spatial_composition.gd') }
-$stages += @{ Name = 'test_work_claims'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_work_claims.gd') }
-$stages += @{ Name = 'test_polygon'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_polygon.gd') }
-$stages += @{ Name = 'test_cut_metrics'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_cut_metrics.gd') }
-$stages += @{ Name = 'test_microstructure'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_microstructure.gd') }
-$stages += @{ Name = 'test_rounding'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_rounding.gd') }
-$stages += @{ Name = 'test_packed_geometry_cache'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_packed_geometry_cache.gd') }
-$stages += @{ Name = 'test_patch_bounds'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_patch_bounds.gd') }
-$stages += @{ Name = 'test_primitive_bvh'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_primitive_bvh.gd') }
-$stages += @{ Name = 'test_rounded_solid'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tests/lapidary/test_rounded_solid.gd') }
-if ($ReferencePython) {
-    $stages += @{ Name = 'export_polarization_checks'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/export_polarization_checks.gd') }
-}
-if ($Gpu) {
-    $stages += @{ Name = 'presentation_check'; Args = @('--quit-after', '600', '--script', 'res://tools/presentation_check.gd') }
-	$stages += @{ Name = 'asset_batch_check'; Args = @('--quit-after', '600', '--script', 'res://tools/asset_batch_check.gd') }
-	$stages += @{ Name = 'specimen_factory_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/specimen_factory_check.gd') }
-	$stages += @{ Name = 'style_factory_check'; Args = @('--quit-after', '600', '--script', 'res://tools/style_factory_check.gd') }
-	$stages += @{ Name = 'microstructure_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/microstructure_gpu_check.gd') }
-	$stages += @{ Name = 'microstructure_portable_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/microstructure_portable_check.gd') }
-	$stages += @{ Name = 'cut_study_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cut_study_gpu_check.gd') }
-	$stages += @{ Name = 'polygon_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/polygon_gpu_check.gd') }
-	$stages += @{ Name = 'continuous_transport_check'; Args = @('--quit-after', '600', '--script', 'res://tools/continuous_transport_check.gd') }
-	$stages += @{ Name = 'analytic_bvh_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/analytic_patch_gpu_check.gd', '--', '--stress', '--bvh') }
-	$stages += @{ Name = 'analytic_patch_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/analytic_patch_gpu_check.gd', '--', '--stress') }
-	$stages += @{ Name = 'geometry_cache_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/geometry_cache_gpu_check.gd') }
-	$stages += @{ Name = 'rounding_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/rounding_gpu_check.gd') }
-	$stages += @{ Name = 'rounding_portable_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/rounding_portable_check.gd') }
-	$stages += @{ Name = 'work_claims_gpu_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/work_claims_gpu_check.gd') }
-	$stages += @{ Name = 'composition_portable_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/composition_portable_check.gd') }
-	$stages += @{ Name = 'spatial_composition_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/spatial_composition_gpu_check.gd') }
-	$stages += @{ Name = 'absorption_mixture_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/absorption_mixture_gpu_check.gd') }
-	$stages += @{ Name = 'reconstruction_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/reconstruction_gpu_check.gd') }
-	$stages += @{ Name = 'convex_surface_check'; Args = @('--quit-after', '600', '--script', 'res://tools/convex_surface_check.gd') }
-	$stages += @{ Name = 'cleavage_backend_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_backend_check.gd') }
-	$stages += @{ Name = 'cleavage_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_gpu_check.gd') }
-	$stages += @{ Name = 'rounded_cleavage_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/cleavage_gpu_check.gd', '--', '--rounded') }
-	$stages += @{ Name = 'cleavage_portable_check'; Args = @('--headless', '--quit-after', '600', '--script', 'res://tools/cleavage_portable_check.gd') }
-	$stages += @{ Name = 'finish_fields_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/finish_fields_gpu_check.gd') }
-	$stages += @{ Name = 'finish_fields_render_check'; Args = @('--quit-after', '600', '--script', 'res://tools/finish_fields_render_check.gd') }
-	$stages += @{ Name = 'microsurface_gpu_check'; Args = @('--quit-after', '600', '--script', 'res://tools/microsurface_gpu_check.gd') }
-	$stages += @{ Name = 'pipeline_cache_check'; Args = @('--quit-after', '600', '--script', 'res://tools/pipeline_cache_check.gd') }
-    $stages += @{ Name = 'geometry_factory_check'; Args = @('--quit-after', '600', '--script', 'res://tools/geometry_factory_check.gd') }
-    foreach ($name in @('foundation_gpu_check', 'factory_gpu_check', 'farm_gpu_check', 'library_gpu_check', 'surface_check', 'spectra_gpu_check', 'principal_indices_gpu_check', 'volume_gpu_check', 'polarization_gpu_check', 'crystal_gpu_check', 'crystal_transport_check', 'geometry_aov_check')) {
-        $stages += @{ Name = $name; Args = @('--quit-after', '600', '--script', "res://tools/$name.gd") }
+. (Join-Path $PSScriptRoot 'check_result.ps1')
+$registry = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'engine_checks.json') -Raw | ConvertFrom-Json
+if ($registry.schema -ne 1) { throw 'Unknown check registry schema' }
+$stages = @($registry.stages | Where-Object {
+    ($_.mode -eq 'cpu' -or ($_.mode -eq 'gpu' -and $Gpu) -or ($_.mode -eq 'precision' -and $CrystalPrecision) -or ($_.mode -eq 'reference' -and $ReferencePython)) -and
+    ($Only.Count -eq 0 -or $_.name -in $Only)
+})
+if ($Only.Count) {
+    foreach ($name in $Only) {
+        if ($name -notin $stages.name) { throw "Unknown or disabled check: $name (select its GPU/reference mode)" }
     }
 }
-if ($CrystalPrecision) {
-    $stages += @{ Name = 'crystal_gpu_precision'; Args = @('--quit-after', '600', '--script', 'res://tools/crystal_gpu_check.gd', '--', '--stress', '--fp64') }
-}
+if ($List) { $stages | Select-Object name,mode,completion; exit 0 }
+New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 $failed = @()
+$results = @()
+function Get-CheckedSourceDigest {
+    $records = [System.Collections.Generic.List[string]]::new()
+    foreach ($directory in @('core', 'resources', 'scenes', 'autoloads', 'tools', 'tests', 'data')) {
+        Get-ChildItem -LiteralPath (Join-Path $projectRoot $directory) -File -Recurse |
+            Where-Object { $_.Extension -in @('.gd', '.glsl', '.ps1', '.py', '.json', '.tres', '.tscn', '.csv') -and $_.FullName -notmatch '[\\/]__pycache__[\\/]' } |
+            Sort-Object FullName | ForEach-Object { $records.Add($_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash) }
+    }
+    return $records -join "`n"
+}
+$sourceBefore = Get-CheckedSourceDigest
 foreach ($stage in $stages) {
-    $arguments = @('--audio-driver', 'Dummy', '--path', $projectRoot) + $stage.Args
+    $arguments = @('--audio-driver', 'Dummy', '--path', $projectRoot, '--log-file', (Join-Path $logRoot ($stage.name + '.godot.log'))) + $stage.args
+    $started = Get-Date
     $output = & $Godot @arguments 2>&1
     $code = $LASTEXITCODE
-    $log = Join-Path $logRoot ($stage.Name + '.log')
-    $output | Set-Content -Encoding utf8 -LiteralPath $log
-    # Godot can exit zero after a GDScript exception; exit status alone is unsafe.
-    if ($code -ne 0 -or ($output | Select-String -Pattern '^\s*(SCRIPT ERROR:|ERROR:|FAIL(:|\b)|FAILED\b)')) {
-        $failed += $stage.Name
-        Write-Output "FAIL $($stage.Name) (see $log)"
+    $text = $output -join "`n"
+    $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot ($stage.name + '.log'))
+    $result = Get-GodotCheckResult -ExitCode $code -Output $text -Completion $stage.completion
+    $results += [ordered]@{ name = $stage.name; result = $result; elapsed_seconds = ((Get-Date) - $started).TotalSeconds }
+    if (-not $result.passed) {
+        $failed += $stage.name
+        Write-Output "FAIL $($stage.name): completed=$($result.completed), exit=$code, environment_errors=$($result.environment_errors.Count)"
         Write-Output $output
-    } else {
-        Write-Output "PASS $($stage.Name)"
-    }
+    } else { Write-Output "PASS $($stage.name)" }
+    $results | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot 'results.json')
 }
-if ($ReferencePython -and $failed.Count -eq 0) {
+if ($ReferencePython -and $failed.Count -eq 0 -and $Only.Count -eq 0) {
     $referenceChecks = @('check_polygon_reference', 'check_mesh_predicates', 'check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')
     if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference', 'check_finish_fields_reference', 'check_absorption_mixtures') }
     foreach ($name in $referenceChecks) {
         $output = & $ReferencePython (Join-Path $projectRoot "tools/$name.py") 2>&1
         $code = $LASTEXITCODE
         $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot "$name.log")
-        if ($code -ne 0) { $failed += $name }
+        if ($code -ne 0) { $failed += $name; Write-Output "FAIL $name" }
         else { Write-Output "PASS $name" }
-        Write-Output $output
     }
 }
-if ($failed.Count -gt 0) {
-    Write-Output "Failed checks: $($failed -join ', ')"
-    exit 1
+if ($sourceBefore -cne (Get-CheckedSourceDigest)) {
+    $failed += 'source_changed_during_validation'
+    Write-Output 'FAIL source_changed_during_validation: rerun against a stable source tree'
 }
+if ($failed.Count -gt 0) { Write-Output "Failed checks: $($failed -join ', ')"; exit 1 }
+Write-Output "ENGINE_CHECKS_COMPLETE: $($stages.Count) Godot stages"
 exit 0

@@ -21,7 +21,7 @@ func _init() -> void:
 	_test_species_optic_axes()
 	_test_ruby_compiler()
 	print("\n%d passed, %d failed" % [_pass, _fail])
-	quit(1 if _fail > 0 else 0)
+	print("CHECK_COMPLETE: test_pleochroism"); quit(1 if _fail > 0 else 0)
 
 
 func _check(cond: bool, name: String) -> void:

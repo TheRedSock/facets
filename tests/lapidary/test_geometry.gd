@@ -58,7 +58,7 @@ func _initialize() -> void:
 	concave.indices[1] = temporary
 	check(not concave.validate().is_empty(), "inverted triangle rejected")
 	print("Geometry: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_geometry"); quit(1 if failures else 0)
 
 func _check_rays(mesh: GemMesh, bvh: GemBvh) -> void:
 	for index in 32:

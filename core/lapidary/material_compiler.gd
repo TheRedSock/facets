@@ -24,8 +24,8 @@ static func compile(material: GemMaterial) -> Dictionary:
 		"index_offset": species.ordinary.index_offset,
 		"extraordinary_refraction": species.extraordinary.packed() if species.extraordinary != null else {},
 		"optic_axis": species.optic_axis_stone.normalized(),
-		"scatter": {"sigma_per_mm": material.scatter_per_mm if material.scatter_per_mm >= 0.0 else species.base_scatter_per_mm,
-			"g": material.scatter_g if material.scatter_per_mm >= 0.0 else species.scatter_anisotropy_g}}
+		"scatter": {"sigma_per_mm": material.scatter_per_mm,
+			"g": material.scatter_g}}
 
 ## Compile each field's additional composition in its host lattice. No added
 ## optical boundary or independent refractive index is introduced by doping.

@@ -11,7 +11,7 @@ func check(value: bool, label: String) -> void:
 func _initialize() -> void:
 	var tracer := GemTracer.create(32, 32)
 	if tracer == null:
-		quit(1)
+		print("CHECK_COMPLETE: polarization_gpu_check"); quit(1)
 		return
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres")
 	var inst := LapidaryStoneCompiler.compile(stone)
@@ -59,7 +59,7 @@ func _initialize() -> void:
 	_interface_probes(tracer.get("_rd"), true)
 	tracer.release()
 	print("GPU polarization: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: polarization_gpu_check"); quit(1 if failures else 0)
 
 func _interface_probes(rd: RenderingDevice, dichroic := false) -> void:
 	var packed := PackedFloat32Array()

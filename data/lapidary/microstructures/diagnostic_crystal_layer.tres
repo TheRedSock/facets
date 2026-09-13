@@ -6,7 +6,6 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="4_0yrtk"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_chromophore.gd" id="5_qwomb"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="6_82xvx"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="7_51j5s"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="8_bsd22"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="9_3xdb8"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_finish_field.gd" id="10_je3rt"]
@@ -57,6 +56,7 @@ ordinary = SubResource("Resource_xoqx8")
 script = ExtResource("6_82xvx")
 species = SubResource("Resource_lre4j")
 absorbers = Array[ExtResource("2_bdugq")]([SubResource("Resource_mn4df")])
+scatter_per_mm = 0.0
 scattering_evidence = SubResource("Resource_p8rjn")
 source_note = "Synthetic isotropic n=1.8, neutral absorption 10/mm. Geometry/transport diagnostic, not measured mineral data."
 

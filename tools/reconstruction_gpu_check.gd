@@ -10,7 +10,7 @@ func check(ok: bool, message: String) -> void:
 		printerr("FAIL: "+message)
 func _initialize() -> void:
 	var tracer:=GemTracer.create(48,48)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: reconstruction_gpu_check"); quit(1);return
 	var policy:=GemRung.policy(GemRung.PREVIEW)
 	policy["birefringence"]=false
 	policy["max_bounces"]=256
@@ -29,7 +29,7 @@ func _initialize() -> void:
 			if polarized:compiled["extraordinary_refraction"]={}
 			var configured:=tracer.configure_stone(compiled,lights,policy)
 			check(configured,"component fixture config")
-			if not configured:tracer.release();quit(1);return
+			if not configured:tracer.release();print("CHECK_COMPLETE: reconstruction_gpu_check"); quit(1);return
 			tracer.accumulate(128)
 			var state:=tracer.checkpoint()
 			var raw:PackedFloat32Array=state.buffers.accum.to_float32_array()
@@ -82,4 +82,4 @@ func _initialize() -> void:
 		check(absf(sum_y/coverage-1)<.015,"reconstructed rough-volume furnace conserves radiance within sampling/filter budget")
 	tracer.release()
 	print("Reconstruction: %d checks, %d failures"%[checks,failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: reconstruction_gpu_check"); quit(1 if failures else 0)

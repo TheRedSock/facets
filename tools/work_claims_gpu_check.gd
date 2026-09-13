@@ -16,7 +16,7 @@ func _initialize()->void:
 	other.orientation=Quaternion(Vector3.UP,.4)
 	var jobs:Array[GemFrameJob]=[job,other]
 	check(not GemJobBundle.write(bundle,jobs,{},2).is_empty(),"portable bundle")
-	if failures:quit(1);return
+	if failures:print("CHECK_COMPLETE: work_claims_gpu_check"); quit(1);return
 	check(_execute(bundle,base,"import",PackedStringArray(["--headless","--editor","--quit"])).code==0,"fresh portable import")
 	var args:=PackedStringArray(["--quit-after","600","--script","res://tools/gem_frame_worker.gd","--","--manifest=res://manifest.json","--output="+output])
 	var initialize:=args.duplicate();initialize.insert(0,"--headless");initialize.append("--initialize-only=true")
@@ -44,7 +44,7 @@ func _initialize()->void:
 	result=_execute(bundle,base,"cache",headless)
 	check(result.code==0 and _last_counters(result.text,"job").get("display_hits")==2,"headless completed displays")
 	check(_last_counters(result.text,"geometry").get("cache_hits")==2,"headless geometry companions")
-	print("Work claims portable GPU: %d failures; %s"%[failures,base]);quit(1 if failures else 0)
+	print("Work claims portable GPU: %d failures; %s"%[failures,base]);print("CHECK_COMPLETE: work_claims_gpu_check"); quit(1 if failures else 0)
 
 func _execute(bundle:String,base:String,name:String,arguments:PackedStringArray)->Dictionary:
 	var args:=PackedStringArray(["--audio-driver","Dummy","--path",bundle]);args.append_array(arguments)

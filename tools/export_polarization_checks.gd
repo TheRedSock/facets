@@ -33,4 +33,4 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
 	FileAccess.open(path, FileAccess.WRITE).store_string(JSON.stringify({"cases": cases}, "\t"))
 	print("Exported %d polarization cases" % cases.size())
-	quit()
+	print("CHECK_COMPLETE: export_polarization_checks"); quit()

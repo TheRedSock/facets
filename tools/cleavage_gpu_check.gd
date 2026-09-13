@@ -17,7 +17,7 @@ func _initialize()->void:
 		stone.condition.rounding.radius_mm=.12
 	var inst:=LapidaryStoneCompiler.compile(stone)
 	var tracer:=GemTracer.create(64,64)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: cleavage_gpu_check"); quit(1);return
 	var policy:=GemRung.policy(GemRung.PREVIEW)
 	policy["birefringence"]=false
 	policy["max_bounces"]=256
@@ -63,4 +63,4 @@ func _initialize()->void:
 	check(not worker.run(job).is_empty() and worker.tracer._print_only,"cleavage print-only reuse")
 	worker.release()
 	print(("Rounded " if rounded else "")+"Cleavage GPU: %d checks, %d failures" % [checks,failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: cleavage_gpu_check"); quit(1 if failures else 0)

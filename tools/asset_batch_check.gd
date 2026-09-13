@@ -56,7 +56,7 @@ func _initialize() -> void:
 		if library.frame(String(request.asset_id) + "/inspect", 1) == null:
 			_fail("Missing separately addressable variant texture"); return
 	print("Asset batch PASS: 5 variants/aliases, 10 requested frames, 8 optical masters, portable cache and selective library; " + path)
-	quit()
+	print("CHECK_COMPLETE: asset_batch_check"); quit()
 
 func _fail(message: String) -> void:
-	printerr("FAIL: " + message); quit(1)
+	printerr("FAIL: " + message); print("CHECK_COMPLETE: asset_batch_check"); quit(1)

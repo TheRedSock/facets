@@ -43,4 +43,4 @@ func _initialize() -> void:
 	stone.condition.defects.append(defect)
 	check(GemJobValidator.validate(job).contains("scattering"), "nested filling follows same capability gate")
 	print("Crystal admission: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_crystal_admission"); quit(1 if failures else 0)

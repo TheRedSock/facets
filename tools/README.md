@@ -1,5 +1,22 @@
 # Engine tools
 
+## Catalog inspection
+
+`inspect_gems.gd` saves a normal asset batch, renders paired independent sample
+streams through the production planner/worker, and writes a labeled sheet, PNG
+hashes, cache identities, full frame wall times and opaque-pixel RGB noise metrics.
+It replaces the former catalog ladder/grain/noise and aggregate evaluation tools.
+The speculative board-live microbenchmark and unused policy have been removed;
+gameplay acceptance measures delivered assets. Inspection does not claim a universal
+noise threshold or physical calibration. A fresh render requires a windowed GPU;
+`--plan-only` and completed-cache replay work headlessly.
+
+`godot --path . --script res://tools/inspect_gems.gd -- --stones=quartz,ruby
+--size=112 --samples=128 --output=res://artifacts/inspection`
+
+Clip sampling uses `GemClipSampler`; all deliverable frames use planner/worker
+jobs. Reference transport checks remain direct numerical experiments.
+
 ## Rotation inspection
 
 `turn_gifs.gd` uses `GemAssetPlanner` and `GemFrameWorker`, the same admission,
@@ -52,6 +69,12 @@ Run `tools/check_engine.ps1 -Gpu` for source parsing, CPU contracts and windowed
 GPU acceptance checks. GPU scripts require a local RenderingDevice; headless
 execution supports CPU planning, validation, packaging, cached results and styling
 from cached unstyled prints.
+
+`engine_checks.json` is the executable gate inventory: entry point, CPU/GPU mode
+and positive completion marker. Use `check_engine.ps1 -List -Gpu` to list it or
+`-Only source_check,test_asset_planner` to run selected enabled checks. An automatic
+quit before the marker fails, as does an exit-zero GDScript exception. Environmental
+startup errors remain failures and are separately identified in `results.json`.
 
 Optional game art direction: `build_gem_assets.ps1 -Style
 res://data/lapidary/styles/illustrative_sprite.tres -RetainPrints`. Unstyled prints

@@ -17,7 +17,7 @@ func _initialize() -> void:
 	_reciprocity_checks()
 	_export_chains()
 	print("Crystal packet/measure: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_crystal_packet"); quit(1 if failures else 0)
 
 func _measure_checks() -> void:
 	var n := V.vec(0, 0, 1)

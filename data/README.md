@@ -1,20 +1,16 @@
-# Data Directory
+# Authored data
 
-This directory holds `.tres` resource files that define game content. Resources are loaded at runtime by autoloads (e.g., `TileRegistry` loads all tile definitions) or referenced directly in run configuration.
+`tiles/` holds 16 logical tile definitions in two eight-gem merge ladders.
+`spawn_tables/` holds optional simulation spawn tables with integer weights.
+Board layouts use `BoardLayoutResource`.
 
-## Current Subdirectories
+`lapidary/` holds optical species/index curves, absorber spectra, materials,
+conditions, shapes/cuts, stones, recipes, clips, rigs, print/style and explicit
+asset batches. Add a physical gem through these resources and a `GemAssetRequest`;
+changing a material does not automatically change gameplay tiers or merge rules.
+`GemGrade` is metadata. Optical evidence is stored with the physical inputs.
 
-- `tiles/` — `TileDefinitionResource` instances for each gem type (8 gems in the default merge ladder)
-- `visuals/` — `GemVisualResource` instances that map tiles to `GemCutSpecResource` geometry plus material settings
-- `spawn_tables/` — `SpawnTableResource` instances for weighted tier distribution (default table is created in code; `.tres` files here override it)
-
-## Adding Content
-
-Create `.tres` files using the Godot editor inspector, or by hand following the resource class schemas in `resources/definitions/`.
-
-- **New gem type:** Create a `.tres` in `data/tiles/` with `TileDefinitionResource`. `TileRegistry` auto-loads it at startup.
-- **New gem visual or cut assignment:** Create or edit a `.tres` in `data/visuals/` with `GemVisualResource`, and add/update the referenced spec asset in `data/visuals/cut_specs/`. `GemVisualRegistry` loads these and compiles the referenced geometry at startup.
-- **New spawn table:** Create a `.tres` in `data/spawn_tables/` with `SpawnTableResource`. Weights must be `Array[int]` (no floats).
-- **Board layouts:** `BoardLayoutResource` defines board shape, gravity, portals, and spawn entries. Can be authored as `.tres` files or built programmatically for procedural generation.
-
-See [plans/deferred-systems-reference.md](../plans/deferred-systems-reference.md) for content directories that will be added in later phases (boons, hazards, floors, effects).
+The [factory contract](../core/lapidary/factory/CONTRACT.md) defines realization,
+identity and delivery. The [tools guide](../tools/README.md) defines build commands.
+Generated worker stores and delivery packages live outside this authored data
+directory. There is no GemVisualResource or runtime optical registry.

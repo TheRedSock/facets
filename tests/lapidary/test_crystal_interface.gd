@@ -54,4 +54,4 @@ func _initialize() -> void:
 		check(absf(result.branches[0].power + result.branches[1].power - pow((1 - n) / (1 + n), 2)) < 1e-12, "principal normal-incidence reflectance uses the correct index")
 	GemArtifactStore.atomic_write("res://artifacts/reference/crystal-interfaces.json", JSON.stringify(cases).to_utf8_buffer())
 	print("Crystal interface: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_crystal_interface"); quit(1 if failures else 0)

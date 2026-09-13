@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_7i2jy"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_tpajj"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_o1fb2"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_2toe6"]
 
 [sub_resource type="Resource" id="Resource_pp0v8"]
@@ -17,28 +16,6 @@ b = PackedFloat64Array(0.6518299902047124, 1.5376051954498586, 0)
 c_um2 = PackedFloat64Array(0.025, 0, 0)
 index_offset = -0.028
 evidence = SubResource("Resource_pp0v8")
-
-[sub_resource type="Resource" id="Resource_11j8m"]
-script = ExtResource("3_o1fb2")
-archetype_id = &"painite_crystal"
-form = 4
-size_mm_range = Vector2(0.15, 0.45)
-aspect = 1.5
-scatter_density = 8.0
-tint = Color(0.95, 0.93, 0.9, 1)
-weight = 1.5
-center_bias = 0.4
-
-[sub_resource type="Resource" id="Resource_korrq"]
-script = ExtResource("3_o1fb2")
-archetype_id = &"painite_feather"
-form = 2
-size_mm_range = Vector2(0.3, 0.9)
-aspect = 24.0
-scatter_density = 7.0
-tint = Color(1, 0.97, 0.93, 1)
-weight = 2.0
-center_bias = 0.25
 
 [sub_resource type="Resource" id="Resource_arif1"]
 script = ExtResource("1_7i2jy")
@@ -58,6 +35,4 @@ display_name = "Painite (CaZrAl9O15(BO3))"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.80 (published RI range ~1.787-1.816) and ASSUMED B-G dispersion 0.018 (no published dispersion found; corundum-like oxide assumed). Uniaxial(-) delta-n 0.028. Mohs 8. Sparse literature — constants are best-effort, flagged for revisit."
 ordinary = SubResource("Resource_3xvts")
 extraordinary = SubResource("Resource_gxyj0")
-base_scatter_per_mm = 0.001
 hardness_mohs = 8.0
-inclusions = Array[ExtResource("3_o1fb2")]([SubResource("Resource_11j8m"), SubResource("Resource_korrq")])

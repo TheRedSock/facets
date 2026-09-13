@@ -11,7 +11,7 @@ func _initialize()->void:
 		jobs.append(frame)
 	var base:=ProjectSettings.globalize_path("res://artifacts/rounding/portable-%d"%Time.get_ticks_usec())
 	var bundle:=base.path_join("bundle");var output:=base.path_join("output")
-	if GemJobBundle.write(bundle,jobs,{},2).is_empty():printerr("FAIL: rounding bundle");quit(1);return
+	if GemJobBundle.write(bundle,jobs,{},2).is_empty():printerr("FAIL: rounding bundle");print("CHECK_COMPLETE: rounding_portable_check"); quit(1);return
 	var run:=PackedStringArray(["--quit-after","600","--script","res://tools/gem_frame_worker.gd","--","--manifest=res://manifest.json","--output="+output])
 	var cached:=run.duplicate();cached.insert(0,"--headless")
 	var stages:=[PackedStringArray(["--headless","--editor","--quit"]),run,cached]
@@ -22,17 +22,17 @@ func _initialize()->void:
 		var log_text:="\n".join(lines)
 		GemArtifactStore.atomic_write(base.path_join("stage%d.log"%i),log_text.to_utf8_buffer())
 		if code!=0 or "SCRIPT ERROR:" in log_text or "ERROR:" in log_text:
-			printerr("FAIL: rounding portable stage %d %s"%[i,log_text]);quit(1);return
+			printerr("FAIL: rounding portable stage %d %s"%[i,log_text]);print("CHECK_COMPLETE: rounding_portable_check"); quit(1);return
 	var store:=GemArtifactStore.new(output)
 	var most_hits:=0;var most_reuses:=0
 	for frame in jobs:
 		var master:=store.read(GemFramePlan.master_key(frame));var geometry:=store.read(GemGeometryPlan.key(frame,2))
 		if master.is_empty() or geometry.is_empty() or master.metadata.get("condition_report",{}).get("rounding",{}).get("removed_mm3",0)<=0 or master.metadata.get("condition_report",{}).get("rounding",{}).get("volume_reference","")!="convex_Steiner_formula":
-			printerr("FAIL: rounding physical outputs/report");quit(1);return
+			printerr("FAIL: rounding physical outputs/report");print("CHECK_COMPLETE: rounding_portable_check"); quit(1);return
 		var stats:Dictionary=master.metadata.get("profile",{}).get("geometry_cache",{})
 		if stats.get("builds",0)!=1 or stats.get("buffer_uploads",0)!=2:
-			printerr("FAIL: portable worker rebuilt unchanged geometry");quit(1);return
+			printerr("FAIL: portable worker rebuilt unchanged geometry");print("CHECK_COMPLETE: rounding_portable_check"); quit(1);return
 		most_hits=maxi(most_hits,stats.hits);most_reuses=maxi(most_reuses,stats.buffer_reuses)
 	if most_hits!=2 or most_reuses!=4:
-		printerr("FAIL: portable animation did not reuse packed/resident geometry");quit(1);return
-	print("Rounding portable PASS: three optical masters, removed-volume reports, geometry, headless reuse and one BVH build; "+base);quit()
+		printerr("FAIL: portable animation did not reuse packed/resident geometry");print("CHECK_COMPLETE: rounding_portable_check"); quit(1);return
+	print("Rounding portable PASS: three optical masters, removed-volume reports, geometry, headless reuse and one BVH build; "+base);print("CHECK_COMPLETE: rounding_portable_check"); quit()

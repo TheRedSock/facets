@@ -55,4 +55,4 @@ func _initialize() -> void:
 			accepted+=1
 			for k in 3:contained=contained and p[k]>=circle.min[k]-1e-12 and p[k]<=circle.max[k]+1e-12
 		check(accepted>900 and contained,"independent circle samples stay inside rotated bounds")
-	print("Patch bounds: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("Patch bounds: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: test_patch_bounds"); quit(1 if failures else 0)

@@ -57,10 +57,10 @@ static func animation(stone: GemStone, clip: GemClip, rig: GemLightRig, print_st
 		job.output_size = Vector2i.ONE * int(policy["out"])
 		job.samples = policy["spp"]
 		job.sample_seed = stone.seed
-		job.orientation = canonical_orientation(GemClipBaker.frame_orientation(clip, t))
-		job.rig_yaw = canonical_yaw(GemClipBaker.frame_rig_yaw_rad(clip, t))
-		job.role_multipliers = GemClipBaker.frame_role_mult(clip, t)
-		job.exposure = GemClipBaker.frame_exposure(clip, t)
+		job.orientation = canonical_orientation(GemClipSampler.frame_orientation(clip, t))
+		job.rig_yaw = canonical_yaw(GemClipSampler.frame_rig_yaw_rad(clip, t))
+		job.role_multipliers = GemClipSampler.frame_role_mult(clip, t)
+		job.exposure = GemClipSampler.frame_exposure(clip, t)
 		result.append(job)
 	return result
 

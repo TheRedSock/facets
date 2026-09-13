@@ -39,4 +39,4 @@ func _initialize() -> void:
 	check(cache.retained_bytes==0,"oversized continuous payload is not retained")
 	solid.patches[0].axis[0]+=.1
 	check(not solid.validation_error().is_empty() and not cache.packed(null,solid).error.is_empty(),"modified compiled patch rejected before packing")
-	print("Primitive BVH: %d checks, %d failures" % [checks,failures]);quit(1 if failures else 0)
+	print("Primitive BVH: %d checks, %d failures" % [checks,failures]);print("CHECK_COMPLETE: test_primitive_bvh"); quit(1 if failures else 0)

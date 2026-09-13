@@ -54,7 +54,7 @@ func _initialize() -> void:
 	check(worker.counters.restyled == 1 and worker.counters.rendered == 0 and worker.counters.reprinted == 0, "restyling avoids trace and mastering")
 	check(worker.run(job).get("status") == "complete" and worker.counters.display_hits == 1, "styled frame cache hit")
 	worker.release()
-	print("Style: %d checks, %d failures" % [checks, failures]); quit(1 if failures else 0)
+	print("Style: %d checks, %d failures" % [checks, failures]); print("CHECK_COMPLETE: test_style"); quit(1 if failures else 0)
 
 func geometry_without_style(job: GemFrameJob) -> String:
 	var copy: GemFrameJob = job.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)

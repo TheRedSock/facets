@@ -27,7 +27,7 @@ layout(push_constant, std430) uniform Params {
 	uint spp;             // 12
 	uint seed;            // 16
 	uint max_bounces;     // 20
-	uint flags;           // 24  bit0 dispersion_split, bit1 birefringence, bit2 volume, bit4 fluorescence
+	uint flags;           // 24  bit0 dispersion_split, bit1 birefringence, bit2 volume
 	uint light_count;     // 28
 	ivec2 grid;           // 32  cols, rows
 	ivec2 cell_px;        // 40
@@ -129,7 +129,7 @@ void segment_beer(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_era
     principal_depth(st,pos,dir,t,wl,tau_o,tau_e);
     ordinary=exp(-tau_o);
     if(!has_eray) { extraordinary=ordinary; return; }
-    float ca=dot(dir,st.optic_fluor.xyz);
+    float ca=dot(dir,st.optic_axis.xyz);
     float c2=clamp(ca*ca,0.0,1.0);
     extraordinary=exp(-(c2*tau_o+(1.0-c2)*tau_e));
 }
@@ -145,7 +145,7 @@ vec4 segment_att(Stone st, vec3 pos, vec3 dir, float t, int a_off, bool has_eray
 PathWeight segment_weight(PathWeight w, Stone st, vec3 pos, vec3 dir, float t, vec4 wl, int pol_mode) {
     vec4 ordinary,extraordinary;
     segment_beer(st,pos,dir,t,st.ranges1.x,(st.ranges1.y&1)!=0,wl,ordinary,extraordinary);
-    return absorption_weight(w,dir,st.optic_fluor.xyz,ordinary,extraordinary);
+    return absorption_weight(w,dir,st.optic_axis.xyz,ordinary,extraordinary);
 }
 
 // ---------------------------------------------------------------- surfaces
@@ -184,7 +184,7 @@ float geometry_index(int material, vec4 indices, vec4 wl, int wavelength, bool e
 	Stone m = stones[material];
 	vec4 extra = principal_indices(m, wl, true);
 	float ne = wavelength >= 0 ? extra[wavelength] : 0.5 * (extra.y + extra.z);
-	return n_e_phi(ordinary, ne, abs(dot(direction, m.optic_fluor.xyz)));
+	return n_e_phi(ordinary, ne, abs(dot(direction, m.optic_axis.xyz)));
 }
 
 bool trace_smith_interface(inout vec3 dir, mat3 frame, vec2 alpha, float eta,
@@ -235,7 +235,7 @@ vec4 trace_mesh_path(Stone st, vec3 pos, vec3 dir, vec4 wl, int wavelength, bool
     // The optional approximate o/e ray split starts with one camera probe
     // per polarization. Subsequent absorption keeps its persistent state.
     if(pol_mode!=POL_UNPOL) {
-        vec3 axis=cross(st.optic_fluor.xyz,-dir);
+        vec3 axis=cross(st.optic_axis.xyz,-dir);
         if(dot(axis,axis)>1e-12) throughput.axis=normalize(axis);
         throughput.Q=vec4(pol_mode==POL_O?1.0:-1.0);
     }
@@ -457,7 +457,7 @@ void main() {
 			float pass_w = (biref ? 0.5 : 1.0);
 			// Shared geometry uses a mid-spectrum index when not splitting.
 			float n_o = disp ? n_wl[wl_i] : 0.5 * (n_wl.y + n_wl.z);
-			float ca_in = abs(dot(rd, st.optic_fluor.xyz));
+			float ca_in = abs(dot(rd, st.optic_axis.xyz));
 			vec4 ne_wl = eray ? principal_indices(st, wl, true) : n_wl;
 			float ne = disp ? ne_wl[wl_i] : 0.5 * (ne_wl.y + ne_wl.z);
 			float n_geom = eray ? n_e_phi(n_o, ne, ca_in) : n_o;

@@ -40,7 +40,7 @@ static func plan(batch: GemAssetBatch) -> Dictionary:
 		specimens[String(request.asset_id)] = stone.fingerprint()
 		for clip in request.clips:
 			var frames := GemFramePlan.animation(stone, clip, request.rig, request.print_style, GemRung.rung_from_name(request.rung))
-			var framing := GemPresentationCompiler.prepare(stone, request.presentation, GemClipBaker.frame_orientation(clip, 0.0))
+			var framing := GemPresentationCompiler.prepare(stone, request.presentation, GemClipSampler.frame_orientation(clip, 0.0))
 			if not framing.error.is_empty(): return {"error": framing.error}
 			var ids := []
 			for job in frames:

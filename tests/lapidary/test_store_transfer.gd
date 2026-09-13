@@ -84,4 +84,4 @@ func _initialize() -> void:
 	var missing := transfer.merge(empty.root, PackedStringArray([second.root]), manifest)
 	check(missing.get("missing", []).has(d1), "incomplete farm return reports missing frames")
 	print("Store transfer: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_store_transfer"); quit(1 if failures else 0)

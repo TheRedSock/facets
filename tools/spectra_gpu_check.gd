@@ -20,7 +20,7 @@ func mean_xyz(values: PackedFloat32Array) -> Vector3:
 func _initialize() -> void:
 	var tracer := GemTracer.create(48, 48)
 	if tracer == null:
-		quit(1)
+		print("CHECK_COMPLETE: spectra_gpu_check"); quit(1)
 		return
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres")
 	var specimen := LapidaryStoneCompiler.compile(stone)
@@ -79,7 +79,7 @@ func _initialize() -> void:
 	_absorption_band(tracer, specimen, policy)
 	tracer.release()
 	print("GPU spectra: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: spectra_gpu_check"); quit(1 if failures else 0)
 
 func _absorption_band(tracer: GemTracer, specimen: Dictionary, policy: Dictionary) -> void:
 	var material := GemMaterial.new()

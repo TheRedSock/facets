@@ -30,7 +30,7 @@ func _initialize()->void:
 		opposite.orientation=field.orientation*Quaternion(Vector3.RIGHT,PI)
 		check(absf(exact+opposite.column(origin,direction,distance)-distance)<3e-6,"opposite profiles partition concentration without negative fields")
 	_composition()
-	print("Spatial composition: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("Spatial composition: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: test_spatial_composition"); quit(1 if failures else 0)
 
 func _composition()->void:
 	var stone:GemStone=load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)

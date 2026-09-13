@@ -18,12 +18,12 @@ func _initialize() -> void:
 func _hold(root: String) -> void:
 	var guard := GemStoreGuard.enter(root, "cross-process-test")
 	if guard == null:
-		quit(1)
+		print("CHECK_COMPLETE: test_store_maintenance"); quit(1)
 		return
 	GemArtifactStore.atomic_write(root.path_join("child-ready"), "ready".to_utf8_buffer())
 	await create_timer(2.0).timeout
 	guard.release()
-	quit()
+	print("CHECK_COMPLETE: test_store_maintenance"); quit()
 
 func _run() -> void:
 	var root := "res://artifacts/store-tests/%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
@@ -95,7 +95,7 @@ func _run() -> void:
 		await create_timer(0.02).timeout
 	check(not maintenance.collect(root, [manifest], 0).is_empty(), "collection resumes after worker releases activity")
 	print("Store maintenance: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_store_maintenance"); quit(1 if failures else 0)
 
 func _scoped_activity(root: String) -> void:
 	var guard := GemStoreGuard.enter(root, "scope-exit-test")

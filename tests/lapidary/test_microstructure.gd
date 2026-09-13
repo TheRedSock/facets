@@ -46,7 +46,7 @@ func _initialize()->void:
 	recipe.populations.append(population)
 	var result:=GemMicrostructureCompiler.realize(source,recipe)
 	check(result.error.is_empty(),"bounded population realizes: "+result.error)
-	if not result.error.is_empty():quit(1);return
+	if not result.error.is_empty():print("CHECK_COMPLETE: test_microstructure"); quit(1);return
 	var stone:GemStone=result.stone
 	check(source.fingerprint()==original and source.condition.defects.is_empty(),"authoring source remains unchanged")
 	check(stone.condition.defects.size()==12,"requested explicit regions realized")
@@ -108,4 +108,4 @@ func _initialize()->void:
 	check(not GemMicrostructureCompiler.realize(source,recipe).error.is_empty(),"missing habit rejected before compilation")
 	var example:GemMicrostructureRecipe=load("res://data/lapidary/microstructures/diagnostic_crystal_layer.tres")
 	check(example.validate().is_empty() and GemMicrostructureCompiler.realize(source,example).error.is_empty(),"authored diagnostic recipe is usable without source-code edits")
-	print("Microstructure: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("Microstructure: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: test_microstructure"); quit(1 if failures else 0)

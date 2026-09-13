@@ -13,7 +13,7 @@ func _initialize() -> void:
 	var out := "res://artifacts/surface"
 	DirAccess.make_dir_recursive_absolute(out)
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
-	stone.material.scatter_per_mm = stone.material.species.base_scatter_per_mm
+	stone.material.scatter_per_mm = 0.002 # Explicit clear-quartz comparison coefficient /mm.
 	stone.condition.banding.contrast = 0.0
 	stone.material.scatter_per_mm = 0.0
 	var base := LapidaryStoneCompiler.compile(stone)
@@ -28,7 +28,7 @@ func _initialize() -> void:
 	var dark_lights := PackedFloat32Array([0, 0, 1, 0.5, 5600, 0, 0.9, 0])
 	var tracer := GemTracer.create(48, 48)
 	if tracer == null:
-		quit(1)
+		print("CHECK_COMPLETE: surface_check"); quit(1)
 		return
 	var measurements := []
 	for alpha in [0.0, 0.001, 0.005, 0.02, 0.1, 0.3]:
@@ -62,7 +62,7 @@ func _initialize() -> void:
 	if "--showcase" in OS.get_cmdline_user_args():
 		_showcase(stone, out)
 	print("Surface: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: surface_check"); quit(1 if failures else 0)
 
 func _multiple_scattering(tracer: GemTracer, input: Dictionary, policy: Dictionary, out: String) -> void:
 	var specimen := input.duplicate(true)

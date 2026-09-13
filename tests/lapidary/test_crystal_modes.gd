@@ -48,7 +48,7 @@ func _initialize() -> void:
 			check(Modes.dot(expected, rotated[mode].ray) > 1 - 1e-12, "mode ray transforms covariantly in world space")
 	GemArtifactStore.atomic_write("res://artifacts/reference/crystal-modes.json", JSON.stringify(cases).to_utf8_buffer())
 	print("Crystal modes: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_crystal_modes"); quit(1 if failures else 0)
 
 static func rotate(value: PackedFloat64Array, axis: PackedFloat64Array, angle: float) -> PackedFloat64Array:
 	return Modes.add(Modes.add(Modes.scale(value, cos(angle)), Modes.scale(Modes.cross(axis, value), sin(angle))), Modes.scale(axis, Modes.dot(axis, value) * (1 - cos(angle))))

@@ -37,7 +37,7 @@ bounds, avoiding recompilation during pose edits. Factory jobs serialize only th
 resolved orientation and `camera_offset`; those values drive both optical rays
 and primary AOVs and enter their independent cache keys. Presentation resources
 and compilation are authoring-only dependencies. Low-level numerical fixtures
-can keep native identity quaternions/zero offsets. Atelier and synchronous clip
+can keep native identity quaternions/zero offsets. Atelier and factory clip
 baking apply the same default presentation as the asset planner.
 
 Camera construction follows the standard raster-to-origin orthographic model

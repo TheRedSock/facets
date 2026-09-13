@@ -37,7 +37,7 @@ func _initialize() -> void:
 	var step: Resource = load("res://data/lapidary/cuts/step.tres")
 	if brilliant == null or step == null:
 		print("FAIL: could not load cut templates from data/lapidary/cuts/")
-		quit(1)
+		print("CHECK_COMPLETE: test_cut_compiler"); quit(1)
 		return
 	for sil in SILHOUETTES:
 		for q in QUALITIES:
@@ -54,7 +54,7 @@ func _initialize() -> void:
 		print("CUT COMPILER TESTS FAILED")
 	else:
 		print("CUT COMPILER TESTS PASSED")
-	quit(1 if _fail_count > 0 else 0)
+	print("CHECK_COMPLETE: test_cut_compiler"); quit(1 if _fail_count > 0 else 0)
 
 
 func _exercise(template: Resource, template_name: String, silhouette: StringName, q: float) -> void:

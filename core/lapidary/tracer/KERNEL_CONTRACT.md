@@ -1,4 +1,4 @@
-# Lapidary kernel contract (v22)
+# Lapidary kernel contract (v23)
 
 This is the CPU/GPU interface for offline workers and Atelier previews. The game
 loads prebuilt assets and does not instantiate the optical renderer. Wire floats
@@ -161,8 +161,8 @@ for visibility, but transport processes their segments to preserve optical lengt
 | 1 | ordinary Sellmeier C.xyz in µm², sampled visible maximum |n_e-n_o| |
 | 2 | scattering σ_s/mm, HG g, zoning frequency, zoning contrast |
 | 3 | zoning axis.xyz, phase |
-| 4 | optic axis.xyz, fluorescence strength (disabled) |
-| 5 | fluorescence nm (disabled), absorb_scale, nested_volume_present, rough_present |
+| 4 | optic axis.xyz, reserved zero |
+| 5 | reserved zero, absorb_scale, nested_volume_present, rough_present |
 | ivec4 6 | plane_offset, plane_count, volume_field_offset, volume_field_count |
 | ivec4 7 | absorb_offset, flags, bvh_root_plus_one, region_offset |
 | 8 | extraordinary Sellmeier B.xyz, ordinary index offset |

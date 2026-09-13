@@ -75,4 +75,4 @@ func _initialize()->void:
 	preference.mean_return_weight=-1
 	check(not preference.validate().is_empty(),"negative weights rejected")
 	check(not GemCutSearch.evaluate(null,null,[],{},8).error.is_empty(),"missing study inputs rejected before GPU access")
-	print("Cut metrics: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("Cut metrics: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: test_cut_metrics"); quit(1 if failures else 0)

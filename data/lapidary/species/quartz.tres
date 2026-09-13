@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_ejd13"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_ipch2"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_u55sg"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_ao17r"]
 
 [sub_resource type="Resource" id="Resource_o7im7"]
@@ -23,26 +22,6 @@ b = PackedFloat64Array(1.09509924, 1.15662475, 0.28851804)
 c_um2 = PackedFloat64Array(0.0102101864, 100, 0)
 range_nm = Vector2(198, 2053.1)
 evidence = SubResource("Resource_o7im7")
-
-[sub_resource type="Resource" id="Resource_88ps0"]
-script = ExtResource("3_u55sg")
-archetype_id = &"quartz_milk_bank"
-form = 3
-size_mm_range = Vector2(0.08, 0.22)
-aspect = 1.0
-scatter_density = 6.0
-weight = 4.0
-
-[sub_resource type="Resource" id="Resource_s0r6y"]
-script = ExtResource("3_u55sg")
-archetype_id = &"quartz_milky_veil"
-form = 2
-size_mm_range = Vector2(0.3, 1)
-aspect = 24.0
-scatter_density = 8.0
-tint = Color(1, 0.99, 0.97, 1)
-weight = 2.0
-center_bias = 0.15
 
 [sub_resource type="Resource" id="Resource_kkvpk"]
 script = ExtResource("1_ejd13")
@@ -70,6 +49,3 @@ display_name = "Quartz (SiO2)"
 source_note = "Alpha-quartz principal dispersion: Ghosh (1999), ordinary and extraordinary curves; see per-axis evidence. Optic axis normal to the table. Mohs hardness is metadata; color and specimen scattering are separate authored inputs."
 ordinary = SubResource("Resource_mdsl1")
 extraordinary = SubResource("Resource_um3of")
-base_scatter_per_mm = 0.002
-scatter_anisotropy_g = 0.55
-inclusions = Array[ExtResource("3_u55sg")]([SubResource("Resource_88ps0"), SubResource("Resource_s0r6y")])

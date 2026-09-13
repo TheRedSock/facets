@@ -5,7 +5,7 @@ extends Resource
 ## (stone turns under a fixed rig, or the rig orbits a fixed stone).
 ## There is no rotation/lighting lattice to harvest from.
 
-enum StoneMotion { STILL, TURNTABLE, TILT_PRESENT }
+enum StoneMotion { STILL, TURNTABLE }
 
 @export var clip_id: StringName
 @export var duration_s := 1.0
@@ -27,7 +27,7 @@ enum StoneMotion { STILL, TURNTABLE, TILT_PRESENT }
 
 @export_group("Effect track")
 ## Named envelopes sampled over normalized clip time and fed to tracer/print:
-## "exposure_pulse", "key_boost", "rim_boost", "bloom_gain".
+## "exposure_pulse", "key_boost", "rim_boost".
 @export var effect_envelopes: Dictionary[String, Curve] = {}
 
 

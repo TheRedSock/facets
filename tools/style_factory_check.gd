@@ -44,7 +44,7 @@ func _initialize() -> void:
 	var transfer := GemStoreTransfer.new().merge(destination.root, PackedStringArray([worker.store.root]), manifest, true)
 	check(not transfer.is_empty() and transfer.missing.is_empty() and transfer.recipes_to_import == 4, "farm transfer carries one master and three requested displays")
 	print("Style factory: %d checks, %d failures; %s" % [checks, failures, output])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: style_factory_check"); quit(1 if failures else 0)
 
 func decode(payload: PackedByteArray) -> Image:
 	var image := Image.new()

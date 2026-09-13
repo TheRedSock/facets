@@ -75,4 +75,4 @@ func _initialize() -> void:
 	check(authored.fingerprint() == original_identity, "Atelier edits cannot mutate shared external material resources")
 	atelier.free()
 	print("Volume authoring: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_volume_authoring"); quit(1 if failures else 0)

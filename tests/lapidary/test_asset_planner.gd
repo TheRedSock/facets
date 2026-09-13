@@ -10,7 +10,7 @@ func _initialize() -> void:
 	var before := GemContentIdentity.digest(batch)
 	var result := GemAssetPlanner.plan(batch)
 	check(result.error.is_empty(), "authored two-quality/two-light batch plans")
-	if not result.error.is_empty(): printerr(result.error); quit(1); return
+	if not result.error.is_empty(): printerr(result.error); print("CHECK_COMPLETE: test_asset_planner"); quit(1); return
 	check(result.jobs.size() == 52 and result.clips.size() == 8 and result.specimens.size() == 4, "only explicitly requested variants and clips expanded")
 	check(GemContentIdentity.digest(batch) == before, "planning leaves authored resources unchanged")
 	check(result.clips.has("quartz_softened_daylight/turn") and not result.clips.has("quartz/turn"), "delivery identity independent of base stone ID")
@@ -68,4 +68,4 @@ func _initialize() -> void:
 	invalid = batch.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	invalid.requests[0].clips[1].turntable_axis = Vector3.ZERO
 	check(not GemAssetPlanner.plan(invalid).has("jobs"), "undefined turntable axis is rejected instead of silently replaced")
-	print("Asset planner: %d checks, %d failures" % [checks, failures]); quit(1 if failures else 0)
+	print("Asset planner: %d checks, %d failures" % [checks, failures]); print("CHECK_COMPLETE: test_asset_planner"); quit(1 if failures else 0)

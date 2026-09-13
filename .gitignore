@@ -14,6 +14,7 @@ plans
 
 # Local reports, working notes, and regenerable render output.
 docs/
+docs/archive/
 generated/
 artifacts/**
 !artifacts/.gdignore

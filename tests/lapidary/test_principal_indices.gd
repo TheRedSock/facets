@@ -72,4 +72,4 @@ func _initialize() -> void:
 	var loaded: GemStone = load(path)
 	check(loaded.fingerprint() == stone.fingerprint(), "farm binary preserves float64 principal model")
 	print("Principal indices: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_principal_indices"); quit(1 if failures else 0)

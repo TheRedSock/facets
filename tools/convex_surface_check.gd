@@ -17,7 +17,7 @@ func _initialize() -> void:
 	stone.condition.cleavage = recipe
 	var tracer := GemTracer.create(192,48)
 	if tracer == null:
-		quit(1)
+		print("CHECK_COMPLETE: convex_surface_check"); quit(1)
 		return
 	var policy := GemRung.policy(GemRung.PREVIEW)
 	policy["birefringence"] = false
@@ -63,4 +63,4 @@ func _initialize() -> void:
 				print(JSON.stringify({"cell":cell,"polarized":polarized,"alpha":alpha,"Y":sum_y/maxf(coverage,1e-12),"cut_pixels":cut_pixels,"id_errors":id_errors}))
 	tracer.release()
 	print("Convex surfaces: %d checks, %d failures" % [checks,failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: convex_surface_check"); quit(1 if failures else 0)

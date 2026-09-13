@@ -2,7 +2,7 @@ extends SceneTree
 const COUNT := 256
 func _initialize() -> void:
 	var rd := RenderingServer.create_local_rendering_device()
-	if rd == null: quit(1); return
+	if rd == null: print("CHECK_COMPLETE: finish_fields_gpu_check"); quit(1); return
 	var finishes := PackedFloat32Array()
 	var fields := PackedFloat32Array()
 	var queries := PackedFloat32Array()
@@ -46,7 +46,7 @@ void main() {
 }
 """
 	var spirv := rd.shader_compile_spirv_from_source(source)
-	if not spirv.compile_error_compute.is_empty(): printerr(spirv.compile_error_compute); rd.free(); quit(1); return
+	if not spirv.compile_error_compute.is_empty(): printerr(spirv.compile_error_compute); rd.free(); print("CHECK_COMPLETE: finish_fields_gpu_check"); quit(1); return
 	var shader := rd.shader_create_from_spirv(spirv)
 	var pipeline := rd.compute_pipeline_create(shader)
 	var blobs := {14:finishes.to_byte_array(),20:fields.to_byte_array(),16:queries.to_byte_array()}
@@ -78,4 +78,4 @@ void main() {
 	for rid in [uniform_set,pipeline,shader]+buffers.values(): rd.free_rid(rid)
 	rd.free()
 	print("Finish field GPU: %d cases, %d invalid" % [COUNT,failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: finish_fields_gpu_check"); quit(1 if failures else 0)

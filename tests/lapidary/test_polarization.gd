@@ -39,4 +39,4 @@ func _initialize() -> void:
 	diamond["region_materials"]=[quartz]
 	check(not tracer.configure_stone(diamond,lighting,{"polarization":true}) and "isotropic real refraction" in tracer.configuration_error,"reject unsupported nested polarized material before device access")
 	print("Polarization: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_polarization"); quit(1 if failures else 0)

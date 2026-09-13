@@ -8,7 +8,7 @@ func check(ok:bool,label:String)->void:
 
 func _initialize()->void:
 	var tracer:=GemTracer.create(16,16)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: spatial_composition_gpu_check"); quit(1);return
 	var stone:=fixture()
 	var lighting:=GemLighting.analytic(PackedFloat32Array(),Vector4(1,1,1,0))
 	for mode in ["scalar","polarized","crystal_matched","crystal"]:
@@ -48,7 +48,7 @@ func _initialize()->void:
 		check(absf(total/256-expectation(stone if cell==0 else other,false,false))<.0003,"batch spectral/field offsets and physical size "+str(cell))
 	tracer.release()
 	_nested_axes()
-	print("GPU spatial composition: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("GPU spatial composition: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: spatial_composition_gpu_check"); quit(1 if failures else 0)
 
 func _nested_axes()->void:
 	var tracer:=GemTracer.create(16,16)

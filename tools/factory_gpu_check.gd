@@ -50,4 +50,4 @@ func _initialize() -> void:
 	check(not worker.run(job).is_empty() and worker.counters.rendered == 1 and not worker.tracer._print_only, "print worker promotes to transport for a missing master")
 	worker.release()
 	print("Factory GPU: %d failures; checkpoint difference %.8f" % [failures, max_error])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: factory_gpu_check"); quit(1 if failures else 0)

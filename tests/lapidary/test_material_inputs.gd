@@ -13,7 +13,7 @@ func _initialize() -> void:
 	_validation()
 	_resampling()
 	print("Material inputs: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_material_inputs"); quit(1 if failures else 0)
 
 func _metadata(quantity: String) -> Dictionary:
 	return {"quantity": quantity, "optical_basis": "isotropic", "path_mm": 2.0,

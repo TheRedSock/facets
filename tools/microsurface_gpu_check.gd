@@ -6,7 +6,7 @@ var failures := 0
 func _initialize() -> void:
 	var rd := RenderingServer.create_local_rendering_device()
 	if rd == null:
-		quit(1)
+		print("CHECK_COMPLETE: microsurface_gpu_check"); quit(1)
 		return
 	var cases: Array[Dictionary] = []
 	var input := PackedFloat32Array()
@@ -45,7 +45,7 @@ void main() {
 	if not spirv.compile_error_compute.is_empty():
 		printerr(spirv.compile_error_compute)
 		rd.free()
-		quit(1)
+		print("CHECK_COMPLETE: microsurface_gpu_check"); quit(1)
 		return
 	var shader := rd.shader_create_from_spirv(spirv)
 	var pipeline := rd.compute_pipeline_create(shader)
@@ -96,4 +96,4 @@ void main() {
 		rd.free_rid(rid)
 	rd.free()
 	print("Microsurface: %d directional samples, %d failing cases" % [SAMPLES*cases.size(), failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: microsurface_gpu_check"); quit(1 if failures else 0)

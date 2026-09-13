@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_jmu82"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_owgaa"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_dv47w"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_5vqgf"]
 
 [sub_resource type="Resource" id="Resource_cs5xp"]
@@ -17,27 +16,6 @@ b = PackedFloat64Array(0.4538599306933173, 1.1094765098522164, 0)
 c_um2 = PackedFloat64Array(0.025, 0, 0)
 index_offset = 0.01
 evidence = SubResource("Resource_cs5xp")
-
-[sub_resource type="Resource" id="Resource_4qvfb"]
-script = ExtResource("3_dv47w")
-archetype_id = &"topaz_tear_feather"
-form = 2
-size_mm_range = Vector2(0.3, 1)
-aspect = 26.0
-scatter_density = 8.0
-tint = Color(1, 0.98, 0.94, 1)
-weight = 3.0
-center_bias = 0.2
-
-[sub_resource type="Resource" id="Resource_fa3bp"]
-script = ExtResource("3_dv47w")
-archetype_id = &"topaz_cloud"
-form = 3
-size_mm_range = Vector2(0.08, 0.22)
-aspect = 1.0
-scatter_density = 5.5
-weight = 1.5
-center_bias = 0.3
 
 [sub_resource type="Resource" id="Resource_n3dr7"]
 script = ExtResource("1_jmu82")
@@ -58,6 +36,4 @@ display_name = "Topaz (Al2SiO4(F,OH)2)"
 source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.612 (F-rich topaz 1.61-1.62, gemologyproject.com; full range 1.606-1.644) and B-G dispersion 0.014; UV pole 0.025 um^2 + constant term. Biaxial(+), approximated uniaxial(+) with delta-n 0.010 (lit. 0.008-0.010). Mohs 8."
 ordinary = SubResource("Resource_oforp")
 extraordinary = SubResource("Resource_g7ty2")
-base_scatter_per_mm = 0.001
 hardness_mohs = 8.0
-inclusions = Array[ExtResource("3_dv47w")]([SubResource("Resource_4qvfb"), SubResource("Resource_fa3bp")])

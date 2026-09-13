@@ -15,7 +15,7 @@ func _initialize()->void:
 	rig.bg_zenith=1;rig.bg_horizon=1;rig.bg_below=1
 	var scenarios:Array[Dictionary]=[{"rig":rig,"orientation":Quaternion.IDENTITY,"motion_orientation":Quaternion(Vector3.UP,deg_to_rad(2.5))}]
 	var tracer:=GemTracer.create(48,48)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: cut_study_gpu_check"); quit(1);return
 	var policy:=GemRung.policy(GemRung.PREVIEW)
 	policy.denoise_passes=0;policy.birefringence=false
 	var preference:=GemCutPreference.new()
@@ -49,4 +49,4 @@ func _initialize()->void:
 	check(not unsupported.error.is_empty(),"unsupported crystal volume cannot reuse prior film")
 	check(not GemCutSearch.preference_score(unsupported,weighted,preference).error.is_empty(),"failed transport cannot rank")
 	tracer.release()
-	print("Cut study GPU: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("Cut study GPU: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: cut_study_gpu_check"); quit(1 if failures else 0)

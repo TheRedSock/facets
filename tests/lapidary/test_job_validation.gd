@@ -32,7 +32,7 @@ func _initialize() -> void:
 			base = job
 	check(base != null, "quartz fixture loaded")
 	if base == null:
-		quit(1)
+		print("CHECK_COMPLETE: test_job_validation"); quit(1)
 		return
 	reject(null, "missing")
 	var job: GemFrameJob = base.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
@@ -136,4 +136,4 @@ func _initialize() -> void:
 	job.stone.condition.defects.append(defect)
 	reject(job, "defect filling: polarization")
 	print("Job validation: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_job_validation"); quit(1 if failures else 0)

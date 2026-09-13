@@ -13,7 +13,7 @@ func _initialize() -> void:
 	job.samples = 4
 	var jobs: Array[GemFrameJob] = [job]
 	if GemJobBundle.write(bundle, jobs, {}, 1).is_empty():
-		quit(1)
+		print("CHECK_COMPLETE: pipeline_cache_check"); quit(1)
 		return
 	var worker := GemFrameWorker.new(output_root + "/store")
 	if worker.run(job).is_empty():
@@ -33,7 +33,7 @@ func _initialize() -> void:
 	_edit("gem_mesh.glsl")
 	_probe("shared", true)
 	print("Pipeline cache GPU: %d failures; evidence %s" % [failures, output_root])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: pipeline_cache_check"); quit(1 if failures else 0)
 
 func _edit(file: String) -> void:
 	var path := bundle.path_join("core/lapidary/tracer/shaders/" + file)

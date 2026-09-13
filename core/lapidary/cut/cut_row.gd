@@ -1,6 +1,6 @@
 class_name GemCutTemplateRow
 extends Resource
-## One crown row in the Lapidary cut language (docs/lapidary-architecture.md §1).
+## One crown row in the Lapidary cut language (docs/archive/2026-09-13/lapidary-architecture.md §1).
 ## A row is a *program statement*, not geometry: the cut compiler expands it
 ## against the active silhouette into tagged half-space planes.
 ##

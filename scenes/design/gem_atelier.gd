@@ -5,7 +5,7 @@ extends Control
 ## progressively: a 4 spp first batch is shown immediately, then accumulation
 ## continues toward TARGET_SPP while idle. Material/condition edits mutate an
 ## in-memory duplicate of the stone — authored .tres files are never written.
-## Clip scrubbing reuses GemClipBaker's sample math, so the preview matches
+## Clip scrubbing reuses GemClipSampler's sample math, so the preview matches
 ## baked frames exactly. Requires a windowed run; in --headless the preview
 ## shows a notice and all controls lock.
 ##
@@ -270,7 +270,7 @@ func _rebuild_now() -> void:
 
 
 ## Cheap path: pose/framing changes restart accumulation without recompiling.
-## With a clip active the sample comes from GemClipBaker (baker parity);
+## With a clip active the sample comes from GemClipSampler (baker parity);
 ## the manual rig-yaw slider stays a base offset under the clip's orbit.
 func _apply_pose() -> void:
 	if not _configured:
@@ -282,18 +282,18 @@ func _apply_pose() -> void:
 	var clip := _active_clip()
 	if clip != null:
 		var t: float = (_c["scrub"] as HSlider).value
-		quat = GemClipBaker.frame_orientation(clip, t)
-		rig_yaw += GemClipBaker.frame_rig_yaw_rad(clip, t)
-		role = GemClipBaker.frame_role_mult(clip, t)
-		_clip_exposure = GemClipBaker.frame_exposure(clip, t)
+		quat = GemClipSampler.frame_orientation(clip, t)
+		rig_yaw += GemClipSampler.frame_rig_yaw_rad(clip, t)
+		role = GemClipSampler.frame_role_mult(clip, t)
+		_clip_exposure = GemClipSampler.frame_exposure(clip, t)
 	else:
 		quat = Quaternion(Vector3.RIGHT, deg_to_rad((_c["tilt"] as HSlider).value)) \
 			* Quaternion(Vector3.UP, deg_to_rad((_c["turn"] as HSlider).value))
-	var rest := GemClipBaker.frame_orientation(clip, 0.0) if clip != null else Quaternion(Vector3.RIGHT, deg_to_rad((_c["tilt"] as HSlider).value))
+	var rest := GemClipSampler.frame_orientation(clip, 0.0) if clip != null else Quaternion(Vector3.RIGHT, deg_to_rad((_c["tilt"] as HSlider).value))
 	var framing := GemPresentationCompiler.prepare(_stone, _presentation, rest)
 	if not framing.error.is_empty(): push_error(framing.error); return
-	var pose := GemPresentationCompiler.sample(framing, quat, Vector2i(RENDER_SIZE, RENDER_SIZE), GemClipBaker.ORTHO_HALF)
-	_tracer.set_clip_sample(pose.orientation, rig_yaw, role, GemClipBaker.ORTHO_HALF, pose.camera_offset)
+	var pose := GemPresentationCompiler.sample(framing, quat, Vector2i(RENDER_SIZE, RENDER_SIZE), GemClipSampler.ORTHO_HALF)
+	_tracer.set_clip_sample(pose.orientation, rig_yaw, role, GemClipSampler.ORTHO_HALF, pose.camera_offset)
 	_tracer.reset_accumulation()
 	_update_status()
 

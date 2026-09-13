@@ -112,7 +112,7 @@ func _initialize()->void:
 		clip_end=maxi(clip_end,offset+(meta>>8))
 	check(clip_end*16==packed.clips.size(),"every packed clipping plane belongs to a declared range")
 	print("Continuous rounded solid: %d checks, %d failures; maximum ray error %s"%[checks,failures,maximum_distance_error])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_rounded_solid"); quit(1 if failures else 0)
 
 ## Independent implicit-box oracle. Break the ray where a coordinate crosses
 ## a core slab; within each interval the squared distance is a quadratic.

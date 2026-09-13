@@ -23,7 +23,7 @@ func _initialize() -> void:
 		check(GemJobValidator.specimen_error(result.stone).is_empty(), "realized geometry/material admission")
 		check(result.stone.seed == 17 and result.stone.grade.grade_id == preset.preset_id, "explicit seed and selection label")
 	check(GemContentIdentity.digest(recipe) == original, "authoring graph remains immutable")
-	if results.size() != 5: quit(1); return
+	if results.size() != 5: print("CHECK_COMPLETE: test_specimen_recipe"); quit(1); return
 	var reference: GemStone = results[&"reference"].stone
 	var softened: GemStone = results[&"softened_polish"].stone
 	var cut: GemStone = results[&"cut_tolerance"].stone
@@ -135,4 +135,4 @@ func _initialize() -> void:
 		parent.left = expanded; parent.right = expanded
 		expanded = parent
 	check(not GemContentIdentity.graph_error(expanded).is_empty(), "shared DAG expansion is bounded before canonical serialization")
-	print("Specimen recipe: %d checks, %d failures" % [checks, failures]); quit(1 if failures else 0)
+	print("Specimen recipe: %d checks, %d failures" % [checks, failures]); print("CHECK_COMPLETE: test_specimen_recipe"); quit(1 if failures else 0)

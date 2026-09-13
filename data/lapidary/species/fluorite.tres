@@ -1,31 +1,8 @@
 [gd_resource type="Resource" script_class="GemSpecies" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="1_1x8co"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="2_c4cyc"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="3_puyeu"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_j4883"]
-
-[sub_resource type="Resource" id="Resource_nb8qv"]
-script = ExtResource("1_1x8co")
-archetype_id = &"fluorite_cleavage_flag"
-form = 2
-size_mm_range = Vector2(0.35, 1)
-aspect = 20.0
-scatter_density = 10.0
-tint = Color(0.96, 0.94, 1, 1)
-weight = 3.0
-center_bias = 0.2
-
-[sub_resource type="Resource" id="Resource_2wp75"]
-script = ExtResource("1_1x8co")
-archetype_id = &"fluorite_droplet_cloud"
-form = 3
-size_mm_range = Vector2(0.05, 0.14)
-aspect = 1.0
-scatter_density = 6.0
-tint = Color(0.98, 0.99, 1, 1)
-weight = 1.8
-center_bias = 0.35
 
 [sub_resource type="Resource" id="Resource_nirht"]
 script = ExtResource("2_c4cyc")
@@ -45,7 +22,4 @@ species_id = &"fluorite"
 display_name = "Fluorite (CaF2)"
 source_note = "Sellmeier: I. H. Malitson, Appl. Opt. 2, 1103-1107 (1963) (refractiveindex.info CaF2/Malitson); published poles 0.050263605/0.1003909/34.649040 um SQUARED to um^2. n_D~1.4338, dispersion 0.007 (low). Cubic: birefringence 0. Mohs 4 — the wear model scratches it honestly. Blue fluorescence ~425 nm (Eu2+ activator; the word 'fluorescence' comes from this mineral). Strong colour banding (zoning)."
 ordinary = SubResource("Resource_8i562")
-base_scatter_per_mm = 0.003
-fluorescence_emission_nm = 425.0
 hardness_mohs = 4.0
-inclusions = Array[ExtResource("1_1x8co")]([SubResource("Resource_nb8qv"), SubResource("Resource_2wp75")])

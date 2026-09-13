@@ -51,4 +51,4 @@ func _initialize() -> void:
 	check(Loss.attenuate_eigenmode(modes[0], 1.5, 1.5, axis, 1, 1, -1).has("error"), "negative optical length is rejected")
 	GemArtifactStore.atomic_write("res://artifacts/reference/crystal-loss.json", JSON.stringify(cases).to_utf8_buffer())
 	print("Crystal loss: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_crystal_loss"); quit(1 if failures else 0)

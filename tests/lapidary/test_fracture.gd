@@ -69,7 +69,7 @@ func _initialize() -> void:
 	check(not defect.fracture_profile.validate().is_empty(), "invalid correlation length rejected")
 	GemArtifactStore.atomic_write("res://artifacts/fracture/topology.json", JSON.stringify(report, "\t").to_utf8_buffer())
 	print("Fracture: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_fracture"); quit(1 if failures else 0)
 
 func _topology(mesh: GemMesh) -> Dictionary:
 	var parent := PackedInt32Array()

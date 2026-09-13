@@ -18,10 +18,10 @@ func _child(args:Dictionary)->void:
 	var status:String=result.get("status","error")
 	if result.has("error"):GemArtifactStore.atomic_write(args["child-root"].path_join(args.token+".error"),str(result).to_utf8_buffer())
 	GemArtifactStore.atomic_write(args["child-root"].path_join(args.token+".ready"),status.to_utf8_buffer())
-	if status!="acquired":quit(0 if status=="busy" else 1);return
+	if status!="acquired":print("CHECK_COMPLETE: test_work_claims"); quit(0 if status=="busy" else 1);return
 	var stop:String=args["child-root"].path_join(args.token+".stop")
 	while not FileAccess.file_exists(stop):await create_timer(.02).timeout
-	result.claim.release();quit()
+	result.claim.release();print("CHECK_COMPLETE: test_work_claims"); quit()
 
 func _spawn(root_path:String,key:String,token:String)->int:
 	return OS.create_process(OS.get_executable_path(),PackedStringArray(["--audio-driver","Dummy","--headless","--path",ProjectSettings.globalize_path("res://"),"--script","res://tests/lapidary/test_work_claims.gd","--","--child-root="+root_path,"--key="+key,"--token="+token]),false)
@@ -123,4 +123,4 @@ func _run()->void:
 	check(recovery.recover(root_path,empty.snapshot,true).is_empty() and FileAccess.get_sha256(root_path.path_join(".maintenance/owner.json"))==maintenance_owner,"offline recovery cannot steal an existing maintenance owner")
 	maintenance.release()
 	print("Work claims: %d checks, %d failures; %s"%[checks,failures,root_path])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_work_claims"); quit(1 if failures else 0)

@@ -55,4 +55,4 @@ func _initialize() -> void:
 	check(restored != null and restored.get_data() == image.get_data(), "linear XYZ/coverage compression is bit-exact above display range")
 	check(store.read("../invalid").is_empty(), "artifact keys cannot escape the store")
 	print("Factory: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_factory"); quit(1 if failures else 0)

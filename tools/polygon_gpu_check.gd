@@ -18,7 +18,7 @@ func _initialize()->void:
 	base["sellmeier_b"]=Vector3.ZERO;base["sellmeier_c"]=Vector3.ZERO
 	base["index_offset"]=.5;base["extraordinary_refraction"]={}
 	var tracer:=GemTracer.create(64,64)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: polygon_gpu_check"); quit(1);return
 	var rig:=GemRigCompiler.compile(load("res://data/lapidary/rigs/gameplay_studio.tres"))
 	var furnace:=GemLighting.analytic(PackedFloat32Array(),Vector4(1,1,1,0))
 	var policy:=GemRung.policy(GemRung.PREVIEW)
@@ -57,4 +57,4 @@ func _initialize()->void:
 			if film[i*4+3]>.999:energy+=film[i*4+1];pixels+=1
 		check(pixels>100 and absf(energy/pixels-1)<.003,mode+" concave dielectric white furnace")
 	tracer.release()
-	print("Polygon GPU: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("Polygon GPU: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: polygon_gpu_check"); quit(1 if failures else 0)

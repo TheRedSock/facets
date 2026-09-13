@@ -39,7 +39,6 @@ static func compile(stone: GemStone, optimize_cleavage := true) -> Dictionary:
 		"index_offset": bulk["index_offset"],
 		"extraordinary_refraction": bulk["extraordinary_refraction"],
 		"optic_axis": stone.resolved_optic_axis(),
-		"fluorescence": {}, # Absorption mixtures do not define emitted-light transport.
 		"dispersion_strong": dispersion_bg(species) >= 0.025,
 		"fingerprint": stone.fingerprint(),
 	}

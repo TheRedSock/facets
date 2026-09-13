@@ -16,7 +16,7 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(output)
 	var worker := GemFrameWorker.new(output + "/store")
 	var tracer := GemTracer.create(256, 256)
-	if tracer == null: quit(1); return
+	if tracer == null: print("CHECK_COMPLETE: presentation_check"); quit(1); return
 	var reports := []
 	for file in DirAccess.get_files_at("res://data/lapidary/stones"):
 		if not file.ends_with(".tres"): continue
@@ -82,4 +82,4 @@ func _initialize() -> void:
 			check(Vector2(expected.position-actual.position).length() <= 1.5 and Vector2(expected.end-actual.end).length() <= 1.5, mode + " optical/geometry framing parity")
 	tracer.release(); worker.release()
 	GemArtifactStore.atomic_write(output.path_join("report.json"), JSON.stringify(reports, "\t").to_utf8_buffer())
-	print("Presentation GPU: %d checks, %d failures" % [checks, failures]); quit(1 if failures else 0)
+	print("Presentation GPU: %d checks, %d failures" % [checks, failures]); print("CHECK_COMPLETE: presentation_check"); quit(1 if failures else 0)

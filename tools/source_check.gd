@@ -7,7 +7,7 @@ func _ready() -> void:
 	for directory in ["core", "resources", "autoloads", "scenes", "tools", "tests"]:
 		_scan("res://" + directory)
 	print("Source parse: %d scripts, %d failures" % [checked, failures])
-	get_tree().quit(1 if failures else 0)
+	print("CHECK_COMPLETE: source_check"); get_tree().quit(1 if failures else 0)
 
 func _scan(path: String) -> void:
 	for name in DirAccess.get_files_at(path):

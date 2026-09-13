@@ -7,13 +7,13 @@ func _initialize()->void:
 	var stress:=OS.get_cmdline_user_args().has("--stress")
 	var accelerated:=OS.get_cmdline_user_args().has("--bvh")
 	var rd:=RenderingServer.create_local_rendering_device()
-	if rd==null:quit(1);return
+	if rd==null:print("CHECK_COMPLETE: analytic_patch_gpu_check"); quit(1);return
 	var shaders:=[];var pipelines:=[]
 	for fp64 in [false,true]:
 		var src:=RDShaderSource.new()
 		src.source_compute="#version 450\n"+("#extension GL_ARB_gpu_shader_fp64 : require\n#define GEM_ANALYTIC_FP64\n" if fp64 else "")+FileAccess.get_file_as_string("res://core/lapidary/tracer/shaders/gem_analytic_patch.glsl")+_body(accelerated)
 		var spirv:=rd.shader_compile_spirv_from_source(src)
-		if not spirv.compile_error_compute.is_empty():printerr(spirv.compile_error_compute);rd.free();quit(1);return
+		if not spirv.compile_error_compute.is_empty():printerr(spirv.compile_error_compute);rd.free();print("CHECK_COMPLETE: analytic_patch_gpu_check"); quit(1);return
 		var shader:=rd.shader_create_from_spirv(spirv);shaders.append(shader);pipelines.append(rd.compute_pipeline_create(shader))
 	var stone:GemStone=load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	stone.condition.rounding=null
@@ -76,7 +76,7 @@ func _initialize()->void:
 	for rid in pipelines+shaders:rd.free_rid(rid)
 	rd.free()
 	GemArtifactStore.atomic_write("res://artifacts/rounded-solid/gpu-bvh-report.json" if accelerated else ("res://artifacts/rounded-solid/gpu-stress-report.json" if stress else "res://artifacts/rounded-solid/gpu-report.json"),JSON.stringify(reports,"\t",true,true).to_utf8_buffer())
-	print("Analytic patch GPU: %d cases, %d failures"%[reports.size(),failures]);quit(1 if failures else 0)
+	print("Analytic patch GPU: %d cases, %d failures"%[reports.size(),failures]);print("CHECK_COMPLETE: analytic_patch_gpu_check"); quit(1 if failures else 0)
 
 func _dispatch(rd:RenderingDevice,shader:RID,pipeline:RID,packed:Dictionary,queries:PackedFloat32Array)->PackedByteArray:
 	var zero:=PackedByteArray();zero.resize(queries.size()/8*48)

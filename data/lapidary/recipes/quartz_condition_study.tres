@@ -1,31 +1,85 @@
-[gd_resource type="Resource" script_class="GemSpecimenRecipe" load_steps=32 format=3]
+[gd_resource type="Resource" script_class="GemSpecimenRecipe" format=3]
 
-[ext_resource type="Script" path="res://resources/lapidary/gem_specimen_recipe.gd" id="recipe"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_quality_preset.gd" id="preset"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_condition_variation.gd" id="variation"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="3_ustba"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_banding.gd" id="4_ecuj0"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_defect.gd" id="5_gnf2s"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_finish_field.gd" id="6_kab2p"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_workmanship.gd" id="10_tbtbn"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_absorber.gd" id="14_rgfkw"]
+[ext_resource type="Resource" path="res://data/lapidary/stones/quartz.tres" id="base"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_condition.gd" id="condition"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="field"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_grade.gd" id="grade"]
+[ext_resource type="Resource" path="res://data/lapidary/microstructures/diagnostic_crystal_layer.tres" id="population"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_quality_preset.gd" id="preset"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_specimen_recipe.gd" id="recipe"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_rounding.gd" id="rounding"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_surface.gd" id="surface"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="field"]
-[ext_resource type="Resource" path="res://data/lapidary/stones/quartz.tres" id="base"]
-[ext_resource type="Resource" path="res://data/lapidary/microstructures/diagnostic_crystal_layer.tres" id="population"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_condition_variation.gd" id="variation"]
+
+[sub_resource type="Resource" id="Resource_sft41"]
+script = ExtResource("3_ustba")
+
+[sub_resource type="Resource" id="Resource_0qq3c"]
+script = ExtResource("4_ecuj0")
+evidence = SubResource("Resource_sft41")
+
+[sub_resource type="Resource" id="Resource_k8pmm"]
+script = ExtResource("surface")
+
+[sub_resource type="Resource" id="Resource_e3o87"]
+script = ExtResource("10_tbtbn")
+
+[sub_resource type="Resource" id="clean_condition"]
+script = ExtResource("condition")
+finish = SubResource("Resource_k8pmm")
+workmanship = SubResource("Resource_e3o87")
+banding = SubResource("Resource_0qq3c")
+
+[sub_resource type="Resource" id="Resource_3y5c7"]
+script = ExtResource("grade")
 
 [sub_resource type="Resource" id="clear_bulk"]
 script = ExtResource("variation")
 channel_id = &"bulk"
 target = "material.scatter_per_mm"
 
-[sub_resource type="Resource" id="clean_condition"]
-script = ExtResource("condition")
-
 [sub_resource type="Resource" id="clean"]
 script = ExtResource("preset")
 preset_id = &"reference"
 condition = SubResource("clean_condition")
+labels = SubResource("Resource_3y5c7")
 variations = Array[ExtResource("variation")]([SubResource("clear_bulk")])
 allowed_species = Array[StringName]([&"quartz"])
 source_note = "Smooth, clear quartz counterfactual. Authored material input, not a certified flawless specimen."
+
+[sub_resource type="Resource" id="Resource_6xk6w"]
+script = ExtResource("3_ustba")
+
+[sub_resource type="Resource" id="Resource_8awuu"]
+script = ExtResource("4_ecuj0")
+evidence = SubResource("Resource_6xk6w")
+
+[sub_resource type="Resource" id="polish"]
+script = ExtResource("surface")
+multiple_scattering = true
+
+[sub_resource type="Resource" id="rounded"]
+script = ExtResource("rounding")
+
+[sub_resource type="Resource" id="Resource_iaowq"]
+script = ExtResource("10_tbtbn")
+
+[sub_resource type="Resource" id="soft_condition"]
+script = ExtResource("condition")
+rounding = SubResource("rounded")
+finish = SubResource("polish")
+workmanship = SubResource("Resource_iaowq")
+banding = SubResource("Resource_8awuu")
+
+[sub_resource type="Resource" id="surface_labels"]
+script = ExtResource("grade")
+surface = 0.65
 
 [sub_resource type="Resource" id="round_radius"]
 script = ExtResource("variation")
@@ -47,22 +101,6 @@ target = "finish.alpha_v"
 minimum = 0.002
 maximum = 0.004
 
-[sub_resource type="Resource" id="rounded"]
-script = ExtResource("rounding")
-
-[sub_resource type="Resource" id="polish"]
-script = ExtResource("surface")
-multiple_scattering = true
-
-[sub_resource type="Resource" id="soft_condition"]
-script = ExtResource("condition")
-rounding = SubResource("rounded")
-finish = SubResource("polish")
-
-[sub_resource type="Resource" id="surface_labels"]
-script = ExtResource("grade")
-surface = 0.65
-
 [sub_resource type="Resource" id="softened"]
 script = ExtResource("preset")
 preset_id = &"softened_polish"
@@ -71,6 +109,10 @@ labels = SubResource("surface_labels")
 variations = Array[ExtResource("variation")]([SubResource("clear_bulk"), SubResource("round_radius"), SubResource("polish_u"), SubResource("polish_v")])
 allowed_species = Array[StringName]([&"quartz"])
 source_note = "Authored continuous junction radius and anisotropic surface slope widths. Evaluates a softened, imperfectly polished state; not a wear-time or hardness model."
+
+[sub_resource type="Resource" id="cut_labels"]
+script = ExtResource("grade")
+cut = 0.75
 
 [sub_resource type="Resource" id="polar_error"]
 script = ExtResource("variation")
@@ -86,10 +128,6 @@ target = "workmanship.azimuth_error_deg"
 minimum = 0.08
 maximum = 0.18
 
-[sub_resource type="Resource" id="cut_labels"]
-script = ExtResource("grade")
-cut = 0.75
-
 [sub_resource type="Resource" id="cut_tolerance"]
 script = ExtResource("preset")
 preset_id = &"cut_tolerance"
@@ -99,15 +137,31 @@ variations = Array[ExtResource("variation")]([SubResource("clear_bulk"), SubReso
 allowed_species = Array[StringName]([&"quartz"])
 source_note = "Bounded facet-angle manufacturing deviations. Labels describe this study's selection categories, not measured cut grades."
 
+[sub_resource type="Resource" id="Resource_nvon0"]
+script = ExtResource("3_ustba")
+
+[sub_resource type="Resource" id="Resource_w16b8"]
+script = ExtResource("4_ecuj0")
+evidence = SubResource("Resource_nvon0")
+
+[sub_resource type="Resource" id="Resource_fxoju"]
+script = ExtResource("surface")
+
 [sub_resource type="Resource" id="cloud_field"]
 script = ExtResource("field")
 center_mm = Vector3(0.3, 0, -0.2)
 radius_mm = Vector3(2.8, 1.6, 1.1)
 scatter_per_mm = 0.2
 
+[sub_resource type="Resource" id="Resource_4cngt"]
+script = ExtResource("10_tbtbn")
+
 [sub_resource type="Resource" id="cloud_condition"]
 script = ExtResource("condition")
+finish = SubResource("Resource_fxoju")
+workmanship = SubResource("Resource_4cngt")
 volume_fields = Array[ExtResource("field")]([SubResource("cloud_field")])
+banding = SubResource("Resource_w16b8")
 
 [sub_resource type="Resource" id="clarity_labels"]
 script = ExtResource("grade")

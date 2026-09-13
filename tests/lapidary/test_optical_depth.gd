@@ -33,4 +33,4 @@ func _initialize() -> void:
 	check(absf(GemOpticalDepth.zoning_column(Vector3.ZERO, Vector3.RIGHT, 2.0, Vector3.BACK, 3.0, 1.0, PI * 0.5) - 4.0) < 1e-7, "parallel-to-band limit is finite and exact")
 	check(absf(GemOpticalDepth.zoning_column(Vector3(0, 0, 1), Vector3.FORWARD, 2.0, Vector3.BACK, 1.0, 0.8, PI * 0.5) - 2.0) < 1e-6, "one complete concentration period has unit mean")
 	print("Optical depth: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_optical_depth"); quit(1 if failures else 0)

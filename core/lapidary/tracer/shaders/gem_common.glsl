@@ -10,8 +10,8 @@ struct Stone {
 	vec4 sell_c_biref;     // sellmeier C xyz (um^2), maximum visible |n_e-n_o|
 	vec4 scatter_zone;     // sigma_per_mm, hg_g, zoning_freq, zoning_contrast
 	vec4 zone_axis_phase;  // zoning axis xyz, phase
-	vec4 optic_fluor;      // optic axis xyz, fluorescence strength
-	vec4 misc;             // fluor_nm (disabled), absorb_scale, nested_volume_present, rough_present
+	vec4 optic_axis;      // optic axis xyz, reserved zero
+	vec4 misc;             // reserved zero, absorb_scale, nested_volume_present, rough_present
 	ivec4 ranges0;         // plane_offset, plane_count, volume_field_offset, volume_field_count
 	ivec4 ranges1;         // absorb_offset, stone_flags, bvh_root, region_offset
 	vec4 extra_b_o_offset; // extraordinary Sellmeier B, ordinary index offset

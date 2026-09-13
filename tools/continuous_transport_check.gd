@@ -11,7 +11,7 @@ func _initialize()->void:
 	var recipe:=GemRounding.new();recipe.radius_mm=.2
 	var rounded:=GemRoundedSolid.compile(planes,PackedInt32Array(),1,recipe)
 	check(rounded.error.is_empty(),"rounded cube compiles")
-	if not rounded.error.is_empty():quit(1);return
+	if not rounded.error.is_empty():print("CHECK_COMPLETE: continuous_transport_check"); quit(1);return
 	var stone:GemStone=load("res://data/lapidary/stones/quartz.tres")
 	var instance:=LapidaryStoneCompiler.compile(stone)
 	instance["rounded_solid"]=rounded;instance["planes"]=PackedFloat32Array();instance["size_mm"]=1.0
@@ -20,7 +20,7 @@ func _initialize()->void:
 	instance["sellmeier_b"]=Vector3.ZERO;instance["sellmeier_c"]=Vector3.ZERO;instance["index_offset"]=.5;instance["extraordinary_refraction"]={}
 	var lighting:=GemLighting.analytic(PackedFloat32Array(),Vector4(1,1,1,0))
 	var tracer:=GemTracer.create(64,64)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: continuous_transport_check"); quit(1);return
 	var policy:=GemRung.policy(GemRung.PREVIEW);policy["birefringence"]=false;policy["denoise_passes"]=0
 	var maximum_distance:=0.0;var minimum_distance:=0.0;var maximum_angle:=0.0;var curved:=0
 	for pose in 3:
@@ -54,7 +54,7 @@ func _initialize()->void:
 	check(maximum_angle<deg_to_rad(.1),"GPU normals approach analytic rounded-box normals")
 	_mixed(instance,planes,lighting)
 	print("Continuous transport GPU: %d checks, %d failures; distance [%s,%s], normal degrees %s"%[checks,failures,minimum_distance,maximum_distance,rad_to_deg(maximum_angle)])
-	tracer.release();quit(1 if failures else 0)
+	tracer.release();print("CHECK_COMPLETE: continuous_transport_check"); quit(1 if failures else 0)
 
 func _mixed(base:Dictionary,planes:PackedFloat32Array,lighting:GemLighting)->void:
 	var warm:=GemTracer.create(64,16)

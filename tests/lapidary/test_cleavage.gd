@@ -115,4 +115,4 @@ func _initialize() -> void:
 	bad.normals=PackedVector3Array([Vector3.ONE])
 	check(not bad.validate().is_empty(),"unnormalized plane rejected")
 	print("Cleavage: %d checks, %d failures" % [checks,failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_cleavage"); quit(1 if failures else 0)

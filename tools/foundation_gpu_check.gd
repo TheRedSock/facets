@@ -12,14 +12,13 @@ func check(condition: bool, label: String) -> void:
 func _initialize() -> void:
 	var tracer := GemTracer.create(32, 32)
 	if tracer == null:
-		quit(1)
+		print("CHECK_COMPLETE: foundation_gpu_check"); quit(1)
 		return
 	var stone: GemStone = load("res://data/lapidary/stones/ruby.tres")
 	var inst := LapidaryStoneCompiler.compile(stone)
 	var lights := PackedFloat32Array([0, 0, 1, 0.5, 5600, 0, 0.9, 0])
 	var policy := GemRung.policy(GemRung.PREVIEW)
 
-	policy["fluorescence"] = true
 	tracer.configure_stone(inst, GemLighting.analytic(lights, Vector4.ZERO), policy)
 	tracer.accumulate(32)
 	var xyz := tracer.read_xyz()
@@ -80,7 +79,7 @@ func _initialize() -> void:
 	check(tracer.samples_accumulated == 0, "pose change retires incompatible samples")
 	print("GPU foundation: %d checks, %d failures; partition error %.8f; equilibrium Y %.6f" % [checks, failures, max_difference, total_y / coverage])
 	tracer.release()
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: foundation_gpu_check"); quit(1 if failures else 0)
 
 func _zoning_checks(tracer: GemTracer, source: Dictionary, lights: PackedFloat32Array, policy: Dictionary) -> void:
 	var specimen := source.duplicate(true)

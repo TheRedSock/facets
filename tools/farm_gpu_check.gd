@@ -44,4 +44,4 @@ func _initialize() -> void:
 	var report := {"failures": failures, "jobs": jobs.size(), "merge": merged, "consumer": consumer.counters}
 	GemArtifactStore.atomic_write(root.path_join("report.json"), JSON.stringify(report, "\t").to_utf8_buffer())
 	print("Farm GPU: " + JSON.stringify(report))
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: farm_gpu_check"); quit(1 if failures else 0)

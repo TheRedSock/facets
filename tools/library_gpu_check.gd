@@ -69,4 +69,4 @@ func _run() -> void:
 	check(view._clip_id == &"idle" and not view.is_processing(), "oneshot returns to idle")
 	view.free()
 	print("Library GPU: %d failures" % failures)
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: library_gpu_check"); quit(1 if failures else 0)

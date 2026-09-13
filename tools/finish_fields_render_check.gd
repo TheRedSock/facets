@@ -31,7 +31,7 @@ func _initialize() -> void:
 	finish.fields=[field]
 	inst["surfaces"]=[finish]
 	var tracer := GemTracer.create(64,64)
-	if tracer==null: quit(1); return
+	if tracer==null: print("CHECK_COMPLETE: finish_fields_render_check"); quit(1); return
 	var policy := GemRung.policy(GemRung.PREVIEW)
 	policy["birefringence"]=false
 	policy["max_bounces"]=256
@@ -77,7 +77,7 @@ func _initialize() -> void:
 	tracer.release()
 	_factory(stone,finish)
 	print("Finish field renderer: %d failures" % failures)
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: finish_fields_render_check"); quit(1 if failures else 0)
 
 func _factory(stone: GemStone, finish: GemSurface) -> void:
 	stone.condition.finish=finish.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)

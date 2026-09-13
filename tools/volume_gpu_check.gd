@@ -13,7 +13,7 @@ func _initialize() -> void:
 	_sampler()
 	_transport()
 	print("GPU spatial volume: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: volume_gpu_check"); quit(1 if failures else 0)
 
 func _sampler() -> void:
 	var rd := RenderingServer.create_local_rendering_device()

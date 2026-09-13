@@ -12,7 +12,7 @@ func _initialize()->void:
 	var bundle_path:=root_path.path_join("bundle")
 	var output_path:=root_path.path_join("output")
 	var manifest:=GemJobBundle.write(bundle_path,[job],{},2)
-	if manifest.is_empty():printerr("FAIL: composition portable bundle");quit(1);return
+	if manifest.is_empty():printerr("FAIL: composition portable bundle");print("CHECK_COMPLETE: composition_portable_check"); quit(1);return
 	var worker_args:=PackedStringArray(["--quit-after","600","--script","res://tools/gem_frame_worker.gd","--","--manifest=res://manifest.json","--output="+output_path])
 	var partial:=worker_args.duplicate();partial.append("--sample-limit=8")
 	var cached:=worker_args.duplicate();cached.insert(0,"--headless")
@@ -24,18 +24,18 @@ func _initialize()->void:
 		var log_text:="\n".join(lines)
 		GemArtifactStore.atomic_write(root_path.path_join("stage%d.log"%i),log_text.to_utf8_buffer())
 		if code!=0 or "SCRIPT ERROR:" in log_text or "ERROR:" in log_text or "FAIL:" in log_text:
-			printerr("FAIL: standalone composition stage %d: %s"%[i,log_text]);quit(1);return
+			printerr("FAIL: standalone composition stage %d: %s"%[i,log_text]);print("CHECK_COMPLETE: composition_portable_check"); quit(1);return
 		if i==1 and not '"status":"partial"' in log_text.replace(" ",""):
-			printerr("FAIL: composition checkpoint was not partial: "+log_text);quit(1);return
+			printerr("FAIL: composition checkpoint was not partial: "+log_text);print("CHECK_COMPLETE: composition_portable_check"); quit(1);return
 		if i==2 and not '"resumed_samples":8' in log_text.replace(" ",""):
-			printerr("FAIL: composition checkpoint was not resumed: "+log_text);quit(1);return
+			printerr("FAIL: composition checkpoint was not resumed: "+log_text);print("CHECK_COMPLETE: composition_portable_check"); quit(1);return
 		if i==3 and not '"display_hits":1' in log_text.replace(" ",""):
-			printerr("FAIL: composition display was not cached: "+log_text);quit(1);return
+			printerr("FAIL: composition display was not cached: "+log_text);print("CHECK_COMPLETE: composition_portable_check"); quit(1);return
 	var store:=GemArtifactStore.new(output_path)
 	var master:=store.read(GemFramePlan.master_key(job))
 	var geometry:=store.read(GemGeometryPlan.key(job,2))
 	var display:=store.read(GemFramePlan.display_key(job))
 	if master.is_empty() or geometry.is_empty() or display.is_empty():
-		printerr("FAIL: standalone composition outputs missing");quit(1);return
+		printerr("FAIL: standalone composition outputs missing");print("CHECK_COMPLETE: composition_portable_check"); quit(1);return
 	print("Composition portable worker PASS: partial, resume, optical, geometry, headless cache; "+root_path)
-	quit()
+	print("CHECK_COMPLETE: composition_portable_check"); quit()

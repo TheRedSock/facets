@@ -11,7 +11,7 @@ func _initialize()->void:
 	stone.crystal_to_stone=Quaternion(recipe.normals[0],Vector3(1,0,.35).normalized())
 	recipe.finish.multiple_scattering=true
 	var tracer:=GemTracer.create(256,256)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: cleavage_backend_check"); quit(1);return
 	var lighting:=GemRigCompiler.compile(load("res://data/lapidary/rigs/gameplay_studio.tres"))
 	var policy:=GemRung.policy(GemRung.PREVIEW)
 	policy["max_bounces"]=256;policy["birefringence"]=false;policy["spectral_geometry"]="full"
@@ -65,4 +65,4 @@ func _initialize()->void:
 	tracer.release()
 	sheet.save_png(out.path_join("comparison.png"))
 	GemArtifactStore.atomic_write(out.path_join("report.json"),JSON.stringify({"cases":reports,"engine":GemRenderIdentity.pipeline_digest("scalar"),"spp":128,"resolution":256},"\t").to_utf8_buffer())
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: cleavage_backend_check"); quit(1 if failures else 0)

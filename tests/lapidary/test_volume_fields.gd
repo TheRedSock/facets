@@ -40,4 +40,4 @@ func _initialize() -> void:
 	check(stone.fingerprint() != fingerprint, "spatial condition participates in specimen identity")
 	check(LapidaryStoneCompiler.compile(stone)["volume_fields"].size() == 1, "spatial condition reaches transport compiler")
 	print("Volume fields: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_volume_fields"); quit(1 if failures else 0)

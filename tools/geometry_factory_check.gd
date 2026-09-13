@@ -63,4 +63,4 @@ func _initialize() -> void:
 		"geometry_consumer": consumer.counters, "merge": merged, "library": packed.get("statistics", {})}
 	GemArtifactStore.atomic_write(root + "/report.json", JSON.stringify(report, "\t").to_utf8_buffer())
 	print("Geometry factory GPU: ", JSON.stringify(report))
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: geometry_factory_check"); quit(1 if failures else 0)

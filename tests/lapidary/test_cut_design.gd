@@ -40,4 +40,4 @@ func _initialize() -> void:
 	workmanship.inward_offset_mm = NAN
 	check(not workmanship.validate().is_empty(), "nonfinite manufacturing input rejected")
 	print("Cut design: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_cut_design"); quit(1 if failures else 0)

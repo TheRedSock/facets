@@ -1,6 +1,6 @@
 class_name GemCutTemplate
 extends Resource
-## A facet program in the Lapidary cut language (docs/lapidary-architecture.md §1).
+## A facet program in the Lapidary cut language (docs/archive/2026-09-13/lapidary-architecture.md §1).
 ## Silhouette-independent: the same template compiles against any of the eight
 ## tier silhouettes (CUT_TAXONOMY.md). Compiled by core/lapidary/cut/cut_compiler.gd
 ## into a convex plane set, optionally tessellated for nested boundaries.

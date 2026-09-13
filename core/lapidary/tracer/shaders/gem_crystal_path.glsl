@@ -12,7 +12,7 @@ dvec2 crystal_indices(int material, float wavelength) {
     return dvec2(principal_index(st,wavelength,false),principal_index(st,wavelength,true));
 }
 dvec3 crystal_axis(int material) {
-    return material<0?dvec3(0,0,1):normalize(dvec3(stones[material].optic_fluor.xyz));
+    return material<0?dvec3(0,0,1):normalize(dvec3(stones[material].optic_axis.xyz));
 }
 CrystalMode crystal_normalize_packet(CrystalMode p) {
     double norm=sqrt(dot(p.er,p.er)+dot(p.ei,p.ei));

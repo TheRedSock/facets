@@ -1,0 +1,1103 @@
+{
+  "schema": 1,
+  "stages": [
+    {
+      "name": "import",
+      "args": [
+        "--headless",
+        "--editor",
+        "--quit"
+      ],
+      "mode": "cpu",
+      "completion": "first_scan_filesystem"
+    },
+    {
+      "name": "source_check",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "res://tools/source_check.tscn"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: source_check"
+    },
+    {
+      "name": "test_foundation",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_foundation.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_foundation"
+    },
+    {
+      "name": "test_cleavage",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_cleavage.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_cleavage"
+    },
+    {
+      "name": "test_convex_cleavage",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_convex_cleavage.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_convex_cleavage"
+    },
+    {
+      "name": "test_mesh_admission",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_mesh_admission.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_mesh_admission"
+    },
+    {
+      "name": "test_geometry",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_geometry.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_geometry"
+    },
+    {
+      "name": "test_boundaries",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_boundaries.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_boundaries"
+    },
+    {
+      "name": "test_factory",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_factory.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_factory"
+    },
+    {
+      "name": "test_job_validation",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_job_validation.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_job_validation"
+    },
+    {
+      "name": "test_store_maintenance",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_store_maintenance.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_store_maintenance"
+    },
+    {
+      "name": "test_store_transfer",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_store_transfer.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_store_transfer"
+    },
+    {
+      "name": "test_spectra",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_spectra.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_spectra"
+    },
+    {
+      "name": "test_material_inputs",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_material_inputs.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_material_inputs"
+    },
+    {
+      "name": "test_principal_indices",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_principal_indices.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_principal_indices"
+    },
+    {
+      "name": "test_crystal_admission",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_crystal_admission.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_crystal_admission"
+    },
+    {
+      "name": "test_optical_depth",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_optical_depth.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_optical_depth"
+    },
+    {
+      "name": "test_volume_fields",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_volume_fields.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_volume_fields"
+    },
+    {
+      "name": "test_polarization",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_polarization.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_polarization"
+    },
+    {
+      "name": "test_crystal_modes",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_crystal_modes.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_crystal_modes"
+    },
+    {
+      "name": "test_crystal_interface",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_crystal_interface.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_crystal_interface"
+    },
+    {
+      "name": "test_crystal_packet",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_crystal_packet.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_crystal_packet"
+    },
+    {
+      "name": "test_crystal_loss",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_crystal_loss.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_crystal_loss"
+    },
+    {
+      "name": "test_species_data",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_species_data.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_species_data"
+    },
+    {
+      "name": "test_pleochroism",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_pleochroism.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_pleochroism"
+    },
+    {
+      "name": "test_clips",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_clips.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_clips"
+    },
+    {
+      "name": "test_board_consumer",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_board_consumer.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_board_consumer"
+    },
+    {
+      "name": "test_cut_compiler",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_cut_compiler.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_cut_compiler"
+    },
+    {
+      "name": "test_cut_design",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_cut_design.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_cut_design"
+    },
+    {
+      "name": "test_fracture",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_fracture.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_fracture"
+    },
+    {
+      "name": "test_volume_authoring",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_volume_authoring.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_volume_authoring"
+    },
+    {
+      "name": "test_geometry_factory",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_geometry_factory.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_geometry_factory"
+    },
+    {
+      "name": "test_render_dependencies",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_render_dependencies.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_render_dependencies"
+    },
+    {
+      "name": "test_style",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_style.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_style"
+    },
+    {
+      "name": "test_specimen_recipe",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_specimen_recipe.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_specimen_recipe"
+    },
+    {
+      "name": "test_presentation",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_presentation.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_presentation"
+    },
+    {
+      "name": "test_asset_planner",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_asset_planner.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_asset_planner"
+    },
+    {
+      "name": "test_finish_fields",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_finish_fields.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_finish_fields"
+    },
+    {
+      "name": "test_absorption_mixtures",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_absorption_mixtures.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_absorption_mixtures"
+    },
+    {
+      "name": "test_spatial_composition",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_spatial_composition.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_spatial_composition"
+    },
+    {
+      "name": "test_work_claims",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_work_claims.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_work_claims"
+    },
+    {
+      "name": "test_polygon",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_polygon.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_polygon"
+    },
+    {
+      "name": "test_cut_metrics",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_cut_metrics.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_cut_metrics"
+    },
+    {
+      "name": "test_microstructure",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_microstructure.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_microstructure"
+    },
+    {
+      "name": "test_rounding",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_rounding.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_rounding"
+    },
+    {
+      "name": "test_packed_geometry_cache",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_packed_geometry_cache.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_packed_geometry_cache"
+    },
+    {
+      "name": "test_patch_bounds",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_patch_bounds.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_patch_bounds"
+    },
+    {
+      "name": "test_primitive_bvh",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_primitive_bvh.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_primitive_bvh"
+    },
+    {
+      "name": "test_rounded_solid",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_rounded_solid.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_rounded_solid"
+    },
+    {
+      "name": "export_polarization_checks",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/export_polarization_checks.gd"
+      ],
+      "mode": "reference",
+      "completion": "CHECK_COMPLETE: export_polarization_checks"
+    },
+    {
+      "name": "presentation_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/presentation_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: presentation_check"
+    },
+    {
+      "name": "asset_batch_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/asset_batch_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: asset_batch_check"
+    },
+    {
+      "name": "specimen_factory_check",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/specimen_factory_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: specimen_factory_check"
+    },
+    {
+      "name": "style_factory_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/style_factory_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: style_factory_check"
+    },
+    {
+      "name": "microstructure_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/microstructure_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: microstructure_gpu_check"
+    },
+    {
+      "name": "microstructure_portable_check",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/microstructure_portable_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: microstructure_portable_check"
+    },
+    {
+      "name": "cut_study_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/cut_study_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: cut_study_gpu_check"
+    },
+    {
+      "name": "polygon_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/polygon_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: polygon_gpu_check"
+    },
+    {
+      "name": "continuous_transport_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/continuous_transport_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: continuous_transport_check"
+    },
+    {
+      "name": "analytic_bvh_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/analytic_patch_gpu_check.gd",
+        "--",
+        "--stress",
+        "--bvh"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: analytic_patch_gpu_check"
+    },
+    {
+      "name": "analytic_patch_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/analytic_patch_gpu_check.gd",
+        "--",
+        "--stress"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: analytic_patch_gpu_check"
+    },
+    {
+      "name": "geometry_cache_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/geometry_cache_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: geometry_cache_gpu_check"
+    },
+    {
+      "name": "rounding_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/rounding_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: rounding_gpu_check"
+    },
+    {
+      "name": "rounding_portable_check",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/rounding_portable_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: rounding_portable_check"
+    },
+    {
+      "name": "work_claims_gpu_check",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/work_claims_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: work_claims_gpu_check"
+    },
+    {
+      "name": "composition_portable_check",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/composition_portable_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: composition_portable_check"
+    },
+    {
+      "name": "spatial_composition_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/spatial_composition_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: spatial_composition_gpu_check"
+    },
+    {
+      "name": "absorption_mixture_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/absorption_mixture_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: absorption_mixture_gpu_check"
+    },
+    {
+      "name": "reconstruction_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/reconstruction_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: reconstruction_gpu_check"
+    },
+    {
+      "name": "convex_surface_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/convex_surface_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: convex_surface_check"
+    },
+    {
+      "name": "cleavage_backend_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/cleavage_backend_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: cleavage_backend_check"
+    },
+    {
+      "name": "cleavage_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/cleavage_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: cleavage_gpu_check"
+    },
+    {
+      "name": "rounded_cleavage_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/cleavage_gpu_check.gd",
+        "--",
+        "--rounded"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: cleavage_gpu_check"
+    },
+    {
+      "name": "cleavage_portable_check",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/cleavage_portable_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: cleavage_portable_check"
+    },
+    {
+      "name": "finish_fields_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/finish_fields_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: finish_fields_gpu_check"
+    },
+    {
+      "name": "finish_fields_render_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/finish_fields_render_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: finish_fields_render_check"
+    },
+    {
+      "name": "microsurface_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/microsurface_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: microsurface_gpu_check"
+    },
+    {
+      "name": "pipeline_cache_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/pipeline_cache_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: pipeline_cache_check"
+    },
+    {
+      "name": "geometry_factory_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/geometry_factory_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: geometry_factory_check"
+    },
+    {
+      "name": "crystal_gpu_precision",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/crystal_gpu_check.gd",
+        "--",
+        "--stress",
+        "--fp64"
+      ],
+      "mode": "precision",
+      "completion": "CHECK_COMPLETE: crystal_gpu_check"
+    },
+    {
+      "name": "foundation_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/foundation_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: foundation_gpu_check"
+    },
+    {
+      "name": "factory_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/factory_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: factory_gpu_check"
+    },
+    {
+      "name": "farm_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/farm_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: farm_gpu_check"
+    },
+    {
+      "name": "library_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/library_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: library_gpu_check"
+    },
+    {
+      "name": "surface_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/surface_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: surface_check"
+    },
+    {
+      "name": "spectra_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/spectra_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: spectra_gpu_check"
+    },
+    {
+      "name": "principal_indices_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/principal_indices_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: principal_indices_gpu_check"
+    },
+    {
+      "name": "volume_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/volume_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: volume_gpu_check"
+    },
+    {
+      "name": "polarization_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/polarization_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: polarization_gpu_check"
+    },
+    {
+      "name": "crystal_gpu_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/crystal_gpu_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: crystal_gpu_check"
+    },
+    {
+      "name": "crystal_transport_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/crystal_transport_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: crystal_transport_check"
+    },
+    {
+      "name": "geometry_aov_check",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tools/geometry_aov_check.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: geometry_aov_check"
+    },
+    {
+      "name": "test_clips_gpu",
+      "args": [
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_clips.gd"
+      ],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: test_clips"
+    },
+    {
+      "name": "test_authoring_surface",
+      "args": [
+        "--headless",
+        "--quit-after",
+        "600",
+        "--script",
+        "res://tests/lapidary/test_authoring_surface.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_authoring_surface"
+    }
+  ]
+}

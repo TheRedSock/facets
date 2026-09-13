@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" path="res://resources/lapidary/gem_optical_evidence.gd" id="1_15mlv"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_index_curve.gd" id="2_8s4xe"]
-[ext_resource type="Script" path="res://resources/lapidary/gem_inclusion_archetype.gd" id="3_p32jk"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_species.gd" id="4_oxy3t"]
 
 [sub_resource type="Resource" id="Resource_c37gg"]
@@ -17,28 +16,6 @@ b = PackedFloat64Array(0.5922467263505751, 1.035035548990193, 0)
 c_um2 = PackedFloat64Array(0.025, 0, 0)
 index_offset = -0.018
 evidence = SubResource("Resource_c37gg")
-
-[sub_resource type="Resource" id="Resource_n18on"]
-script = ExtResource("3_p32jk")
-archetype_id = &"elbaite_growth_tube"
-size_mm_range = Vector2(0.4, 1.3)
-aspect = 35.0
-orientation_axes = Array[Vector3]([Vector3(0, 0, 1)])
-scatter_density = 16.0
-tint = Color(0.96, 1, 0.97, 1)
-weight = 3.5
-center_bias = 0.2
-
-[sub_resource type="Resource" id="Resource_cbuhn"]
-script = ExtResource("3_p32jk")
-archetype_id = &"elbaite_trichite_veil"
-form = 2
-size_mm_range = Vector2(0.3, 0.9)
-aspect = 24.0
-scatter_density = 8.0
-tint = Color(0.95, 1, 0.96, 1)
-weight = 2.0
-center_bias = 0.25
 
 [sub_resource type="Resource" id="Resource_sl4km"]
 script = ExtResource("1_15mlv")
@@ -60,6 +37,4 @@ source_note = "2-term Sellmeier FIT (this file's generator): targets n_D=1.635 (
 ordinary = SubResource("Resource_igh56")
 extraordinary = SubResource("Resource_njd63")
 optic_axis_stone = Vector3(1, 0, 0)
-base_scatter_per_mm = 0.002
 hardness_mohs = 7.5
-inclusions = Array[ExtResource("3_p32jk")]([SubResource("Resource_n18on"), SubResource("Resource_cbuhn")])

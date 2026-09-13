@@ -30,7 +30,7 @@ func _process(_delta: float) -> bool:
 	print("\n=== Board consumer tests (TileView x GemForge) ===\n")
 	_run()
 	print("\n%d passed, %d failed" % [_pass, _fail])
-	quit(1 if _fail > 0 else 0)
+	print("CHECK_COMPLETE: test_board_consumer"); quit(1 if _fail > 0 else 0)
 	return true
 
 

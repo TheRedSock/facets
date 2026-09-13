@@ -36,4 +36,4 @@ func _initialize()->void:
 	inst.plane_surface_ids=PackedInt32Array()
 	check(not tracer.configure_stone(inst,lighting,{}) and "complete convex plane" in tracer.configuration_error,"empty slot table cannot bypass validation")
 	print("Convex cleavage: %d checks, %d failures"%[checks,failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_convex_cleavage"); quit(1 if failures else 0)

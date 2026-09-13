@@ -54,7 +54,7 @@ func _initialize() -> void:
 	check(not lighting.validate().is_empty(), "unaligned spectral offset rejected")
 	_factory_identity()
 	print("Spectra: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_spectra"); quit(1 if failures else 0)
 
 func _factory_identity() -> void:
 	var job := GemFrameJob.new()

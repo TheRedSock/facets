@@ -109,4 +109,4 @@ func _initialize()->void:
 	check(LapidaryStoneCompiler.compile(stone).has("compilation_error"),"invalid procedural host returns a compilation error")
 	DirAccess.make_dir_recursive_absolute("res://artifacts/polygon")
 	check(GemArtifactStore.atomic_write("res://artifacts/polygon/corpus.json",JSON.stringify(corpus,"\t",true,true).to_utf8_buffer()),"write current rational-reference corpus")
-	print("Polygon: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("Polygon: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: test_polygon"); quit(1 if failures else 0)

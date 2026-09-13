@@ -11,7 +11,7 @@ func check(value: bool, label: String) -> void:
 func _initialize() -> void:
 	var tracer := GemTracer.create(64, 64)
 	if tracer == null:
-		quit(1)
+		print("CHECK_COMPLETE: geometry_aov_check"); quit(1)
 		return
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var inst := LapidaryStoneCompiler.compile(stone)
@@ -31,7 +31,7 @@ func _initialize() -> void:
 	check(geometry != null and geometry.data.size() == 64 * 64 * 48, "geometry pass returns its exact typed layout")
 	if geometry == null:
 		tracer.release()
-		quit(1)
+		print("CHECK_COMPLETE: geometry_aov_check"); quit(1)
 		return
 	var center := geometry.record(32, 32)
 	check(absf(center.position_mm.z - 2) < 1e-5 and center.normal_object.distance_to(Vector3.BACK) < 1e-6, "front point and object normal are physical")
@@ -85,4 +85,4 @@ func _initialize() -> void:
 	geometry.normal_image().save_png("res://artifacts/aov/quartz_normals.png")
 	tracer.release()
 	print("Geometry AOV: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: geometry_aov_check"); quit(1 if failures else 0)

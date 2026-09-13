@@ -85,4 +85,4 @@ func _initialize()->void:
 	check(mixed.get("condition_report",{}).has("cleavage") and mixed.condition_report.cleavage.volume_reference=="tessellated_continuous_host" and mixed.condition_report.cleavage.limit_includes_discretization_gap,"cleavage volume estimate is identified and included in admission")
 	check(mixed.get("condition_report",{}).has("rounding") and mixed.get("condition_report",{}).has("cleavage"),"condition reports retain both ordered operations")
 	if mixed.has("mesh"):check(mixed.mesh.validate().is_empty(),"combined rounded/cleaved mesh admitted")
-	print("Rounding: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)
+	print("Rounding: %d checks, %d failures"%[checks,failures]);print("CHECK_COMPLETE: test_rounding"); quit(1 if failures else 0)

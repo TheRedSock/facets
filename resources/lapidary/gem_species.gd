@@ -16,22 +16,9 @@ extends Resource
 ## typically set the table perpendicular to c; tourmaline parallel to c.
 @export var optic_axis_stone := Vector3(0.0, 0.0, 1.0)
 
-@export_group("Pure crystal volume")
-## Scatter of the flawless crystal (usually ~0; specimen milkiness is an explicit material/condition input).
-@export var base_scatter_per_mm := 0.0
-@export var scatter_anisotropy_g := 0.6
-## Historical authoring metadata; actual boundary finish belongs to GemSurface.
-@export var base_polish_roughness := 0.008
-
-@export_group("Fluorescence")
-@export var fluorescence_emission_nm := 0.0
-@export var fluorescence_strength := 0.0
-
 @export_group("Wear & structure")
 ## Mohs hardness is authoring metadata, not a substitute for fracture toughness.
 @export var hardness_mohs := 7.0
-## Species-typical inclusion vocabulary; no automatic realization is enabled.
-@export var inclusions: Array[GemInclusionArchetype] = []
 
 
 
@@ -54,6 +41,4 @@ func validate() -> PackedStringArray:
 		errors.append_array(extraordinary.validate())
 	if not optic_axis_stone.is_finite() or (extraordinary != null and optic_axis_stone.length_squared() < 1e-12):
 		errors.append("Invalid crystal optical axis")
-	if not is_finite(base_scatter_per_mm) or base_scatter_per_mm < 0.0 or not is_finite(scatter_anisotropy_g) or absf(scatter_anisotropy_g) >= 1.0:
-		errors.append("Invalid species scattering")
 	return errors

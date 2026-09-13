@@ -11,7 +11,7 @@ func _initialize()->void:
 	var recipe:=GemRounding.new();recipe.radius_mm=.2
 	var rounded:=GemRoundingReference.compile(planes,PackedInt32Array(),1,recipe)
 	check(rounded.has("mesh"),"rounded cube compiles")
-	if not rounded.has("mesh"):quit(1);return
+	if not rounded.has("mesh"):print("CHECK_COMPLETE: rounding_gpu_check"); quit(1);return
 	var stone:GemStone=load("res://data/lapidary/stones/quartz.tres")
 	var instance:=LapidaryStoneCompiler.compile(stone)
 	instance["mesh"]=rounded.mesh;instance["planes"]=PackedFloat32Array();instance["size_mm"]=1.0
@@ -20,7 +20,7 @@ func _initialize()->void:
 	instance["sellmeier_b"]=Vector3.ZERO;instance["sellmeier_c"]=Vector3.ZERO;instance["index_offset"]=.5;instance["extraordinary_refraction"]={}
 	var lighting:=GemLighting.analytic(PackedFloat32Array(),Vector4(1,1,1,0))
 	var tracer:=GemTracer.create(64,64)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: rounding_gpu_check"); quit(1);return
 	var policy:=GemRung.policy(GemRung.PREVIEW);policy["birefringence"]=false;policy["denoise_passes"]=0
 	var maximum_distance:=0.0;var minimum_distance:=0.0;var maximum_angle:=0.0;var curved:=0
 	for pose in 3:
@@ -51,4 +51,4 @@ func _initialize()->void:
 	check(maximum_distance<.000005 and minimum_distance>=-float(rounded.report.chord_sag_bound_mm)-.000005,"GPU hit positions lie within analytic rounded-box tessellation bound")
 	check(maximum_angle<deg_to_rad(13),"GPU normals approach analytic rounded-box normals")
 	print("Rounding GPU: %d checks, %d failures; distance [%s,%s], normal degrees %s"%[checks,failures,minimum_distance,maximum_distance,rad_to_deg(maximum_angle)])
-	tracer.release();quit(1 if failures else 0)
+	tracer.release();print("CHECK_COMPLETE: rounding_gpu_check"); quit(1 if failures else 0)

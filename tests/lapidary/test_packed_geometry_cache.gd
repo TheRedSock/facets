@@ -61,7 +61,7 @@ func _initialize() -> void:
 	cache.entry_limit = 2; cache.packed(source); cache.clear()
 	check(cache.retained_bytes == 0 and cache.statistics().entries == 0, "explicit clear releases retained payloads")
 	print("Packed geometry cache: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_packed_geometry_cache"); quit(1 if failures else 0)
 
 func _clone(source: GemMesh) -> GemMesh:
 	var result := GemMesh.new()

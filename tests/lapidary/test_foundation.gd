@@ -9,7 +9,7 @@ func _initialize() -> void:
 	_identity()
 	_geometry()
 	print("Foundation: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_foundation"); quit(1 if failures else 0)
 
 func check(condition: bool, label: String) -> void:
 	checks += 1

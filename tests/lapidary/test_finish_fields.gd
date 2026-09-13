@@ -62,4 +62,4 @@ func _initialize() -> void:
 	for i in 17: finish.fields.append(field)
 	check(not finish.validate().is_empty(), "bounded shader field count enforced")
 	print("Finish fields: %d checks, %d failures" % [checks,failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_finish_fields"); quit(1 if failures else 0)

@@ -83,4 +83,4 @@ func _initialize() -> void:
 	var deep := box(Vector3(-1, -1, -12), Vector3(1, 1, 12))
 	check(GemTracer._boundary_radius({"mesh": deep, "planes": PackedFloat32Array()}) > 12.0, "arbitrary-depth mesh bounds camera origins")
 	print("Boundaries: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: test_boundaries"); quit(1 if failures else 0)

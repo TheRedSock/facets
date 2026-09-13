@@ -4,7 +4,7 @@ extends RefCounted
 ## repeated scattering with optional variance-guided residual reconstruction.
 ## The zero-scatter light remains sharp. REFERENCE keeps the unfiltered estimator.
 ## Anisotropic transport remains approximate, including in REFERENCE.
-enum { INTERACT, PREVIEW, BOARD_LIVE, CLIP_BAKE, HERO, REFERENCE }
+enum { INTERACT, PREVIEW, CLIP_BAKE, HERO, REFERENCE }
 
 const TABLE := {
 	INTERACT: {
@@ -18,13 +18,6 @@ const TABLE := {
 		"res": 256, "out": 256, "spp": 128, "batch": 8, "max_bounces": 128,
 		"dispersion": true, "spectral_geometry": "full",
 		"birefringence": true, "volume": true, "rad_clamp": 100000.0,
-
-		"denoise_passes": 3, "denoise_phi": 2.0,
-	},
-	BOARD_LIVE: {
-		"res": 112, "out": 112, "spp": 16, "batch": 1, "max_bounces": 64,
-		"dispersion": false, "spectral_geometry": "selective",
-		"birefringence": false, "volume": true, "rad_clamp": 100000.0,
 
 		"denoise_passes": 3, "denoise_phi": 2.0,
 	},
@@ -56,7 +49,7 @@ static func policy(rung: int) -> Dictionary:
 	return TABLE[rung].duplicate()
 
 static func rung_name(rung: int) -> String:
-	return ["interact", "preview", "board_live", "clip_bake", "hero", "reference"][rung]
+	return ["interact", "preview", "clip_bake", "hero", "reference"][rung]
 
 static func rung_from_name(name: String) -> int:
-	return ["interact", "preview", "board_live", "clip_bake", "hero", "reference"].find(name)
+	return ["interact", "preview", "clip_bake", "hero", "reference"].find(name)

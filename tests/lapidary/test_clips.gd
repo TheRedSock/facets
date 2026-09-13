@@ -1,11 +1,10 @@
 extends SceneTree
-## Delivery-layer tests: clip frame math, cache key stability + invalidation,
-## manifest priority order, strip/sidecar roundtrip. Headless-safe — the GPU
+## Shared clip sampling and production factory rendering. Headless-safe — the GPU
 ## section self-skips (prints "SKIP gpu") when no RenderingDevice exists.
 ##
 ## Run: godot --headless --script tests/lapidary/test_clips.gd
 
-const ClipBakerScript := preload("res://core/lapidary/clips/clip_baker.gd")
+const ClipSamplerScript := preload("res://core/lapidary/clips/clip_sampler.gd")
 const TracerScript := preload("res://core/lapidary/tracer/gem_tracer.gd")
 
 var _pass := 0
@@ -19,7 +18,7 @@ func _init() -> void:
 	_test_forge_service()
 	_test_gpu_smoke()
 	print("\n%d passed, %d failed" % [_pass, _fail])
-	quit(1 if _fail > 0 else 0)
+	print("CHECK_COMPLETE: test_clips"); quit(1 if _fail > 0 else 0)
 
 
 func _check(cond: bool, name: String) -> void:
@@ -32,19 +31,6 @@ func _check(cond: bool, name: String) -> void:
 
 
 # ------------------------------------------------------------------ fixtures
-
-func _make_stone(seed_val := 1, size_mm := 5.0) -> GemStone:
-	var species := GemSpecies.new()
-	species.species_id = &"test_quartz"
-	species.ordinary.b = PackedFloat64Array([0.6962, 0.4079, 0.8975])
-	species.ordinary.c_um2 = PackedFloat64Array([0.0047, 0.0135, 97.93])
-	var stone := GemStone.new()
-	stone.stone_id = &"test_stone"
-	stone.material.species = species
-	stone.seed = seed_val
-	stone.size_mm = size_mm
-	return stone
-
 
 func _make_clip(clip_id: StringName, duration := 1.0, fps := 2.0) -> GemClip:
 	var clip := GemClip.new()
@@ -101,28 +87,28 @@ func _test_baker_sample_math() -> void:
 
 	var rest := Quaternion.from_euler(Vector3(deg_to_rad(turn.rest_tilt_deg.x),
 		deg_to_rad(turn.rest_tilt_deg.y), deg_to_rad(turn.rest_tilt_deg.z)))
-	var q0: Quaternion = ClipBakerScript.frame_orientation(turn, 0.0)
+	var q0: Quaternion = ClipSamplerScript.frame_orientation(turn, 0.0)
 	_check(q0.angle_to(rest) < 0.001, "turn t=0 orientation == rest tilt")
-	var q1: Quaternion = ClipBakerScript.frame_orientation(turn, 1.0)
+	var q1: Quaternion = ClipSamplerScript.frame_orientation(turn, 1.0)
 	_check(q1.angle_to(rest) < 0.001, "turn t=1 (360 deg) returns to rest tilt")
-	var qm: Quaternion = ClipBakerScript.frame_orientation(turn, 0.5)
+	var qm: Quaternion = ClipSamplerScript.frame_orientation(turn, 0.5)
 	_check(qm.angle_to(q0) > 1.0, "turn t=0.5 is far from rest (spin mid)")
-	var q_early: Quaternion = ClipBakerScript.frame_orientation(turn, 0.2)
+	var q_early: Quaternion = ClipSamplerScript.frame_orientation(turn, 0.2)
 	_check(q_early.angle_to(rest) < deg_to_rad(50.0),
 		"turn t=0.2 has not spun far yet (accel)")
 
 	var flash := load("res://data/lapidary/clips/flash.tres") as GemClip
-	_check(absf(ClipBakerScript.frame_exposure(flash, 0.5) - 1.8) < 0.01,
+	_check(absf(ClipSamplerScript.frame_exposure(flash, 0.5) - 1.8) < 0.01,
 		"flash exposure at t=0.5 == 1.8")
 	var idle := load("res://data/lapidary/clips/idle.tres") as GemClip
-	_check(is_equal_approx(ClipBakerScript.frame_exposure(idle, 0.0), 1.0),
+	_check(is_equal_approx(ClipSamplerScript.frame_exposure(idle, 0.0), 1.0),
 		"idle exposure defaults to 1.0")
 
 	var orbit := _make_clip(&"orbit_test")
 	orbit.rig_orbit_degrees = 40.0
-	_check(is_equal_approx(ClipBakerScript.frame_rig_yaw_rad(orbit, 0.5), deg_to_rad(20.0)),
+	_check(is_equal_approx(ClipSamplerScript.frame_rig_yaw_rad(orbit, 0.5), deg_to_rad(20.0)),
 		"rig yaw is linear in t")
-	_check(ClipBakerScript.frame_role_mult(idle, 0.5).is_equal_approx(Vector4.ONE),
+	_check(ClipSamplerScript.frame_role_mult(idle, 0.5).is_equal_approx(Vector4.ONE),
 		"role multipliers default to 1")
 
 	var lights: GemLighting = GemRigCompiler.compile(
@@ -154,35 +140,41 @@ func _test_gpu_smoke() -> void:
 		return
 	probe.release()
 
-	var stone := _make_stone(7)
-	var lights: GemLighting = GemRigCompiler.compile(
-		load("res://data/lapidary/rigs/gameplay_studio.tres") as GemLightRig)
-	var idle := load("res://data/lapidary/clips/idle.tres") as GemClip
-	var baked: Dictionary = ClipBakerScript.bake(stone, idle, GemRung.INTERACT, lights)
-	_check(not baked.is_empty(), "INTERACT bake produces a result")
-	if baked.is_empty():
-		return
-	var frames: Array = baked["frames"]
-	_check(frames.size() == 1, "idle bakes exactly 1 frame")
-	var img: Image = frames[0]
-	var policy := GemRung.policy(GemRung.INTERACT)
-	_check(img.get_width() == int(policy["out"]) and img.get_height() == int(policy["out"]),
-		"INTERACT output matches rung out size")
+	var request := GemAssetRequest.new()
+	request.asset_id = &"clip_test"
+	request.stone = load("res://data/lapidary/stones/quartz.tres")
+	request.rig = load("res://data/lapidary/rigs/gameplay_studio.tres")
+	request.print_style = GemPrint.load_house()
+	request.clips = [load("res://data/lapidary/clips/idle.tres"), load("res://data/lapidary/clips/flash.tres")]
+	request.rung = "interact"
+	request.resolution = Vector2i(64, 64)
+	request.output_size = Vector2i(32, 32)
+	request.samples = 16
+	var batch := GemAssetBatch.new()
+	batch.requests = [request]
+	var plan := GemAssetPlanner.plan(batch)
+	_check(plan.error.is_empty(), "public planner admits clip request")
+	if not plan.error.is_empty(): return
+	var worker := GemFrameWorker.new("res://artifacts/clip-factory/%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
+	var frames: Array[Image] = []
+	for job in plan.jobs:
+		var result := worker.run(job)
+		_check(result.get("status") == "complete", "factory completes sampled frame")
+		if result.get("status") != "complete": worker.release(); return
+		frames.append(GemFrameWorker._display_image(worker.store.read(GemFramePlan.display_key(job)), job, GemFramePlan.display_engine(job)))
+	var img := frames[0]
+	_check(img.get_size() == request.output_size, "factory resolves requested dimensions")
 	var center := img.get_pixel(img.get_width() / 2, img.get_height() / 2)
 	_check(center.a > 0.5, "stone covers the frame center (coverage alpha)")
 
 	# Effect track reaches the print pass: flash mid-frames must be brighter.
-	var flash := load("res://data/lapidary/clips/flash.tres") as GemClip
-	var flashed: Dictionary = ClipBakerScript.bake(stone, flash, GemRung.INTERACT, lights)
-	_check(not flashed.is_empty(), "flash INTERACT bake produces a result")
-	if flashed.is_empty():
-		return
-	var flash_frames: Array = flashed["frames"]
-	_check(flash_frames.size() == 6, "flash bakes 6 frames")
-	var lum_first := _mean_covered_luminance(flash_frames[0])
-	var lum_mid := _mean_covered_luminance(flash_frames[3]) # t=0.6, exposure ~1.77
+	_check(frames.size() == 7, "idle and flash produce seven requested frames")
+	var lum_first := _mean_covered_luminance(frames[1])
+	var lum_mid := _mean_covered_luminance(frames[4]) # t=0.6, exposure ~1.77
 	_check(lum_mid > lum_first * 1.1,
 		"exposure_pulse brightens mid frames (%.3f -> %.3f)" % [lum_first, lum_mid])
+	_check(worker.counters.rendered == 1, "exposure-only frames share one optical master")
+	worker.release()
 
 
 static func _mean_covered_luminance(img: Image) -> float:

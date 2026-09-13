@@ -11,7 +11,7 @@ func check(value: bool, label: String) -> void:
 func _initialize() -> void:
 	var warm := GemTracer.create(64,16)
 	var cold := GemTracer.create(64,16)
-	if warm == null or cold == null: quit(1); return
+	if warm == null or cold == null: print("CHECK_COMPLETE: geometry_cache_gpu_check"); quit(1); return
 	cold._geometry_cache.entry_limit = 0
 	var stone: GemStone = load("res://data/lapidary/stones/quartz.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	stone.condition = GemCondition.new(); stone.material.scatter_per_mm = 0
@@ -85,7 +85,7 @@ func _initialize() -> void:
 	warm.release(); cold.release()
 	check(warm.geometry_cache_statistics().retained_bytes == 0, "tracer release frees CPU payload retention")
 	print("Geometry cache GPU: %d checks, %d failures; maximum XYZA error %s" % [checks,failures,maximum_error])
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: geometry_cache_gpu_check"); quit(1 if failures else 0)
 
 func _clone(source: GemMesh) -> GemMesh:
 	var result := GemMesh.new()

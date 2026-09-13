@@ -63,5 +63,5 @@ func _initialize() -> void:
 	settings.orientation_deg = Vector3.ZERO
 	settings.custom_pivot.x = NAN
 	check(not settings.validate().is_empty(), "invalid presentation rejected")
-	print("Presentation: %d checks, %d failures" % [checks, failures]); quit(1 if failures else 0)
+	print("Presentation: %d checks, %d failures" % [checks, failures]); print("CHECK_COMPLETE: test_presentation"); quit(1 if failures else 0)
 

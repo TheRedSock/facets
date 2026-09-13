@@ -529,15 +529,14 @@ func _pack_stone(b: StreamPeerBuffer, inst: Dictionary, p_off: int, p_cnt: int,
 	var sc: Vector3 = inst["sellmeier_c"]
 	var scat: Dictionary = inst.get("scatter", {})
 	var zon: Dictionary = inst.get("zoning", {})
-	var fluor: Dictionary = inst.get("fluorescence", {})
 	var optic: Vector3 = inst.get("optic_axis", Vector3(0, 0, 1))
 	var zaxis: Vector3 = zon.get("axis", Vector3(0, 0, 1))
 	for v: float in [sb.x, sb.y, sb.z, inst.get("size_mm", 4.0),
 			sc.x, sc.y, sc.z, GemMaterialCompiler.anisotropy_max(inst),
 			scat.get("sigma_per_mm", 0.0), scat.get("g", 0.6), zon.get("frequency", 0.0), zon.get("contrast", 0.0),
 			zaxis.x, zaxis.y, zaxis.z, zon.get("phase", 0.0),
-			optic.x, optic.y, optic.z, fluor.get("strength", 0.0),
-			fluor.get("nm", 0.0), inst.get("absorb_scale", 1.0), inst.get("volume_present", 0.0), inst.get("rough_present", 0.0)]:
+			optic.x, optic.y, optic.z, 0.0,
+			0.0, inst.get("absorb_scale", 1.0), inst.get("volume_present", 0.0), inst.get("rough_present", 0.0)]:
 		b.put_float(v)
 	for v: int in [p_off, -1 if inst.has("analytic_shape") else p_cnt, inst.get("volume_offset", 0), inst.get("volume_count", 0), a_off, stone_flags, inst.get("bvh_root", 0), inst.get("region_offset", 0)]:
 		b.put_32(v)

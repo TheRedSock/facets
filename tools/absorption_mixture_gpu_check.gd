@@ -2,7 +2,7 @@ extends SceneTree
 ## Uniform source-backed slabs; Python independently integrates the raw CSVs.
 func _initialize()->void:
 	var tracer:=GemTracer.create(16,16)
-	if tracer==null:quit(1);return
+	if tracer==null:print("CHECK_COMPLETE: absorption_mixture_gpu_check"); quit(1);return
 	var report:=[]
 	var rig:=GemLightRig.new()
 	rig.bg_zenith=1;rig.bg_horizon=1;rig.bg_below=1
@@ -28,14 +28,14 @@ func _initialize()->void:
 						var normal:Vector3=axis*sign_value
 						instance.planes.append_array(PackedFloat32Array([normal.x,normal.y,normal.z,depth/2 if axis.z!=0 else 100,0,0,0,0]))
 				if not tracer.configure_stone(instance,lighting,policy):
-					printerr("FAIL: ",tracer.configuration_error);tracer.release();quit(1);return
+					printerr("FAIL: ",tracer.configuration_error);tracer.release();print("CHECK_COMPLETE: absorption_mixture_gpu_check"); quit(1);return
 				tracer.accumulate(512)
 				var film:=tracer.read_xyz()
 				var sum_x:=0.0;var sum_y:=0.0;var sum_z:=0.0;var coverage:=0.0
 				for pixel in film.size()/4:
 					sum_x+=film[pixel*4];sum_y+=film[pixel*4+1];sum_z+=film[pixel*4+2];coverage+=film[pixel*4+3]
 				if not tracer.transport_error().is_empty() or coverage<255.99:
-					printerr("FAIL: slab transport ",tracer.transport_error());tracer.release();quit(1);return
+					printerr("FAIL: slab transport ",tracer.transport_error());tracer.release();print("CHECK_COMPLETE: absorption_mixture_gpu_check"); quit(1);return
 				var terms:=[]
 				for term in stone.material.absorbers:
 					terms.append({"id":String(term.chromophore.chromophore_id).trim_prefix("gia_2020_corundum_"),"ppma":term.amount})
@@ -49,4 +49,4 @@ func _initialize()->void:
 	tracer.release()
 	GemArtifactStore.atomic_write("res://artifacts/reference/absorption-mixtures.json",JSON.stringify(report,"\t").to_utf8_buffer())
 	print("Absorption mixture GPU: 12 slabs rendered without transport errors; run check_absorption_mixtures.py for numeric comparison")
-	quit()
+	print("CHECK_COMPLETE: absorption_mixture_gpu_check"); quit()

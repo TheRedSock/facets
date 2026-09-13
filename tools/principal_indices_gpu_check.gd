@@ -4,7 +4,7 @@ extends SceneTree
 func _initialize() -> void:
 	var rd := RenderingServer.create_local_rendering_device()
 	if rd == null:
-		quit(1)
+		print("CHECK_COMPLETE: principal_indices_gpu_check"); quit(1)
 		return
 	var tracer := GemTracer.new()
 	var wire := StreamPeerBuffer.new()
@@ -36,7 +36,7 @@ void main() {
 	if not spirv.compile_error_compute.is_empty():
 		printerr(spirv.compile_error_compute)
 		rd.free()
-		quit(1)
+		print("CHECK_COMPLETE: principal_indices_gpu_check"); quit(1)
 		return
 	var shader := rd.shader_create_from_spirv(spirv)
 	var pipeline := rd.compute_pipeline_create(shader)
@@ -83,4 +83,4 @@ void main() {
 	var report := {"cases": species_list.size() * 1601, "max_index_error": maximum, "failures": failures}
 	GemArtifactStore.atomic_write("res://artifacts/checks/principal_indices_gpu.json", JSON.stringify(report, "\t").to_utf8_buffer())
 	print("Principal index GPU: ", report)
-	quit(1 if failures else 0)
+	print("CHECK_COMPLETE: principal_indices_gpu_check"); quit(1 if failures else 0)
