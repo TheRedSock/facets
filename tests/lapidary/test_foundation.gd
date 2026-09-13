@@ -27,7 +27,7 @@ func _identity() -> void:
 	stone.material.species.ordinary.b[0] += 0.000001
 	check(fingerprint != stone.fingerprint(), "species content invalidates")
 	fingerprint = stone.fingerprint()
-	stone.cut.table_ratio += 0.01
+	stone.cut.parameters.table += 0.01
 	check(fingerprint != stone.fingerprint(), "cut content invalidates")
 	fingerprint = stone.fingerprint()
 	stone.size_mm += 0.00001

@@ -16,7 +16,10 @@ func _initialize() -> void:
 	for kind in [&"round", &"square", &"triangle", &"oval", &"diamond", &"rectangle", &"marquise", &"pear"]:
 		for grade in [0.6, 1.0]:
 			var shape := GemShape.faceted_outline(kind)
-			var compiled: Dictionary = CutCompiler.compile(template, shape, 71, Vector4(2.8, 0.4, 0.004, 0.006) * (1.0 - grade))
+			var selected: GemCutTemplate = load("res://data/lapidary/cuts/brilliant_triangle.tres") if kind == &"triangle" else template
+			var compiled: Dictionary = CutCompiler.compile(selected, shape, 71, Vector4(2.8, 0.4, 0.004, 0.006) * (1.0 - grade))
+			check(not compiled.has("compilation_error"), "%s q%.1f program admission: %s" % [kind, grade, compiled.get("compilation_error", "")])
+			if compiled.has("compilation_error"): continue
 			var mesh := GemShapeCompiler.from_hull(compiled["planes"], compiled["facet_ids"])
 			var errors := mesh.validate()
 			check(errors.is_empty(), "%s q%.1f closed oriented mesh: %s" % [kind, grade, errors])

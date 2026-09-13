@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="GemCutTemplate" load_steps=29 format=3]
+[gd_resource type="Resource" script_class="GemCutTemplate" load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://core/lapidary/cut/cut_template.gd" id="1"]
 
@@ -9,17 +9,17 @@
 [sub_resource type="Resource" id="set_main"]
 script = ExtResource("2")
 set_id = &"main"
-divisions = 8
-indices = PackedFloat64Array(0, 1, 2, 3, 4, 5, 6, 7)
+divisions = 6
+indices = PackedFloat64Array(0, 1, 2, 3, 4, 5)
 phase_degrees = 0.0
 sampling = "radial"
 
 [sub_resource type="Resource" id="set_halves"]
 script = ExtResource("2")
 set_id = &"halves"
-divisions = 16
-indices = PackedFloat64Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
-phase_degrees = 11.25
+divisions = 12
+indices = PackedFloat64Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+phase_degrees = 15.0
 sampling = "radial"
 
 [sub_resource type="Resource" id="set_axis"]
@@ -33,65 +33,49 @@ sampling = "radial"
 [sub_resource type="Resource" id="set_star_0"]
 script = ExtResource("2")
 set_id = &"star_0"
-divisions = 8
+divisions = 6
 indices = PackedFloat64Array(0)
-phase_degrees = 22.5
+phase_degrees = 30.0
 sampling = "radial"
 
 [sub_resource type="Resource" id="set_star_1"]
 script = ExtResource("2")
 set_id = &"star_1"
-divisions = 8
+divisions = 6
 indices = PackedFloat64Array(1)
-phase_degrees = 22.5
+phase_degrees = 30.0
 sampling = "radial"
 
 [sub_resource type="Resource" id="set_star_2"]
 script = ExtResource("2")
 set_id = &"star_2"
-divisions = 8
+divisions = 6
 indices = PackedFloat64Array(2)
-phase_degrees = 22.5
+phase_degrees = 30.0
 sampling = "radial"
 
 [sub_resource type="Resource" id="set_star_3"]
 script = ExtResource("2")
 set_id = &"star_3"
-divisions = 8
+divisions = 6
 indices = PackedFloat64Array(3)
-phase_degrees = 22.5
+phase_degrees = 30.0
 sampling = "radial"
 
 [sub_resource type="Resource" id="set_star_4"]
 script = ExtResource("2")
 set_id = &"star_4"
-divisions = 8
+divisions = 6
 indices = PackedFloat64Array(4)
-phase_degrees = 22.5
+phase_degrees = 30.0
 sampling = "radial"
 
 [sub_resource type="Resource" id="set_star_5"]
 script = ExtResource("2")
 set_id = &"star_5"
-divisions = 8
+divisions = 6
 indices = PackedFloat64Array(5)
-phase_degrees = 22.5
-sampling = "radial"
-
-[sub_resource type="Resource" id="set_star_6"]
-script = ExtResource("2")
-set_id = &"star_6"
-divisions = 8
-indices = PackedFloat64Array(6)
-phase_degrees = 22.5
-sampling = "radial"
-
-[sub_resource type="Resource" id="set_star_7"]
-script = ExtResource("2")
-set_id = &"star_7"
-divisions = 8
-indices = PackedFloat64Array(7)
-phase_degrees = 22.5
+phase_degrees = 30.0
 sampling = "radial"
 
 [sub_resource type="Resource" id="group_crown"]
@@ -190,30 +174,6 @@ inset = "0"
 zone = 1
 meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1", "star_2", "star_3", "star_4")
 
-[sub_resource type="Resource" id="group_star_6"]
-script = ExtResource("3")
-group_id = &"star_6"
-directions = SubResource("set_star_6")
-inclination = "p.star * p.crown_scale"
-side = 1
-height = "meet"
-scale = "p.table + 0.5 * (1-p.table)"
-inset = "0"
-zone = 1
-meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1", "star_2", "star_3", "star_4", "star_5")
-
-[sub_resource type="Resource" id="group_star_7"]
-script = ExtResource("3")
-group_id = &"star_7"
-directions = SubResource("set_star_7")
-inclination = "p.star * p.crown_scale"
-side = 1
-height = "meet"
-scale = "p.table + 0.5 * (1-p.table)"
-inset = "0"
-zone = 1
-meet_groups = PackedStringArray("crown", "upper", "star_0", "star_1", "star_2", "star_3", "star_4", "star_5", "star_6")
-
 [sub_resource type="Resource" id="group_table"]
 script = ExtResource("3")
 group_id = &"table"
@@ -264,7 +224,7 @@ meet_groups = PackedStringArray("pavilion", "lower")
 
 [resource]
 script = ExtResource("1")
-cut_id = &"brilliant"
+cut_id = &"brilliant_triangle"
 parameters = {
 "girdle": 0.03,
 "crown": 34.5,
@@ -276,4 +236,4 @@ parameters = {
 "lower_delta": 6.0,
 "culet": 0.96
 }
-groups = Array[ExtResource("3")]([SubResource("group_crown"), SubResource("group_upper"), SubResource("group_star_0"), SubResource("group_star_1"), SubResource("group_star_2"), SubResource("group_star_3"), SubResource("group_star_4"), SubResource("group_star_5"), SubResource("group_star_6"), SubResource("group_star_7"), SubResource("group_table"), SubResource("group_pavilion"), SubResource("group_lower"), SubResource("group_culet")])
+groups = Array[ExtResource("3")]([SubResource("group_crown"), SubResource("group_upper"), SubResource("group_star_0"), SubResource("group_star_1"), SubResource("group_star_2"), SubResource("group_star_3"), SubResource("group_star_4"), SubResource("group_star_5"), SubResource("group_table"), SubResource("group_pavilion"), SubResource("group_lower"), SubResource("group_culet")])

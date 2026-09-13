@@ -1,16 +1,38 @@
 extends SceneTree
-## Bounded multi-metric study. Preferences are explicit; no catalog promotion.
+## Bounded study of named cut parameters; no catalog promotion.
+## Required --vary=parameter:value,value (repeat for each axis), at most 128 combinations.
 var output:="res://artifacts/cut-search"
 var failed:=false
 func _initialize()->void:_run.call_deferred()
 
 func _run()->void:
 	var id:="quartz";var quick:=OS.get_cmdline_user_args().has("--quick")
+	var axes := {}
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--stone="):id=argument.trim_prefix("--stone=")
-	if not id.is_valid_filename():_fail("Invalid specimen name");quit(1);return
+		elif argument.begins_with("--vary="):
+			var pair := argument.trim_prefix("--vary=").split(":", true, 1)
+			if pair.size() != 2 or axes.has(pair[0]): _fail("Use distinct --vary=name:value,value axes"); _finish(1); return
+			var values := []
+			for text in pair[1].split(","):
+				if not text.is_valid_float() or not is_finite(float(text)): _fail("Invalid search value"); _finish(1); return
+				values.append(float(text))
+			if values.is_empty() or values.size() > 128: _fail("Invalid axis size"); _finish(1); return
+			axes[pair[0]] = values
+		elif argument != "--quick": _fail("Unknown option: " + argument); _finish(1); return
+	if not id.is_valid_filename():_fail("Invalid specimen name");_finish(1);return
 	var source:GemStone=load("res://data/lapidary/stones/%s.tres"%id)
-	if source==null or source.shape.mode!="faceted":_fail("Study needs an authored faceted specimen");quit(1);return
+	if source==null or source.shape.mode!="faceted":_fail("Study needs an authored faceted specimen");_finish(1);return
+	if axes.is_empty(): _fail("Declare --vary=parameter:value,value using the selected cut's parameters"); _finish(1); return
+	var candidates: Array[Dictionary] = [{}]
+	for key in axes:
+		if not source.cut.parameters.has(key): _fail("Unknown cut parameter: " + key); _finish(1); return
+		if candidates.size() * axes[key].size() > 128: _fail("Search exceeds 128 candidates"); _finish(1); return
+		var expanded: Array[Dictionary] = []
+		for candidate in candidates:
+			for value in axes[key]:
+				var next := candidate.duplicate(); next[key] = value; expanded.append(next)
+		candidates = expanded
 	output=output.path_join(id).path_join("multi")
 	DirAccess.make_dir_recursive_absolute(output)
 	var preference:=GemCutPreference.new()
@@ -19,22 +41,20 @@ func _run()->void:
 	for i in 4:training.append(_scenario(i,false));heldout.append(_scenario(i,true))
 	var resolution:=48 if quick else 96;var samples:=8 if quick else 32
 	var tracer:=GemTracer.create(resolution,resolution)
-	if tracer==null:quit(1);return
+	if tracer==null:_finish(1);return
 	var baseline:=GemCutSearch.evaluate(tracer,source,training,policy,samples,preference)
-	if not _valid(baseline,"baseline"):tracer.release();quit(1);return
+	if not _valid(baseline,"baseline"):tracer.release();_finish(1);return
 	var records:Array[Dictionary]=[];var rejected:=[]
 	var started:=Time.get_ticks_msec()
-	for angle in [34.0,38.0,42.0,46.0,50.0]:
-		for table in [.48,.56,.64]:
-			for scale in [.85,1.0,1.15]:
-				var stone:=GemCutSearch.candidate(source,angle,table,scale)
-				var measured:=GemCutSearch.evaluate(tracer,stone,training,policy,samples,preference)
-				if not measured.error.is_empty():
-					rejected.append({"pavilion_deg":angle,"table_ratio":table,"crown_scale":scale,"error":measured.error});continue
-				var score:=GemCutSearch.preference_score(measured,baseline,preference)
-				if not _valid(score,"preference"):tracer.release();quit(1);return
-				records.append({"pavilion_deg":angle,"table_ratio":table,"crown_scale":scale,"measurement":measured,"preference":score})
-		print("Cut study %s: %d accepted, %d rejected, %.1fs"%[id,records.size(),rejected.size(),(Time.get_ticks_msec()-started)/1000.0])
+	for parameters in candidates:
+		var stone := GemCutSearch.candidate(source, parameters)
+		var measured := GemCutSearch.evaluate(tracer, stone, training, policy, samples, preference)
+		if not measured.error.is_empty():
+			rejected.append({"parameters": parameters, "error": measured.error}); continue
+		var score := GemCutSearch.preference_score(measured, baseline, preference)
+		if not _valid(score, "preference"): tracer.release(); _finish(1); return
+		records.append({"parameters": parameters, "measurement": measured, "preference": score})
+		print("Cut study %s: %d accepted, %d rejected, %.1fs" % [id, records.size(), rejected.size(), (Time.get_ticks_msec()-started)/1000.0])
 		await process_frame
 	var scores:Array[Dictionary]=[]
 	for record in records:scores.append(record.preference)
@@ -42,48 +62,48 @@ func _run()->void:
 	for i in records.size():records[i]["frontier"]=frontier.has(i)
 	records.sort_custom(func(a:Dictionary,b:Dictionary)->bool:return a.preference.utility>b.preference.utility)
 	tracer.release();tracer=GemTracer.create(96,96)
-	if tracer==null:quit(1);return
+	if tracer==null:_finish(1);return
 	var confirmation_samples:=128
 	var confirmed_baseline:=GemCutSearch.evaluate(tracer,source,training,policy,confirmation_samples,preference)
-	if not _valid(confirmed_baseline,"confirmed baseline"):tracer.release();quit(1);return
+	if not _valid(confirmed_baseline,"confirmed baseline"):tracer.release();_finish(1);return
 	var confirmed:Array[Dictionary]=[]
 	for record in records:
 		if not record.frontier:continue
-		var stone:=GemCutSearch.candidate(source,record.pavilion_deg,record.table_ratio,record.crown_scale)
+		var stone:=GemCutSearch.candidate(source,record.parameters)
 		var measured:=GemCutSearch.evaluate(tracer,stone,training,policy,confirmation_samples,preference)
-		if not _valid(measured,"confirmation"):tracer.release();quit(1);return
+		if not _valid(measured,"confirmation"):tracer.release();_finish(1);return
 		var score:=GemCutSearch.preference_score(measured,confirmed_baseline,preference)
-		if not _valid(score,"confirmed preference"):tracer.release();quit(1);return
-		confirmed.append({"pavilion_deg":record.pavilion_deg,"table_ratio":record.table_ratio,"crown_scale":record.crown_scale,"measurement":measured,"preference":score})
+		if not _valid(score,"confirmed preference"):tracer.release();_finish(1);return
+		confirmed.append({"parameters":record.parameters,"measurement":measured,"preference":score})
 		if confirmed.size()==3:break
-	confirmed.append({"baseline":true,"pavilion_deg":source.cut.pavilion_angle_deg,"table_ratio":source.cut.table_ratio,"crown_scale":1.0,"measurement":confirmed_baseline,"preference":GemCutSearch.preference_score(confirmed_baseline,confirmed_baseline,preference)})
+	confirmed.append({"baseline":true,"parameters":{},"measurement":confirmed_baseline,"preference":GemCutSearch.preference_score(confirmed_baseline,confirmed_baseline,preference)})
 	confirmed.sort_custom(func(a:Dictionary,b:Dictionary)->bool:
 		if a.preference.eligible!=b.preference.eligible:return a.preference.eligible
 		return a.preference.utility>b.preference.utility)
 	# Independent streams test selection sensitivity. These are a repeat, not a
 	# confidence interval: two seed pairs cannot establish statistical certainty.
 	var repeat_baseline:=GemCutSearch.evaluate(tracer,source,training,policy,confirmation_samples,preference,113,191)
-	if not _valid(repeat_baseline,"repeat baseline"):tracer.release();quit(1);return
+	if not _valid(repeat_baseline,"repeat baseline"):tracer.release();_finish(1);return
 	var repeat_scores:Array[Dictionary]=[]
 	for record in confirmed:
-		var stone:=GemCutSearch.candidate(source,record.pavilion_deg,record.table_ratio,record.crown_scale)
+		var stone:=GemCutSearch.candidate(source,record.parameters)
 		var measured:Dictionary=repeat_baseline if record.get("baseline",false) else GemCutSearch.evaluate(tracer,stone,training,policy,confirmation_samples,preference,113,191)
-		if not _valid(measured,"repeat candidate"):tracer.release();quit(1);return
+		if not _valid(measured,"repeat candidate"):tracer.release();_finish(1);return
 		record["repeat_measurement"]=measured
 		record["repeat_preference"]=GemCutSearch.preference_score(measured,repeat_baseline,preference)
-		if not _valid(record.repeat_preference,"repeat preference"):tracer.release();quit(1);return
+		if not _valid(record.repeat_preference,"repeat preference"):tracer.release();_finish(1);return
 		repeat_scores.append(record.repeat_preference)
 	var repeat_best:=-1
 	for i in repeat_scores.size():
 		if repeat_scores[i].eligible and (repeat_best<0 or repeat_scores[i].utility>repeat_scores[repeat_best].utility):repeat_best=i
 	var stability:={"repeat_seeds":[113,191],"repeat_best_index":repeat_best,"same_leader":repeat_best==0,"interpretation":"Seed sensitivity only; not a confidence interval. Original training preference selects the review candidate; retain alternatives if the leader changes."}
 	var baseline_heldout:=GemCutSearch.evaluate(tracer,source,heldout,policy,confirmation_samples,preference)
-	if not _valid(baseline_heldout,"held-out baseline"):tracer.release();quit(1);return
+	if not _valid(baseline_heldout,"held-out baseline"):tracer.release();_finish(1);return
 	for i in confirmed.size():
 		var record:=confirmed[i]
-		var stone:=GemCutSearch.candidate(source,record.pavilion_deg,record.table_ratio,record.crown_scale)
+		var stone:=GemCutSearch.candidate(source,record.parameters)
 		record["heldout"]=GemCutSearch.evaluate(tracer,stone,heldout,policy,confirmation_samples,preference)
-		if not _valid(record.heldout,"held-out candidate"):tracer.release();quit(1);return
+		if not _valid(record.heldout,"held-out candidate"):tracer.release();_finish(1);return
 		if GemResourceBundle.save(stone,output.path_join("candidate-%d.res"%i))!=OK:_fail("Cannot save candidate")
 	var report:={"version":3,"specimen":id,"source":source.fingerprint(),"engine":GemRenderIdentity.worker_digest(),"policy":policy,
 		"screening":{"resolution":resolution,"samples":samples},"confirmation":{"resolution":96,"samples":confirmation_samples},"seeds":[17,71],
@@ -95,13 +115,13 @@ func _run()->void:
 	if not GemArtifactStore.atomic_write(output.path_join("report.json"),JSON.stringify(report,"\t",true,true).to_utf8_buffer()):_fail("Cannot save report")
 	tracer.release()
 	if confirmed.is_empty() or not confirmed[0].preference.eligible:
-		print("No candidate meets the declared preference constraints; report saved.");quit(1 if failed else 0);return
+		print("No candidate meets the declared preference constraints; report saved.");_finish(1 if failed else 0);return
 	var winner:=confirmed[0]
 	print("Selected utility %.6f; held-out mean Y %.6f -> %.6f"%[winner.preference.utility,baseline_heldout.mean_Y,winner.heldout.mean_Y])
 	print("Independent seed repeat retains leader: "+str(stability.same_leader))
-	var selected:=GemCutSearch.candidate(source,winner.pavilion_deg,winner.table_ratio,winner.crown_scale)
+	var selected:=GemCutSearch.candidate(source,winner.parameters)
 	tracer=GemTracer.create(256,256)
-	if tracer==null:quit(1);return
+	if tracer==null:_finish(1);return
 	policy.denoise_passes=3
 	for variant in [{"name":"baseline","stone":source},{"name":"candidate","stone":selected}]:
 		for i in 2:
@@ -111,7 +131,7 @@ func _run()->void:
 			tracer.accumulate(128)
 			if not tracer.transport_error().is_empty():_fail(tracer.transport_error());continue
 			if tracer.finalize_print(GemPrint.load_house()).save_png(output.path_join("%s-%d.png"%[variant.name,i]))!=OK:_fail("Cannot save review image")
-	tracer.release();quit(1 if failed else 0)
+	tracer.release();_finish(1 if failed else 0)
 
 func _valid(value:Dictionary,label:String)->bool:
 	if value.get("error","").is_empty():return true
@@ -152,3 +172,6 @@ func _scenario(index: int, heldout: bool) -> Dictionary:
 		"orientation":orientation,"motion_orientation":Quaternion(Vector3.UP,deg_to_rad(2.5))*orientation,
 		"description": {"key_azimuth_deg": azimuth, "key_elevation_deg": elevation, "key_radius_deg": radius,
 			"motion_y_deg":2.5,"observer_mask":index%2==0,"tilt_x_deg": tilt_x, "tilt_y_deg": tilt_y, "illumination": "D65; key3/fill0.75; background0.25/0.08/0.005"}}
+
+func _finish(code := 0) -> void:
+	print("CHECK_COMPLETE: optimize_cut"); quit(code)

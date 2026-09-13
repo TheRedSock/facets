@@ -2,6 +2,10 @@
 
 ## Durable authoring and source candidates
 
+Facet programs and examples are documented in `core/lapidary/cut/CONTRACT.md`.
+Headless `inspect_cut.gd` writes facet/meet overlays, dimensions and sections from
+the compiled geometry; its default is the pointed-crown/flat-bottom example.
+
 The public editing workflow is `GemAuthoringDocument`; its save, undo, provenance,
 admission and cache rules are in `core/lapidary/authoring/CONTRACT.md`.
 `godot --headless --path . --script res://tools/generate_lapidary_data.gd`
@@ -207,7 +211,7 @@ two-band diagnostic under `artifacts/polarization/dichroic/`; its coefficients
 must not be treated as measured fluorite data.
 
 Cut design uses explicit template proportions and `GemCondition.workmanship`
-angular/millimeter tolerances. Run windowed `tools/optimize_cut.gd -- --stone=quartz`
+angular/millimeter tolerances. Run windowed `tools/optimize_cut.gd -- --stone=quartz --vary=pavilion:38,42,46 --vary=table:0.48,0.64`
 (or `--quick`) for a bounded pavilion/table/crown search. It writes exact candidate
 resources, training and held-out metrics, and comparison images under
 `artifacts/cut-search/<stone>/multi/`. `GemCutPreference` declares return weights,

@@ -7,7 +7,7 @@
 [ext_resource type="Script" path="res://resources/lapidary/gem_condition.gd" id="5_m7fs1"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_volume_field.gd" id="6_xfema"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_workmanship.gd" id="7_30v4d"]
-[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant.tres" id="8_o7p4w"]
+[ext_resource type="Resource" path="res://data/lapidary/cuts/brilliant_triangle.tres" id="8_o7p4w"]
 [ext_resource type="Resource" path="res://data/lapidary/grades/t3.tres" id="9_673dh"]
 [ext_resource type="Resource" path="res://data/lapidary/chromophores/verdelite_fe.tres" id="10_1q4y3"]
 [ext_resource type="Script" path="res://resources/lapidary/gem_material.gd" id="11_nxuls"]
@@ -61,7 +61,6 @@ scattering_evidence = SubResource("Resource_5uimw")
 script = ExtResource("14_jwjm3")
 outline = &"triangle"
 corner_radius = 0.14
-sectors = 6
 outline_points = PackedVector2Array()
 loft_sections = PackedVector2Array(-0.65, 0.05, -0.04, 1, 0.04, 1, 0.35, 0.55)
 

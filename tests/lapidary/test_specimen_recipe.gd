@@ -83,13 +83,15 @@ func _initialize() -> void:
 	check(not variation.validate().is_empty(), "zero logarithmic bound rejected")
 	variation.logarithmic = false; variation.target = "script.source_code"
 	check(not variation.validate().is_empty(), "arbitrary property access rejected")
-	variation.target = "cut.table_ratio"; variation.minimum = 0.05; variation.maximum = 0.95
+	variation.target = "cut.parameters.table"
+	check(not variation.validate().is_empty(), "condition variation cannot rewrite the nominal facet program")
+	variation.target = "material.scatter_g"; variation.minimum = -0.99; variation.maximum = 0.99
 	check(variation.validate().is_empty(), "exact declared decimal endpoints are admitted")
 	var alternate_cut: GemSpecimenRecipe = recipe.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	alternate_cut.presets[0].cut_override = recipe.base.cut.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
-	alternate_cut.presets[0].cut_override.table_ratio = 0.64
+	alternate_cut.presets[0].cut_override.parameters.table = 0.64
 	var new_design := GemSpecimenFactory.realize(alternate_cut, &"reference", 17)
-	check(new_design.error.is_empty() and new_design.stone.cut.table_ratio == 0.64 and recipe.base.cut.table_ratio != 0.64, "preset may select an explicit independent nominal cut")
+	check(new_design.error.is_empty() and new_design.stone.cut.parameters.table == 0.64 and recipe.base.cut.parameters.table != 0.64, "preset may select an explicit independent nominal cut")
 	var mutated: GemStone = softened.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	check(GemJobValidator.specimen_error(mutated).is_empty(), "detached identical physical content admitted")
 	mutated.condition.finish.alpha_u = -0.1

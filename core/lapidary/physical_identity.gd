@@ -4,6 +4,7 @@ extends RefCounted
 ## New fields participate conservatively; exclude only audited metadata.
 const METADATA := ["script", "resource_path", "resource_name", "resource_local_to_scene", "source_note"]
 const EXCLUDED := {
+	"cut_template.gd": ["cut_id"],
 	"gem_species.gd": ["display_name", "hardness_mohs"],
 	"gem_material.gd": ["material_id"],
 	"gem_chromophore.gd": ["chromophore_id", "display_name", "ui_color"],

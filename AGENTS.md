@@ -298,6 +298,12 @@ round/oval cabochons and supported convex rounding use analytic intersections;
 other procedural curves can remain tessellation-limited. See the kernel contract
 for thin-feature precision and encoded-boundary admission limits.
 
+Faceted cuts use one declarative `GemCutTemplate`/`GemFacetGroup` program with
+independent index sets and explicit construction meets. See
+`core/lapidary/cut/CONTRACT.md`. No table/culet is forced. Cut labels do not seed
+manufacture; stable group/index IDs own its channels. The old crown-row grammar,
+shape sector coupling and nominal cut condition-variation targets are removed.
+
 Transport policies (`GemRung.TABLE`) own numerical work. Production uses repeated
 volume scattering with optional residual reconstruction; reference disables
 reconstruction. Increasing sample count does not add missing optical capabilities.

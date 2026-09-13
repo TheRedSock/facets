@@ -3,12 +3,14 @@ extends RefCounted
 ## Bounded design-space exploration. The score is an explicit engineering
 ## objective under an illumination/view ensemble, never a gemological grade.
 
-static func candidate(source: GemStone, pavilion_deg: float, table_ratio: float, crown_scale: float) -> GemStone:
+static func candidate(source: GemStone, parameters: Dictionary) -> GemStone:
+	if source == null or source.cut == null: return null
+	for key in parameters:
+		if not source.cut.parameters.has(key): return null
+		var value: Variant = parameters[key]
+		if not (value is int or value is float) or not is_finite(float(value)): return null
 	var stone := source.duplicate_deep(Resource.DEEP_DUPLICATE_ALL) as GemStone
-	stone.cut.pavilion_angle_deg = pavilion_deg
-	stone.cut.table_ratio = table_ratio
-	for row in stone.cut.crown_rows:
-		row.angle_deg *= crown_scale
+	stone.cut.parameters.merge(parameters, true)
 	return stone
 
 static func evaluate(tracer:GemTracer, stone:GemStone, scenarios:Array[Dictionary], policy:Dictionary, samples:int, preference:GemCutPreference=null, seed_value:=17, noise_seed:=71)->Dictionary:

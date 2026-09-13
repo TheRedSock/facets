@@ -69,7 +69,7 @@ func _initialize()->void:
 	var extended:=GemMicrostructureCompiler.realize(source,recipe)
 	for i in 12:check(GemContentIdentity.digest(extended.stone.condition.defects[i+1])==GemContentIdentity.digest(stone.condition.defects[i]),"adding an independent population preserves existing seed channels")
 	recipe.populations.pop_front()
-	source.cut.table_ratio=.48
+	source.cut.parameters.table=.48
 	check(GemContentIdentity.digest(GemMicrostructureCompiler.realize(source,recipe).stone.condition)==GemContentIdentity.digest(stone.condition),"recutting does not move physical inclusions")
 	source.grade.clarity=.01
 	check(GemContentIdentity.digest(GemMicrostructureCompiler.realize(source,recipe).stone.condition)==GemContentIdentity.digest(stone.condition),"grade metadata cannot change microstructure")

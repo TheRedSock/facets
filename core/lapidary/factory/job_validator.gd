@@ -103,8 +103,8 @@ static func _specimen_error_uncached(stone: GemStone, polarized: bool) -> String
 	var shape := stone.shape
 	if shape == null or shape.mode not in ["faceted", "cabochon", "loft"]:
 		return "missing or unknown shape mode"
-	if not _between(shape.aspect_ratio, 0.2, 8) or not _between(shape.corner_radius, 0, 0.45) or not _between(shape.sectors, 3, 128):
-		return "invalid outline proportions or sector count"
+	if not _between(shape.aspect_ratio, 0.2, 8) or not _between(shape.corner_radius, 0, 0.45):
+		return "invalid outline proportions"
 	if not _between(shape.radial_segments, 8, 512) or not _between(shape.dome_rings, 4, 128) or not _between(shape.dome_height, 0.01, 3):
 		return "invalid curved shape resolution or dome height"
 	if shape.outline_points.is_empty() and shape.outline not in OUTLINES:
@@ -113,7 +113,8 @@ static func _specimen_error_uncached(stone: GemStone, polarized: bool) -> String
 		return "shape exceeds the procedural tessellation limits"
 	if shape.mode == "faceted":
 		if not shape.outline_points.is_empty():
-			return "custom polygon outlines require loft mode"
+			var girdle_error := Cuts.SilhouetteLib.custom_error(shape.outline_points)
+			if not girdle_error.is_empty(): return girdle_error
 		if not stone.cut is GemCutTemplate:
 			return "faceted jobs require an explicit GemCutTemplate"
 		error = Cuts.template_error(stone.cut)

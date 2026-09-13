@@ -471,7 +471,7 @@ func _build_stones(species: Dictionary, chromophores: Dictionary, grades: Dictio
 			stone.material.absorbers.append(GemAbsorber.relative(chromophores[row[2]],0.4 if row[2]==&"ruby_cr" else 1.0))
 		stone.grade = grades[row[3]]
 		stone.shape = GemShape.faceted_outline(row[4])
-		stone.cut = cuts[row[5]]
+		stone.cut = load("res://data/lapidary/cuts/" + String(row[5]) + "_triangle.tres") if row[4] == &"triangle" else cuts[row[5]]
 		stone.seed = row[6]
 		stone.size_mm = row[7]
 		var volume: Array = CATALOG_VOLUME[stone.stone_id]

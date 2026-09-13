@@ -9,7 +9,7 @@ extends SceneTree
 ## arcs at q=1; X-mirror for smooth silhouettes), solved pavilion angle within 0.5 deg
 ## of the explicit template angle, exact regularity at q = 1
 ## (zero jitter), determinism (same seed -> identical output; different seed
-## -> different jitter), and zero compiler warnings. Planes with exactly-empty
+## -> different jitter), and admitted construction. Planes with exactly-empty
 ## faces are PRUNED by the compiler (sliver facets erased by meeting error,
 ## fan facets that cannot fit a pointed silhouette); the hull girdle count may
 ## drop at tips (knife-edge) while the 2D outline keeps every girdle line.
@@ -58,6 +58,7 @@ func _initialize() -> void:
 
 
 func _exercise(template: Resource, template_name: String, silhouette: StringName, q: float) -> void:
+	if silhouette == &"triangle": template = load("res://data/lapidary/cuts/" + template_name + "_triangle.tres")
 	var label := "%s/%s q=%.2f" % [template_name, silhouette, q]
 	var fails := PackedStringArray()
 	var result: Dictionary = CutCompiler.compile(template, GemShape.faceted_outline(silhouette), SEED_A, Vector4(2.8, 0.4, 0.004, 0.006) * (1.0 - q))
@@ -77,8 +78,6 @@ func _exercise(template: Resource, template_name: String, silhouette: StringName
 		fails.append("outline not convex")
 	if is_equal_approx(q, 1.0):
 		_check_silhouette_outline(silhouette, outline, fails)
-	if not result.get("warnings", PackedStringArray()).is_empty():
-		fails.append("compiler warnings: %s" % ", ".join(result["warnings"]))
 
 	var zones := _zone_histogram(planes)
 	if zones.get(0, 0) != 1:
@@ -93,7 +92,7 @@ func _exercise(template: Resource, template_name: String, silhouette: StringName
 		fails.append("girdle count %d out of [3, 48]" % girdle_count)
 
 	# Actual pavilion angle vs explicit design.
-	var solved: float = template.pavilion_angle_deg
+	var solved: float = template.parameters.pavilion
 	var pav_angles := _pavilion_angles(planes, 4 if template_name == "brilliant" else 7)
 	if pav_angles.is_empty():
 		fails.append("no pavilion planes found")

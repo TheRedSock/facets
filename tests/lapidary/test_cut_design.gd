@@ -17,9 +17,9 @@ func _initialize() -> void:
 	check(LapidaryStoneCompiler.compile(stone)["planes"] == nominal, "material IOR cannot rewrite geometry")
 	stone.seed += 100
 	check(LapidaryStoneCompiler.compile(stone)["planes"] == nominal, "zero manufacturing tolerance is seed-independent")
-	stone.cut.pavilion_angle_deg = 35
+	stone.cut.parameters.pavilion = 35
 	check(LapidaryStoneCompiler.compile(stone)["planes"] != nominal, "explicit pavilion angle changes geometry")
-	stone.cut.pavilion_angle_deg = 41
+	stone.cut.parameters.pavilion = 41
 	var workmanship := stone.condition.workmanship
 	workmanship.polar_error_deg = 0.2
 	var perturbed: PackedFloat32Array = LapidaryStoneCompiler.compile(stone)["planes"]

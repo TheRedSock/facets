@@ -46,6 +46,11 @@ The host interior obeys dot(n,x)<=d. Zone IDs: 0 table, 1 crown main/star,
 2 upper girdle, 3 girdle, 4 pavilion main, 5 lower girdle, 6 culet, 7 step row.
 They identify cut structure, not surface finish.
 
+Declarative cut programs generate nonnegative int32 facet IDs from stable
+group/index names and reject hash collisions. IDs are preserved through pruning;
+they are not plane-array positions. The wire representation above is unchanged.
+See `core/lapidary/cut/CONTRACT.md` for construction and manufacture semantics.
+
 ## Optional primary geometry companions
 
 `GemTracer.geometry_aov(coverage_side)` runs a separate lazy compute pipeline;

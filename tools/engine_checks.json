@@ -1136,6 +1136,48 @@
         "res://tools/atelier_admission_check.gd"
       ],
       "completion": "CHECK_COMPLETE: atelier_admission_check"
+    },
+    {
+      "name": "test_facet_program",
+      "mode": "cpu",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/lapidary/test_facet_program.gd"
+      ],
+      "completion": "CHECK_COMPLETE: test_facet_program"
+    },
+    {
+      "name": "inspect_cut",
+      "mode": "cpu",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tools/inspect_cut.gd"
+      ],
+      "completion": "CHECK_COMPLETE: inspect_cut"
+    },
+    {
+      "name": "optimize_cut",
+      "mode": "gpu",
+      "args": [
+        "--script",
+        "res://tools/optimize_cut.gd",
+        "--",
+        "--stone=diamond",
+        "--quick",
+        "--vary=pavilion:40,42"
+      ],
+      "completion": "CHECK_COMPLETE: optimize_cut"
+    },
+    {
+      "name": "facet_program_gpu_check",
+      "mode": "gpu",
+      "args": [
+        "--script",
+        "res://tools/facet_program_gpu_check.gd"
+      ],
+      "completion": "CHECK_COMPLETE: facet_program_gpu_check"
     }
   ]
 }

@@ -32,8 +32,8 @@ provenance. A changed request makes its review stale.
 
 `GemContentIdentity` remains the full evidence/admission identity.
 `GemPhysicalIdentity` excludes audited labels, notes and optical evidence from
-master/geometry inputs. New fields participate conservatively. Cut IDs currently
-participate in manufacture seeding and therefore remain physical inputs. Material
+master/geometry inputs. New fields participate conservatively. Cut labels do not
+seed manufacture; stable group/index identities own its independent channels. Material
 amounts/scattering, optical curves, geometry and physical condition changes still
 invalidate their participating outputs. Print changes reuse masters; style
 changes reuse prints. Full renderer-source identities remain versioned.

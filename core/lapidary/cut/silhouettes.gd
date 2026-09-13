@@ -15,9 +15,7 @@ extends RefCounted
 ##     wobble. Girdle-unevenness jitter applies to the k edges only, never the
 ##     corner arcs.
 ##   - Smooth girdles: 32 support planes on a half-offset normal ring.
-##   - `sectors` is the gameplay symmetry count used to anchor facet rows.
-##     Profiles are oriented so multiples of TAU/sectors land on silhouette
-##     features (vertices / edge centers) where the shape has them.
+## Facet indices belong to the independent cut program.
 
 const SUPERSAMPLE := 720
 const GIRDLE_SMOOTH := 32
@@ -33,7 +31,6 @@ const KINDS: Array[StringName] = [
 
 class Silhouette:
 	var kind: StringName = &"round"
-	var sectors: int = 8
 	var radial_segments: int = 32
 	# Rounded regular polygon (square / triangle / diamond / rectangle).
 	var poly_k: int = 0
@@ -54,6 +51,7 @@ class Silhouette:
 	var norm: float = 1.0
 	# Cached boundary samples (SUPERSAMPLE points, normalized) for support queries.
 	var _pts := PackedVector2Array()
+	var custom_points := PackedVector2Array()
 
 	## Support function h(dir) = max over the outline of dot(dir, p): the
 	## offset of the tangent line with outward normal `dir`. Facet planes MUST
@@ -77,6 +75,15 @@ class Silhouette:
 		return bp
 
 	func radius(theta: float) -> float:
+		if not custom_points.is_empty():
+			var ray := Vector2(cos(theta), sin(theta))
+			var distance := INF
+			for i in custom_points.size():
+				var a := custom_points[i]; var b := custom_points[(i + 1) % custom_points.size()]
+				var n := Vector2(b.y - a.y, a.x - b.x).normalized()
+				var denominator := n.dot(ray)
+				if denominator > 0: distance = minf(distance, n.dot(a) / denominator)
+			return distance
 		if scale_y == 1.0:
 			return _base_radius(theta) / norm
 		# Scaled body S = diag(1, scale_y): r_S(u) = r_base(w) / |S^-1 u|,
@@ -147,6 +154,10 @@ class Silhouette:
 static func make(kind: StringName, shape: GemShape = null) -> Silhouette:
 	var s := Silhouette.new()
 	s.kind = kind
+	if shape != null and not shape.outline_points.is_empty():
+		if not custom_error(shape.outline_points).is_empty(): return null
+		s.custom_points = shape.outline_points.duplicate(); s._pts = s.custom_points
+		return s
 	match kind:
 		&"round":
 			pass
@@ -163,7 +174,6 @@ static func make(kind: StringName, shape: GemShape = null) -> Silhouette:
 			s.poly_k = 3
 			s.poly_phase = 0.0
 			s.corner_r = 0.14
-			s.sectors = 6
 		&"diamond":
 			# Lozenge: rhombus vertices on the axes, elongated along +X.
 			s.poly_k = 4
@@ -194,7 +204,6 @@ static func make(kind: StringName, shape: GemShape = null) -> Silhouette:
 		var default_aspect: float = {&"oval": 1.0 / 0.78, &"diamond": 1.3, &"rectangle": 1.35, &"marquise": 1.8, &"pear": 1.4}.get(kind, 1.0)
 		s.scale_y *= default_aspect / shape.aspect_ratio
 		s.corner_r = clampf(shape.corner_radius, 0.0, 0.45)
-		s.sectors = maxi(3, shape.sectors)
 		s.radial_segments = clampi(shape.radial_segments, 8, 512)
 	var peak := 0.0
 	for i in SUPERSAMPLE:
@@ -213,9 +222,28 @@ static func make(kind: StringName, shape: GemShape = null) -> Silhouette:
 ## per vertex (equal steps in the exterior angle). Smooth kinds: GIRDLE_SMOOTH
 ## normals, half-step offset so a vertex does not land on an axis of symmetry.
 static func girdle_supports(sil: Silhouette) -> Dictionary:
+	if not sil.custom_points.is_empty():
+		var points := PackedVector2Array(); var normals := PackedVector2Array(); var jitter := PackedByteArray()
+		for i in sil.custom_points.size():
+			var a := sil.custom_points[i]; var b := sil.custom_points[(i + 1) % sil.custom_points.size()]
+			points.append(a); normals.append(Vector2(b.y - a.y, a.x - b.x).normalized()); jitter.append(1)
+		return {"points": points, "normals": normals, "jitter": jitter}
 	if sil.poly_k >= 3:
 		return _polygon_supports(sil)
 	return _support_ring(sil, sil.radial_segments, true)
+
+static func custom_error(points: PackedVector2Array) -> String:
+	if points.size() < 3 or points.size() > 256: return "Custom girdle needs 3..256 CCW vertices"
+	var admitted := GemPolygon.triangulate(points)
+	if not admitted.error.is_empty(): return "Custom girdle: " + admitted.error
+	var radius := 0.0
+	for i in points.size():
+		var a := points[i]; var b := points[(i + 1) % points.size()]; var c := points[(i + 2) % points.size()]
+		if (b-a).cross(c-b) <= 0: return "Faceted custom girdle must be strictly convex"
+		if (b-a).cross(-a) <= 0: return "Custom girdle must contain the specimen origin strictly inside"
+		radius = maxf(radius, a.length())
+	if absf(radius - 1.0) > 1e-5: return "Custom girdle must have unit maximum radius; physical millimeters come from size_mm"
+	return ""
 
 
 static func _polygon_supports(sil: Silhouette) -> Dictionary:

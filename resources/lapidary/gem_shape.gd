@@ -6,9 +6,9 @@ extends Resource
 @export var outline: StringName = &"round"
 @export_range(0.2, 8.0) var aspect_ratio := 1.0
 @export_range(0.0, 0.45) var corner_radius := 0.1
-@export_range(3, 128) var sectors := 8
 @export_range(8, 512) var radial_segments := 32
-## Custom CCW simple polygon for lofts, including concave outlines.
+## Custom CCW polygon; faceted girdles require convexity and unit radius.
+## Loft outlines may be concave.
 @export var outline_points := PackedVector2Array()
 ## Loft sections ordered bottom to top: (height, outline scale).
 @export var loft_sections := PackedVector2Array([Vector2(-0.65, 0.05), Vector2(-0.04, 1), Vector2(0.04, 1), Vector2(0.35, 0.55)])
@@ -22,7 +22,6 @@ static func faceted_outline(kind: StringName) -> GemShape:
 	var corners := {&"square": 0.12, &"triangle": 0.14, &"diamond": 0.07, &"rectangle": 0.1}
 	shape.aspect_ratio = aspects.get(kind, 1.0)
 	shape.corner_radius = corners.get(kind, 0.1)
-	shape.sectors = 6 if kind == &"triangle" else 8
 	return shape
 
 static func cabochon_outline(kind: StringName) -> GemShape:

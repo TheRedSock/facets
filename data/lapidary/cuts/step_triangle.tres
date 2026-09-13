@@ -9,9 +9,9 @@
 [sub_resource type="Resource" id="set_frame"]
 script = ExtResource("2")
 set_id = &"frame"
-divisions = 16
-indices = PackedFloat64Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
-phase_degrees = 11.25
+divisions = 12
+indices = PackedFloat64Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+phase_degrees = 15.0
 sampling = "boundary"
 
 [sub_resource type="Resource" id="set_axis"]
@@ -120,7 +120,7 @@ meet_groups = PackedStringArray("pavilion_0", "pavilion_1", "pavilion_2")
 
 [resource]
 script = ExtResource("1")
-cut_id = &"step"
+cut_id = &"step_triangle"
 parameters = {
 "girdle": 0.03,
 "crown_a": 45.0,

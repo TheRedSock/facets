@@ -66,8 +66,8 @@ func _initialize() -> void:
 	job.quality.polarization = true
 	reject(job, "isotropic")
 	job = base.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
-	job.stone.cut.crown_rows[0].angle_deg = NAN
-	reject(job, "row angle")
+	job.stone.cut.groups[0].inclination = "sqrt(-1)"
+	reject(job, "inclination")
 	job = base.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	job.stone.cut = null
 	reject(job, "explicit GemCutTemplate")

@@ -38,8 +38,6 @@ static func realize(recipe: GemSpecimenRecipe, preset_id: StringName, seed_value
 		var owner: Resource
 		var property := variation.target.get_slice(".", 1)
 		match variation.target.get_slice(".", 0):
-			"cut":
-				if stone.shape != null and stone.shape.mode == "faceted" and stone.cut is GemCutTemplate: owner = stone.cut
 			"material": owner = stone.material
 			"finish": owner = stone.condition.finish
 			"rounding": owner = stone.condition.rounding
