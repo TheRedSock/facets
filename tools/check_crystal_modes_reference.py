@@ -64,3 +64,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("CHECK_COMPLETE: check_crystal_modes_reference")

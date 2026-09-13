@@ -2,10 +2,12 @@ param(
     [string]$Godot = 'C:/Godot/Godot_v4.6.1-stable_win64_console.exe',
     [string]$AssetPack = '',
     [string]$Output = '',
-    [switch]$Probe
+    [switch]$Probe,
+    [double]$FrameBudgetMs = 0
 )
 # Export a fresh runtime-only project. Never copy the developer's .godot cache.
 $ErrorActionPreference = 'Stop'
+if ([double]::IsNaN($FrameBudgetMs) -or [double]::IsInfinity($FrameBudgetMs) -or $FrameBudgetMs -lt 0 -or ($FrameBudgetMs -gt 0 -and -not $Probe)) { throw 'A positive finite frame budget requires -Probe' }
 $projectRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'check_process.ps1')
 . (Join-Path $PSScriptRoot 'check_result.ps1')
@@ -66,7 +68,9 @@ $shippedPack = Join-Path $Output 'gem-assets.pck'
 $inventoryReport = Join-Path $auditRoot 'inventory.json'
 Invoke-PackageStage 'inventory' @('--headless', '--main-pack', $gamePack, '--script', (Join-Path $PSScriptRoot 'audit_game_package.gd'), '--', "--pack=$shippedPack", "--report=$inventoryReport") 'CHECK_COMPLETE: audit_game_package'
 if ($Probe) {
-    Invoke-PackageStage 'runtime-probe' @('--audio-driver', 'Dummy', '--main-pack', $gamePack, '--script', (Join-Path $PSScriptRoot 'export_runtime_probe.gd'), '--', "--pack=$shippedPack", "--report=$(Join-Path $auditRoot 'runtime-probe.json')") 'CHECK_COMPLETE: export_runtime_probe'
+    $probeArguments = @('--audio-driver', 'Dummy', '--main-pack', $gamePack, '--script', (Join-Path $PSScriptRoot 'export_runtime_probe.gd'), '--', "--pack=$shippedPack", "--report=$(Join-Path $auditRoot 'runtime-probe.json')")
+    if ($FrameBudgetMs -gt 0) { $probeArguments += '--frame-budget-ms=' + $FrameBudgetMs.ToString([Globalization.CultureInfo]::InvariantCulture) }
+    Invoke-PackageStage 'runtime-probe' $probeArguments 'CHECK_COMPLETE: export_runtime_probe'
 }
 foreach ($relative in $sourceHashes.Keys) {
     if ((Get-FileHash -LiteralPath (Join-Path $projectRoot $relative) -Algorithm SHA256).Hash -ne $sourceHashes[$relative]) { throw "Runtime source changed during export: $relative" }

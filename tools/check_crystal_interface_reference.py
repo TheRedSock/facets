@@ -27,3 +27,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("CHECK_COMPLETE: check_crystal_interface_reference")

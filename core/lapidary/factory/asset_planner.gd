@@ -96,9 +96,4 @@ static func _clip_error(clip: GemClip, budget: int) -> String:
 	if not is_finite(clip.duration_s) or not is_finite(clip.fps) or clip.duration_s <= 0 or clip.fps <= 0: return "Clip timing must be finite and positive"
 	var count := clip.duration_s * clip.fps
 	if not is_finite(count) or roundf(count) > budget: return "Clip exceeds frame budget"
-	if clip.stone_motion not in [GemClip.StoneMotion.STILL, GemClip.StoneMotion.TURNTABLE]: return "Unsupported clip motion"
-	if not clip.rest_tilt_deg.is_finite() or not clip.turntable_axis.is_finite() or not is_finite(clip.turntable_degrees) or not is_finite(clip.rig_orbit_degrees): return "Nonfinite clip motion"
-	if clip.stone_motion == GemClip.StoneMotion.TURNTABLE and clip.turntable_axis.length_squared() < 0.0001: return "Turntable clip needs an explicit nonzero axis"
-	for key in clip.effect_envelopes:
-		if key not in ["exposure_pulse", "key_boost", "rim_boost"] or clip.effect_envelopes[key] == null: return "Unsupported or missing clip envelope: " + key
-	return ""
+	return clip.track_error()

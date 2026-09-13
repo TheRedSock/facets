@@ -4,7 +4,7 @@ func _initialize() -> void:
 	var batch: GemAssetBatch = load("res://data/lapidary/batches/quartz_quality_lighting.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	var clip := GemClip.new()
 	clip.clip_id = &"inspect"; clip.duration_s = 1; clip.fps = 2; clip.loop = false
-	clip.stone_motion = GemClip.StoneMotion.TURNTABLE; clip.turntable_degrees = 30
+	clip.orientation_keys = [GemOrientationKey.new(), GemOrientationKey.new(1.0, Quaternion(Vector3.UP,deg_to_rad(30))) ]
 	for request in batch.requests:
 		request.clips = [clip]; request.rung = "interact"
 		request.resolution = Vector2i(48, 48); request.output_size = Vector2i(32, 32); request.samples = 16

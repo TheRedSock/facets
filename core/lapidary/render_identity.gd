@@ -3,7 +3,7 @@ extends RefCounted
 ## Result compatibility is distinct from the complete renderer inventory.
 ## Unknown/new files are shared conservatively until explicitly classified.
 const EXCLUSIVE := {
-	"authoring": ["core/lapidary/cut/cut_inspection.gd", "core/lapidary/authoring/admission.gd", "core/lapidary/authoring/appearance_acceptance.gd", "core/lapidary/authoring/document.gd", "core/lapidary/factory/job_validator.gd", "core/lapidary/factory/resource_bundle.gd", "resources/lapidary/gem_optical_evidence.gd", "core/lapidary/factory/presentation_compiler.gd", "resources/lapidary/gem_presentation.gd", "core/lapidary/factory/specimen_factory.gd", "resources/lapidary/gem_specimen_recipe.gd", "resources/lapidary/gem_quality_preset.gd", "resources/lapidary/gem_condition_variation.gd", "core/lapidary/factory/asset_planner.gd", "resources/lapidary/gem_asset_request.gd", "resources/lapidary/gem_asset_batch.gd"],
+	"authoring": ["core/lapidary/clips/clip_sampler.gd", "resources/lapidary/gem_clip.gd", "resources/lapidary/gem_orientation_key.gd", "core/lapidary/cut/cut_inspection.gd", "core/lapidary/authoring/admission.gd", "core/lapidary/authoring/appearance_acceptance.gd", "core/lapidary/authoring/document.gd", "core/lapidary/factory/job_validator.gd", "core/lapidary/factory/resource_bundle.gd", "resources/lapidary/gem_optical_evidence.gd", "core/lapidary/factory/presentation_compiler.gd", "resources/lapidary/gem_presentation.gd", "core/lapidary/factory/specimen_factory.gd", "resources/lapidary/gem_specimen_recipe.gd", "resources/lapidary/gem_quality_preset.gd", "resources/lapidary/gem_condition_variation.gd", "core/lapidary/factory/asset_planner.gd", "resources/lapidary/gem_asset_request.gd", "resources/lapidary/gem_asset_batch.gd"],
 	"style": ["core/lapidary/style_pipeline.gd", "resources/lapidary/gem_style.gd"],
 	"frame_execution": ["core/lapidary/factory/frame_worker.gd"],
 	"crystal": ["core/lapidary/tracer/crystal_shader.gd", "core/lapidary/tracer/shaders/gem_crystal.glsl", "core/lapidary/tracer/shaders/gem_crystal_path.glsl"],
@@ -31,7 +31,7 @@ static func pipeline_digest(domain: String) -> String:
 static func inventory() -> Dictionary:
 	if _inventory.is_empty():
 		var files: Array[String] = []
-		for root in ["res://core/lapidary/authoring", "res://core/lapidary/cut", "res://core/lapidary/geometry", "res://core/lapidary/lighting", "res://core/lapidary/tracer", "res://resources/lapidary"]:
+		for root in ["res://core/lapidary/clips", "res://core/lapidary/authoring", "res://core/lapidary/cut", "res://core/lapidary/geometry", "res://core/lapidary/lighting", "res://core/lapidary/tracer", "res://resources/lapidary"]:
 			_collect(root, files)
 		files.append_array(["res://core/lapidary/stone_compiler.gd", "res://core/lapidary/material_compiler.gd", "res://core/lapidary/physical_identity.gd",
 			"res://core/lapidary/factory/job_validator.gd", "res://core/lapidary/factory/resource_bundle.gd", "res://core/lapidary/factory/specimen_factory.gd",

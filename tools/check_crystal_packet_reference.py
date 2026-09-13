@@ -45,4 +45,5 @@ report = {"mitsuba": mi.__version__, "chains": len(cases), "interfaces_per_chain
           "failures": sum(e > 3e-5 for e in errors + field_errors)}
 (root / "crystal-packet-comparison.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report))
+if not report["failures"]: print("CHECK_COMPLETE: check_crystal_packet_reference")
 raise SystemExit(bool(report["failures"]))

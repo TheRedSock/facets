@@ -48,7 +48,7 @@ static func value_at(root:Variant,path:Array)->Variant:
 	return value
 func _fill(value:Variant,parent:TreeItem,path:Array)->void:
 	if value is Curve:
-		var item:=tree.create_item(parent);item.set_text(0,"Linear curve points");item.set_metadata(0,path);item.set_metadata(1,{"curve":true});item.set_text(1,str(value.point_count)+" points");return
+		var item:=tree.create_item(parent);item.set_text(0,"Curve points and slopes");item.set_metadata(0,path);item.set_metadata(1,{"curve":true});item.set_text(1,str(value.point_count)+" points");return
 	if value is Resource:
 		for property:Dictionary in value.get_property_list():
 			if not GemContentIdentity._content_property(property) or String(property.name).begins_with("_"):continue
@@ -93,9 +93,13 @@ func _select()->void:
 			choice.add_item(entry[0]);choice.set_item_metadata(index,option)
 			if str(option)==str(value):choice.select(index)
 	if value is Curve:
-		var points:Array[Vector2]=[]
-		for i in value.point_count:points.append(value.get_point_position(i))
-		editor.text=var_to_str(points);hint.text="Curve replacement: [Vector2(time, value), ...], linear tangents."
+		var points:Array[Vector4]=[]
+		for i in value.point_count:
+			var point:Vector2=value.get_point_position(i)
+			points.append(Vector4(point.x,point.y,value.get_point_left_tangent(i),value.get_point_right_tangent(i)))
+		editor.text=var_to_str(points);hint.text="[Vector4(time, value, incoming slope, outgoing slope), ...]. Normalized time 0..1; zero slopes ease at a key."
+	elif value is Quaternion:
+		editor.text=var_to_str(value.get_euler()*180.0/PI);hint.text="Absolute orientation: Vector3(X, Y, Z) Euler degrees (Godot YXZ order). Stored as a unit quaternion; tracks interpolate shortest arcs."
 	elif value is Resource:editor.text="";hint.text="Detached resource. Load replaces this branch; Save selected writes a new reusable resource."
 	else:editor.text=str(value) if value is String or value is StringName else var_to_str(value);hint.text=_help(_selected,meta)
 func _apply()->void:
@@ -106,12 +110,18 @@ func _apply()->void:
 		if old is StringName:value=StringName(value)
 	elif old is Curve:
 		var points:Variant=str_to_var(editor.text)
-		if not points is Array:problem.emit("Curve needs an array of Vector2 points");return
-		var curve:=Curve.new();curve.min_value=old.min_value;curve.max_value=old.max_value
+		if not points is Array:problem.emit("Curve needs an array of Vector4 points/slopes");return
+		var curve:=Curve.new();var low:=0.0;var high:=1.0
 		for point in points:
-			if not point is Vector2 or not point.is_finite() or point.x<0 or point.x>1:problem.emit("Invalid curve point");return
-			curve.add_point(point,0,0,Curve.TANGENT_LINEAR,Curve.TANGENT_LINEAR)
+			if not point is Vector4 or not point.is_finite() or point.x<0 or point.x>1:problem.emit("Invalid curve point/slopes");return
+			low=minf(low,point.y);high=maxf(high,point.y)
+		curve.min_value=low;curve.max_value=high
+		for point in points:curve.add_point(Vector2(point.x,point.y),point.z,point.w,Curve.TANGENT_FREE,Curve.TANGENT_FREE)
 		value=curve
+	elif old is Quaternion:
+		var angles:Variant=str_to_var(editor.text)
+		if not angles is Vector3 or not angles.is_finite():problem.emit("Orientation needs Vector3 Euler angles in degrees");return
+		value=Quaternion.from_euler(angles*PI/180.0)
 	elif old is Resource:problem.emit("Use Load resource to replace this resource");return
 	elif old is String:value=editor.text
 	elif old is StringName:value=StringName(editor.text)
@@ -180,5 +190,4 @@ static func _active(value:Resource,key:String)->bool:
 		if key in ["crystal_habit","crystal_scale"]:return value.kind=="crystal"
 		if key=="fracture_profile":return value.kind=="fracture"
 		if key in ["irregularity","radial_segments","radial_rings"]:return value.kind in ["fracture","chip"]
-	if value is GemClip and key in ["turntable_axis","turntable_degrees","easing"]:return value.stone_motion==GemClip.StoneMotion.TURNTABLE
 	return true

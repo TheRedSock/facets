@@ -1138,6 +1138,16 @@
       "completion": "CHECK_COMPLETE: atelier_admission_check"
     },
     {
+      "name": "atelier_latency_check",
+      "mode": "gpu",
+      "args": [
+        "--script",
+        "res://tools/atelier_latency_check.gd"
+      ],
+      "completion": "CHECK_COMPLETE: atelier_latency_check",
+      "timeout_seconds": 3600
+    },
+    {
       "name": "test_facet_program",
       "mode": "cpu",
       "args": [

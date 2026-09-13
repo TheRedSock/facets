@@ -20,7 +20,7 @@ func _initialize() -> void:
 	if DirAccess.make_dir_recursive_absolute(output) != OK: _fail("Cannot create output directory"); return
 	if GemResourceBundle.save(batch, output.path_join("request.res")) != OK: _fail("Cannot save inspection request"); return
 	var report := {"schema": 1, "status": "planned", "options": opts, "rig": RIG_PATH,
-		"game_style": "none", "print": "house", "rest_tilt_deg": [-12, 0, 0], "axis": [0, 1, 0],
+		"game_style": "none", "print": "house", "orientation_track": "Four quarter-turn intervals around local Y composed with a -12 degree X rest tilt",
 		"presentation": "shape_default / rest_bounds / rest_frame_pivot", "turn_degrees": 360, "duplicate_endpoint": false, "estimate": planned.estimate,
 		"effective_policy": planned.jobs[0].quality, "effective_samples": planned.jobs[0].samples,
 		"specimens": planned.specimens, "worker_engine": GemRenderIdentity.worker_digest(), "clips": planned.clips, "results": []}
@@ -112,8 +112,9 @@ func _batch(opts: Dictionary) -> GemAssetBatch:
 	var clip := GemClip.new()
 	clip.clip_id = &"inspection_rotation"; clip.fps = opts.fps
 	clip.duration_s = float(opts.frames) / float(opts.fps); clip.loop = true
-	clip.stone_motion = GemClip.StoneMotion.TURNTABLE
-	clip.rest_tilt_deg = Vector3(-12, 0, 0); clip.turntable_axis = Vector3.UP; clip.turntable_degrees = 360
+	clip.orientation_keys.clear()
+	for index in 5:
+		clip.orientation_keys.append(GemOrientationKey.new(float(index)/4, Quaternion(Vector3.RIGHT,deg_to_rad(-12))*Quaternion(Vector3.UP,index*PI/2)))
 	for id: String in available:
 		if not selected.is_empty() and id not in selected: continue
 		var request := GemAssetRequest.new()

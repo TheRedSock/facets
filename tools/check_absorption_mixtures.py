@@ -68,3 +68,4 @@ report = {"cases":results, "max_absolute_xyz_error":max(r["max_absolute_xyz_erro
 (ROOT / "artifacts/reference/absorption-mixtures-comparison.json").write_text(json.dumps(report, indent=2)+"\n", encoding="utf-8")
 print(json.dumps(report))
 assert len(results)==12 and report["max_absolute_xyz_error"]<.001, report
+print("CHECK_COMPLETE: check_absorption_mixtures")

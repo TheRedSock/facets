@@ -73,3 +73,4 @@ for i,case in enumerate(report["pairs"]):
     expected = len(shared) == 3 or any(not on_shared(p,shared) for p in intersections([points[j] for j in ai],[points[j] for j in bi]))
     assert expected == case["invalid"], (i,case,expected)
 print(f"Exact rational triangle intersection reference: {len(report['pairs'])} pairs PASS")
+print("CHECK_COMPLETE: check_mesh_predicates")

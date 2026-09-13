@@ -13,6 +13,7 @@ static func error(resource: Resource) -> String:
 		return GemAssetPlanner.plan(batch).error
 	if resource is GemCutTemplate: return GemJobValidator.Cuts.template_error(resource)
 	if resource is GemClip: return GemAssetPlanner._clip_error(resource, 65536)
+	if resource is Curve: return GemClip.curve_error(resource,false)
 	if resource is GemLightRig: return GemJobValidator._rig(resource)
 	if resource is GemAbsorber: return "Edit absorption terms within their host material (species and density are required)"
 	if resource.has_method("validate"):

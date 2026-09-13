@@ -1,19 +1,43 @@
-[gd_resource type="Resource" script_class="GemClip" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="GemClip" format=3]
 
-[ext_resource type="Script" uid="uid://bnllrumera5os" path="res://resources/lapidary/gem_clip.gd" id="1_clip"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_clip.gd" id="clip"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_orientation_key.gd" id="key"]
+
+[sub_resource type="Resource" id="key_0"]
+script = ExtResource("key")
+time = 0
+orientation = Quaternion(-0.1045284632676535, 0, -0, 0.9945218953682733)
+
+[sub_resource type="Resource" id="key_1"]
+script = ExtResource("key")
+time = 0.25
+orientation = Quaternion(-0.07391278520356671, 0.7032331762534042, -0.07391278520356671, 0.7032331762534042)
+
+[sub_resource type="Resource" id="key_2"]
+script = ExtResource("key")
+time = 0.5
+orientation = Quaternion(-6.400522398026175e-18, 0.9945218953682733, -0.1045284632676535, 6.089690279223575e-17)
+
+[sub_resource type="Resource" id="key_3"]
+script = ExtResource("key")
+time = 0.75
+orientation = Quaternion(0.0739127852035667, 0.7032331762534042, -0.07391278520356671, -0.7032331762534041)
+
+[sub_resource type="Resource" id="key_4"]
+script = ExtResource("key")
+time = 1
+orientation = Quaternion(0.1045284632676535, 1.217938055844715e-16, -1.280104479605235e-17, -0.9945218953682733)
 
 [sub_resource type="Curve" id="Curve_ease_inout"]
 _data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.5, 0.5), 2.2, 2.2, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
 point_count = 3
 
 [resource]
-script = ExtResource("1_clip")
+script = ExtResource("clip")
 clip_id = &"turn"
 duration_s = 0.4
 fps = 30.0
 loop = false
-stone_motion = 1
-rest_tilt_deg = Vector3(-12, 0, 0)
-turntable_axis = Vector3(0, 1, 0)
-turntable_degrees = 360.0
-easing = SubResource("Curve_ease_inout")
+orientation_keys = Array[ExtResource("key")]([SubResource("key_0"), SubResource("key_1"), SubResource("key_2"), SubResource("key_3"), SubResource("key_4")])
+time_curve = SubResource("Curve_ease_inout")

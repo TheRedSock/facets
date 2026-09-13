@@ -41,7 +41,7 @@ are extracted into ignored artifacts. No global installation is needed.
 Build optical delivery first, then run:
 
 ```powershell
-tools/build_game_package.ps1 -AssetPack generated/gem-assets.pck -Probe
+tools/build_game_package.ps1 -AssetPack generated/gem-assets.pck -Probe -FrameBudgetMs 16.7
 ```
 
 The tracked export preset enumerates runtime sources. The build copies those
@@ -55,6 +55,9 @@ runtime entries/classes, validates all tile roles and decodes/checksums every pa
 The gem PCK must contain exactly the manifest and its referenced pages. The
 optional runtime probe tests 64 views, upgrade completion and prefetched bursts.
 Both execute from the package directory and reject source-tree visibility.
+The probe prepares every declared tile and measures repeated animation bursts
+and steady rest separately. `-FrameBudgetMs 16.7` enforces the agreed desktop
+p95 budget; a probe without a budget only establishes functional behavior.
 
 Godot's standard export templates disable `--script` and `--main-pack` overrides.
 These external automated harnesses use the matching editor executable. Actual
@@ -62,3 +65,11 @@ release-executable navigation, missing/corrupt-pack errors and final performance
 are separate acceptance evidence; a package probe cannot claim that evidence.
 Synthetic package integration uses `tools/create_delivery_test_pack.gd` and never
 promotes its test images into the production content catalog.
+
+`tools/measure_release_frames.ps1 -ProcessId <Facets.exe PID>` records external
+per-present ETW timings from the unmodified release process. Its pinned standalone
+PresentMon binary requires an administrative or Performance Log Users token.
+No service or group change is performed. Capture the foreground game with no
+other optical workload and retain interaction evidence beside its raw CSV and
+package checksums. These intervals measure application presentation; compositor
+drop/display information remains available separately in the raw capture.

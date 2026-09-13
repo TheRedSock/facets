@@ -62,4 +62,5 @@ print(json.dumps({k: v for k, v in report.items() if k != "cases"}))
 for case, result in zip(cases, errors):
     if not result["passed"]:
         print({k: v for k, v in case.items() if k != "matrix"}, result)
+if not report["failures"]: print("CHECK_COMPLETE: check_polarization_reference")
 raise SystemExit(bool(report["failures"]))

@@ -74,11 +74,15 @@ if ($ReferencePython -and $failed.Count -eq 0 -and $Only.Count -eq 0) {
     $referenceChecks = @('check_polygon_reference', 'check_mesh_predicates', 'check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')
     if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference', 'check_finish_fields_reference', 'check_absorption_mixtures') }
     foreach ($name in $referenceChecks) {
+	    $referenceStarted = Get-Date
         $execution = Invoke-BoundedCheckProcess -Executable $ReferencePython -Arguments @((Join-Path $projectRoot "tools/$name.py")) -TimeoutSeconds 1800
         $output = $execution.output
         $code = $execution.exit_code
         $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot "$name.log")
-        if ($code -ne 0) { $failed += $name; Write-Output "FAIL $name" }
+        $result = Get-GodotCheckResult -ExitCode $code -Output $output -Completion "CHECK_COMPLETE: $name"
+        $results += [ordered]@{ name = $name; result = $result; elapsed_seconds = ((Get-Date) - $referenceStarted).TotalSeconds }
+        $results | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot 'results.json')
+        if (-not $result.passed) { $failed += $name; Write-Output "FAIL $name"; Write-Output $output }
         else { Write-Output "PASS $name" }
     }
 }

@@ -16,10 +16,10 @@ func _init() -> void:
 	request.rig = load("res://data/lapidary/rigs/gameplay_studio.tres")
 	request.print_style = GemPrint.load_house()
 	request.clips = [load("res://data/lapidary/clips/idle.tres").duplicate_deep(Resource.DEEP_DUPLICATE_ALL)]
-	request.clips[0].stone_motion = 2
+	request.clips[0].orientation_keys.clear()
 	var batch := GemAssetBatch.new(); batch.requests = [request]
-	check(not GemAssetPlanner.plan(batch).error.is_empty(), "unknown clip motion is rejected")
-	request.clips[0].stone_motion = GemClip.StoneMotion.STILL
+	check(not GemAssetPlanner.plan(batch).error.is_empty(), "empty orientation track is rejected")
+	request.clips[0].orientation_keys = [GemOrientationKey.new()]
 	request.clips[0].effect_envelopes["unknown_effect"] = Curve.new()
 	check(not GemAssetPlanner.plan(batch).error.is_empty(), "unknown effect is rejected")
 	var registry: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://tools/engine_checks.json"))

@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="GemClip" format=3]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_clip.gd" id="clip"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_orientation_key.gd" id="key"]
+
+[sub_resource type="Resource" id="key_0"]
+script = ExtResource("key")
+time = 0
+orientation = Quaternion(-0.1045284632676535, 0, -0, 0.9945218953682733)
+
+[sub_resource type="Resource" id="key_1"]
+script = ExtResource("key")
+time = 0.5
+orientation = Quaternion(-0.1039558454088797, 0.1039558454088797, -0.01092619963309718, 0.9890738003669027)
+
+[sub_resource type="Resource" id="key_2"]
+script = ExtResource("key")
+time = 1
+orientation = Quaternion(-0.1045284632676535, 0, -0, 0.9945218953682733)
+
+[sub_resource type="Curve" id="Curve_ease_inout"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.5, 0.5), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+script = ExtResource("clip")
+clip_id = &"tilt_return"
+duration_s = 0.8
+fps = 20.0
+loop = true
+orientation_keys = Array[ExtResource("key")]([SubResource("key_0"), SubResource("key_1"), SubResource("key_2")])
+time_curve = SubResource("Curve_ease_inout")

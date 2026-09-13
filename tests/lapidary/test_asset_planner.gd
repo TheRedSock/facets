@@ -66,6 +66,6 @@ func _initialize() -> void:
 	invalid.requests[0].clips[0].effect_envelopes["unsupported_effect"] = Curve.new()
 	check(not GemAssetPlanner.plan(invalid).has("jobs"), "unsupported effects do not silently disappear")
 	invalid = batch.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
-	invalid.requests[0].clips[1].turntable_axis = Vector3.ZERO
-	check(not GemAssetPlanner.plan(invalid).has("jobs"), "undefined turntable axis is rejected instead of silently replaced")
+	invalid.requests[0].clips[1].orientation_keys[0].orientation = Quaternion(0,0,0,0)
+	check(not GemAssetPlanner.plan(invalid).has("jobs"), "undefined orientation is rejected instead of silently replaced")
 	print("Asset planner: %d checks, %d failures" % [checks, failures]); print("CHECK_COMPLETE: test_asset_planner"); quit(1 if failures else 0)

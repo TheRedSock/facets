@@ -290,6 +290,8 @@ Current ownership:
 - `GemAssetRequest`/`GemAssetBatch` define explicit delivery variants. Asset names
   are independent of physical stone identity. `GemClipSampler` is the shared clip
   math; deliverable rendering uses planner/worker jobs, with no second clip baker.
+  Clips use explicit unit-quaternion orientation keys and a monotone time curve;
+  there are no still/turntable mode branches. See `core/lapidary/clips/CONTRACT.md`.
 - `GemPresentation` independently owns orientation, rest framing and rotation
   pivot. Default pears point down; rest manufactured bounds are centered. Do not
   recenter each animation frame or alter crystal coordinates for presentation.

@@ -22,7 +22,7 @@ func _initialize() -> void:
 		if not file.ends_with(".tres"): continue
 		var stone: GemStone = load("res://data/lapidary/stones/" + file)
 		var clip := GemClip.new(); clip.clip_id = &"idle"; clip.duration_s = 1; clip.fps = 1
-		clip.rest_tilt_deg = Vector3(-12, 0, 0)
+		clip.orientation_keys = [GemOrientationKey.new(0.0,Quaternion(Vector3.RIGHT,deg_to_rad(-12))) ]
 		var request := GemAssetRequest.new(); request.asset_id = stone.stone_id; request.stone = stone
 		request.rig = load("res://data/lapidary/rigs/gameplay_studio.tres"); request.print_style = GemPrint.load_house()
 		request.resolution = Vector2i(256, 256); request.output_size = request.resolution; request.samples = 128; request.clips.append(clip)

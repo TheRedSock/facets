@@ -14,9 +14,16 @@ requests remain untouched. The client reads and hashes one immutable byte buffer
 if collection overtakes a read, it retries the latest response. Session logs,
 completed delivery directories and the resumable optical store are retained.
 
-The inspector exposes stored, active resource fields and named enum values. Curves can be replaced by explicit normalized-time/value points with linear tangents. Named effect curves can be created and removed from their typed dictionary. Facet inspection shows the manufactured declarative hull before rounding/cleavage, with stable IDs, meets, dimensions and top/front sections. Native-size output is shown separately from the enlarged preview.
+The inspector exposes stored, active resource fields and named enum values. Curves use explicit normalized-time/value/incoming-slope/outgoing-slope entries. Orientations are edited as Euler degrees and stored as unit quaternions. Named effect curves can be created and removed from their typed dictionary. Generic orientation keys and time curves use the shared clip sampler; see `core/lapidary/clips/CONTRACT.md`. Facet inspection shows the manufactured declarative hull before rounding/cleavage, with stable IDs, meets, dimensions and top/front sections. Native-size output is shown separately from the enlarged preview.
 
 Device reports identify allocator buffer/texture ownership, relevant limits and timestamp availability. Plan/unit/elapsed times are wall-clock values. Driver internal memory is not VRAM capacity. Responsiveness and final clip controls are still under P4 acceptance; no interactive frame budget has yet been certified.
+
+The selected desktop budget is at most 100 ms from an edit through request
+submission to the next UI draw. `atelier_latency_check.gd` measures that path
+and separately reports cold initialization and first-image/completion latency
+for material, geometry, pose and print changes. Print changes must reuse the
+optical master. Run this gate with no concurrent optical worker before accepting
+its measurements; its presence alone is not responsiveness acceptance.
 
 Atelier frame telemetry uses successive monotonic microsecond timestamps, not
 Godot's potentially smoothed/clamped delta. Sampling a contended GPU session is

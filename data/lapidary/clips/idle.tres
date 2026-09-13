@@ -1,12 +1,18 @@
-[gd_resource type="Resource" script_class="GemClip" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GemClip" format=3]
 
-[ext_resource type="Script" uid="uid://bnllrumera5os" path="res://resources/lapidary/gem_clip.gd" id="1_clip"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_clip.gd" id="clip"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_orientation_key.gd" id="key"]
+
+[sub_resource type="Resource" id="key_0"]
+script = ExtResource("key")
+time = 0
+orientation = Quaternion(-0.1045284632676535, 0, -0, 0.9945218953682733)
 
 [resource]
-script = ExtResource("1_clip")
+script = ExtResource("clip")
 clip_id = &"idle"
 duration_s = 1.0
 fps = 1.0
 loop = true
-stone_motion = 0
-rest_tilt_deg = Vector3(-12, 0, 0)
+orientation_keys = Array[ExtResource("key")]([SubResource("key_0")])

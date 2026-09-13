@@ -15,6 +15,7 @@ func _init() -> void:
 	print("\n=== Lapidary clip delivery tests ===\n")
 	_test_clip_frame_math()
 	_test_baker_sample_math()
+	_test_orientation_tracks()
 	_test_forge_service()
 	_test_gpu_smoke()
 	print("\n%d passed, %d failed" % [_pass, _fail])
@@ -35,6 +36,7 @@ func _check(cond: bool, name: String) -> void:
 func _make_clip(clip_id: StringName, duration := 1.0, fps := 2.0) -> GemClip:
 	var clip := GemClip.new()
 	clip.clip_id = clip_id
+	clip.orientation_keys = [GemOrientationKey.new()]
 	clip.duration_s = duration
 	clip.fps = fps
 	clip.loop = false
@@ -52,18 +54,15 @@ func _test_clip_frame_math() -> void:
 	if idle == null or turn == null or flash == null:
 		return
 
-	_check(idle.frame_count() == 1 and idle.stone_motion == GemClip.StoneMotion.STILL,
+	_check(idle.frame_count() == 1 and idle.orientation_keys.size()==1,
 		"idle is a 1-frame still")
 	_check(is_equal_approx(idle.frame_time(0), 0.0), "idle frame_time(0) == 0")
 
 	_check(turn.frame_count() == 12, "turn 0.4s @ 30fps -> 12 frames")
-	_check(turn.stone_motion == GemClip.StoneMotion.TURNTABLE and not turn.loop,
-		"turn is a non-looping turntable")
-	_check(turn.turntable_axis.is_equal_approx(Vector3(0, 1, 0))
-		and is_equal_approx(turn.turntable_degrees, 360.0), "turn: 360 deg around (0,1,0)")
-	_check(turn.easing != null, "turn has an easing curve")
-	_check(turn.easing.sample(0.2) < 0.18, "turn easing starts slow (accel)")
-	_check(turn.easing.sample(0.8) > 0.82, "turn easing finishes slow (decel)")
+	_check(turn.orientation_keys.size()==5 and not turn.loop,"presentation turn has four explicit quarter-turn intervals")
+	_check(turn.time_curve != null, "turn has a time curve")
+	_check(turn.time_curve.sample(0.2) < 0.18, "turn time curve starts slow (accel)")
+	_check(turn.time_curve.sample(0.8) > 0.82, "turn time curve finishes slow (decel)")
 	_check(is_equal_approx(turn.frame_time(0), 0.0)
 		and is_equal_approx(turn.frame_time(11), 1.0), "turn frame_time spans 0..1")
 
@@ -85,8 +84,7 @@ func _test_baker_sample_math() -> void:
 		_check(false, "turn clip available")
 		return
 
-	var rest := Quaternion.from_euler(Vector3(deg_to_rad(turn.rest_tilt_deg.x),
-		deg_to_rad(turn.rest_tilt_deg.y), deg_to_rad(turn.rest_tilt_deg.z)))
+	var rest := Quaternion(Vector3.RIGHT,deg_to_rad(-12))
 	var q0: Quaternion = ClipSamplerScript.frame_orientation(turn, 0.0)
 	_check(q0.angle_to(rest) < 0.001, "turn t=0 orientation == rest tilt")
 	var q1: Quaternion = ClipSamplerScript.frame_orientation(turn, 1.0)
@@ -114,6 +112,39 @@ func _test_baker_sample_math() -> void:
 	var lights: GemLighting = GemRigCompiler.compile(
 		load("res://data/lapidary/rigs/gameplay_studio.tres") as GemLightRig)
 	_check(lights.lights.size() % 8 == 0 and lights.lights.size() / 8 >= 1, "gameplay_studio packs >= 1 light")
+
+func _test_orientation_tracks() -> void:
+	var tilt:GemClip=load("res://data/lapidary/clips/tilt_return.tres")
+	_check(tilt.track_error().is_empty(),"Saved tilt/return is an admitted generic track")
+	_check(absf(ClipSamplerScript.frame_orientation(tilt,0).dot(ClipSamplerScript.frame_orientation(tilt,1)))>1-.000001,"Tilt loop closes at the rest orientation")
+	_check(ClipSamplerScript.frame_orientation(tilt,.5).angle_to(ClipSamplerScript.frame_orientation(tilt,0))>.1,"Tilt has actual intermediate motion")
+	var clip:=_make_clip(&"arbitrary_orientation")
+	var a:=Quaternion(Vector3(1,2,3).normalized(),.3)
+	var b:=a*Quaternion(Vector3(2,-1,1).normalized(),.8)
+	clip.orientation_keys=[GemOrientationKey.new(0,a),GemOrientationKey.new(.25,a),GemOrientationKey.new(1,b)]
+	_check(clip.track_error().is_empty(),"Uneven key times and an explicit hold are admitted")
+	_check(absf(ClipSamplerScript.frame_orientation(clip,.125).dot(a))>1-.000001,"Hold interval keeps orientation fixed")
+	var mid:Quaternion=ClipSamplerScript.frame_orientation(clip,.625)
+	_check(absf(mid.angle_to(a)-.4)<.00001 and absf(mid.angle_to(b)-.4)<.00001,"Shortest arc midpoint has equal angular distance to arbitrary endpoints")
+	clip.loop=true
+	_check(not clip.track_error().is_empty(),"Open orientation endpoint cannot masquerade as a seamless loop")
+	clip.loop=false;clip.orientation_keys[1].time=0
+	_check(not clip.track_error().is_empty(),"Duplicate key times are rejected")
+	clip.orientation_keys=[GemOrientationKey.new(),GemOrientationKey.new(1,Quaternion(Vector3.UP,PI))]
+	_check(not clip.track_error().is_empty(),"Ambiguous half-turn interval requires an intermediate key")
+	clip.orientation_keys=[GemOrientationKey.new(),GemOrientationKey.new(1,Quaternion(Vector3.UP,.2))]
+	var curve:=Curve.new();curve.add_point(Vector2.ZERO);curve.add_point(Vector2.ONE)
+	curve.set_point_right_tangent(0,-1)
+	clip.time_curve=curve
+	_check(not clip.track_error().is_empty(),"Time remap with continuous negative overshoot is rejected even if endpoints are valid")
+	curve.set_point_right_tangent(0,0);curve.set_point_left_tangent(1,0)
+	_check(clip.track_error().is_empty(),"Smooth endpoint-preserving time remap is admitted")
+	curve.set_point_left_tangent(1,10)
+	_check(not clip.track_error().is_empty(),"Interior curve reversal cannot pass via sampled clip endpoints")
+	clip.time_curve=null;clip.orientation_keys=[GemOrientationKey.new()];clip.loop=true;clip.rig_orbit_degrees=20
+	_check(not clip.track_error().is_empty(),"Loop lighting direction must close too")
+	clip.rig_orbit_degrees=360
+	_check(clip.track_error().is_empty(),"Complete rig orbit closes without a special stone-motion mode")
 
 
 # ------------------------------------------------------------------ forge service

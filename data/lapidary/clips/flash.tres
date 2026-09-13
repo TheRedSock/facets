@@ -1,6 +1,13 @@
-[gd_resource type="Resource" script_class="GemClip" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="GemClip" format=3]
 
-[ext_resource type="Script" uid="uid://bnllrumera5os" path="res://resources/lapidary/gem_clip.gd" id="1_clip"]
+[ext_resource type="Script" path="res://resources/lapidary/gem_clip.gd" id="clip"]
+
+[ext_resource type="Script" path="res://resources/lapidary/gem_orientation_key.gd" id="key"]
+
+[sub_resource type="Resource" id="key_0"]
+script = ExtResource("key")
+time = 0
+orientation = Quaternion(-0.1045284632676535, 0, -0, 0.9945218953682733)
 
 [sub_resource type="Curve" id="Curve_exposure_pulse"]
 max_value = 2.0
@@ -8,13 +15,12 @@ _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.5, 1.8), 0.0, 0.0, 0, 0, Vecto
 point_count = 3
 
 [resource]
-script = ExtResource("1_clip")
+script = ExtResource("clip")
 clip_id = &"flash"
 duration_s = 0.3
 fps = 20.0
 loop = false
-stone_motion = 0
-rest_tilt_deg = Vector3(-12, 0, 0)
+orientation_keys = Array[ExtResource("key")]([SubResource("key_0")])
 effect_envelopes = Dictionary[String, Curve]({
 "exposure_pulse": SubResource("Curve_exposure_pulse")
 })

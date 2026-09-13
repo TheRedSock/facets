@@ -1,24 +1,18 @@
 class_name GemClipSampler
 extends RefCounted
 ## Shared deterministic clip sampling for preview and frozen asset jobs.
-const ORTHO_HALF := 1.25
-
-## Stone orientation for a normalized clip time: rest tilt composed with the
-## motion track (motion first, then tilt — the turntable axis tilts with the
-## stone). STILL is the only motion-free mode.
+## Absolute orientation, shortest-arc interpolation between explicit keys.
 static func frame_orientation(clip: GemClip, t: float) -> Quaternion:
-	var tilt := clip.rest_tilt_deg
-	var rest := Quaternion.from_euler(Vector3(
-		deg_to_rad(tilt.x), deg_to_rad(tilt.y), deg_to_rad(tilt.z)))
-	assert(clip.stone_motion in [GemClip.StoneMotion.STILL, GemClip.StoneMotion.TURNTABLE], "Unsupported clip motion")
-	if clip.stone_motion == GemClip.StoneMotion.STILL:
-		return rest
+	assert(is_finite(t) and not clip.orientation_keys.is_empty(), "Sample an admitted orientation track at finite time")
+	var keys := clip.orientation_keys
+	if keys.size()==1: return keys[0].orientation
 	var p := clampf(t, 0.0, 1.0)
-	if clip.easing != null:
-		p = clip.easing.sample(p)
-	var axis := clip.turntable_axis
-	assert(axis.length_squared() >= 0.0001, "Turntable needs a nonzero axis")
-	return rest * Quaternion(axis.normalized(), deg_to_rad(clip.turntable_degrees * p))
+	if clip.time_curve!=null: p=clip.time_curve.sample(p)
+	for index in range(1,keys.size()):
+		if p<=keys[index].time:
+			var a:=keys[index-1];var b:=keys[index]
+			return a.orientation.slerp(b.orientation,(p-a.time)/(b.time-a.time)).normalized()
+	return keys.back().orientation
 
 
 ## Rig track: yaw in radians. The kernel rotates light directions around

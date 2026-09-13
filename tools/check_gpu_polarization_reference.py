@@ -57,4 +57,5 @@ report = {"mitsuba": mi.__version__, "interface_chains": len(cases), "interfaces
           "maximum_absolute_error": max(errors), "failures": sum(x >= 3e-5 for x in errors), "errors": errors}
 (root / "gpu-polarization-report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps({k: v for k, v in report.items() if k != "errors"}))
+if not report["failures"]: print("CHECK_COMPLETE: check_gpu_polarization_reference")
 raise SystemExit(bool(report["failures"]))

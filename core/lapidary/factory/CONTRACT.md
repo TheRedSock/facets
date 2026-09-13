@@ -62,8 +62,10 @@ Delivery IDs and clip IDs contain 1..128 ASCII letters/digits/underscore/hyphen/
 each batch has 1..4096 requests and a configurable job budget of 1..65,536, default
 16,384. The budget counts pre-deduplication frame requests and retained prints.
 Larger productions can publish separate batches into a shared artifact store.
-Only implemented still/turntable motion and exposure/key/rim envelopes are
-admitted. Per-frame optical policy admission still runs after curve sampling.
+Only explicit orientation keys, orientation time curves, linear rig orbit and
+exposure/key/rim envelopes are admitted. See `core/lapidary/clips/CONTRACT.md` for
+the single motion grammar and loop/timing rules. Per-frame optical policy
+admission still runs after curve sampling.
 
 The library key is `asset_id/clip_id`; it never changes GemStone identity or
 transport. Equal physical jobs reuse masters/displays across delivery aliases,

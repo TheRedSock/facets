@@ -32,3 +32,4 @@ report = {"modes": len(cases), "complex_eigenproblems": len(cases)*3,
 (root / "crystal-loss-comparison.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report))
 assert maximum["1.0"] < 2e-6 and maximum["0.1"] < 1e-7 and maximum["0.01"] < 1e-7, report
+print("CHECK_COMPLETE: check_crystal_loss_reference")

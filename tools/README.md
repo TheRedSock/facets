@@ -20,6 +20,19 @@ They reject visible source files and omitted/dead global classes. Standard expor
 templates disable script overrides. Actual release-executable UI and uncontended
 performance must be validated separately; the probe labels its executable.
 
+Add `-FrameBudgetMs 16.7` to `build_game_package.ps1 -Probe` to enforce the
+selected desktop p95 budget. The probe prefetches every declared tile, assigns
+the views without changing simulation state, and measures repeated upgrade
+bursts separately from steady rest. Without this argument its scope is
+explicitly functional, not performance acceptance.
+
+`measure_release_frames.ps1 -ProcessId <Facets.exe PID>` captures the unmodified
+release executable externally with pinned standalone PresentMon 2.5.1 and checks
+the same p95 budget. It retains raw per-present CSV, package/tool checksums and
+timing summaries. ETW requires an administrator or Performance Log Users token;
+the tool does not change group membership or install a service. See the
+[PresentMon console contract](https://github.com/GameTechDev/PresentMon/blob/v2.5.1/README-ConsoleApplication.md).
+
 ## Durable authoring and source candidates
 
 Facet programs and examples are documented in `core/lapidary/cut/CONTRACT.md`.
@@ -32,6 +45,11 @@ admission and cache rules are in `core/lapidary/authoring/CONTRACT.md`.
 writes a fresh candidate tree and property diff under `generated/catalog-candidates/`.
 It never overwrites authored catalog data. GPU `authoring_workflow_check.gd`
 validates saved/reopened input through the actual planner and worker.
+
+`atelier_latency_check.gd` measures cold initialization, material/geometry/pose
+changes and print-only reuse through the actual Atelier client. Edits must reach
+the next UI draw within the selected 100 ms budget. Preview first-image and
+completion times are reported separately. Run with the GPU otherwise idle.
 
 Check stages require completion markers and have process timeouts (300s CPU,
 1800s GPU/reference; a registry entry can override `timeout_seconds`). Timeouts

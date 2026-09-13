@@ -21,6 +21,8 @@ func _run()->void:
 	var request:GemAssetRequest=document.snapshot();request.rung="interact";request.samples=8;request.resolution=Vector2i(64,64);request.output_size=Vector2i(32,32)
 	request.stone.seed=int(Time.get_ticks_usec()&0x7fffffff);request.asset_id=&"atelier_authored";request.stone.stone_id=&"atelier_authored"
 	request.stone.cut.cut_id=&"atelier_authored_cut"
+	request.stone.cut.parameters["table"]=.49
+	request.clips=[load("res://data/lapidary/clips/tilt_return.tres")]
 	document.create(request);scene.call("_changed")
 	var destination:="res://artifacts/atelier-workflow/%d"%Time.get_ticks_usec();DirAccess.make_dir_recursive_absolute(destination)
 	check(document.save(destination.path_join("new gem and cut ø.tres")).is_empty(),"Save new specimen/cut request")
@@ -75,7 +77,10 @@ func _run()->void:
 	check(library.open(client.last_report.get("library","")),"Built library passes actual delivery admission")
 	var planned:=GemAssetPlanner.plan(_batch(document.snapshot()))
 	var job:GemFrameJob=planned.jobs[0]
-	check(library.manifest.get("clips",{}).get("atelier_authored/idle",{}).get("frames",[])==[GemFramePlan.display_key(job)],"Build resolves the exact saved preview job")
+	var expected_frames:=[]
+	for planned_job:GemFrameJob in planned.jobs:expected_frames.append(GemFramePlan.display_key(planned_job))
+	check(library.manifest.get("clips",{}).get("atelier_authored/tilt_return",{}).get("frames",[])==expected_frames,"Build resolves every saved generic-motion frame")
+	check(expected_frames.size()==16 and expected_frames[0]==GemFramePlan.display_key(job),"Saved tilt is a full sequence with the exact selected preview frame")
 	var controls:Dictionary=scene.get("_c")
 	controls.details.text="Validated new gem/cut, invalidation/recovery, saved-preview/build parity, current-request-only results."
 	await process_frame;await RenderingServer.frame_post_draw

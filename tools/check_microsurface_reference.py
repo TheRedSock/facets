@@ -171,3 +171,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("CHECK_COMPLETE: check_microsurface_reference")
