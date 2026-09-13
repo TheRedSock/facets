@@ -29,4 +29,5 @@ func _initialize() -> void:
 	GemArtifactStore.atomic_write("res://artifacts/store-maintenance.json", JSON.stringify(result, "\t").to_utf8_buffer())
 	result.erase("paths")
 	print(JSON.stringify(result))
+	print("CHECK_COMPLETE: maintain_gem_store")
 	quit()

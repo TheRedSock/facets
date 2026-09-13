@@ -35,6 +35,7 @@ func _initialize() -> void:
 	if manifest.is_empty() or GemJobBundle.archive(output, output + ".zip") != OK:
 		_fail("Failed to write portable job bundle"); return
 	print("Portable jobs: ", output, " ", JSON.stringify(manifest.estimate), " geometry companions: ", manifest.geometry.size())
+	print("CHECK_COMPLETE: prepare_gem_jobs")
 	quit()
 
 func _convenience_batch(args: Dictionary) -> GemAssetBatch:

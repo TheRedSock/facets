@@ -162,6 +162,9 @@ off in the preset.
 prints and packs referenced assets, then collects unneeded factory cache entries.
 `-PlanOnly` writes jobs without rendering. The game loads the generated library;
 it does not bake assets at runtime.
+Every build stage must emit its exact `CHECK_COMPLETE` marker as well as exit
+successfully without engine errors. A sample-limited partial worker run retains
+its checkpoint but does not emit completed-render evidence.
 
 The standalone stages are `prepare_gem_jobs.gd`, `gem_frame_worker.gd`, and
 `pack_gem_library.gd`. `maintain_gem_store.gd` defaults to a dry run and refuses

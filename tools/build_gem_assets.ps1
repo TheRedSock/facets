@@ -27,6 +27,7 @@ param(
 # Copy generated/gem-assets.pck next to an exported game executable.
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'check_result.ps1')
 $logRoot = Join-Path $projectRoot 'artifacts/build-assets'
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 $generatedRoot = Join-Path $projectRoot 'generated'
@@ -35,7 +36,10 @@ New-Item -ItemType File -Force -Path (Join-Path $generatedRoot '.gdignore') | Ou
 function Invoke-GemStage([string]$Name, [string[]]$Arguments) {
     $log = Join-Path $logRoot "$Name.log"
     & $Godot --audio-driver Dummy @Arguments 2>&1 | Tee-Object -FilePath $log
-    if ($LASTEXITCODE -ne 0 -or (Select-String -LiteralPath $log -Pattern '^\s*(SCRIPT ERROR:|ERROR:|FAIL(:|\b)|FAILED\b)')) {
+    $stageExitCode = $LASTEXITCODE
+    $completion = @{ prepare='prepare_gem_jobs'; render='gem_frame_worker'; pack='pack_gem_library'; collect='maintain_gem_store' }[$Name]
+    $result = Get-GodotCheckResult -ExitCode $stageExitCode -Output (Get-Content -LiteralPath $log -Raw) -Completion "CHECK_COMPLETE: $completion"
+    if (-not $result.passed) {
         throw "Asset stage $Name failed; see $log"
     }
 }

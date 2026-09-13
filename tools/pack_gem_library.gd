@@ -25,4 +25,5 @@ func _initialize() -> void:
 		quit(1)
 		return
 	print("Game asset pack: ", pack_path)
+	print("CHECK_COMPLETE: pack_gem_library")
 	quit()

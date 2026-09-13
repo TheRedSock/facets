@@ -5,6 +5,7 @@ extends SceneTree
 ## Exit 2 means retryable claimed work remains; exit 1 means an actual failure.
 ## --initialize-only=true creates the shared store once before parallel dispatch.
 var _busy := 0
+var _partial := 0
 func _initialize() -> void:
 	var args := {}
 	for argument in OS.get_cmdline_user_args():
@@ -83,10 +84,13 @@ func _initialize() -> void:
 			failures += 1
 		else:
 			if result.get("status")=="busy":_busy+=1
+			if result.get("status")=="partial":_partial+=1
 			print(JSON.stringify({"job": key, "status": result.get("status", "complete"), "counters": worker.counters}))
 	worker.release()
 	if outputs != "optical":
 		failures += _geometry(geometry, base, args.get("output", "res://output"), shard, shards)
+	if failures == 0 and _busy == 0 and _partial == 0:
+		print("CHECK_COMPLETE: gem_frame_worker")
 	quit(1 if failures else (2 if _busy else 0))
 
 func _geometry(records: Dictionary, base: String, output: String, shard: int, shards: int) -> int:
