@@ -58,6 +58,27 @@ func _run()->void:
 	check(protocol.submit(document.snapshot(),"build").is_empty(),"Protocol freezes a real request")
 	var submitted:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(protocol.session.path_join("request.json")))
 	check(observed.size()==1 and int(submitted.generation)>observed[0],"Build remains newer when worker already consumed cancellation")
+	var transient:=output.path_join("transient");DirAccess.make_dir_recursive_absolute(transient)
+	for filename in ["request-1.res","request-3.res","request-5.res","preview-1-1.png","preview-3-2.png","preview-3-3.png","request-notes.res","preview-review.png"]:
+		GemArtifactStore.atomic_write(transient.path_join(filename),"fixture".to_utf8_buffer())
+	DirAccess.make_dir_recursive_absolute(transient.path_join("delivery-1"))
+	GemArtifactStore.atomic_write(transient.path_join("delivery-1/library.json"),"durable".to_utf8_buffer())
+	check(GemAtelierSessionFiles.collect(transient,3).is_empty(),"Worker collects exact transient names")
+	check(not FileAccess.file_exists(transient.path_join("request-1.res")) and not FileAccess.file_exists(transient.path_join("preview-1-1.png")),"Consumed old requests and superseded preview images are removed")
+	for filename in ["request-3.res","request-5.res","preview-3-2.png","preview-3-3.png","request-notes.res","preview-review.png","delivery-1/library.json"]:
+		check(FileAccess.file_exists(transient.path_join(filename)),"Collection preserves current/future requests, recent images and durable files: "+filename)
+	var retry:=GemPreviewClient.new();retry.session=ProjectSettings.globalize_path(transient);retry.generation=7
+	var delivered:Array[Image]=[];retry.updated.connect(func(_report:Dictionary,image:Image):delivered.append(image))
+	var image:=Image.create(2,2,false,Image.FORMAT_RGBA8);image.fill(Color.RED)
+	var bytes:=image.save_png_to_buffer();var hash:=HashingContext.new();hash.start(HashingContext.HASH_SHA256);hash.update(bytes)
+	var response:={"generation":7,"status":"complete","image":"preview-7-4.png","image_sha256":hash.finish().hex_encode()}
+	GemArtifactStore.atomic_write(transient.path_join("response.json"),JSON.stringify(response).to_utf8_buffer())
+	retry.call("_process",0.0);check(delivered.is_empty(),"Missing/superseded image is not accepted")
+	GemArtifactStore.atomic_write(transient.path_join(response.image),bytes)
+	retry.call("_process",0.0)
+	check(delivered.size()==1 and delivered[0].get_data()==image.get_data(),"Unchanged response is retried and its verified bytes are displayed")
+	retry.call("_process",0.0);check(delivered.size()==1,"Accepted response is emitted only once")
+	retry.free()
 	protocol.free()
 	scene.free();await process_frame
 	print("Atelier document UI failures: ",failures);print("CHECK_COMPLETE: test_atelier_document_ui");quit(1 if failures else 0)

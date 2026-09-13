@@ -16,6 +16,7 @@ var _replace_dialog:ConfirmationDialog
 var _pending_open:=""
 var _discard_dialog:ConfirmationDialog
 var _frame_times:Array[float]=[]
+var _last_frame_usec:=0
 func _ready()->void:
 	_c=AtelierUi.build(self);client=GemPreviewClient.new();add_child(client)
 	client.invalidated.connect(_invalidate);client.updated.connect(_response)
@@ -46,8 +47,11 @@ func _ready()->void:
 	_open("res://data/lapidary/stones/quartz.tres",true)
 func _exit_tree()->void:
 	if client!=null:client.close()
-func _process(delta:float)->void:
-	_frame_times.append(delta*1000)
+func _process(_delta:float)->void:
+	# Engine delta can be smoothed/clamped; responsiveness measures wall time.
+	var now:=Time.get_ticks_usec()
+	if _last_frame_usec>0:_frame_times.append((now-_last_frame_usec)/1000.0)
+	_last_frame_usec=now
 	if _frame_times.size()>10000:_frame_times.pop_front()
 	if _render_at>0 and Time.get_ticks_msec()>=_render_at:_render_at=0;_submit("preview")
 func edit_value(path:Array,value:Variant)->void:

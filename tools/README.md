@@ -40,6 +40,14 @@ are `tests/test_check_process.ps1` and `tests/test_check_result.ps1`.
 
 ## Catalog inspection
 
+`appearance_corpus.gd` renders the frozen seven-case spatial/motion acceptance
+set through the production worker. `python tools/check_appearance.py --inspect
+--gallery` writes native-size chronological reference/draft/detail sheets on
+black, white and game backgrounds under `artifacts/appearance-corpus/review`.
+Inspection allows incomplete reports; the default analysis command fails until
+all required images and reviewed thresholds pass. `test_appearance_metrics.py`
+checks that frozen motion, blur, bias and removed features fail the metrics.
+
 `inspect_gems.gd` saves a normal asset batch, renders paired independent sample
 streams through the production planner/worker, and writes a labeled sheet, PNG
 hashes, cache identities, full frame wall times and opaque-pixel RGB noise metrics.

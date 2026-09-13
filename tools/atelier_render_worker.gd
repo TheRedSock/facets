@@ -22,6 +22,8 @@ func _run()->void:
 		if int(message.get("generation",-1))>generation:
 			generation=int(message.generation)
 			if message.get("action")!="cancel":await _request(message)
+			var cleanup_error := GemAtelierSessionFiles.collect(session, generation)
+			if not cleanup_error.is_empty(): _error(cleanup_error)
 		await create_timer(.02).timeout
 	worker.release();print("ATELIER_WORKER_STOPPED");quit()
 func _request(message:Dictionary)->void:
@@ -121,7 +123,10 @@ func _abandoned()->bool:
 	if latest!=_heartbeat:_heartbeat=latest;_heartbeat_at=Time.get_ticks_msec()
 	return Time.get_ticks_msec()-_heartbeat_at>30000
 func _send(response:Dictionary)->void:
-	GemArtifactStore.atomic_write(session.path_join("response.json"),JSON.stringify(response).to_utf8_buffer())
+	if not GemArtifactStore.atomic_write(session.path_join("response.json"),JSON.stringify(response).to_utf8_buffer()):
+		printerr("Cannot publish Atelier response");return
+	var cleanup_error := GemAtelierSessionFiles.collect(session, generation)
+	if not cleanup_error.is_empty(): printerr(cleanup_error)
 func _error(why:String)->void:_send({"generation":generation,"status":"error","error":why})
 
 func _device_report()->Dictionary:

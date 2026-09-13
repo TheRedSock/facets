@@ -1,6 +1,7 @@
 """The acceptance metrics must reject stable blur, missing features and stale frames."""
 import numpy as np
-from check_appearance import signals,feature_metrics
+import copy
+from check_appearance import signals,feature_metrics,threshold_errors,REQUIRED_LIMITS,source_errors
 mask=np.ones((16,16),bool)
 ref=np.zeros((4,16,16,3));control=ref.copy()
 for frame,x in enumerate([3,6,9,6]):ref[frame,3:13,x:x+1]=100
@@ -17,4 +18,15 @@ biased=signals(ref,ref+3,mask);assert biased['mean_bias_lsb']==3
 noisy=ref+np.random.default_rng(137).normal(0,.1,ref.shape)
 f=feature_metrics(ref,noisy,control,mask)
 assert .99<f['gain']<1.01 and f['correlation']>.99
+config={'cases':['test'],'profiles':{'draft':{},'reference':{}}}
+valid={'schema':1,'config_sha256':'hash','reviewer':'test fixture','review_notes':{'test':'Explicit synthetic reference'},'selected_profiles':{'test':'draft'},'limits':{'test':{key:1 for key in REQUIRED_LIMITS}}}
+assert not threshold_errors(config,valid,'hash')
+assert threshold_errors(config,{},'hash')
+for key,value in [('selected_profiles',{}),('selected_profiles',[]),('selected_profiles',{'test':'reference'}),('limits',{'test':{}}),('limits',[]),('review_notes',{}),('config_sha256','stale')]:
+    invalid=copy.deepcopy(valid);invalid[key]=value
+    assert threshold_errors(config,invalid,'hash'),(key,value)
+for value in [float('nan'),float('inf'),-1,True,'1']:
+    invalid=copy.deepcopy(valid);invalid['limits']['test']['spatial_rmse_lsb']=value
+    assert threshold_errors(config,invalid,'hash')
+assert source_errors({}) and source_errors({'../outside-repo':'fake'})
 print('CHECK_COMPLETE: test_appearance_metrics')

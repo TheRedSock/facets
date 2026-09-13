@@ -8,8 +8,18 @@ The Atelier edits one detached `GemAssetRequest` through `GemAuthoringDocument`.
 
 Cancellation is cooperative between sample units. Partial work is a resumable estimator checkpoint, never a completed display. Close sends stop; a lost parent heartbeat also ends the worker after the current unit. The worker releases its tracer before its positive shutdown marker. Generation checks prevent late results from replacing a newer edit. GPU failures remain errors; no synthetic image substitutes for failed optics.
 
+The worker collects older consumed `request-<generation>.res` bundles and retains
+only the two newest `preview-<generation>-<sequence>.png` files. Future queued
+requests remain untouched. The client reads and hashes one immutable byte buffer;
+if collection overtakes a read, it retries the latest response. Session logs,
+completed delivery directories and the resumable optical store are retained.
+
 The inspector exposes stored, active resource fields and named enum values. Curves can be replaced by explicit normalized-time/value points with linear tangents. Named effect curves can be created and removed from their typed dictionary. Facet inspection shows the manufactured declarative hull before rounding/cleavage, with stable IDs, meets, dimensions and top/front sections. Native-size output is shown separately from the enlarged preview.
 
 Device reports identify allocator buffer/texture ownership, relevant limits and timestamp availability. Plan/unit/elapsed times are wall-clock values. Driver internal memory is not VRAM capacity. Responsiveness and final clip controls are still under P4 acceptance; no interactive frame budget has yet been certified.
+
+Atelier frame telemetry uses successive monotonic microsecond timestamps, not
+Godot's potentially smoothed/clamped delta. Sampling a contended GPU session is
+diagnostic evidence, not an uncontended responsiveness result.
 
 Validation: `test_atelier_document_ui` exercises actual headless controls, nullable resources, typed arrays, named curves, durable save/reload, source isolation and the cancel-before-submit protocol. Windowed `atelier_admission_check` exercises a new saved gem/cut, invalidation/recovery, stale response rejection, cancellation after real partial sampling, checkpoint recovery, preview/build identity and close during active work. These functional checks are not a substitute for the uncontended latency benchmark.

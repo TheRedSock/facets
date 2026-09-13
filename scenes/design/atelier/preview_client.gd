@@ -56,17 +56,26 @@ func _process(_delta:float)->void:
 	if not FileAccess.file_exists(path):return
 	var content:=FileAccess.get_file_as_string(path)
 	if content==_last_response:return
-	_last_response=content
 	var response:Variant=JSON.parse_string(content)
-	if not response is Dictionary or int(response.get("generation",-1))!=generation:stale_results+=1;return
+	if not response is Dictionary or int(response.get("generation",-1))!=generation:
+		_last_response=content;stale_results+=1;return
 	var image:Image=null
 	var image_file:=str(response.get("image",""))
 	if not image_file.is_empty() and image_file!=_last_image:
 		if image_file!=image_file.get_file() or not image_file.begins_with("preview-%d-"%generation):
 			status="error";updated.emit({"status":"error","error":"Invalid worker image reference"},null);return
 		var image_path:=session.path_join(image_file)
-		if FileAccess.get_sha256(image_path)!=response.get("image_sha256"):return
-		image=Image.load_from_file(image_path);_last_image=image_file
+		var file:=FileAccess.open(image_path,FileAccess.READ)
+		if file==null:return
+		var bytes:=file.get_buffer(file.get_length());file.close()
+		var hash:=HashingContext.new();hash.start(HashingContext.HASH_SHA256);hash.update(bytes)
+		if hash.finish().hex_encode()!=response.get("image_sha256"):return
+		image=Image.new()
+		# Publication/collection may advance while the client reads. Retry the
+		# current response next frame instead of consuming an incomplete image.
+		if image.load_png_from_buffer(bytes)!=OK:return
+		_last_image=image_file
+	_last_response=content
 	status=str(response.get("status","error"));last_report=response
 	updated.emit(response,image)
 func _write(value:Dictionary)->bool:

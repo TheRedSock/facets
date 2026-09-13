@@ -1203,7 +1203,19 @@
       ],
       "mode": "gpu",
       "timeout_seconds": 21600,
-      "completion": "CHECK_COMPLETE: appearance_corpus"
+      "completion": "CHECK_COMPLETE: appearance_corpus",
+      "analysis": [
+        {
+          "completion": "CHECK_COMPLETE: test_appearance_metrics",
+          "script": "tools/test_appearance_metrics.py",
+          "name": "test_appearance_metrics"
+        },
+        {
+          "completion": "CHECK_COMPLETE: check_appearance",
+          "script": "tools/check_appearance.py",
+          "name": "check_appearance"
+        }
+      ]
     },
     {
       "name": "test_atelier_document_ui",
