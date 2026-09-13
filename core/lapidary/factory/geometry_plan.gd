@@ -13,7 +13,7 @@ static func source_digest() -> String:
 
 static func key(job: GemFrameJob, coverage_side: int) -> String:
 	return GemContentIdentity.digest(["primary-geometry-v1", source_digest(),
-		specimen_inputs(job.stone), job.resolution, GemFramePlan.canonical_orientation(job.orientation),
+		GemPhysicalIdentity.inputs(specimen_inputs(job.stone)), job.resolution, GemFramePlan.canonical_orientation(job.orientation),
 		job.ortho_half, job.camera_offset, coverage_side])
 
 static func specimen_inputs(stone: GemStone) -> Dictionary:
@@ -26,7 +26,7 @@ static func specimen_inputs(stone: GemStone) -> Dictionary:
 				var fields := {}
 				for property: Dictionary in defect.get_property_list():
 					var name: String = property.name
-					if int(property.usage) & PROPERTY_USAGE_STORAGE == 0 or name in ["script", "resource_path", "resource_name", "resource_local_to_scene", "finish", "filling"] or name.begins_with("metadata/"):
+					if int(property.usage) & PROPERTY_USAGE_STORAGE == 0 or name in ["script", "resource_path", "resource_name", "resource_local_to_scene", "source_note", "finish", "filling"] or name.begins_with("metadata/"):
 						continue
 					fields[name] = defect.get(name)
 				# Presence/order of filled regions determines semantic material IDs.

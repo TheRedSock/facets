@@ -1,5 +1,19 @@
 # Engine tools
 
+## Durable authoring and source candidates
+
+The public editing workflow is `GemAuthoringDocument`; its save, undo, provenance,
+admission and cache rules are in `core/lapidary/authoring/CONTRACT.md`.
+`godot --headless --path . --script res://tools/generate_lapidary_data.gd`
+writes a fresh candidate tree and property diff under `generated/catalog-candidates/`.
+It never overwrites authored catalog data. GPU `authoring_workflow_check.gd`
+validates saved/reopened input through the actual planner and worker.
+
+Check stages require completion markers and have process timeouts (300s CPU,
+1800s GPU/reference; a registry entry can override `timeout_seconds`). Timeouts
+terminate the launched process tree and fail the stage. The process/result gates
+are `tests/test_check_process.ps1` and `tests/test_check_result.ps1`.
+
 ## Catalog inspection
 
 `inspect_gems.gd` saves a normal asset batch, renders paired independent sample

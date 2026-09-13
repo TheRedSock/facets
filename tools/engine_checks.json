@@ -1098,6 +1098,44 @@
       ],
       "mode": "cpu",
       "completion": "CHECK_COMPLETE: test_authoring_surface"
+    },
+    {
+      "name": "test_authoring_document",
+      "mode": "cpu",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/lapidary/test_authoring_document.gd"
+      ],
+      "completion": "CHECK_COMPLETE: test_authoring_document"
+    },
+    {
+      "name": "generate_lapidary_data",
+      "mode": "cpu",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tools/generate_lapidary_data.gd"
+      ],
+      "completion": "CHECK_COMPLETE: generate_lapidary_data"
+    },
+    {
+      "name": "authoring_workflow_check",
+      "mode": "gpu",
+      "args": [
+        "--script",
+        "res://tools/authoring_workflow_check.gd"
+      ],
+      "completion": "CHECK_COMPLETE: authoring_workflow_check"
+    },
+    {
+      "name": "atelier_admission_check",
+      "mode": "gpu",
+      "args": [
+        "--script",
+        "res://tools/atelier_admission_check.gd"
+      ],
+      "completion": "CHECK_COMPLETE: atelier_admission_check"
     }
   ]
 }

@@ -29,12 +29,6 @@ const HOUSE_PATH := "res://data/lapidary/print/house_print.tres"
 ## Desaturate only where luminance clips (keeps fire from going white mush).
 @export var highlight_desat := 0.35
 
-@export_group("Exceptions")
-## Rare, justified per-family deltas: [{selector:String, deltas:Dictionary, reason:String}].
-## Empty reason = validation failure. Kept as data here, never as per-stone knobs.
-@export var exceptions: Array[Dictionary] = []
-
-
 ## Authoritative house print. Hard-fails if the resource is missing.
 static func load_house() -> GemPrint:
 	assert(ResourceLoader.exists(HOUSE_PATH),
@@ -54,7 +48,4 @@ func validate() -> PackedStringArray:
 		errors.append("Print contrast and chroma softness must be positive")
 	if highlight_desat > 1 or black_point > 1:
 		errors.append("Print highlight desaturation and black point must be in [0, 1]")
-	for e in exceptions:
-		if String(e.get("reason", "")).strip_edges().is_empty():
-			errors.append("Print exception without a written reason: %s" % str(e.get("selector", "?")))
 	return errors

@@ -5,6 +5,8 @@ enum Unit { RELATIVE_SCALE, NUMBER_PER_CM3, PPMA_TOTAL_ATOMS }
 @export var chromophore: GemChromophore
 @export var amount := 1.0
 @export var unit := Unit.RELATIVE_SCALE
+## Evidence for the concentration, independent of the measured spectrum.
+@export var amount_evidence: GemOpticalEvidence = GemOpticalEvidence.new()
 
 static func relative(spectrum: GemChromophore, scale := 1.0) -> GemAbsorber:
 	var term:=GemAbsorber.new()
@@ -20,6 +22,8 @@ func coefficient_scale(atom_density_per_cm3: float) -> float:
 
 func validate(species_id: StringName, atom_density_per_cm3: float) -> PackedStringArray:
 	var errors:=PackedStringArray()
+	if amount_evidence == null: errors.append("Absorption amount evidence is missing")
+	else: errors.append_array(amount_evidence.validate())
 	if chromophore==null:return PackedStringArray(["Absorption term needs a spectrum"])
 	errors.append_array(chromophore.validate())
 	if unit not in [Unit.RELATIVE_SCALE,Unit.NUMBER_PER_CM3,Unit.PPMA_TOTAL_ATOMS] or not is_finite(amount) or amount<0:

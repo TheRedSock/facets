@@ -14,6 +14,18 @@ enum Kind { AUTHORED_APPROXIMATION, PUBLISHED_MODEL, FITTED_TARGETS, SUPPLIED_ME
 @export var relative_uncertainty := -1.0
 @export_multiline var assumptions := ""
 
+static func derived(parent: GemOpticalEvidence, method_description: String) -> GemOpticalEvidence:
+	# Repeated slider edits derive from the source evidence, not an unbounded
+	# nested chain of intermediate drafts. Document undo retains those edits.
+	var source := parent
+	if parent != null and parent.source_record.get("derivation") == "authored-edit-v1" and parent.source_record.get("parent") is GemOpticalEvidence:
+		source = parent.source_record.parent
+	var result := GemOpticalEvidence.new()
+	result.method = method_description
+	result.assumptions = "Authored derivative; changed values are not the source measurement or published model."
+	result.source_record = {"derivation": "authored-edit-v1", "parent_evidence": GemContentIdentity.digest(source), "parent": source.duplicate_deep(Resource.DEEP_DUPLICATE_ALL) if source != null else null}
+	return result
+
 func validate() -> PackedStringArray:
 	var errors := PackedStringArray()
 	if kind < 0 or kind > Kind.SUPPLIED_MEASUREMENT:

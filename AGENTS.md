@@ -314,6 +314,12 @@ shared resources to make an authoring preview.
 
 ## Validation and development
 
+Authoring edits use `GemAuthoringDocument` and shared `GemAuthoringAdmission`.
+See `core/lapidary/authoring/CONTRACT.md`. Catalog generation only emits candidates
+and a diff under `generated/`; never regenerate over hand-authored source data.
+Physical cache identity excludes labels/evidence; admission and appearance review
+retain full provenance. Unsupported preview requests must clear stale images.
+
 `tools/check_engine.ps1` runs the registered CPU gates; `-Gpu` adds GPU/factory
 gates, `-CrystalPrecision` adds FP64 stress, and `-ReferencePython <python>` runs
 independent Python comparisons. `-Only name1,name2` selects enabled gates. Stages

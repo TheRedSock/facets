@@ -6,6 +6,12 @@ extends RefCounted
 static func save(resource: Resource, path: String) -> Error:
 	return ResourceSaver.save(_copy(resource, {}) as Resource, path)
 
+static func detached(resource: Resource) -> Resource:
+	return _copy(resource, {}) as Resource
+
+static func copy_value(value: Variant) -> Variant:
+	return _copy(value, {})
+
 static func _copy(value: Variant, copies: Dictionary) -> Variant:
 	if value is Script:
 		return value

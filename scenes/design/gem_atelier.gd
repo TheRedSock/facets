@@ -185,12 +185,11 @@ func _on_volume_changed(value: float, key: String) -> void:
 		return
 	match key:
 		"scatter":
-			# Resolve inherited g before switching to explicit scattering.
-			_stone.material.scatter_g = GemMaterialCompiler.compile(_stone.material).scatter.g
 			_stone.material.scatter_per_mm = value
+			GemAuthoringDocument._derive_evidence(_stone.material, "scatter_per_mm")
 		"anisotropy":
-			_stone.material.scatter_per_mm = GemMaterialCompiler.compile(_stone.material).scatter.sigma_per_mm
 			_stone.material.scatter_g = value
+			GemAuthoringDocument._derive_evidence(_stone.material, "scatter_g")
 		"band_period":
 			_stone.condition.banding.period_mm = value
 		"band_contrast":
@@ -236,6 +235,7 @@ func _on_pose_changed(_value: float) -> void:
 func _queue_rebuild() -> void:
 	if _tracer == null:
 		return
+	_invalidate_preview("Pending current specimen")
 	_rebuild_at_ms = Time.get_ticks_msec() + DEBOUNCE_MS
 
 
@@ -251,6 +251,8 @@ func _process(_delta: float) -> void:
 	if _tracer.samples_accumulated < TARGET_SPP:
 		var batch := FIRST_BATCH_SPP if _tracer.samples_accumulated == 0 else STEP_SPP
 		_tracer.accumulate(mini(batch, TARGET_SPP - _tracer.samples_accumulated))
+		var error := _tracer.transport_error()
+		if not error.is_empty(): _invalidate_preview(error); return
 		stepped = true
 	if stepped or _present_dirty:
 		_present_dirty = false
@@ -259,14 +261,27 @@ func _process(_delta: float) -> void:
 
 
 func _rebuild_now() -> void:
+	var job := GemFrameJob.new()
+	job.stone = _stone; job.rig = _rig; job.print_style = _default_print
+	job.resolution = Vector2i(RENDER_SIZE, RENDER_SIZE); job.output_size = job.resolution
+	job.samples = TARGET_SPP; job.quality = GemRung.policy(GemRung.PREVIEW)
+	var error := GemAuthoringAdmission.error(job)
+	if not error.is_empty(): _invalidate_preview(error); return
 	var instance := LapidaryStoneCompiler.compile(_stone)
 	_fingerprint = str(instance.get("fingerprint", ""))
-	_tracer.configure_stone(instance, GemRigCompiler.compile(_rig),
-		GemRung.policy(GemRung.PREVIEW))
+	if not _tracer.configure_stone(instance, GemRigCompiler.compile(_rig), job.quality):
+		_invalidate_preview(_tracer.configuration_error); return
 	# configure_stone does not ingest seed/background itself — set them after.
 	_tracer.set_seed(int(instance["seed"]))
 	_configured = true
 	_apply_pose()
+
+func _invalidate_preview(message: String) -> void:
+	_configured = false
+	_last_image = null; _preview_tex = null
+	(_c["preview"] as TextureRect).texture = null
+	(_c["overlay"] as Label).text = message
+	(_c["overlay"] as Label).visible = true
 
 
 ## Cheap path: pose/framing changes restart accumulation without recompiling.
@@ -274,6 +289,7 @@ func _rebuild_now() -> void:
 ## the manual rig-yaw slider stays a base offset under the clip's orbit.
 func _apply_pose() -> void:
 	if not _configured:
+		_queue_rebuild()
 		return
 	var quat: Quaternion
 	var rig_yaw := deg_to_rad((_c["yaw"] as HSlider).value)
@@ -281,6 +297,8 @@ func _apply_pose() -> void:
 	_clip_exposure = 1.0
 	var clip := _active_clip()
 	if clip != null:
+		var error := GemAuthoringAdmission.error(clip)
+		if not error.is_empty(): _invalidate_preview(error); return
 		var t: float = (_c["scrub"] as HSlider).value
 		quat = GemClipSampler.frame_orientation(clip, t)
 		rig_yaw += GemClipSampler.frame_rig_yaw_rad(clip, t)
@@ -291,10 +309,13 @@ func _apply_pose() -> void:
 			* Quaternion(Vector3.UP, deg_to_rad((_c["turn"] as HSlider).value))
 	var rest := GemClipSampler.frame_orientation(clip, 0.0) if clip != null else Quaternion(Vector3.RIGHT, deg_to_rad((_c["tilt"] as HSlider).value))
 	var framing := GemPresentationCompiler.prepare(_stone, _presentation, rest)
-	if not framing.error.is_empty(): push_error(framing.error); return
+	if not framing.error.is_empty(): _invalidate_preview(framing.error); return
 	var pose := GemPresentationCompiler.sample(framing, quat, Vector2i(RENDER_SIZE, RENDER_SIZE), GemClipSampler.ORTHO_HALF)
 	_tracer.set_clip_sample(pose.orientation, rig_yaw, role, GemClipSampler.ORTHO_HALF, pose.camera_offset)
 	_tracer.reset_accumulation()
+	_last_image = null; _preview_tex = null
+	(_c["preview"] as TextureRect).texture = null
+	(_c["overlay"] as Label).visible = false
 	_update_status()
 
 

@@ -1,9 +1,8 @@
 extends SceneTree
 
-## GENERATOR (kept on purpose): authors the lapidary SPECIES / CHROMOPHORE /
-## GRADE / STONE .tres files under data/lapidary/. The committed .tres files are
-## the canonical artifacts; this script exists so the 81-sample absorption
-## curves and the fitted Sellmeier coefficients are reproducible and reviewable.
+## Produces detached catalog CANDIDATES and a property diff under generated/.
+## Never replaces hand-authored data. Published constants remain reproducible;
+## adoption of a candidate is an explicit authoring-document save/replace.
 ##
 ## Run:
 ##   godot --headless --path . --script res://tools/generate_lapidary_data.gd
@@ -32,23 +31,30 @@ const WL_F := 486.1
 const WL_C := 656.3
 const WL_B := 686.7
 const WL_G := 430.8
+var output_root := ""
+var differences := []
+var save_failed := false
 
 
 func _init() -> void:
+	output_root = "res://generated/catalog-candidates/" + str(Time.get_unix_time_from_system()).replace(".", "-")
 	for dir in [DIR_SPECIES, DIR_CHROMO, DIR_GRADES, DIR_STONES]:
-		DirAccess.make_dir_recursive_absolute(dir)
+		DirAccess.make_dir_recursive_absolute(_candidate_path(dir))
 
 	var species := _build_species()
 	var chromophores := _build_chromophores()
 	var grades := _build_grades()
 	var stones := _build_stones(species, chromophores, grades)
 
-	print("\n=== Lapidary data generated ===")
+	var report := FileAccess.open(output_root.path_join("diff.json"), FileAccess.WRITE)
+	if report == null: save_failed = true
+	else: report.store_string(JSON.stringify({"source_unchanged": true, "candidates": differences}, "\t"))
+	print("\n=== Lapidary candidates: %s ===" % output_root)
 	_print_species_table(species)
 	_print_beer_lambert(chromophores, stones)
 	print("Files: %d species, %d chromophores, %d grades, %d stones" % [
 		species.size(), chromophores.size(), grades.size(), stones.size()])
-	quit(0)
+	print("CHECK_COMPLETE: generate_lapidary_data"); quit(1 if save_failed else 0)
 
 
 # ------------------------------------------------------------------ species
@@ -554,12 +560,24 @@ func _save(res: Resource, path: String) -> void:
 		evidence.citation = res.source_note
 		evidence.method = "Published Sellmeier coefficients" if evidence.kind == GemOpticalEvidence.Kind.PUBLISHED_MODEL else "Two-target empirical dispersion fit; see citation for assumptions"
 		res.ordinary.evidence = evidence
-	var err := ResourceSaver.save(res, path)
-	assert(err == OK, "failed to save %s (err %d)" % [path, err])
-	# Register the saved path on the instance so resources saved later reference
-	# it as an ext_resource instead of embedding a duplicated sub-resource.
-	res.take_over_path(path)
-	print("  wrote %s" % path)
+	var destination := _candidate_path(path)
+	var err := GemResourceBundle.save(res, destination)
+	if err != OK: save_failed = true; printerr("FAIL: candidate save " + destination); return
+	var before := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) if ResourceLoader.exists(path) else null
+	var after := ResourceLoader.load(destination, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	var changes := []
+	GemAuthoringDocument._diff(before, after, [], changes)
+	var records := []
+	for change: Dictionary in changes:
+		records.append({"path": change.path, "before": str(change.before), "after": str(change.after),
+			"before_digest": GemContentIdentity.digest(change.before), "after_digest": GemContentIdentity.digest(change.after)})
+	differences.append({"source": path, "candidate": destination, "changes": records,
+		"source_sha256": FileAccess.get_sha256(path), "candidate_sha256": FileAccess.get_sha256(destination)})
+	print("  candidate %s (%d property changes)" % [destination, records.size()])
+
+func _candidate_path(path: String) -> String:
+	assert(path.begins_with("res://data/lapidary/"))
+	return output_root.path_join(path.trim_prefix("res://data/lapidary/"))
 
 
 # ------------------------------------------------------------------ reporting

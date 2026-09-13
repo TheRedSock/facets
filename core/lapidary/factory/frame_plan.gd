@@ -19,7 +19,7 @@ static func master_key(job: GemFrameJob) -> String:
 		policy.erase(key)
 	var lighting := GemRigCompiler.compile(job.rig)
 	return GemContentIdentity.digest(["linear-master-v3", master_engine(job),
-		job.stone.transport_inputs(), lighting.lights, lighting.spectra, lighting.background, policy,
+		GemPhysicalIdentity.inputs(job.stone.transport_inputs()), lighting.lights, lighting.spectra, lighting.background, policy,
 		job.resolution, job.samples, job.sample_seed, canonical_orientation(job.orientation),
 		canonical_yaw(job.rig_yaw), job.role_multipliers, job.ortho_half, job.camera_offset])
 

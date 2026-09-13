@@ -56,11 +56,7 @@ static func realize(recipe: GemSpecimenRecipe, preset_id: StringName, seed_value
 		owner.set(property, int(value) if variation.target == "population.count" else value)
 		realized[variation.target_key()] = {"channel": String(variation.channel_id), "quantile": q, "value": value}
 	if changed_scattering:
-		var evidence := GemOpticalEvidence.new()
-		evidence.method = "Bounded specimen condition variation"
-		evidence.assumptions = "Authored scattering parameters; the realized value is not the original measurement."
-		evidence.source_record = {"parent_evidence": GemContentIdentity.digest(base.material.scattering_evidence)}
-		stone.material.scattering_evidence = evidence
+		stone.material.scattering_evidence = GemOpticalEvidence.derived(base.material.scattering_evidence, "Bounded specimen condition variation")
 	error = GemJobValidator.specimen_error(stone)
 	if not error.is_empty(): return {"error": "Realized condition rejected: " + error}
 	var population_report := {}

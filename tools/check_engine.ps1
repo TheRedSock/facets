@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $logRoot = Join-Path $projectRoot 'artifacts/checks'
 . (Join-Path $PSScriptRoot 'check_result.ps1')
+. (Join-Path $PSScriptRoot 'check_process.ps1')
 $registry = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'engine_checks.json') -Raw | ConvertFrom-Json
 if ($registry.schema -ne 1) { throw 'Unknown check registry schema' }
 $stages = @($registry.stages | Where-Object {
@@ -38,9 +39,11 @@ $sourceBefore = Get-CheckedSourceDigest
 foreach ($stage in $stages) {
     $arguments = @('--audio-driver', 'Dummy', '--path', $projectRoot, '--log-file', (Join-Path $logRoot ($stage.name + '.godot.log'))) + $stage.args
     $started = Get-Date
-    $output = & $Godot @arguments 2>&1
-    $code = $LASTEXITCODE
-    $text = $output -join "`n"
+    $timeout = if ($stage.timeout_seconds) { [int]$stage.timeout_seconds } elseif ($stage.mode -eq 'cpu') { 300 } else { 1800 }
+    $execution = Invoke-BoundedCheckProcess -Executable $Godot -Arguments $arguments -TimeoutSeconds $timeout
+    $code = $execution.exit_code
+    $text = $execution.output
+    $output = $text -split "`r?`n"
     $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot ($stage.name + '.log'))
     $result = Get-GodotCheckResult -ExitCode $code -Output $text -Completion $stage.completion
     $results += [ordered]@{ name = $stage.name; result = $result; elapsed_seconds = ((Get-Date) - $started).TotalSeconds }
@@ -55,8 +58,9 @@ if ($ReferencePython -and $failed.Count -eq 0 -and $Only.Count -eq 0) {
     $referenceChecks = @('check_polygon_reference', 'check_mesh_predicates', 'check_polarization_reference', 'check_crystal_modes_reference', 'check_crystal_interface_reference', 'check_crystal_packet_reference', 'check_crystal_loss_reference')
     if ($Gpu) { $referenceChecks += @('check_gpu_polarization_reference', 'check_microsurface_reference', 'check_finish_fields_reference', 'check_absorption_mixtures') }
     foreach ($name in $referenceChecks) {
-        $output = & $ReferencePython (Join-Path $projectRoot "tools/$name.py") 2>&1
-        $code = $LASTEXITCODE
+        $execution = Invoke-BoundedCheckProcess -Executable $ReferencePython -Arguments @((Join-Path $projectRoot "tools/$name.py")) -TimeoutSeconds 1800
+        $output = $execution.output
+        $code = $execution.exit_code
         $output | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot "$name.log")
         if ($code -ne 0) { $failed += $name; Write-Output "FAIL $name" }
         else { Write-Output "PASS $name" }

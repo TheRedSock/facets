@@ -144,16 +144,16 @@ static func _specimen_error_uncached(stone: GemStone, polarized: bool) -> String
 		error = GemMaterialCompiler.polarization_error(bulk)
 		if not error.is_empty():
 			return error
+	if condition != null and condition.workmanship != null and not condition.workmanship.validate().is_empty():
+		return "; ".join(condition.workmanship.validate())
+	var geometry := LapidaryStoneCompiler.compile_geometry(stone)
+	if geometry.has("compilation_error"): return "Geometry: " + str(geometry.compilation_error)
+	if geometry.get("planes", PackedFloat32Array()).is_empty() and not geometry.has("mesh") and not geometry.has("analytic_shape") and not geometry.has("rounded_solid"):
+		return "Geometry compilation produced no closed host"
 	if condition == null:
 		return ""
-	if condition.workmanship != null and not condition.workmanship.validate().is_empty():
-		return "; ".join(condition.workmanship.validate())
 	if condition.finish != null and not condition.finish.validate().is_empty():
 		return "; ".join(condition.finish.validate())
-	var geometry:Dictionary={}
-	if condition.rounding!=null and condition.rounding.radius_mm>0:
-		geometry=LapidaryStoneCompiler.compile_geometry(stone)
-		if geometry.has("compilation_error"):return geometry.compilation_error
 	var descriptors: Array[GemDefect] = condition.defects.duplicate()
 	if condition.cleavage != null:
 		if geometry.is_empty():geometry=LapidaryStoneCompiler.compile_geometry(stone)
