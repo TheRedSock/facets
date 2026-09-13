@@ -62,6 +62,9 @@ are `tests/test_check_process.ps1` and `tests/test_check_result.ps1`.
 set through the production worker. `python tools/check_appearance.py --inspect
 --gallery` writes native-size chronological reference/draft/detail sheets on
 black, white and game backgrounds under `artifacts/appearance-corpus/review`.
+The generated `review/index.html` plays synchronized native-size reference and
+candidate crops, with pause, frame stepping, slower playback and background
+selection. It uses the same linear-light-composited sheets as the still review.
 Inspection allows incomplete reports; the default analysis command fails until
 all required images and reviewed thresholds pass. `test_appearance_metrics.py`
 checks that frozen motion, blur, bias and removed features fail the metrics.

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gem appearance review</title>
+<style>
+body{margin:24px;background:#181b22;color:#e3e7ed;font:16px system-ui,sans-serif}
+h1{font-size:23px;margin:0 0 10px}p{max-width:960px;line-height:1.5;color:#b9c3d2}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin:20px 0}
+label{display:flex;flex-direction:column;gap:5px;font-size:14px}select,button,input{font:inherit}
+select,button{padding:7px;background:#2a3343;color:#fff;border:1px solid #566379;border-radius:4px}
+.panels{display:flex;gap:24px;overflow:auto;padding-bottom:10px}figure{margin:0;flex:none}
+figcaption{margin:0 0 8px;color:#c9d5e8}canvas{display:block;image-rendering:pixelated}
+#status{font-weight:600;color:#ffcf8a}#frame-label{font-variant-numeric:tabular-nums}
+</style>
+<h1>Gem appearance review</h1>
+<div id="status"></div>
+<p>Reference and candidate advance through the same saved poses. Both use candidate/reference stream 0;
+the numerical gate checks both independent candidate streams. The panels crop the native-size
+linear-light-composited review sheets without resampling. Browser zoom changes their displayed size.</p>
+<div class="controls">
+<label>Specimen / rig / output<select id="case"></select></label>
+<label>Candidate<select id="profile"></select></label>
+<label>Background<select id="background"><option>game</option><option>black</option><option>white</option></select></label>
+<label>Playback speed<select id="speed"><option value="1">1× authored time</option><option value="0.25">¼× inspection</option></select></label>
+<button id="play">Pause</button><button id="step">Next frame</button>
+<label>Frame<input id="frame" type="range" min="0" step="1" value="0"></label><span id="frame-label"></span>
+</div>
+<div class="panels"><figure><figcaption id="reference-label"></figcaption><canvas id="reference"></canvas></figure>
+<figure><figcaption id="candidate-label"></figcaption><canvas id="candidate"></canvas></figure></div>
+<p id="note"></p>
+<script>
+const data=__CORPUS_REVIEW__;
+const el=id=>document.getElementById(id);
+let entry=null,sheet=null,frame=0,playing=true,elapsed=0,previous=performance.now(),generation=0;
+el('status').textContent=`Numerical corpus status: ${data.status}. A partial gallery is not acceptance.`;
+el('frame').max=String(data.frames-1);
+for(let i=0;i<data.entries.length;i++){
+ const item=data.entries[i],option=document.createElement('option');option.value=String(i);
+ option.textContent=`${item.case} / ${item.rig} / ${item.size} px`;el('case').append(option);
+}
+function render(){
+ if(!entry||!sheet)return;
+ const candidate=el('profile').value;
+ for(const [id,profile] of [['reference',entry.profiles[0]],['candidate',candidate]]){
+  const canvas=el(id),context=canvas.getContext('2d');
+  if(canvas.width!==entry.size){canvas.width=entry.size;canvas.height=entry.size;}
+  context.imageSmoothingEnabled=false;
+  context.clearRect(0,0,entry.size,entry.size);
+  context.drawImage(sheet,entry.profiles.indexOf(profile)*entry.size,48+frame*(entry.size+20),entry.size,entry.size,0,0,entry.size,entry.size);
+  el(id+'-label').textContent=`${id==='reference'?'Reference':'Candidate'}: ${profile}`;
+ }
+ el('frame').value=String(frame);el('frame-label').textContent=`${frame+1}/${data.frames} · ${(frame/data.fps).toFixed(3)} s`;
+}
+function loadSheet(){
+ const current=++generation;sheet=null;
+ for(const id of ['reference','candidate'])el(id).getContext('2d').clearRect(0,0,el(id).width,el(id).height);
+ if(!entry)return;
+ const image=new Image();
+ image.onload=()=>{if(current!==generation)return;sheet=image;render();};
+ image.onerror=()=>{if(current===generation)el('note').textContent='Review sheet could not load. Regenerate the complete gallery.';};
+ image.src=entry.sheets[el('background').value];
+ el('note').textContent=`${entry.size}×${entry.size} output; ${data.frames} saved poses at ${data.fps} fps. Fixed specimen seed, matched camera and lighting. No per-frame recentering.`;
+}
+function selectCase(){
+ entry=data.entries[Number(el('case').value)];frame=0;elapsed=0;el('profile').replaceChildren();
+ if(!entry)return;
+ for(const profile of entry.profiles.slice(1)){const option=document.createElement('option');option.textContent=profile;el('profile').append(option);}
+ loadSheet();
+}
+function pause(){playing=false;el('play').textContent='Play';elapsed=0;}
+el('case').onchange=selectCase;el('profile').onchange=render;el('background').onchange=loadSheet;
+el('play').onclick=()=>{playing=!playing;elapsed=0;el('play').textContent=playing?'Pause':'Play';};
+el('step').onclick=()=>{pause();frame=(frame+1)%data.frames;render();};
+el('frame').oninput=()=>{pause();frame=Number(el('frame').value);render();};
+function tick(now){
+ if(playing&&sheet){elapsed+=Math.min(now-previous,250)*Number(el('speed').value);const period=1000/data.fps;
+  if(elapsed>=period){frame=(frame+Math.floor(elapsed/period))%data.frames;elapsed%=period;render();}}
+ previous=now;requestAnimationFrame(tick);
+}
+if(data.entries.length)selectCase();else{el('note').textContent='No complete case/rig/size comparison is available yet.';el('play').disabled=true;el('step').disabled=true;}
+requestAnimationFrame(tick);
+</script>
+</html>

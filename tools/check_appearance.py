@@ -84,12 +84,20 @@ def review_sheet(case,rig,size,frames,backgrounds,fps):
                 sheet.paste(Image.fromarray(pixels),(column*size,y))
                 draw.text((column*size+4,y+size+2),f'{frame/fps:.3f}s',fill=(220,220,220))
         sheet.save(output/f'{case}-{rig}-{size}-{background}.png')
+    return {'case':case,'rig':rig,'size':size,'profiles':profiles,
+            'sheets':{background:f'{case}-{rig}-{size}-{background}.png' for background in backgrounds}}
+
+def review_gallery(entries,status,config):
+    output=OUT/'review';output.mkdir(exist_ok=True)
+    payload={'entries':entries,'status':status,'frames':config['frames'],'fps':config['fps']}
+    template=Path(__file__).with_name('appearance_review.html').read_text(encoding='utf-8')
+    (output/'index.html').write_text(template.replace('__CORPUS_REVIEW__',json.dumps(payload).replace('</','<\\/')),encoding='utf-8')
 def main():
     args=argparse.ArgumentParser();args.add_argument('--inspect',action='store_true');args.add_argument('--gallery',action='store_true');opt=args.parse_args()
     config=json.loads((ROOT/'data/lapidary/acceptance/corpus.json').read_text(encoding='utf-8'))
     configuration_errors=config_errors(config)
     if configuration_errors:raise ValueError('; '.join(configuration_errors))
-    report=json.loads((OUT/'report.json').read_text(encoding='utf-8'));records=report['records'];missing=[];results=[];failures=[]
+    report=json.loads((OUT/'report.json').read_text(encoding='utf-8'));records=report['records'];missing=[];results=[];failures=[];gallery=[]
     threshold_path=ROOT/'data/lapidary/acceptance/thresholds.json'
     thresholds=json.loads(threshold_path.read_text(encoding='utf-8')) if threshold_path.exists() else None
     config_hash=hashlib.sha256((ROOT/'data/lapidary/acceptance/corpus.json').read_bytes()).hexdigest()
@@ -128,7 +136,7 @@ def main():
             for candidate in candidates:
                 candidate_images=[get(case,rig,size,f,candidate,0) for f in range(config['frames'])]
                 if not any(x is None for x in candidate_images):review[candidate]=np.array(candidate_images)
-            if len(review)==len(candidates)+1:review_sheet(case,rig,size,review,config['backgrounds'],config['fps'])
+            if len(review)==len(candidates)+1:gallery.append(review_sheet(case,rig,size,review,config['backgrounds'],config['fps']))
         control_images=None
         if case in config['feature_controls']:
             control_case=config['feature_controls'][case]
@@ -176,6 +184,7 @@ def main():
         costs.append({'case':case,'size':size,'profile':profile,'recorded_frames':len(selected),'unique_masters':len({r['master'] for r in selected}),'wall_ms_median':float(np.median(times)),'wall_ms_p95':float(np.percentile(times,95)),'wall_ms_sum':float(sum(times)),'shared_master_with_smaller_output':sum(any(other['master']==r['master'] and other['size']<size for other in records.values()) for r in selected)})
     result={'status':'incomplete' if missing else ('failed' if failures else 'passed'),'missing_count':len(missing),'failures':failures,'results':results,'config_sha256':config_hash,'costs':costs,'cost_note':'Observed production-worker wall time includes concurrent validation and possible checkpoint resume. Outputs sharing a smaller-size master include reprint-only work. These are not uncontended GPU timings.'}
     (OUT/'analysis.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+    if opt.gallery:review_gallery(gallery,result['status'],config)
     print(json.dumps({'status':result['status'],'complete_comparisons':len(results),'missing':len(missing),'failures':failures[:30]}))
     for case in config['cases']:
       for profile in config['case_profiles'][case]:
