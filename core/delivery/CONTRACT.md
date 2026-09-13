@@ -59,6 +59,12 @@ The probe prepares every declared tile and measures repeated animation bursts
 and steady rest separately. `-FrameBudgetMs 16.7` enforces the agreed desktop
 p95 budget; a probe without a budget only establishes functional behavior.
 
+Desktop presentation uses mailbox V-Sync with a 120 fps application cap. This
+keeps the newest completed frame available for tear-free display and bounds the
+render workload. The target remains p95 application frame intervals <=16.7 ms;
+display refresh rate is separate. The probe records window size, V-Sync mode,
+application cap and reported screen refresh rate alongside its measurements.
+
 Godot's standard export templates disable `--script` and `--main-pack` overrides.
 These external automated harnesses use the matching editor executable. Actual
 release-executable navigation, missing/corrupt-pack errors and final performance

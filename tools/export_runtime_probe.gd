@@ -69,6 +69,7 @@ func _run()->void:
 	var report:={"status":"passed" if failures.is_empty() else "failed","failures":failures,
 		"scope":"functional_and_performance" if frame_budget_ms>0 else "functional",
 		"frame_budget_ms":frame_budget_ms,"cold_ready_ms":cold_ms,"catalog_prefetch_ms":catalog_ready_ms,
+		"presentation":{"window_size":[root.size.x,root.size.y],"vsync_mode":DisplayServer.window_get_vsync_mode(),"max_fps":Engine.max_fps,"screen_refresh_hz":DisplayServer.screen_get_refresh_rate()},
 		"declared_tiles":catalog_ids,"tile_views":views.size(),"loaded_views":loaded,"before":before,"after":after,
 		"frame_phases":[burst,steady],"renderer":RenderingServer.get_video_adapter_name(),"godot":Engine.get_version_info(),"executable":OS.get_executable_path(),"source_tree_available":FileAccess.file_exists("res://core/lapidary/stone_compiler.gd")}
 	var file:=FileAccess.open(output,FileAccess.WRITE);file.store_string(JSON.stringify(report,"\t"));file.close()
