@@ -89,13 +89,7 @@ func _plan_merge(plan: Array[Dictionary], cells: Array, tier: int, reason: Strin
 
 	# Pick the survivor: prefer a swap cell if one participates in this match,
 	# destination (index 1) before origin (index 0). Fall back to bottom-right.
-	var survivor_cell: Vector2i = cells[cells.size() - 1]
-	if swap_cells.size() == 2:
-		# Check destination first, then origin
-		if swap_cells[1] in cells:
-			survivor_cell = swap_cells[1]
-		elif swap_cells[0] in cells:
-			survivor_cell = swap_cells[0]
+	var survivor_cell := MatchClassifier.survivor(cells, swap_cells)
 
 	# Remove all cells except the survivor
 	for cell in cells:

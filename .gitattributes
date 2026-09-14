@@ -3,3 +3,9 @@
 data/lapidary/standards/* -text
 data/lapidary/**/measurements/* -text
 data/lapidary/measurements/**/*.csv -text
+
+# Frozen gameplay fixtures and replay/codec evidence retain their exact bytes.
+# Their original CRLF endings are valid; still check ordinary whitespace errors.
+tests/fixtures/game_prototype_v1/* -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/game/goldens/*.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/game/p1-checkpoints.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

@@ -6,19 +6,24 @@ extends RefCounted
 ## Consumed by the EventTimeline for animation sequencing.
 var last_spawn_events: Array[Dictionary] = []
 
-## Optional per-run tier selection: tier -> tile_id.
-var tier_tile_overrides: Dictionary = {}
+var catalog: GameCatalog
+var last_error := ""
+
+func _init(admitted_catalog: GameCatalog = null) -> void:
+	catalog = admitted_catalog
 
 
 ## Populates the entire board using a spawn table for weighted tier selection.
-func populate_board(board: BoardState, rng: SeededRng, spawn_table: SpawnTableResource) -> void:
+func populate_board(board: BoardState, rng: SeededRng, spawn_table: SpawnTableResource) -> bool:
+	if not _admit_supply(spawn_table): return false
 	for cell in board.all_cells():
 		board.set_tile(cell, _spawn_tile(rng, spawn_table))
+	return true
 
 
 ## Fills spawn-eligible empty cells using a spawn table.
 ## Call with the result of BoardPhysics.find_spawn_eligible_cells() for
-## topology-aware spawning, or with an empty array to fall back to all empties.
+## topology-aware spawning. An empty eligible list always remains empty.
 ## Returns the number of tiles spawned.
 func refill_spawn_entries(
 	board: BoardState,
@@ -27,6 +32,7 @@ func refill_spawn_entries(
 	spawn_cells: Array[Vector2i],
 ) -> int:
 	last_spawn_events.clear()
+	if not _admit_supply(spawn_table): return -1
 	var spawned := 0
 	for pos in spawn_cells:
 		if not board.is_blocked(pos) and board.get_tile(pos) == null:
@@ -37,6 +43,9 @@ func refill_spawn_entries(
 				"cell": pos,
 				"tile_id": tile.tile_id,
 				"tier": tile.tier,
+				"instance_id": tile.instance_id,
+				"source": tile.to_dict(),
+				"direction": board.get_effective_gravity(pos),
 			})
 			spawned += 1
 	return spawned
@@ -46,55 +55,40 @@ func refill_spawn_entries(
 ## Kept for backward compatibility with simple boards.
 ## Returns the number of tiles spawned.
 func refill_empty_cells(board: BoardState, rng: SeededRng, spawn_table: SpawnTableResource) -> int:
-	last_spawn_events.clear()
-	var spawned := 0
-	for y in board.size.y:
-		for x in board.size.x:
-			var pos := Vector2i(x, y)
-			if not board.is_blocked(pos) and board.get_tile(pos) == null:
-				var tile := _spawn_tile(rng, spawn_table)
-				board.set_tile(pos, tile)
-				last_spawn_events.append({
-					"type": &"tile_spawned",
-					"cell": pos,
-					"tile_id": tile.tile_id,
-					"tier": tile.tier,
-				})
-				spawned += 1
-	return spawned
+	return refill_spawn_entries(board, rng, spawn_table, board.all_cells())
 
+func _admit_supply(spawn_table: SpawnTableResource) -> bool:
+	last_error = ""
+	if catalog == null: last_error = "missing_catalog"
+	elif spawn_table == null: last_error = "missing_supply"
+	else: last_error = GameCatalog.validate_supply(Array(spawn_table.allowed_tiers), Array(spawn_table.weights))
+	return last_error.is_empty()
 
 ## Creates a single tile using weighted random selection from the spawn table.
-## Uses TileRegistry for named tiles if available, falls back to debug tiles.
+## Uses only the admitted roster; missing/invalid inputs fail before drawing.
 func _spawn_tile(rng: SeededRng, spawn_table: SpawnTableResource) -> TileState:
+	last_error = ""
+	if catalog == null:
+		last_error = "missing_catalog"
+		return null
+	if spawn_table == null:
+		last_error = "missing_supply"
+		return null
+	last_error = GameCatalog.validate_supply(Array(spawn_table.allowed_tiers), Array(spawn_table.weights))
+	if not last_error.is_empty(): return null
 	var tier := _weighted_pick_int(rng, spawn_table.allowed_tiers, spawn_table.weights)
-	# Use TileRegistry for proper named tiles if definitions are loaded
-	var tile_registry: Node = _get_tile_registry()
-	if tile_registry != null and tile_registry.has_definitions():
-		if tier_tile_overrides.has(tier):
-			var selected_tile_id: StringName = tier_tile_overrides[tier]
-			if tile_registry.get_definition(selected_tile_id) != null:
-				return tile_registry.create_tile(selected_tile_id)
-		return tile_registry.create_tile_for_tier(tier, rng)
-	return TileState.from_debug_tier(tier)
+	return catalog.create_tile(tier)
 
 
 ## Integer-only weighted random selection. No floating point operations.
 ## Eliminates cross-platform determinism risk from float multiplication/comparison.
 func _weighted_pick_int(rng: SeededRng, values: Array[int], weights: Array[int]) -> int:
-	if values.is_empty():
-		return 1
-
-	# If weights are missing or mismatched, fall back to uniform
-	if weights.size() != values.size():
-		return values[rng.randi_range(0, values.size() - 1)]
+	if not GameCatalog.validate_supply(Array(values), Array(weights)).is_empty(): return -1
 
 	var total_weight := 0
 	for w in weights:
 		total_weight += w
 
-	if total_weight <= 0:
-		return values[rng.randi_range(0, values.size() - 1)]
 
 	var roll := rng.randi_range(0, total_weight - 1)
 	var cumulative := 0
@@ -111,10 +105,3 @@ func _weighted_pick_int(rng: SeededRng, values: Array[int], weights: Array[int])
 func populate_debug_board(board: BoardState, rng: SeededRng, visible_tiers: int) -> void:
 	for cell in board.all_cells():
 		board.set_tile(cell, TileState.from_debug_tier(rng.randi_range(1, max(1, visible_tiers))))
-
-
-func _get_tile_registry() -> Node:
-	var main_loop := Engine.get_main_loop()
-	if main_loop is SceneTree:
-		return main_loop.root.get_node_or_null("/root/TileRegistry")
-	return null

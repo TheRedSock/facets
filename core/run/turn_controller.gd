@@ -1,230 +1,97 @@
 class_name TurnController
 extends RefCounted
 
-## Owns the single-turn resolution loop:
-## swap → detect → classify → plan → conflict → resolve → physics → spawn → cascade
-##
-## This is the core gameplay pipeline. RunController delegates to this for turn execution.
-##
-## Two usage modes:
-##   1. Monolithic: execute_turn() runs the full cascade loop at once (tests, initial board).
-##   2. Incremental: prepare_turn() + step_cascade() loop — one cascade step per call,
-##      allowing callers to build the authoritative timeline in smaller chunks when desired.
-
 var match_detector := MatchDetector.new()
 var match_classifier := MatchClassifier.new()
 var effect_planner := EffectPlanner.new()
 var conflict_resolver := ConflictResolver.new()
-var effect_resolver := EffectResolver.new()
+var effect_resolver: EffectResolver
 var board_physics := BoardPhysics.new()
-var spawn_resolver := SpawnResolver.new()
-
-## Maximum cascade depth to prevent infinite loops.
+var spawn_resolver: SpawnResolver
+var rules := RuleSet.new()
+## Explicit diagnostic injection, never serialized as game policy.
+var fail_at := ""
+## Optional legacy diagnostics; canonical facts/checkpoints do not consume these.
+var capture_step_hashes := true
 const MAX_CASCADE_DEPTH := 50
-
-## Maximum upgrade chain depth within a single cascade step.
-## Upgrade chains re-match after upgrades but before gravity.
 const MAX_CHAIN_DEPTH := 20
+var _prepared: EventTimeline
+var _cursor := 0
 
-# ---- Incremental cascade state ----
+func _init(catalog: GameCatalog = null) -> void:
+	spawn_resolver = SpawnResolver.new(catalog)
+	effect_resolver = EffectResolver.new(catalog)
 
-var _inc_board: BoardState
-var _inc_rng: SeededRng
-var _inc_spawn_table: SpawnTableResource
-var _inc_event_log: EventLog
-var _inc_swap_cells: Array[Vector2i] = []
-var _inc_cascade_depth: int = 0
-var _inc_active: bool = false
-
-
-## Prepares for incremental cascade resolution.
-## Call step_cascade() repeatedly until it returns null.
-func prepare_turn(
-	board: BoardState,
-	rng: SeededRng,
-	spawn_table: SpawnTableResource,
-	event_log: EventLog,
-	swap_cells: Array[Vector2i] = [],
-) -> void:
-	_inc_board = board
-	_inc_rng = rng
-	_inc_spawn_table = spawn_table
-	_inc_event_log = event_log
-	_inc_swap_cells = swap_cells
-	_inc_cascade_depth = 0
-	_inc_active = true
-
-
-## Returns true if the incremental cascade still has potential work to do.
-func is_cascade_active() -> bool:
-	return _inc_active
-
-
-## Executes one cascade step: detect → classify → plan → resolve → chain → gravity → spawn.
-## Returns the step Dictionary (same format as EventTimeline.cascade_steps entries),
-## or null if no matches remain (turn is complete).
-func step_cascade() -> Variant:
-	if not _inc_active or _inc_cascade_depth >= MAX_CASCADE_DEPTH:
-		_inc_active = false
-		return null
-
-	# Step 1: Detect matches
-	var raw_matches := match_detector.find_matches(_inc_board)
-	if raw_matches.is_empty():
-		_inc_active = false
-		return null
-
-	# Step 2: Classify matches
-	var classified := match_classifier.classify(raw_matches)
-	if classified.is_empty():
-		_inc_active = false
-		return null
-
-	# Build match events for timeline
-	var match_events: Array[Dictionary] = []
-	for m in classified:
-		match_events.append({
-			"type": &"match_formed",
-			"cells": m.get("cells", []),
-			"match_group": m.get("match_group", &""),
-			"tier": m.get("tier", 0),
-			"semantic_type": m.get("semantic_type", &""),
-		})
-
-	# Step 3: Plan effects (swap_cells only applies to the first cascade)
-	var active_swap: Array[Vector2i] = []
-	if _inc_cascade_depth == 0:
-		active_swap = _inc_swap_cells
-	var effect_plan := effect_planner.build_base_plan(classified, active_swap)
-
-	# Step 4: Resolve conflicts
-	effect_plan = conflict_resolver.resolve(effect_plan, _inc_board)
-
-	# Step 5: Apply effects (mutate board)
-	effect_resolver.apply(_inc_board, effect_plan, _inc_event_log)
-	var first_round_effects := _snapshot_last_effect_events()
-
-	# Collect first round into chain_steps
-	var chain_steps: Array[Dictionary] = []
-	chain_steps.append({
-		"match_events": match_events,
-		"remove_events": first_round_effects["remove_events"],
-		"upgrade_events": first_round_effects["upgrade_events"],
-	})
-
-	# Aggregate flat event arrays for stats and timeline consumers that still read
-	# the top-level step arrays.
-	var all_match_events: Array[Dictionary] = []
-	all_match_events.append_array(match_events)
-	var all_remove_events: Array[Dictionary] = []
-	all_remove_events.append_array(first_round_effects["remove_events"])
-	var all_upgrade_events: Array[Dictionary] = []
-	all_upgrade_events.append_array(first_round_effects["upgrade_events"])
-
-	# Step 5b: Upgrade chain loop — re-match after upgrades, before gravity.
-	# An upgrade may land next to same-tier tiles, forming a new match instantly.
-	var chain_depth := 0
-	while chain_depth < MAX_CHAIN_DEPTH:
-		var chain_matches := match_detector.find_matches(_inc_board)
-		if chain_matches.is_empty():
-			break
-		var chain_classified := match_classifier.classify(chain_matches)
-		if chain_classified.is_empty():
-			break
-
-		var chain_match_events: Array[Dictionary] = []
-		for m in chain_classified:
-			chain_match_events.append({
-				"type": &"match_formed",
-				"cells": m.get("cells", []),
-				"match_group": m.get("match_group", &""),
-				"tier": m.get("tier", 0),
-				"semantic_type": m.get("semantic_type", &""),
-			})
-
-		# Chain matches never use swap_cells (those only affect the initial match)
-		var chain_plan := effect_planner.build_base_plan(chain_classified)
-		chain_plan = conflict_resolver.resolve(chain_plan, _inc_board)
-		effect_resolver.apply(_inc_board, chain_plan, _inc_event_log)
-		var chain_effects := _snapshot_last_effect_events()
-
-		chain_steps.append({
-			"match_events": chain_match_events,
-			"remove_events": chain_effects["remove_events"],
-			"upgrade_events": chain_effects["upgrade_events"],
-		})
-		all_match_events.append_array(chain_match_events)
-		all_remove_events.append_array(chain_effects["remove_events"])
-		all_upgrade_events.append_array(chain_effects["upgrade_events"])
-
-		chain_depth += 1
-		_inc_event_log.push(&"upgrade_chain", {
-			"cascade_depth": _inc_cascade_depth,
-			"chain_depth": chain_depth,
-			"matches_found": chain_classified.size(),
-		})
-
-	# Step 6: Gravity collapse (iterative settling)
-	board_physics.resolve_gravity(_inc_board)
-
-	# Step 7: Refill empty cells (spawn-entry-aware)
-	var spawn_cells := board_physics.find_spawn_eligible_cells(_inc_board)
-	spawn_resolver.refill_spawn_entries(_inc_board, _inc_rng, _inc_spawn_table, spawn_cells)
-
-	# Build cascade step
-	var step := {
-		"cascade_index": _inc_cascade_depth,
-		"chain_steps": chain_steps,
-		"match_events": all_match_events,
-		"remove_events": all_remove_events,
-		"upgrade_events": all_upgrade_events,
-		"gravity_events": board_physics.last_move_events.duplicate(),
-		"spawn_events": spawn_resolver.last_spawn_events.duplicate(),
-		"board_hash": _inc_board.compute_hash(),
-	}
-
-	_inc_cascade_depth += 1
-
-	_inc_event_log.push(&"cascade_step", {
-		"depth": _inc_cascade_depth,
-		"matches_found": classified.size(),
-		"tiles_removed": all_remove_events.size(),
-	})
-
-	return step
-
-
-# ---- Monolithic API (backward compat for tests and initial board resolution) ----
-
-
-## Executes a full turn: resolve all matches, apply effects, cascade until stable.
-## Returns an EventTimeline with structured per-tile events for animation.
-##
-## swap_cells: optional [from, to] pair from a player swap. Passed to the
-## effect planner for the first cascade only so the upgrade survivor spawns
-## at the swapped cell rather than the default bottom-right position.
-func execute_turn(
-	board: BoardState,
-	rng: SeededRng,
-	spawn_table: SpawnTableResource,
-	event_log: EventLog,
-	swap_cells: Array[Vector2i] = [],
-) -> EventTimeline:
-	prepare_turn(board, rng, spawn_table, event_log, swap_cells)
+func execute_turn(board: BoardState, rng: SeededRng, supply: SpawnTableResource, event_log: EventLog, swap_cells: Array[Vector2i] = []) -> EventTimeline:
 	var timeline := EventTimeline.new()
-
-	while is_cascade_active():
-		var step = step_cascade()
-		if step == null:
-			break
-		timeline.add_cascade_step(step)
-
-	event_log.push(&"turn_completed", timeline.to_stats())
-
+	var budget := ResolutionBudget.new(rules)
+	var cascade := 0
+	var first := true
+	while true:
+		if not budget.spend(board.size.x * board.size.y * 2): return _failure(timeline, budget.error, budget)
+		var matches := match_classifier.classify(match_detector.find_matches(board))
+		if not matches.is_empty():
+			if cascade >= int(rules.value("max_cascades")): return _failure(timeline, "cascade_cap", budget)
+			var chain := 0
+			while not matches.is_empty():
+				if chain > int(rules.value("max_chains")): return _failure(timeline, "chain_cap", budget)
+				var pair: Array[Vector2i] = []
+				if first: pair.assign(swap_cells)
+				var match_events: Array[Dictionary] = []
+				for m in matches:
+					var sources: Array = []
+					for pos in m.cells: sources.append({"cell": pos, "tile": board.get_tile(pos).to_dict()})
+					var survivor: Variant = MatchClassifier.survivor(m.cells, pair) if m.tier < 8 else null
+					var fact := m.duplicate(true)
+					fact.type = &"match_formed"
+					fact.sources = sources
+					fact.survivor = survivor
+					fact.survivor_id = board.get_tile(survivor).instance_id if survivor != null else ""
+					match_events.append(fact)
+				var plan := conflict_resolver.resolve(effect_planner.build_base_plan(matches, pair), board)
+				if not budget.spend(plan.size(), matches.size() + plan.size() * 2): return _failure(timeline, budget.error, budget)
+				if effect_resolver.apply(board, plan, event_log) < 0: return _failure(timeline, effect_resolver.last_error, budget)
+				if fail_at == "after_promotion": return _failure(timeline, "injected_after_promotion", budget)
+				var step := {"cascade_index": cascade, "chain_index": chain, "match_events": match_events,
+					"remove_events": effect_resolver.last_remove_events.duplicate(true), "upgrade_events": effect_resolver.last_upgrade_events.duplicate(true),
+					"gravity_events": [], "spawn_events": [], "board_hash": board.compute_hash() if capture_step_hashes else -1}
+				timeline.add_cascade_step(step)
+				first = false
+				chain += 1
+				if not budget.spend(board.size.x * board.size.y * 2): return _failure(timeline, budget.error, budget)
+				matches = match_classifier.classify(match_detector.find_matches(board))
+			cascade += 1
+		var settled := BoardSettler.resolve(board, rng, supply, spawn_resolver, budget, "normal_swap")
+		if not settled.ok: return _failure(timeline, settled.code, budget)
+		if fail_at == "after_spawn": return _failure(timeline, "injected_after_spawn", budget)
+		var settled_hash := board.compute_hash() if capture_step_hashes and not settled.steps.is_empty() else -1
+		for physical in settled.steps:
+			physical.cascade_index = cascade
+			physical.match_events = []
+			physical.remove_events = []
+			physical.upgrade_events = []
+			physical.board_hash = settled_hash
+			timeline.add_cascade_step(physical)
+		if not budget.spend(board.size.x * board.size.y * 2): return _failure(timeline, budget.error, budget)
+		if match_detector.find_matches(board).is_empty(): break
+	timeline.work_count = budget.work
 	return timeline
 
-func _snapshot_last_effect_events() -> Dictionary:
-	return {
-		"remove_events": effect_resolver.last_remove_events.duplicate(),
-		"upgrade_events": effect_resolver.last_upgrade_events.duplicate(),
-	}
+func _failure(timeline: EventTimeline, code: String, budget: ResolutionBudget) -> EventTimeline:
+	timeline.failure_code = code
+	timeline.work_count = budget.work
+	return timeline
+
+## Temporary adapters resolve once, before returning any presentation work.
+func prepare_turn(board: BoardState, rng: SeededRng, supply: SpawnTableResource, log: EventLog, pair: Array[Vector2i] = []) -> void:
+	_prepared = execute_turn(board,rng,supply,log,pair)
+	_cursor = 0
+
+func step_cascade() -> Variant:
+	if not is_cascade_active(): return null
+	var step: Dictionary = _prepared.cascade_steps[_cursor]
+	_cursor += 1
+	return step
+
+func is_cascade_active() -> bool:
+	return _prepared != null and _prepared.failure_code.is_empty() and _cursor < _prepared.cascade_steps.size()

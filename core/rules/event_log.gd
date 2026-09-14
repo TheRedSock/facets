@@ -6,13 +6,15 @@ extends RefCounted
 
 var entries: Array[Dictionary] = []
 var _max_entries: int = 10000
+var _next_index := 0
 
 
 func push(event_type: StringName, data: Dictionary = {}) -> void:
-	var entry := data.duplicate()
+	var entry := data.duplicate(true)
 	entry["type"] = event_type
-	entry["index"] = entries.size()
-	entries.append(entry)
+	entry["index"] = _next_index
+	_next_index += 1
+	entries.append(GameValue.freeze(entry))
 
 	# Prevent unbounded growth
 	if entries.size() > _max_entries:
@@ -21,6 +23,7 @@ func push(event_type: StringName, data: Dictionary = {}) -> void:
 
 func clear() -> void:
 	entries.clear()
+	# Retention/clear never reuses sequence IDs. A new session gets a new log.
 
 
 func get_last(count: int = 1) -> Array[Dictionary]:

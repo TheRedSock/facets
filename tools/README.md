@@ -26,6 +26,19 @@ the views without changing simulation state, and measures repeated upgrade
 bursts separately from steady rest. Without this argument its scope is
 explicitly functional, not performance acceptance.
 
+P1-A's actual-action probe is separate from the delivered-view burst. Run the
+registered `-Gpu -Only game_action_probe` stage, or launch the exact packaged
+`Facets.exe -- --action-probe=C:/absolute/report.json`. It plays 20 deterministic
+seed-0 actions through RunScene and records commit/input/playback/frame timing,
+checkpoint identity, page loads and skip/restart/error/navigation checks. Add
+`--probe-serial` for the retained reference. Add `--probe-corpus` for a separate
+100-seed / 2,000-action CPU run without playback. Output directories must exist.
+`CHECK_COMPLETE: action_probe` and a passing functional status are required;
+reported target booleans are separate, and false targets remain open gates.
+The probe is opt-in command-line diagnostics and does not change normal input
+or rules. Movie capture is a separate visual run and invalidates performance
+comparisons; retain source/package identities with each report.
+
 `measure_release_frames.ps1 -ProcessId <Facets.exe PID>` captures the unmodified
 release executable externally with pinned standalone PresentMon 2.5.1 and checks
 the same p95 budget. It retains raw per-present CSV, package/tool checksums and
@@ -574,3 +587,12 @@ independent exact rational area and topology checks. `polygon_gpu_check.gd` chec
 collinear-boundary optical equivalence in all three solvers and concave-host
 energy conservation. The standard runner includes CPU/GPU checks and runs the
 Python oracle when `-ReferencePython` is supplied.
+
+P1 game verification uses the additive game stages in engine_checks.json; see
+[game test contracts](../tests/game/README.md). The runtime allowlist includes
+core board/rules/run, ActionPlayer and data/game/rules/prototype.tres. Export with
+`./tools/build_game_package.ps1 -AssetPack generated/gem-assets.pck -Probe -FrameBudgetMs 16.7`.
+This creates a fresh runtime-only staging project, audits exact packaged paths,
+and probes the exported PCK. The actual release executable still needs its own
+interaction check. Codec reference generation and reviewed action-vector candidate
+capture live in tools/game; neither is an automatic test-golden updater.

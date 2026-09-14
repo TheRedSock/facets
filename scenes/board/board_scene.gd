@@ -19,7 +19,40 @@ var _board_offset := Vector2.ZERO
 
 ## Input state for tap-select-tap-swap and click-drag-swap.
 var _selected_cell: Vector2i = Vector2i(-1, -1)
-var _input_locked: bool = false
+var _input_gates: Dictionary = {}
+var _input_locked: bool:
+	get: return not _input_gates.is_empty()
+var _action_player: ActionPlayer
+
+func set_input_gate(reason: String, blocked: bool, owner: int = 0) -> void:
+	if blocked: _input_gates[reason] = owner
+	elif _input_gates.get(reason) == owner: _input_gates.erase(reason)
+
+func input_is_locked() -> bool:
+	return _input_locked
+
+func reset_input_gates() -> void:
+	_input_gates.clear()
+
+func play_committed_action(result: Dictionary, instant: bool = false) -> void:
+	if _action_player == null: _action_player = ActionPlayer.new(self)
+	await _action_player.play(result,instant)
+
+func play_rejected_swap(a: Vector2i,b: Vector2i) -> void:
+	if _action_player == null: _action_player = ActionPlayer.new(self)
+	await _action_player.invalid(a,b)
+
+func cancel_action_playback(snap: bool = true) -> void:
+	if _action_player != null: _action_player.cancel(snap)
+
+func snap_to(snapshot: BoardState) -> void:
+	_board_state = snapshot.duplicate_board()
+	_compute_layout()
+	_rebuild_all()
+
+func _exit_tree() -> void:
+	cancel_action_playback(false)
+	_action_player = null
 var _drag_origin: Vector2i = Vector2i(-1, -1)
 var _drag_completed: bool = false
 

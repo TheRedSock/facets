@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="GameRulesResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/definitions/game_rules_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+roster = Array[String](["quartz", "amethyst", "peridot", "topaz", "sapphire", "emerald", "ruby", "diamond"])
+supply_targets = Array[int]([1, 2, 3, 4])
+supply_weights = Array[int]([4, 3, 2, 1])

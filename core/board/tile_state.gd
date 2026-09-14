@@ -1,6 +1,8 @@
 class_name TileState
 extends RefCounted
 
+var instance_id: String = ""
+
 ## Unique identifier for this gem type (e.g., &"quartz", &"amethyst").
 var tile_id: StringName = &"debug_tile"
 
@@ -60,6 +62,7 @@ static func from_debug_tier(value: int) -> TileState:
 
 func duplicate_tile() -> TileState:
 	var tile := TileState.new()
+	tile.instance_id = instance_id
 	tile.tile_id = tile_id
 	tile.match_group = match_group
 	tile.tier = tier
@@ -75,6 +78,7 @@ func duplicate_tile() -> TileState:
 
 func to_dict() -> Dictionary:
 	return {
+		"instance_id": instance_id,
 		"tile_id": String(tile_id),
 		"match_group": String(get_match_group()),
 		"tier": tier,

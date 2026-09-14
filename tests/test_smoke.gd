@@ -132,6 +132,9 @@ func test_board_layout_resource() -> void:
 	layout.add_spawn_entry(Vector2i(3, 0))
 	layout.add_portal(Vector2i(0, 3), Vector2i.DOWN, Vector2i(3, 0))
 	layout.set_fill_sources(Vector2i(2, 2), [Vector2i(-1, -1), Vector2i(1, -1)])
+	# P1 raw admission rejects the old fixture's fill reference into blocked (1,1).
+	assert_false(LayoutAdmission.admit(layout).ok, "Blocked fill source rejects before application")
+	layout.set_fill_sources(Vector2i(2, 2), [Vector2i(-1, 0), Vector2i(1, -1)])
 
 	var board := BoardState.new()
 	board.apply_layout(layout)
@@ -313,7 +316,7 @@ func test_merge_base_match() -> void:
 	var plan := planner.build_base_plan(classified)
 
 	var event_log := EventLog.new()
-	var resolver := EffectResolver.new()
+	var resolver := EffectResolver.new(GameTestCatalog.create())
 	resolver.apply(board, plan, event_log)
 
 	# (0,0) and (1,0) should be removed, (2,0) should be upgraded to T2
@@ -519,7 +522,7 @@ func test_gravity_determinism() -> void:
 	var spawn_table := SpawnTableResource.new()
 	spawn_table.allowed_tiers = [1, 2, 3]
 	spawn_table.weights = [3, 2, 1]
-	var resolver := SpawnResolver.new()
+	var resolver := SpawnResolver.new(GameTestCatalog.create())
 	resolver.populate_board(board_a, rng, spawn_table)
 	rng.reseed(42)
 	resolver.populate_board(board_b, rng, spawn_table)
@@ -551,7 +554,7 @@ func test_gravity_max_rounds_safety() -> void:
 	var physics := BoardPhysics.new()
 	# This should terminate (not hang) due to MAX_SETTLE_ROUNDS
 	var moves := physics.resolve_gravity(board)
-	assert_true(moves >= 0, "Gravity with cycle should terminate safely")
+	assert_true(moves == -1 and physics.last_result.code == "physical_cycle", "Gravity cycle returns explicit failure")
 
 
 # ---- Phase 4: Pipeline Tests ----
@@ -608,7 +611,7 @@ func test_effect_resolution() -> void:
 	]
 
 	var event_log := EventLog.new()
-	var resolver := EffectResolver.new()
+	var resolver := EffectResolver.new(GameTestCatalog.create())
 	var removed := resolver.apply(board, plan, event_log)
 
 	assert_eq(removed, 1, "Should remove 1 tile")
@@ -625,7 +628,7 @@ func test_spawn_integer_weighted_pick() -> void:
 	spawn_table.allowed_tiers = [1, 2, 3]
 	spawn_table.weights = [6, 3, 1]  # 60% T1, 30% T2, 10% T3
 
-	var resolver := SpawnResolver.new()
+	var resolver := SpawnResolver.new(GameTestCatalog.create())
 	var counts := {1: 0, 2: 0, 3: 0}
 	for i in 1000:
 		var board := BoardState.new(Vector2i(1, 1))
@@ -651,7 +654,7 @@ func test_spawn_integer_determinism() -> void:
 	rng_a.reseed(42)
 	rng_b.reseed(42)
 
-	var resolver := SpawnResolver.new()
+	var resolver := SpawnResolver.new(GameTestCatalog.create())
 	resolver.populate_board(board_a, rng_a, spawn_table)
 	resolver.populate_board(board_b, rng_b, spawn_table)
 
@@ -673,7 +676,7 @@ func test_event_timeline_structure() -> void:
 	spawn_table.allowed_tiers = [1, 2, 3]
 	spawn_table.weights = [3, 2, 1]
 
-	var tc := TurnController.new()
+	var tc := TurnController.new(GameTestCatalog.create())
 	var timeline := tc.execute_turn(board, rng, spawn_table, event_log)
 
 	assert_true(not timeline.is_empty(), "Timeline should have at least 1 cascade step")
@@ -704,7 +707,7 @@ func test_turn_controller() -> void:
 	spawn_table.allowed_tiers = [1, 2, 3]
 	spawn_table.weights = [3, 2, 1]
 
-	var tc := TurnController.new()
+	var tc := TurnController.new(GameTestCatalog.create())
 	var timeline := tc.execute_turn(board, rng, spawn_table, event_log)
 
 	var stats := timeline.to_stats()
@@ -744,7 +747,7 @@ func _run_determinism_sequence(run_seed: int) -> Array[int]:
 	var spawn_table := SpawnTableResource.new()
 	spawn_table.allowed_tiers = [1, 2, 3, 4]
 	spawn_table.weights = [4, 3, 2, 1]
-	var tc := TurnController.new()
+	var tc := TurnController.new(GameTestCatalog.create())
 	tc.spawn_resolver.populate_board(board, rng, spawn_table)
 
 	var hashes: Array[int] = [board.compute_hash()]

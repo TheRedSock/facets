@@ -3,8 +3,8 @@ extends Node
 ## Headless simulation for balance testing.
 ## Run: godot --headless res://tests/test_simulation.tscn
 ##
-## Runs N games with a greedy AI that evaluates all possible swaps and picks
-## the best one (5+ > 4 > 3, ties broken by lowest position on the grid).
+## Runs N games using the authoritative ordered legal-action query.
+## Selects the first legal command; accounting comes from committed facts.
 ## Prints per-run and aggregate statistics.
 
 const NUM_RUNS := 10  ## Increase for more statistical confidence (100+ takes minutes in GDScript)
@@ -108,60 +108,10 @@ func _run_single_game(run_idx: int) -> Dictionary:
 
 
 func _find_best_swap(board: BoardState) -> Array:
-	var best_swap: Array = []
-	var best_score := -1
-	var best_row := -1
-	var directions: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.DOWN]
-	var last_checked_row := -1
-
-	for cell: Vector2i in board.all_cells():
-		if cell.y != last_checked_row:
-			if best_score == 3 and best_row >= last_checked_row and last_checked_row >= 0:
-				break
-			last_checked_row = cell.y
-
-		var tile_a: TileState = board.get_tile(cell)
-		if tile_a == null:
-			continue
-
-		for dir: Vector2i in directions:
-			var neighbor := Vector2i(cell.x + dir.x, cell.y + dir.y)
-			if not board.in_bounds(neighbor) or board.is_blocked(neighbor):
-				continue
-			var tile_b: TileState = board.get_tile(neighbor)
-			if tile_b == null:
-				continue
-			# Swapping identical match groups can never create a new match
-			if tile_a.get_match_group() == tile_b.get_match_group():
-				continue
-
-			board.swap_cells(cell, neighbor)
-			var matches: Array[Dictionary] = _match_detector.find_matches(board)
-			board.swap_cells(cell, neighbor)
-
-			if matches.is_empty():
-				continue
-
-			var classified: Array[Dictionary] = _match_classifier.classify(matches)
-			var score := 0
-			var lowest_row := 0
-			for m: Dictionary in classified:
-				var st: StringName = m.get("semantic_type", &"base_match")
-				var match_score: int = _score_for_type(st)
-				if match_score > score:
-					score = match_score
-				var match_cells: Array = m.get("cells", [])
-				for c: Vector2i in match_cells:
-					if c.y > lowest_row:
-						lowest_row = c.y
-
-			if score > best_score or (score == best_score and lowest_row > best_row):
-				best_score = score
-				best_row = lowest_row
-				best_swap = [cell, neighbor]
-
-	return best_swap
-
+	var commands := ActionLegality.enumerate_legal_swaps(board)
+	if commands.is_empty(): return []
+	# Deterministic first-legal reference policy; game strategy/tuning is P2/P3.
+	return [commands[0].origin, commands[0].destination]
 
 func _score_for_type(semantic_type: StringName) -> int:
 	match semantic_type:
@@ -174,18 +124,9 @@ func _score_for_type(semantic_type: StringName) -> int:
 
 
 func _compute_move_delta(timeline: EventTimeline) -> int:
-	var best: StringName = &"base_match"
-	for step: Dictionary in timeline.cascade_steps:
-		var match_events: Array = step.get("match_events", [])
-		for event: Dictionary in match_events:
-			var st: StringName = event.get("semantic_type", &"base_match")
-			if st == &"match_5_plus" or st == &"match_lt":
-				return 1
-			if st == &"match_4":
-				best = st
-	if best == &"match_4":
-		return 0
-	return -1
+	for fact in timeline.rule_facts:
+		if fact.type == "action_started": return -int(fact.cost)
+	return 0
 
 
 func _accumulate_stats(stats: Dictionary, timeline: EventTimeline) -> void:

@@ -1266,6 +1266,70 @@
       ],
       "mode": "cpu",
       "completion": "CHECK_COMPLETE: test_rng_cross_platform"
+    },
+    {
+      "name": "test_game_rules",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/game/test_game_rules.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_rules"
+    },
+    {
+      "name": "test_game_state",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/game/test_game_state.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_state"
+    },
+    {
+      "name": "test_game_transaction",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/game/test_game_transaction.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_transaction",
+      "timeout_seconds": 1800
+    },
+    {
+      "name": "test_game_replay",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/game/test_game_replay.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_replay",
+      "timeout_seconds": 1800
+    },
+    {
+      "name": "test_game_motion",
+      "args": ["--headless", "--script", "res://tests/game/test_game_motion.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_motion"
+    },
+    {
+      "name": "game_action_probe",
+      "args": ["--", "--action-probe=res://artifacts/game/p1a/registered-action-probe.json"],
+      "mode": "gpu",
+      "completion": "CHECK_COMPLETE: action_probe"
+    },
+    {
+      "name": "test_game_playback",
+      "args": [
+        "--headless",
+        "--script",
+        "res://tests/game/test_game_playback.gd"
+      ],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_playback"
     }
   ]
 }

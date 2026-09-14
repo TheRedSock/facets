@@ -3,6 +3,9 @@ extends RefCounted
 
 var size: Vector2i = Vector2i.ZERO
 var _cells: Array = []
+var spawn_policy: String = "fill_empty_cells"
+var next_instance: int = 1
+var id_namespace: String = "piece"
 
 ## Portal connections: "x,y,dx,dy" -> Vector2i target cell.
 ## When get_neighbor() is called for a cell+direction that has a portal entry,
@@ -55,6 +58,9 @@ func set_tile(cell: Vector2i, tile: TileState) -> void:
 	var cell_state: CellState = get_cell(cell)
 	if cell_state == null or cell_state.blocked:
 		return
+	if tile != null and tile.instance_id.is_empty():
+		tile.instance_id = "%s/%d" % [id_namespace, next_instance]
+		next_instance += 1
 	cell_state.tile = tile
 
 
@@ -87,24 +93,25 @@ func is_blocked(cell: Vector2i) -> bool:
 
 
 ## Swaps the tiles in two cells. Rejects swaps involving blocked or immovable tiles.
-func swap_cells(a: Vector2i, b: Vector2i) -> void:
-	if not in_bounds(a) or not in_bounds(b):
-		return
+func swap_cells(a: Vector2i, b: Vector2i) -> bool:
+	if a == b or not can_move_occupant(a) or not can_move_occupant(b): return false
 	var cell_a: CellState = get_cell(a)
 	var cell_b: CellState = get_cell(b)
 	if cell_a.blocked or cell_b.blocked:
-		return
+		return false
 	if (cell_a.tile != null and cell_a.tile.immovable) or \
 	   (cell_b.tile != null and cell_b.tile.immovable):
-		return
+		return false
 	var temp := cell_a.tile
 	cell_a.tile = cell_b.tile
 	cell_b.tile = temp
+	return true
 
 
 ## Moves a tile from one cell to another. Target must be empty and non-blocked.
 ## Returns true if the move succeeded.
 func move_tile(from: Vector2i, to: Vector2i) -> bool:
+	if not can_move_occupant(from): return false
 	var from_cell: CellState = get_cell(from)
 	if from_cell == null or from_cell.tile == null:
 		return false
@@ -140,7 +147,40 @@ func get_effective_gravity(cell: Vector2i) -> Vector2i:
 	var cs: CellState = get_cell(cell)
 	if cs == null:
 		return Vector2i.DOWN
-	return cs.gravity_direction
+	return cs.gravity_direction if cs.gravity_direction != Vector2i.ZERO else Vector2i.DOWN
+
+func can_move_occupant(cell: Vector2i) -> bool:
+	var cs := get_cell(cell)
+	return cs != null and not cs.blocked and cs.tile != null and not cs.tile.immovable and cs.lock.is_empty()
+
+func neighbor_for(cell: Vector2i, direction: Vector2i, purpose: String) -> Vector2i:
+	if is_blocked(cell) or purpose not in ["match", "swap", "gravity", "fill"]: return Vector2i(-1, -1)
+	if purpose in ["match", "swap"] and abs(direction.x) + abs(direction.y) != 1: return Vector2i(-1, -1)
+	var target := get_neighbor(cell, direction) if purpose == "gravity" else cell + direction
+	return Vector2i(-1, -1) if is_blocked(target) else target
+
+func duplicate_board() -> BoardState:
+	var result := BoardState.new(size)
+	result._portals = _portals.duplicate(true)
+	result.spawn_policy = spawn_policy
+	result.next_instance = next_instance
+	result.id_namespace = id_namespace
+	for i in _cells.size():
+		var source: CellState = _cells[i]
+		var target: CellState = result._cells[i]
+		target.blocked = source.blocked
+		target.gravity_direction = source.gravity_direction
+		target.fill_sources = source.fill_sources.duplicate()
+		target.is_spawn_entry = source.is_spawn_entry
+		target.tags = source.tags.duplicate(true)
+		target.lock = source.lock.duplicate(true)
+		target.tile = source.tile.duplicate_tile() if source.tile != null else null
+	return result
+
+func to_dict() -> Dictionary:
+	var cells: Array = []
+	for cs in _cells: cells.append(cs.to_dict())
+	return {"size": size, "cells": cells, "portals": _portals.duplicate(true), "spawn_policy": spawn_policy, "next_instance": next_instance, "id_namespace": id_namespace}
 
 
 ## Adds a portal connection. Gravity/movement from `from` in `direction` arrives at `to`.
@@ -161,41 +201,38 @@ func has_portal(from: Vector2i, direction: Vector2i) -> bool:
 ## Applies a BoardLayoutResource to configure this board's topology.
 ## Resizes the board, sets blocked cells, gravity directions, spawn entries,
 ## fill sources, and portal connections.
-func apply_layout(layout: BoardLayoutResource) -> void:
-	resize(layout.board_size)
+func apply_layout(layout: BoardLayoutResource) -> bool:
+	var result := LayoutAdmission.admit(layout)
+	if not result.ok: return false
+	apply_topology(result.topology)
+	return true
 
-	# Apply blocked cells
-	for cell_pos in layout.blocked_cells:
-		set_blocked(cell_pos, true)
+func apply_topology(topology: Dictionary) -> void:
+	resize(topology.size)
+	spawn_policy = topology.spawn_policy
+	_portals = topology.portals.duplicate(true)
+	for i in _cells.size():
+		var raw: Dictionary = topology.cells[i]
+		var cs: CellState = _cells[i]
+		cs.blocked = raw.blocked
+		cs.gravity_direction = raw.gravity
+		cs.is_spawn_entry = raw.entry
+		cs.fill_sources.assign(raw.fill)
 
-	# Apply gravity overrides
-	for key in layout.gravity_overrides:
-		var pos := BoardLayoutResource._parse_cell_key(key)
-		var cs: CellState = get_cell(pos)
-		if cs != null:
-			cs.gravity_direction = layout.gravity_overrides[key]
-
-	# Apply spawn entries
-	for cell_pos in layout.spawn_entries:
-		var cs: CellState = get_cell(cell_pos)
-		if cs != null:
-			cs.is_spawn_entry = true
-
-	# Apply fill source overrides
-	for key in layout.fill_source_overrides:
-		var pos := BoardLayoutResource._parse_cell_key(key)
-		var cs: CellState = get_cell(pos)
-		if cs != null:
-			cs.fill_sources = layout.fill_source_overrides[key]
-
-	# Apply portal connections
-	_portals.clear()
-	for portal in layout.portals:
-		var from: Vector2i = portal["from"]
-		var dir: Vector2i = portal["direction"]
-		var to: Vector2i = portal["to"]
-		add_portal(from, dir, to)
-
+func layout_resource() -> BoardLayoutResource:
+	var layout := BoardLayoutResource.new()
+	layout.board_size = size
+	layout.spawn_policy = spawn_policy
+	for pos in all_positions():
+		var cs := get_cell(pos)
+		if cs.blocked: layout.add_blocked(pos); continue
+		layout.set_gravity(pos, cs.gravity_direction)
+		if cs.is_spawn_entry: layout.add_spawn_entry(pos)
+		if not cs.fill_sources.is_empty(): layout.set_fill_sources(pos, cs.fill_sources)
+	for key in _portals:
+		var parts: PackedStringArray = key.split(",")
+		layout.add_portal(Vector2i(int(parts[0]),int(parts[1])),Vector2i(int(parts[2]),int(parts[3])),_portals[key])
+	return layout
 
 # ---- State Hashing ----
 
@@ -204,28 +241,11 @@ func apply_layout(layout: BoardLayoutResource) -> void:
 ## Used for replay verification and anti-cheat checkpoints.
 ## Two boards with identical cell/tile configurations produce identical hashes.
 func compute_hash() -> int:
-	var hash_val := 17
-	for y in size.y:
-		for x in size.x:
-			var pos := Vector2i(x, y)
-			var cs: CellState = get_cell(pos)
-			hash_val = hash_val * 31 + (1 if cs.blocked else 0)
-			hash_val = hash_val * 31 + cs.gravity_direction.x
-			hash_val = hash_val * 31 + cs.gravity_direction.y
-			if cs.tile != null:
-				hash_val = hash_val * 31 + cs.tile.tile_id.hash()
-				hash_val = hash_val * 31 + cs.tile.tier
-				hash_val = hash_val * 31 + (1 if cs.tile.protected else 0)
-				hash_val = hash_val * 31 + (1 if cs.tile.immovable else 0)
-				hash_val = hash_val * 31 + (1 if cs.tile.unmatchable else 0)
-				hash_val = hash_val * 31 + cs.tile.gravity_override.x
-				hash_val = hash_val * 31 + cs.tile.gravity_override.y
-				for flag_key in cs.tile.status_flags:
-					hash_val = hash_val * 31 + flag_key.hash()
-			else:
-				hash_val = hash_val * 31 + 0
-	return hash_val
+	# Compatibility only. Authoritative replay uses the complete SHA-256 digest.
+	return digest().left(15).hex_to_int()
 
+func digest() -> String:
+	return CanonicalCodec.digest(to_dict())
 
 # ---- Query Helpers ----
 

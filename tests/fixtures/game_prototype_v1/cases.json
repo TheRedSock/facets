@@ -1,0 +1,885 @@
+{
+  "schema": 1,
+  "rules_id": "facets.prototype.v1",
+  "default_roster": [
+    "quartz",
+    "amethyst",
+    "peridot",
+    "topaz",
+    "sapphire",
+    "emerald",
+    "ruby",
+    "diamond"
+  ],
+  "coordinates": "zero-based x,y; rows increase downward",
+  "tile_encoding": "0 empty, 1..8 active appraisal tier; instance ID = fixture ID + initial row-major index",
+  "default_phase_policy": "Only inspect the named phase. Match snapshots are intentionally unresolved; do not run opening stabilization first. Full-action fixtures use default supply and seeded RNG.",
+  "cases": [
+    {
+      "id": "match_3",
+      "phase": "swap_then_first_match",
+      "board": [
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          2,
+          1,
+          3
+        ]
+      ],
+      "seed": 140901,
+      "expected": {
+        "component_sizes": [
+          3
+        ],
+        "survivor": [
+          1,
+          0
+        ],
+        "promoted_tier": 2,
+        "removed_count": 2
+      },
+      "swap": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "match_4",
+      "phase": "swap_then_first_match",
+      "board": [
+        [
+          1,
+          1,
+          2,
+          1
+        ],
+        [
+          2,
+          3,
+          1,
+          4
+        ]
+      ],
+      "seed": 140902,
+      "expected": {
+        "component_sizes": [
+          4
+        ],
+        "survivor": [
+          2,
+          0
+        ],
+        "promoted_tier": 2,
+        "removed_count": 3,
+        "base_craft_candidate": 1
+      },
+      "swap": [
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "match_5",
+      "phase": "swap_then_first_match",
+      "board": [
+        [
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        [
+          2,
+          3,
+          1,
+          4,
+          2
+        ]
+      ],
+      "seed": 140903,
+      "expected": {
+        "component_sizes": [
+          5
+        ],
+        "survivor": [
+          2,
+          0
+        ],
+        "promoted_tier": 2,
+        "removed_count": 4,
+        "base_craft_candidate": 2
+      },
+      "swap": [
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "match_l",
+      "phase": "match_snapshot",
+      "board": [
+        [
+          1,
+          2,
+          3
+        ],
+        [
+          1,
+          3,
+          2
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ],
+      "seed": 140904,
+      "expected": {
+        "component_sizes": [
+          5
+        ],
+        "survivor": [
+          2,
+          2
+        ],
+        "intersection": true
+      }
+    },
+    {
+      "id": "match_t",
+      "phase": "match_snapshot",
+      "board": [
+        [
+          1,
+          1,
+          1
+        ],
+        [
+          2,
+          1,
+          3
+        ],
+        [
+          3,
+          1,
+          2
+        ]
+      ],
+      "seed": 140905,
+      "expected": {
+        "component_sizes": [
+          5
+        ],
+        "survivor": [
+          1,
+          2
+        ],
+        "intersection": true
+      }
+    },
+    {
+      "id": "multi_intersection",
+      "phase": "match_snapshot",
+      "board": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          0
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "seed": 140906,
+      "expected": {
+        "component_sizes": [
+          9
+        ],
+        "survivor": [
+          3,
+          3
+        ],
+        "unique_member_count": 9
+      },
+      "known_gap": "connected_match_classification_overlaps"
+    },
+    {
+      "id": "first_action_win",
+      "phase": "complete_action",
+      "board": [
+        [
+          2,
+          1,
+          3
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          3,
+          0,
+          2
+        ]
+      ],
+      "seed": 140907,
+      "expected": {
+        "room_result": "complete",
+        "work": 15,
+        "marked_rubble_remaining": 0,
+        "completion_count": 1
+      },
+      "swap": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "work": 16,
+      "craft": 1,
+      "obstacles": [
+        {
+          "cell": [
+            1,
+            2
+          ],
+          "kind": "rubble",
+          "durability": 1,
+          "marked": true
+        }
+      ],
+      "objective": {
+        "kind": "clear_marked_rubble"
+      },
+      "notes": "Damaged rubble fixture (1 remaining hit); completion at first stable boundary, before subsequent hazard/refill work."
+    },
+    {
+      "id": "last_action_win",
+      "phase": "complete_action",
+      "board": [
+        [
+          2,
+          1,
+          3
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          3,
+          0,
+          2
+        ]
+      ],
+      "seed": 140908,
+      "expected": {
+        "room_result": "complete",
+        "work": 0,
+        "marked_rubble_remaining": 0,
+        "completion_count": 1
+      },
+      "swap": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "work": 1,
+      "craft": 1,
+      "obstacles": [
+        {
+          "cell": [
+            1,
+            2
+          ],
+          "kind": "rubble",
+          "durability": 1,
+          "marked": true
+        }
+      ],
+      "objective": {
+        "kind": "clear_marked_rubble"
+      },
+      "notes": "Damaged rubble fixture (1 remaining hit); completion at first stable boundary, before subsequent hazard/refill work."
+    },
+    {
+      "id": "occupied_spawn_entry",
+      "phase": "spawn_query",
+      "board": [
+        [
+          1,
+          2
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "seed": 140909,
+      "expected": {
+        "eligible_cells": []
+      },
+      "spawn_entries": [
+        [
+          0,
+          0
+        ]
+      ],
+      "known_gap": "occupied_entry_allows_interior_spawning"
+    },
+    {
+      "id": "entry_refill_settles",
+      "phase": "settle_refill",
+      "board": [
+        [
+          0
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "seed": 140910,
+      "expected": {
+        "occupied_cells": 3,
+        "spawn_origins": [
+          [
+            0,
+            0
+          ]
+        ],
+        "all_events_root_cause": "setup"
+      },
+      "spawn_entries": [
+        [
+          0,
+          0
+        ]
+      ],
+      "notes": "Validate physical fill independent of matching; inspect occupancy before match resolution."
+    },
+    {
+      "id": "outlet_delivery",
+      "phase": "stable_extraction",
+      "board": [
+        [
+          1,
+          2,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          1,
+          5,
+          2
+        ]
+      ],
+      "seed": 140911,
+      "expected": {
+        "room_result": "complete",
+        "extracted_count": 1,
+        "removed_count": 1,
+        "carry_excludes_cell": [
+          1,
+          2
+        ]
+      },
+      "outlets": [
+        [
+          1,
+          2
+        ]
+      ],
+      "objective": {
+        "kind": "extract",
+        "minimum_tier": 5,
+        "count": 1
+      },
+      "work": 1
+    },
+    {
+      "id": "locked_swap_rejected",
+      "phase": "validate_action",
+      "board": [
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          2,
+          1,
+          3
+        ]
+      ],
+      "seed": 140912,
+      "expected": {
+        "accepted": false,
+        "state_and_rng_unchanged": true
+      },
+      "swap": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "locks": [
+        {
+          "cell": [
+            1,
+            1
+          ],
+          "kind": "seal",
+          "durability": 1
+        }
+      ],
+      "notes": "Future seal overlay adapter; authoritative lock legality must already have an owner in P1."
+    },
+    {
+      "id": "locked_gem_matches",
+      "phase": "match_snapshot",
+      "board": [
+        [
+          1,
+          1,
+          1
+        ],
+        [
+          2,
+          3,
+          2
+        ]
+      ],
+      "seed": 140913,
+      "expected": {
+        "component_sizes": [
+          3
+        ],
+        "survivor": [
+          2,
+          0
+        ],
+        "seal_removed_before_merge": true
+      },
+      "locks": [
+        {
+          "cell": [
+            1,
+            0
+          ],
+          "kind": "seal",
+          "durability": 1
+        }
+      ]
+    },
+    {
+      "id": "recovery_possible",
+      "phase": "recovery_query",
+      "board": [
+        [
+          1,
+          2,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          1,
+          2
+        ]
+      ],
+      "seed": 140914,
+      "expected": {
+        "legal_swaps_before": 0,
+        "preserve_multiset": true,
+        "work_delta": 0,
+        "craft_delta": 0
+      },
+      "craft": 0,
+      "tool_available": false,
+      "recovery_witness": [
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          2,
+          1,
+          3
+        ],
+        [
+          3,
+          2,
+          3
+        ]
+      ],
+      "notes": "Witness proves this multiset can recover; it is not an expected first RNG shuffle. Engine adapter must record attempts and witness its own result."
+    },
+    {
+      "id": "recovery_impossible",
+      "phase": "recovery_query",
+      "board": [
+        [
+          4,
+          5,
+          6
+        ],
+        [
+          5,
+          6,
+          4
+        ],
+        [
+          6,
+          4,
+          5
+        ]
+      ],
+      "seed": 140915,
+      "expected": {
+        "legal_swaps_before": 0,
+        "result": "board_locked",
+        "state_preserved": true
+      },
+      "craft": 0,
+      "tool_available": false,
+      "notes": "All pieces are above the reshuffle tier ceiling."
+    },
+    {
+      "id": "portal_not_match_adjacency",
+      "phase": "match_snapshot",
+      "board": [
+        [
+          1,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "seed": 140916,
+      "expected": {
+        "component_sizes": []
+      },
+      "portals": [
+        {
+          "from": [
+            1,
+            0
+          ],
+          "direction": [
+            1,
+            0
+          ],
+          "to": [
+            2,
+            1
+          ]
+        }
+      ],
+      "known_gap": "portal_creates_match"
+    },
+    {
+      "id": "zero_gravity_fallback",
+      "phase": "gravity_query",
+      "board": [
+        [
+          1
+        ]
+      ],
+      "seed": 140917,
+      "expected": {
+        "direction": [
+          0,
+          1
+        ]
+      },
+      "cell_gravity": [
+        {
+          "cell": [
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            0
+          ]
+        }
+      ],
+      "known_gap": "zero_cell_gravity_is_zero"
+    },
+    {
+      "id": "status_value_hash",
+      "phase": "state_identity",
+      "board": [
+        [
+          1
+        ]
+      ],
+      "seed": 140918,
+      "expected": {
+        "hash_must_change": true
+      },
+      "mutation": {
+        "field": "tile.status_flags.counter",
+        "cell": [
+          0,
+          0
+        ],
+        "before": 1,
+        "after": 99
+      },
+      "known_gap": "hash_ignores_status_value"
+    },
+    {
+      "id": "portal_hash",
+      "phase": "state_identity",
+      "board": [
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "seed": 140919,
+      "expected": {
+        "hash_must_change": true
+      },
+      "mutation": {
+        "field": "portals",
+        "before": [],
+        "after": [
+          {
+            "from": [
+              0,
+              0
+            ],
+            "direction": [
+              0,
+              1
+            ],
+            "to": [
+              1,
+              1
+            ]
+          }
+        ]
+      },
+      "known_gap": "hash_ignores_portal"
+    },
+    {
+      "id": "distant_swap_rejected",
+      "phase": "validate_action",
+      "board": [
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          2,
+          1,
+          3
+        ]
+      ],
+      "seed": 140920,
+      "expected": {
+        "accepted": false,
+        "state_and_rng_unchanged": true
+      },
+      "swap": [
+        [
+          0,
+          0
+        ],
+        [
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "id": "same_cell_rejected",
+      "phase": "validate_action",
+      "board": [
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          2,
+          1,
+          3
+        ]
+      ],
+      "seed": 140921,
+      "expected": {
+        "accepted": false,
+        "state_and_rng_unchanged": true
+      },
+      "swap": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "empty_swap_rejected",
+      "phase": "validate_action",
+      "board": [
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          2,
+          1,
+          3
+        ]
+      ],
+      "seed": 140922,
+      "expected": {
+        "accepted": false,
+        "state_and_rng_unchanged": true
+      },
+      "swap": [
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "id": "blocked_swap_unrelated_match",
+      "phase": "validate_action",
+      "board": [
+        [
+          1,
+          1,
+          1
+        ],
+        [
+          2,
+          3,
+          2
+        ]
+      ],
+      "seed": 140923,
+      "expected": {
+        "accepted": false,
+        "state_and_rng_unchanged": true
+      },
+      "swap": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "immovable_cells": [
+        [
+          0,
+          1
+        ]
+      ],
+      "notes": "Intentionally contains a preexisting unrelated match to reproduce the invalid-success path."
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+[
+  {
+    "id": "match_3",
+    "phase": "swap_then_first_match",
+    "fields": {
+      "component_sizes": "P1",
+      "survivor": "P1",
+      "promoted_tier": "P1",
+      "removed_count": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "match_4",
+    "phase": "swap_then_first_match",
+    "fields": {
+      "component_sizes": "P1",
+      "survivor": "P1",
+      "promoted_tier": "P1",
+      "removed_count": "P1",
+      "base_craft_candidate": "P2"
+    },
+    "coverage": "partial"
+  },
+  {
+    "id": "match_5",
+    "phase": "swap_then_first_match",
+    "fields": {
+      "component_sizes": "P1",
+      "survivor": "P1",
+      "promoted_tier": "P1",
+      "removed_count": "P1",
+      "base_craft_candidate": "P2"
+    },
+    "coverage": "partial"
+  },
+  {
+    "id": "match_l",
+    "phase": "match_snapshot",
+    "fields": {
+      "component_sizes": "P1",
+      "survivor": "P1",
+      "intersection": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "match_t",
+    "phase": "match_snapshot",
+    "fields": {
+      "component_sizes": "P1",
+      "survivor": "P1",
+      "intersection": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "multi_intersection",
+    "phase": "match_snapshot",
+    "fields": {
+      "component_sizes": "P1",
+      "survivor": "P1",
+      "unique_member_count": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "first_action_win",
+    "phase": "complete_action",
+    "fields": {
+      "room_result": "P2",
+      "work": "P2",
+      "marked_rubble_remaining": "P2",
+      "completion_count": "P2"
+    },
+    "coverage": "deferred"
+  },
+  {
+    "id": "last_action_win",
+    "phase": "complete_action",
+    "fields": {
+      "room_result": "P2",
+      "work": "P2",
+      "marked_rubble_remaining": "P2",
+      "completion_count": "P2"
+    },
+    "coverage": "deferred"
+  },
+  {
+    "id": "occupied_spawn_entry",
+    "phase": "spawn_query",
+    "fields": {
+      "eligible_cells": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "entry_refill_settles",
+    "phase": "settle_refill",
+    "fields": {
+      "occupied_cells": "P1",
+      "spawn_origins": "P1",
+      "all_events_root_cause": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "outlet_delivery",
+    "phase": "stable_extraction",
+    "fields": {
+      "room_result": "P3",
+      "extracted_count": "P3",
+      "removed_count": "P3",
+      "carry_excludes_cell": "P3"
+    },
+    "coverage": "deferred"
+  },
+  {
+    "id": "locked_swap_rejected",
+    "phase": "validate_action",
+    "fields": {
+      "accepted": "P1",
+      "state_and_rng_unchanged": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "locked_gem_matches",
+    "phase": "match_snapshot",
+    "fields": {
+      "component_sizes": "P1",
+      "survivor": "P1",
+      "seal_removed_before_merge": "P6"
+    },
+    "coverage": "partial"
+  },
+  {
+    "id": "recovery_possible",
+    "phase": "recovery_query",
+    "fields": {
+      "legal_swaps_before": "P1",
+      "preserve_multiset": "P2",
+      "work_delta": "P2",
+      "craft_delta": "P2"
+    },
+    "coverage": "partial"
+  },
+  {
+    "id": "recovery_impossible",
+    "phase": "recovery_query",
+    "fields": {
+      "legal_swaps_before": "P1",
+      "result": "P2",
+      "state_preserved": "P2"
+    },
+    "coverage": "partial"
+  },
+  {
+    "id": "portal_not_match_adjacency",
+    "phase": "match_snapshot",
+    "fields": {
+      "component_sizes": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "zero_gravity_fallback",
+    "phase": "gravity_query",
+    "fields": {
+      "direction": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "status_value_hash",
+    "phase": "state_identity",
+    "fields": {
+      "hash_must_change": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "portal_hash",
+    "phase": "state_identity",
+    "fields": {
+      "hash_must_change": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "distant_swap_rejected",
+    "phase": "validate_action",
+    "fields": {
+      "accepted": "P1",
+      "state_and_rng_unchanged": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "same_cell_rejected",
+    "phase": "validate_action",
+    "fields": {
+      "accepted": "P1",
+      "state_and_rng_unchanged": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "empty_swap_rejected",
+    "phase": "validate_action",
+    "fields": {
+      "accepted": "P1",
+      "state_and_rng_unchanged": "P1"
+    },
+    "coverage": "full"
+  },
+  {
+    "id": "blocked_swap_unrelated_match",
+    "phase": "validate_action",
+    "fields": {
+      "accepted": "P1",
+      "state_and_rng_unchanged": "P1"
+    },
+    "coverage": "full"
+  }
+]

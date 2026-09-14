@@ -1,0 +1,567 @@
+[
+  {
+    "label": "Board size should be 8x8",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Origin should be in bounds",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Corner should be in bounds",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Out of bounds should be false",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Negative should be false",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tier should be 3",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "match_group should default to tile_id",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should not be protected by default",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Default gravity should be DOWN",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should not be spawn entry by default",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have no fill sources by default",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have no tags by default",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Configured gravity should be LEFT",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Configured should be spawn entry",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Default gravity_override should be ZERO",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should not be immovable by default",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should not be unmatchable by default",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Duplicate should copy gravity_override",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Duplicate should copy immovable",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Duplicate should copy unmatchable",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Board size should be 4x4",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Cell (1,1) should be blocked",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Cell (0,0) should not be blocked",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "(0,0) gravity should be LEFT",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "(2,2) gravity should be default DOWN",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "(3,0) should be spawn entry",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Portal should exist from (0,3) DOWN",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Portal should route to (3,0)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "(2,2) should have 2 fill sources",
+    "disposition": "retained with admitted fixture",
+    "replacement": "tests/test_smoke.gd: reject old blocked-source layout, then validate corrected local source"
+  },
+  {
+    "label": "Right neighbor of (2,2)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Down neighbor of (2,2)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Left neighbor of (2,2)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Up neighbor of (2,2)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Right edge should be OOB",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Left edge should be OOB",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Top edge should be OOB",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Bottom edge should be OOB",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Portal should override neighbor",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Non-portal direction should be normal",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Default effective gravity should be DOWN",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Cell gravity override should be LEFT",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile gravity override should take priority",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Immovable tile should not be swapped",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Other tile should remain in place",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Identical boards should have identical hashes",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Hash should change when tile tier changes",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should deduplicate to 1 removal with Vector2i key",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should find at least 1 match",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Match should have 3 cells",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Unmatchable tile should break the run — no match found",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Hole should break the run — no 3-match on either side",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should classify 1 match",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should be a base_match",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "First cell should be removed",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Second cell should be removed",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Survivor cell should still exist",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Survivor should be upgraded to T2",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "4-match should produce 3 removes",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "4-match should produce 1 upgrade",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Max-tier match should remove all 3 tiles",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Max-tier match should have no upgrades",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have moved tiles down",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile should have fallen to bottom",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Top cell should be empty",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile should rest above the hole",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Original position should be empty",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile should have moved right to (4,1)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Original position should be empty",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile should have moved left to (0,1)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Original position should be empty",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Immovable tile should stay at (1,1)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile above immovable should stack on top",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile should reach (3,3) via L-path",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Original position should be empty",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile should have filled diagonally into (1,2)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Source cell should be empty",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile should have fallen through portal to (2,3)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Original position should be empty",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have recorded move events",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Event type should be tile_moved",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "First move should be from (1,0)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "First move should be to (1,1)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Identical boards should produce identical gravity results",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have same number of move events",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Gravity with cycle should terminate safely",
+    "disposition": "intentional change",
+    "replacement": "tests/test_smoke.gd: explicit physical_cycle failure; tests/game/test_game_transaction.gd: complete rollback at caps"
+  },
+  {
+    "label": "Should plan 3 effects (2 removes + 1 upgrade)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have 2 remove effects",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have 1 upgrade effect",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Upgrade should target last cell in match",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should deduplicate to 1 removal",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should remove 1 tile",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Cell should be empty after removal",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Tile should be upgraded to tier 3",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have 1 remove event",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should have 1 upgrade event",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "T1 should be more common than T2",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "T2 should be more common than T3",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Same seed should produce identical boards",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Timeline should have at least 1 cascade step",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Step should have match_events",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Step should have remove_events",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Step should have gravity_events",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Step should have spawn_events",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Step should have board_hash",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should remove at least 2 tiles",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Stats should report at least 1 match",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should find at least 1 match",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Should remove at least 2 tiles",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Same seed should produce same sequence",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Same seed + actions should produce identical board hashes",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Validator should detect gravity cycle",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "Validator should detect out-of-bounds portal target",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd"
+  },
+  {
+    "label": "T1 should appear >400 times out of 1000 (got %d)",
+    "disposition": "retained",
+    "replacement": "tests/test_smoke.gd: integer weighted supply frequency assertion"
+  }
+]

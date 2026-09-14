@@ -8,16 +8,17 @@ var match_axes: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.DOWN]
 
 
 ## Scans the board for all line matches along configured match axes.
-## Uses get_neighbor() for topology-aware adjacency (portal-safe, shape-safe).
+## Uses local match-purpose adjacency; gravity portals never join lines.
 ## Respects the unmatchable tile flag.
 ## Returns an array of match dictionaries, each with "type", "cells", and "match_group".
 ## Does not mutate the board.
 func find_matches(board: BoardState) -> Array[Dictionary]:
 	var matches: Array[Dictionary] = []
-	var visited: Dictionary = {}
+	var visited := PackedByteArray()
 	var num_axes: int = match_axes.size()
 	var bw: int = board.size.x
 	var bh: int = board.size.y
+	visited.resize(bw * bh * num_axes)
 
 	for axis_idx: int in num_axes:
 		var axis: Vector2i = match_axes[axis_idx]
@@ -29,12 +30,12 @@ func find_matches(board: BoardState) -> Array[Dictionary]:
 				if board.is_blocked(pos):
 					continue
 				var visit_key: int = (y * bw + x) * num_axes + axis_idx
-				if visited.has(visit_key):
+				if visited[visit_key] != 0:
 					continue
 
 				var run: Array[Vector2i] = _collect_run(board, pos, axis)
 				for cell: Vector2i in run:
-					visited[(cell.y * bw + cell.x) * num_axes + axis_idx] = true
+					visited[(cell.y * bw + cell.x) * num_axes + axis_idx] = 1
 
 				if run.size() >= 3:
 					var tile: TileState = board.get_tile(pos)
@@ -49,7 +50,7 @@ func find_matches(board: BoardState) -> Array[Dictionary]:
 
 
 ## Collects a run of tiles with the same match_group starting from a position in a direction.
-## Uses board.get_neighbor() for topology-aware traversal.
+## Uses board.neighbor_for(..., "match") for local traversal.
 ## Stops at null tiles, unmatchable tiles, out-of-bounds, and different match groups.
 func _collect_run(board: BoardState, start: Vector2i, direction: Vector2i) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
@@ -59,12 +60,17 @@ func _collect_run(board: BoardState, start: Vector2i, direction: Vector2i) -> Ar
 
 	var group: StringName = start_tile.get_match_group()
 	var cursor := start
-	while cursor != Vector2i(-1, -1):
-		var tile: TileState = board.get_tile(cursor)
+	while cursor != Vector2i(-1, -1) and cells.size() < board.size.x * board.size.y:
+		var cell := board.get_cell(cursor)
+		if cell == null or cell.blocked: break
+		var tile: TileState = cell.tile
 		if tile == null or tile.unmatchable or tile.get_match_group() != group:
 			break
 		cells.append(cursor)
-		cursor = board.get_neighbor(cursor, direction)
+		# Matching is always local and cardinal; avoid repeated portal/purpose
+		# dispatch inside an already selected matching line.
+		if abs(direction.x) + abs(direction.y) != 1: break
+		cursor += direction
 
 	return cells
 

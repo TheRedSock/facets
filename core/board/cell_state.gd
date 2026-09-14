@@ -20,6 +20,8 @@ var fill_sources: Array[Vector2i] = []
 
 ## Extensible metadata for cell modifiers (ice, lava, conveyor, etc.).
 var tags: Dictionary = {}
+## Minimal movement lock; matching is independent. Seal lifecycle is deferred.
+var lock: Dictionary = {}
 
 
 static func open() -> CellState:
@@ -61,5 +63,6 @@ func to_dict() -> Dictionary:
 		"is_spawn_entry": is_spawn_entry,
 		"fill_sources": fill_sources.duplicate(),
 		"tags": tags.duplicate(),
+		"lock": lock.duplicate(true),
 		"tile": tile_data,
 	}

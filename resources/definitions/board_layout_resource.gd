@@ -7,6 +7,8 @@ extends Resource
 
 ## Unique identifier for this layout.
 @export var layout_id: StringName = &"default"
+@export var schema_version: int = 1
+@export_enum("fill_empty_cells", "entry_only") var spawn_policy: String = "fill_empty_cells"
 
 ## Board dimensions (width x height). All cells within this rectangle exist;
 ## use blocked_cells to carve out holes/shapes.

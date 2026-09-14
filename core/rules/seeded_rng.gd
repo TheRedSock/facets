@@ -7,6 +7,15 @@ extends RefCounted
 var _rng := RandomNumberGenerator.new()
 var current_seed: int = 0
 
+func capture() -> Dictionary:
+	return {"seed": current_seed, "state": _rng.state}
+
+func restore(snapshot: Dictionary) -> bool:
+	if snapshot.size() != 2 or not snapshot.get("seed") is int or not snapshot.get("state") is int: return false
+	reseed(snapshot.seed)
+	_rng.state = snapshot.state
+	return true
+
 
 func reseed(new_seed: int) -> void:
 	current_seed = new_seed

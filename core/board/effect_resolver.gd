@@ -7,8 +7,11 @@ var last_remove_events: Array[Dictionary] = []
 ## Per-tile upgrade events from the last apply() call.
 var last_upgrade_events: Array[Dictionary] = []
 
-## Optional per-run tier selection: tier -> tile_id.
-var tier_tile_overrides: Dictionary = {}
+var catalog: GameCatalog
+var last_error := ""
+
+func _init(admitted_catalog: GameCatalog = null) -> void:
+	catalog = admitted_catalog
 
 
 ## Applies the approved effect plan to the board state.
@@ -20,7 +23,10 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 	last_remove_events.clear()
 	last_upgrade_events.clear()
 	var tiles_removed := 0
-	var tile_registry: Node = _get_tile_registry()
+	last_error = ""
+	if catalog == null:
+		last_error = "missing_catalog"
+		return -1
 
 	for entry in effect_plan:
 		var effect: StringName = entry.get("effect", &"")
@@ -37,6 +43,8 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 						"tile_id": removed_tile.tile_id,
 						"tier": removed_tile.tier,
 						"reason": entry.get("reason", &""),
+						"instance_id": removed_tile.instance_id,
+						"source": removed_tile.to_dict(),
 					}
 					last_remove_events.append(event)
 					event_log.push(&"tile_removed", {
@@ -52,32 +60,11 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 				if tile != null:
 					var old_tier := tile.tier
 					var old_tile_id := tile.tile_id
+					var old_snapshot := tile.to_dict()
 
-					# Merge-aware upgrade: follow the merge chain if available.
-					# If tile has merge_target_id, resolve it through TileRegistry
-					# to get the full target definition (new tile_id, tier, match_group, etc.).
-					# Falls back to simple tier+1 if no merge chain is defined.
-					if tile.merge_target_id != &"" and tile_registry != null and tile_registry.has_definitions():
-						var target_def: TileDefinitionResource = tile_registry.get_definition(tile.merge_target_id)
-						if target_def != null and tier_tile_overrides.has(target_def.tier):
-							var selected_tile_id: StringName = tier_tile_overrides[target_def.tier]
-							var selected_def: TileDefinitionResource = tile_registry.get_definition(selected_tile_id)
-							if selected_def != null and selected_def.tier == target_def.tier:
-								target_def = selected_def
-						if target_def != null:
-							tile.tile_id = target_def.tile_id
-							tile.tier = target_def.tier
-							tile.match_group = target_def.match_group
-							tile.merge_target_id = target_def.merge_target_id
-							# Copy family tags from the target definition
-							tile.family_tags = target_def.family_tags.duplicate()
-						else:
-							# merge_target_id set but definition not found — simple tier bump
-							tile.tier += 1
-							tile.merge_target_id = &""
-					else:
-						# No merge chain (debug tiles, top tier, etc.) — simple tier bump
-						tile.tier += 1
+					if not catalog.promote(tile):
+						last_error = "invalid_promotion"
+						return -1
 
 					var event := {
 						"type": &"tile_upgraded",
@@ -86,6 +73,9 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 						"old_tile_id": old_tile_id,
 						"old_tier": old_tier,
 						"new_tier": tile.tier,
+						"instance_id": tile.instance_id,
+						"old": old_snapshot,
+						"new": tile.to_dict(),
 					}
 					last_upgrade_events.append(event)
 					event_log.push(&"tile_upgraded", {
@@ -103,10 +93,3 @@ func apply(board: BoardState, effect_plan: Array[Dictionary], event_log: EventLo
 				event_log.push(&"unhandled_effect", entry)
 
 	return tiles_removed
-
-
-func _get_tile_registry() -> Node:
-	var main_loop := Engine.get_main_loop()
-	if main_loop is SceneTree:
-		return main_loop.root.get_node_or_null("/root/TileRegistry")
-	return null

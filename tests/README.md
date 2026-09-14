@@ -22,3 +22,17 @@ Long-running balance experiments: `godot --headless res://tests/test_simulation.
 
 Logs and artifacts are ignored under artifacts/. See docs/ENGINE_READINESS_REPORT.md
 for phase acceptance and core/lapidary/*/CONTRACT.md for detailed contracts.
+
+P1 game foundation checks are documented in [tests/game](game/README.md). Run:
+
+```powershell
+& ./tools/check_engine.ps1 -Only import,source_check,test_smoke,test_rng_cross_platform,test_board_consumer,test_run_delivery,test_game_rules,test_game_state,test_game_transaction,test_game_replay,test_game_playback,test_game_motion
+```
+
+The replay corpus has a 30-minute ceiling and 100 explicit seeds. Interrupted
+runs are incomplete, even if their first seeds passed. Frozen P0 fixture ownership
+and historical smoke dispositions are tracked beside the game tests.
+
+P1-A actual-action presentation measurement is `-Gpu -Only game_action_probe`.
+Its report distinguishes functional completion from measured performance targets;
+use the executable probe described in the tools guide for release evidence.
