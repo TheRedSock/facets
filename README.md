@@ -1,34 +1,55 @@
 # Facets
 
-Godot 4.6 gemstone match-3 merge roguelike. Desktop viewport: 1920×1080.
-The executable used for validation is `C:/Godot/Godot_v4.6.1-stable_win64_console.exe`.
+Facets is a gemstone match-3 merge roguelike in development, built with Godot and
+GDScript. The intended game combines an evolving collection of real gems with tactical
+board objectives and branching runs.
 
-Swap adjacent tiles to form matches. Matching tiles merge into an upgraded survivor;
-the deterministic simulation produces an event timeline for visual playback.
-`core/board`, `core/run` and `core/rules` contain simulation. `scenes/` owns input and
-animation. See [AGENTS.md](AGENTS.md) for topology, gravity, RNG and rendering invariants.
+## What is here
 
-Gem assets are generated offline from explicit material, geometry, condition,
-lighting and presentation resources. The spectral GPU renderer supports convex,
-mesh and analytic geometry, repeated volume scattering and optional reconstruction.
-Specialized transport modes have explicit limitations. Physical grade labels never
-alter optics; authored condition presets and an independent style layer control
-their respective inputs. The game reads a bounded prebuilt asset library through
-GemForge; it never renders missing optical assets at runtime.
+The repository contains an offline gem-authoring/rendering pipeline, runtime
+asset delivery, and an early playable board demonstration. The proposed roguelike
+prototype adds rooms, family reactions, rewards and carryover; the design documents
+describe intended work, not features already present in the demo.
 
-Build with `tools/build_gem_assets.ps1`. Current factory contracts and available
-commands are in [the tools guide](tools/README.md), [factory contract](core/lapidary/factory/CONTRACT.md)
-and [kernel contract](core/lapidary/tracer/KERNEL_CONTRACT.md). Generated output is
-ignored under `generated/`; desktop delivery includes the generated gem-assets.pck.
+The [documentation index](docs/README.md) routes the current design and engine
+reports. The [prototype build plan](docs/PROTOTYPE_BUILD_PLAN.md) records phase
+status, dependencies and acceptance criteria. Its [P0 baseline](docs/P0_BASELINE.md)
+preserves the initial rules and review evidence.
 
-Run the project in Godot to access Play and the Gem Atelier. The
-[engine readiness report](docs/ENGINE_READINESS_REPORT.md) records implemented
-authoring, cut design, appearance and desktop-delivery validation.
-Current documentation is indexed in [docs/README.md](docs/README.md). Superseded
-documents are preserved under the gitignored `docs/archive/`.
+## Run and develop
 
-Validation: `tools/check_engine.ps1` for CPU gates, `-Gpu` for GPU and factory gates,
-`-ReferencePython <python>` for independent numerical comparisons. Use `-List -Gpu`
-to inspect registered stages. GPU tools need a windowed RenderingDevice; use
-`inspect_gems.gd -- --plan-only` for headless inspection planning. Simulation tests
-are documented in [tests/README.md](tests/README.md).
+Open `project.godot` in Godot 4.6. The project menu provides the board demo and Gem
+Atelier. Tool scripts specify their tested Godot executable and export-template
+requirements; check them when configuring another workstation.
+
+Gameplay uses prebuilt gem assets. Follow the [tools guide](tools/README.md) for
+asset generation, delivery validation and desktop packaging, and the
+[authoring workflow](docs/AUTHORING_WORKFLOW.md) for editing specimens. Rendering
+and GPU checks need a windowed GPU environment; headless checks cover their
+explicit CPU/data scope.
+
+Use the [tests guide](tests/README.md) for simulation tests and registered engine
+checks. Existing test success does not establish the proposed game's balance,
+readability or completeness.
+
+## Navigate the project
+
+| Area | Purpose |
+|---|---|
+| `core/board/`, `core/run/`, `core/rules/` | Board simulation and run/rule orchestration |
+| `core/lapidary/` | Offline gem pipeline; detailed contracts live with each subsystem |
+| `core/delivery/` | Runtime asset loading and presentation contract |
+| `resources/`, `data/` | Schemas, authored content and presentation mappings |
+| `scenes/` | Gameplay views, application UI and authoring tools |
+| `tools/`, `tests/` | Build, validation and test entry points |
+
+For upcoming architecture and workspace changes, see the
+[architecture guide](docs/ARCHITECTURE_HARDENING.md). The
+[presentation specification](docs/PRESENTATION_ASSETS.md) defines UI, background,
+audio and effects production. [AGENTS.md](AGENTS.md) is the agent routing and
+collaboration guide.
+
+`docs/`, `plans/`, `generated/` and review artifacts follow the repository's local,
+gitignored workflow and may not exist in a fresh clone. Tracked subsystem contracts,
+source and tests remain available; obtain the local design package when working
+on the proposed prototype. Archived documents are historical references.
