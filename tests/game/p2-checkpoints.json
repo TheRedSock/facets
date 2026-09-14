@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "baseline_commit": "95a02f7bd83ede2b0dbb9245633ee25bc75a798f",
+  "policy_contract": "core/run/ROOM_CONTRACT.md",
+  "batches": {
+    "B0": "policy_frozen",
+    "B1": "pending",
+    "B2": "pending",
+    "B3": "pending",
+    "B4": "pending",
+    "B5": "pending",
+    "B6": "pending",
+    "B7": "pending"
+  },
+  "inherited_p0_fields": {
+    "match_4.base_craft_candidate": "B3",
+    "match_5.base_craft_candidate": "B3",
+    "first_action_win": "B2",
+    "last_action_win": "B2",
+    "recovery_possible": "B4",
+    "recovery_impossible": "B4"
+  },
+  "player_sessions": "pending",
+  "intervention_trial": "required_after_room",
+  "inherited_cpu_acceptance": "open",
+  "inherited_player_feel_acceptance": "open"
+}
