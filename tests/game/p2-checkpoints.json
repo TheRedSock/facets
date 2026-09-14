@@ -9,7 +9,7 @@
     "B3": "simulation_implemented_and_verified",
     "B4": "simulation_implemented_and_verified",
     "B5": "functional_ui_and_playback_verified",
-    "B6": "visual_assets_and_package_verified_audio_review_pending",
+    "B6": "functional_presentation_verified_v3_audio_accepted_and_packaged",
     "B7": "automated_room_release_checks_passed_player_sessions_pending"
   },
   "inherited_p0_fields": {
@@ -27,7 +27,16 @@
   "simulation_evidence": "artifacts/game/p2/simulation/checks/results.json",
   "room_seed_evaluation": "100-seed automated corpus passed; human teaching and purposeful-tool review pending",
   "playback_evidence": "artifacts/game/p2/playback/checks/results.json",
-  "package_evidence": "artifacts/package-build/20260914-211156-2739/report.json",
-  "release_evidence": "artifacts/game/p2/presentation/final-1600x900.json; final-1280x720.json",
-  "audio_status": "First set too melodic; second set too percussive. Third revision will use user-provided MP3 references. Runtime audio disabled."
+  "package_evidence": "artifacts/package-build/20260914-213143-0379/report.json",
+  "release_evidence": "artifacts/game/p2/presentation/accepted-audio-1600x900.json; accepted-audio-1280x720.json",
+  "audio_status": "User accepted all ten v3 resonant material cues on 2026-09-14: Yes, use these. Exact hashes promoted; 328320 PCM bytes. No reference samples copied. Both release probes loaded ten cues and played 86; dense in-game listening remains part of player sessions.",
+  "audio_checks": "artifacts/game/p2/presentation/audio-final-checks/results.json; audio-teardown-checks/results.json",
+  "checkpoints": {
+    "P1_P1A": "95a02f7",
+    "B0": "5e71dcb",
+    "B1_B4": "a35452f",
+    "B5": "e46ecc3",
+    "B6_visual_package": "f746c05",
+    "B6_accepted_audio": "commit containing this ledger update; see git log"
+  }
 }

@@ -88,7 +88,7 @@ func _on_board_changed(board: BoardState) -> void:
 	_delivery_loading = false
 	if not prepared:
 		var forge := get_node_or_null("/root/GemForge")
-		_show_delivery_error(forge.last_error if forge != null else "Gem delivery service is unavailable")
+		_show_delivery_error(_audio.last_error if not _audio.last_error.is_empty() else (forge.last_error if forge != null else "Gem delivery service is unavailable"))
 		return
 	board_scene.set_board_state(board.duplicate_board())
 	await get_tree().process_frame
@@ -249,6 +249,7 @@ func _on_restart_pressed() -> void:
 		_resolution_error = run_controller.last_error; _update_hud()
 
 func _prepare_forge_clips() -> bool:
+	if not _audio.last_error.is_empty(): return false
 	var forge := get_node_or_null("/root/GemForge")
 	var state := run_controller.get_run_state()
 	if forge == null or state == null: return false

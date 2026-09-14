@@ -24,10 +24,17 @@ func _run() -> void:
 	# Dummy driver verifies lifecycle/voice ownership, not perceptual sound quality.
 	var silent := AudioStreamWAV.new(); silent.format = AudioStreamWAV.FORMAT_16_BITS
 	silent.mix_rate = 48000; silent.data = PackedByteArray(); silent.data.resize(48000)
+	var accepted_match: AudioStream = scene._audio.streams.get("match_commit")
+	scene._audio.cancel()
 	scene._audio.streams["match_commit"] = silent
 	scene._audio.set_muted(false)
+	var burst_start := scene._audio.cues_played
 	for i in 30: scene._audio.play("match_commit")
-	check(scene._audio.voices.filter(func(v: AudioStreamPlayer) -> bool: return v.playing).size() <= 6,"bounded game voices")
+	check(scene._audio.cues_played == burst_start+1,"duplicate simultaneous impacts coalesce")
+	for cue in ["tile_swap","tile_promoted","obstacle_hit","obstacle_broken"]: scene._audio.play(cue)
+	check(scene._audio.voices.slice(2,6).filter(func(v: AudioStreamPlayer) -> bool: return v.playing).size() == 4,"bounded game impact voices")
+	scene._audio.play("room_success"); scene._audio.play("ui_accept")
+	check(scene._audio.voices[6].playing and scene._audio.voices[0].playing,"results and UI remain audible during dense impacts")
 	var prior_generation := scene._audio.generation
 	scene._audio.cancel(); var played := scene._audio.cues_played
 	scene._audio.play("match_commit",prior_generation)
@@ -35,6 +42,8 @@ func _run() -> void:
 	scene._audio.set_muted(true); scene._audio.play("match_commit")
 	check(scene._audio.cues_played == played,"mute prevents playback")
 	scene._audio.set_muted(false)
+	scene._audio.streams["match_commit"] = accepted_match
+	silent = null
 	var model := RoomHudModel.build(scene.run_controller.run_state)
 	check(model.is_read_only() and model.tools.all(func(t: Dictionary) -> bool: return t.reason == "Need %d Craft" % t.cost),"immutable HUD explains unaffordable tools")
 	Engine.time_scale = 40.0
@@ -85,6 +94,8 @@ func _run() -> void:
 		check(scene.run_controller.run_state.digest() == win.digest() and not scene.board_scene.input_is_locked(),"restart removes stale terminal gate")
 	Engine.time_scale = 1.0
 	scene.queue_free(); await process_frame; await process_frame
+	# The headless frame loop can outrun the audio mixer consuming stopped voices.
+	await create_timer(0.1).timeout
 	finish("test_game_room_playback")
 
 func _motion_pockets() -> void:

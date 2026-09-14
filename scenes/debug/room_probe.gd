@@ -12,9 +12,9 @@ func _process(_delta: float) -> void:
 	_previous = now
 
 func run(path: String) -> void:
+	var start := Time.get_ticks_usec()
 	var scene: RunScene = load("res://scenes/run/run_scene.tscn").instantiate()
 	scene.room_mode = true; get_tree().root.add_child(scene)
-	var start := Time.get_ticks_usec()
 	for frame in 600:
 		await get_tree().process_frame
 		if scene.board_scene.visible and not scene._delivery_loading: break
@@ -70,8 +70,16 @@ func run(path: String) -> void:
 	await scene._begin_room()
 	if scene.run_controller.run_state.digest() != initial_digest: failures.append("restart_identity")
 	report.functional_tools = await _functional_tools(scene)
+	report.audio_cues = scene._audio.streams.size()
+	report.audio_cues_played = scene._audio.cues_played
+	if scene._audio.streams.size() != 10 or scene._audio.cues_played == 0: failures.append("runtime_audio_cues")
+	scene._toggle_sound()
+	if not RoomAudio.muted or scene._audio.voices.any(func(v: AudioStreamPlayer) -> bool: return v.playing): failures.append("runtime_mute")
+	scene._toggle_sound(); scene._audio.cancel()
 	scene.queue_free(); await get_tree().process_frame; await get_tree().process_frame
 	scene = null
+	# Let the audio mixer consume stop requests before the probe quits the process.
+	await get_tree().create_timer(0.2).timeout
 	_finish(path,report)
 
 func _functional_tools(scene: RunScene) -> Array:

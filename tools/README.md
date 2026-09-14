@@ -612,11 +612,14 @@ The older `--action-probe` remains the identifiable legacy workload.
 Original sound candidate production (Python standard library only):
 
 ```powershell
-python tools/game/build_prototype_sfx.py --recipes art_source/game/audio/prototype_sfx.json --output generated/game/sfx-material-candidates
-python tools/game/check_prototype_sfx.py generated/game/sfx-material-candidates
+python tools/game/build_prototype_sfx.py --recipes art_source/game/audio/prototype_sfx.json --output generated/game/sfx-new-candidates
+python tools/game/check_prototype_sfx.py generated/game/sfx-new-candidates
 ```
 
 The generator never writes runtime assets. PCM/header/peak checks do not establish
-perceptual acceptance. The first melodic candidate was rejected; revised rhythmic
-impact/friction candidates await listening review. Provenance and that feedback
-are recorded in art_source/game/manifest.json.
+perceptual acceptance. The user accepted the third resonant material set on
+2026-09-14: filtered impact/friction plus inharmonic ringing. Ten exact outputs
+are selected in the runtime manifest, with uncompressed PCM import settings.
+Recipes, reference-only file hashes and listening feedback are recorded in
+art_source/game/manifest.json. Generate future experiments in a new candidate
+directory; keep accepted recipes and outputs together until a replacement is reviewed.

@@ -1,7 +1,18 @@
 {
-  "audio_resources": [],
+  "audio_resources": [
+    "res://assets/audio/sfx/ui_nav.wav",
+    "res://assets/audio/sfx/ui_accept.wav",
+    "res://assets/audio/sfx/ui_reject.wav",
+    "res://assets/audio/sfx/tile_swap.wav",
+    "res://assets/audio/sfx/match_commit.wav",
+    "res://assets/audio/sfx/tile_promoted.wav",
+    "res://assets/audio/sfx/obstacle_hit.wav",
+    "res://assets/audio/sfx/obstacle_broken.wav",
+    "res://assets/audio/sfx/room_success.wav",
+    "res://assets/audio/sfx/room_failure.wav"
+  ],
   "schema": 1,
-  "audio_acceptance": "candidates only; listening pending",
+  "audio_acceptance": "Third resonant material set accepted by user: Yes, use these. 2026-09-14.",
   "visual_acceptance": "pending native screenshot inspection",
   "profile": "workshop_p2",
   "authored": "Original procedural/vector artwork created for Facets",
@@ -20,6 +31,16 @@
     "res://assets/ui/icons/restart.svg": "2d311101b1dc13cca26bc24b491f30d22a53d3a7460c6c3b2c38b0c30a05c890",
     "res://assets/ui/icons/tactic_charge.svg": "0f77f92a02f7f1fa74258542095a06fce6c544bfbdfd56b6fb520a048fdab6b6",
     "res://assets/ui/themes/workshop.tres": "2515e42b048b2089aed753f124c9ad7e5b14639bbc2a0efd4846a30691e40a4b",
-    "res://data/localization/en.tres": "bbaec270e71d39e6bbf188e052aa5da9642e890823f809b4822536ac7539732d"
+    "res://data/localization/en.tres": "bbaec270e71d39e6bbf188e052aa5da9642e890823f809b4822536ac7539732d",
+    "res://assets/audio/sfx/ui_nav.wav": "72e32b2c6a89f988f2d1737ccc580387fbd4d31c961f890ca3f406018a1db837",
+    "res://assets/audio/sfx/ui_accept.wav": "21ad49c43a5c8c4351a789fdfd27b401f71f4ee047e6c34a28522496918e2b42",
+    "res://assets/audio/sfx/ui_reject.wav": "9013fff5b2bfa064465fd031b49bb16ee68a71c87a71dd2b37dc28a2e43d561a",
+    "res://assets/audio/sfx/tile_swap.wav": "8589ecf4710c784ceba6f16cffc3ab8557d1686ecc25d007c754f40fccd9cd7a",
+    "res://assets/audio/sfx/match_commit.wav": "3b75b2192fda9958ffe6bfb2660c04d6d9e0d2f04681c6d39f5890ac5186f0a3",
+    "res://assets/audio/sfx/tile_promoted.wav": "6cf67c394b92e9b645b4afbd58afdd66f6877cdc3167ba09fd3390d373ad703a",
+    "res://assets/audio/sfx/obstacle_hit.wav": "2e5168cc2b9a7cf0949cfb4b960e6b77a91080d5786c6217062ad9563fa87193",
+    "res://assets/audio/sfx/obstacle_broken.wav": "b8fa3921bb1412d642e5f91ac6a3cdb1287c8cfc521ce3cd7922bf9602062b1a",
+    "res://assets/audio/sfx/room_success.wav": "c8f0ccb24c409ea883fecb0ad85bde962541bc187210cda0b49eb60f12c40ad5",
+    "res://assets/audio/sfx/room_failure.wav": "48b5c08f540db45b0042e2d9e4df08062ddfa1994a0ea1129201d6952e7fe86f"
   }
 }

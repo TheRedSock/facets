@@ -21,9 +21,12 @@ def synth(recipe):
     low_rate = math.exp(-math.tau * recipe["body_hz"] / RATE)
     edge_rate = math.exp(-math.tau * recipe["edge_hz"] / RATE)
     body_scale = math.sqrt((1 + low_rate) / (1 - low_rate)) * .55
+    # Inharmonic resonances give the struck material a tail without a melody.
+    modes = [(frequency * rng.uniform(.985, 1.015), weight, decay)
+             for frequency, weight, decay in recipe.get("modes", [])]
     for index in range(count):
         t = index / RATE
-        # Aperiodic friction and impacts, without tuned oscillators or notes.
+        # Aperiodic friction/impact excites independently damped material modes.
         white = rng.uniform(-1, 1)
         low = low_rate * low + (1 - low_rate) * white
         edge = edge_rate * edge + (1 - edge_rate) * white
@@ -33,13 +36,22 @@ def synth(recipe):
             grain = rng.uniform(.3, 1)
         grain *= .987
         envelope = 0.0
+        ring = 0.0
         for onset, strength in recipe["impacts"]:
             age = t - onset
             if age >= 0:
                 envelope += strength * min(1.0, age / .0015) * math.exp(-age * recipe["decay"])
-        envelope *= min(1.0, (count - index) / (RATE * .010))
+                for frequency, weight, decay in modes:
+                    ring += strength * weight * min(1.0, age / .002) * math.exp(-age / decay) * math.sin(math.tau * frequency * age)
+        scrape = recipe.get("scrape", [0, 0, 0])
+        if scrape[0] < t < scrape[1]:
+            position = (t - scrape[0]) / (scrape[1] - scrape[0])
+            envelope += scrape[2] * math.sin(math.pi * position) ** .7
+        tail = min(1.0, (count - index) / (RATE * .020))
         texture = low * body_scale + (white - edge) * recipe["sharpness"] * (grit + grain)
-        value = recipe["gain"] * envelope * texture
+        value = recipe["gain"] * tail * (envelope * texture + recipe.get("ring_gain", 0) * ring)
+        if not math.isfinite(value) or abs(value) > .5:
+            raise ValueError("Candidate exceeds the finite peak budget; lower its gain")
         samples.append(round(max(-.5, min(.5, value)) * 32767))
     return struct.pack("<" + "h" * len(samples), *samples)
 
@@ -57,7 +69,7 @@ def main():
     args = parser.parse_args()
     recipes = json.loads(args.recipes.read_text(encoding="utf-8"))
     args.output.mkdir(parents=True, exist_ok=True)
-    manifest = {"generator": "facets-prototype-sfx-v2-material", "python": platform.python_version(),
+    manifest = {"generator": "facets-prototype-sfx-v3-resonant-material", "python": platform.python_version(),
                 "authorship": "Original mathematical recipes authored for Facets",
                 "acceptance": "candidate; listening required", "cues": {}}
     sampler = bytearray()

@@ -81,4 +81,7 @@ and the separate intervention trial require their own evidence.
 candidates using the frozen swaps. `test_game_room_playback` exercises typed
 effects in concurrent/serial/instant/skip modes, terminal/restart gates, keyboard
 target previews, rubble-pocket refill, and bounded audio/mute/cancellation using
-the dummy driver. Listening acceptance remains a separate human observation.
+the dummy driver. Dense-impact checks cover duplicate coalescing, the four-impact
+cap and reserved UI/result voices. Headless teardown allows one mixer interval
+after releasing the scene. The third cue set was accepted by the user on
+2026-09-14; dense in-game listening remains a separate human observation.
