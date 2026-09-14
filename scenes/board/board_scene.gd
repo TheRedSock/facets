@@ -5,6 +5,7 @@ signal cell_pressed(cell: Vector2i)
 signal swap_requested(cell_a: Vector2i, cell_b: Vector2i)
 signal async_group_finished(group_id: int)
 signal delivery_failed(message:String)
+signal selection_canceled
 
 @export var tile_view_scene: PackedScene
 
@@ -23,6 +24,19 @@ var _input_gates: Dictionary = {}
 var _input_locked: bool:
 	get: return not _input_gates.is_empty()
 var _action_player: ActionPlayer
+var target_mode := false
+var cursor_cell := Vector2i.ZERO
+var target_cells: Array[Vector2i] = []
+var _overlay: Control
+
+func apply_overlay_fact(event: Dictionary) -> void:
+	if _board_state == null: return
+	match event.type:
+		"obstacle_damaged": _board_state.obstacles[event.obstacle_id] = event.new.duplicate(true)
+		"obstacle_broken": _board_state.obstacles.erase(event.obstacle_id)
+		"lock_damaged": _board_state.get_cell(event.cell).lock = event.new.duplicate(true)
+		"lock_cleared": _board_state.get_cell(event.cell).lock = {}
+	if _overlay != null: _overlay.queue_redraw()
 
 func set_input_gate(reason: String, blocked: bool, owner: int = 0) -> void:
 	if blocked: _input_gates[reason] = owner
@@ -49,6 +63,7 @@ func snap_to(snapshot: BoardState) -> void:
 	_board_state = snapshot.duplicate_board()
 	_compute_layout()
 	_rebuild_all()
+	if _overlay != null: _overlay.queue_redraw()
 
 func _exit_tree() -> void:
 	cancel_action_playback(false)
@@ -71,13 +86,43 @@ var _async_group_completion_queue: Array[int] = []
 
 
 func _ready() -> void:
+	focus_mode = Control.FOCUS_ALL
 	_grid_bg = Control.new()
 	_grid_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_grid_bg.draw.connect(_draw_board_background)
 	add_child(_grid_bg)
 	move_child(_grid_bg, 0)
+	_overlay = Control.new(); _overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.draw.connect(_draw_room_overlay); add_child(_overlay)
+	focus_entered.connect(func() -> void: _overlay.queue_redraw())
+	focus_exited.connect(func() -> void: _overlay.queue_redraw())
 
 	resized.connect(_on_resized)
+
+func _draw_room_overlay() -> void:
+	if _board_state == null: return
+	for obstacle in _board_state.obstacles.values():
+		var rect := Rect2(_cell_to_pixel(obstacle.cell),Vector2(_cell_size))
+		var center := rect.get_center()
+		var radius := minf(rect.size.x,rect.size.y)*0.36
+		var points := PackedVector2Array([center+Vector2(-radius,-radius*0.6),center+Vector2(radius*0.5,-radius),center+Vector2(radius,radius*0.6),center+Vector2(-radius*0.6,radius)])
+		_overlay.draw_colored_polygon(points,Color("687078"))
+		_overlay.draw_polyline(PackedVector2Array([points[0],points[1],points[2],points[3],points[0]]),Color("b8b6ac"),2.0,true)
+		if obstacle.durability == 1:
+			_overlay.draw_polyline(PackedVector2Array([center+Vector2(0,-radius),center+Vector2(-8,0),center+Vector2(8,5),center+Vector2(0,radius)]),Color("202a35"),4.0,true)
+		for pip in obstacle.durability: _overlay.draw_circle(center+Vector2((pip-0.5)*12,rect.size.y*0.38),3,Color("f2eadb"))
+	for pos in _board_state.all_cells():
+		if not _board_state.get_cell(pos).lock.is_empty(): _overlay.draw_rect(Rect2(_cell_to_pixel(pos)+Vector2(5,5),Vector2(_cell_size)-Vector2(10,10)),Color("d9b978"),false,3)
+	for pos in target_cells:
+		_overlay.draw_rect(Rect2(_cell_to_pixel(pos)+Vector2(3,3),Vector2(_cell_size)-Vector2(6,6)),Color("d9b978"),false,3)
+	if _selected_cell != Vector2i(-1,-1): _overlay.draw_rect(Rect2(_cell_to_pixel(_selected_cell)+Vector2(2,2),Vector2(_cell_size)-Vector2(4,4)),Color("d9b978"),false,3)
+	if has_focus():
+		var rect := Rect2(_cell_to_pixel(cursor_cell),Vector2(_cell_size))
+		_overlay.draw_rect(rect,Color("eaf6ff"),false,2); _overlay.draw_rect(rect.grow(-4),Color("eaf6ff"),false,1)
+
+func set_targets(cells: Array[Vector2i]) -> void:
+	target_cells = cells.duplicate()
+	if _overlay != null: _overlay.queue_redraw()
 
 
 func _on_resized() -> void:
@@ -559,6 +604,8 @@ func _compute_layout() -> void:
 	if tile_canvas != null:
 		tile_canvas.position = _board_offset
 		tile_canvas.size = Vector2(board_pixel_w, board_pixel_h)
+	if _overlay != null:
+		_overlay.position = _board_offset; _overlay.size = Vector2(board_pixel_w,board_pixel_h); _overlay.queue_redraw()
 
 
 func estimate_cell_size(board_size: Vector2i) -> Vector2i:
@@ -940,10 +987,23 @@ func _start_upgrade_settle(view: TileView, duration: float) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if _input_locked:
 		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		var direction := Vector2i.ZERO
+		match event.keycode:
+			KEY_LEFT: direction = Vector2i.LEFT
+			KEY_RIGHT: direction = Vector2i.RIGHT
+			KEY_UP: direction = Vector2i.UP
+			KEY_DOWN: direction = Vector2i.DOWN
+			KEY_ENTER, KEY_SPACE: _handle_tap(cursor_cell)
+			KEY_ESCAPE: _deselect(); selection_canceled.emit()
+			_: return
+		if _board_state != null: cursor_cell = (cursor_cell+direction).clamp(Vector2i.ZERO,_board_state.size-Vector2i.ONE)
+		_overlay.queue_redraw(); accept_event(); return
 
 	# --- Mouse press: start a potential drag ---
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			grab_focus()
 			var cell := _pixel_to_cell(event.position)
 			_drag_origin = cell
 			_drag_completed = false
@@ -957,6 +1017,7 @@ func _gui_input(event: InputEvent) -> void:
 
 	# --- Mouse motion while held: detect drag into adjacent cell ---
 	if event is InputEventMouseMotion and _drag_origin != Vector2i(-1, -1) and not _drag_completed:
+		if target_mode: return
 		var current_cell := _pixel_to_cell(event.position)
 		if current_cell == Vector2i(-1, -1) or current_cell == _drag_origin:
 			return
@@ -971,9 +1032,13 @@ func _gui_input(event: InputEvent) -> void:
 ## Handles a tap (press + release on the same cell without dragging).
 ## Implements the two-tap swap: first tap selects, second tap on adjacent cell swaps.
 func _handle_tap(cell: Vector2i) -> void:
+	if _input_locked: return
 	if cell == Vector2i(-1, -1):
 		_deselect()
 		return
+	cursor_cell = cell
+	if target_mode:
+		cell_pressed.emit(cell); _overlay.queue_redraw(); return
 
 	if _selected_cell == Vector2i(-1, -1):
 		_select_cell(cell)
@@ -990,9 +1055,7 @@ func _handle_tap(cell: Vector2i) -> void:
 func _select_cell(cell: Vector2i) -> void:
 	_deselect()
 	_selected_cell = cell
-	if _tile_views.has(cell):
-		var view: TileView = _tile_views[cell]
-		view.modulate = Color(1.0, 1.0, 0.7, 1.0)
+	if _overlay != null: _overlay.queue_redraw()
 
 
 func _deselect() -> void:
@@ -1000,6 +1063,7 @@ func _deselect() -> void:
 		var view: TileView = _tile_views[_selected_cell]
 		view.modulate = Color.WHITE
 	_selected_cell = Vector2i(-1, -1)
+	if _overlay != null: _overlay.queue_redraw()
 
 
 # ---- Board Construction & Tile View Pool ----
@@ -1008,6 +1072,7 @@ func _deselect() -> void:
 func _rebuild_all() -> void:
 	if tile_canvas == null or _board_state == null:
 		return
+	if _overlay != null: _overlay.queue_redraw()
 
 	# Return all tracked views to the pool
 	for key in _tile_views:

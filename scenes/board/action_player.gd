@@ -68,7 +68,7 @@ func invalid(a: Vector2i, b: Vector2i) -> void:
 	await _wait(tween,token)
 
 func play(result: Dictionary, instant: bool = false) -> void:
-	if serial_reference or instant:
+	if instant or (serial_reference and not result.before.room_board):
 		await _play_serial(result,instant)
 		return
 	cancel(false)
@@ -79,19 +79,24 @@ func play(result: Dictionary, instant: bool = false) -> void:
 	for pos in result.before.all_cells():
 		var tile: TileState = result.before.get_tile(pos)
 		if tile != null and board._tile_views.has(pos): _views_by_id[tile.instance_id] = board._tile_views[pos]
-	var a: Vector2i = result.command.origin; var b: Vector2i = result.command.destination
-	var first: TileView = board._tile_views.get(a); var second: TileView = board._tile_views.get(b)
-	if first == null or second == null: cancel(true); return
-	var tween := _tween()
-	tween.tween_property(first,"position",board._cell_to_pixel(b),AnimationSequencer.swap_duration)
-	tween.tween_property(second,"position",board._cell_to_pixel(a),AnimationSequencer.swap_duration)
-	if not await _wait(tween,token): return
-	board._tile_views[a] = second; board._tile_views[b] = first
-	first.cell = b; second.cell = a
+	if result.command.has("origin"):
+		var a: Vector2i = result.command.origin; var b: Vector2i = result.command.destination
+		var first: TileView = board._tile_views.get(a); var second: TileView = board._tile_views.get(b)
+		if first == null or second == null: cancel(true); return
+		var tween := _tween()
+		tween.tween_property(first,"position",board._cell_to_pixel(b),AnimationSequencer.swap_duration)
+		tween.tween_property(second,"position",board._cell_to_pixel(a),AnimationSequencer.swap_duration)
+		if not await _wait(tween,token): return
+		board._tile_views[a] = second; board._tile_views[b] = first
+		first.cell = b; second.cell = a
 	for phase in last_plan:
 		if not current(token): return
-		if phase.kind == "match": await _match(phase.step,token)
-		elif phase.concurrent: await _travel(phase,token)
+		if phase.kind == "match":
+			await _match(phase.step,token)
+			if not current(token): return
+			for event in phase.step.get("overlay_events",[]): board.apply_overlay_fact(event)
+			for event in phase.step.get("recovery_events",[]): await _recovery(event,token)
+		elif phase.concurrent and not serial_reference: await _travel(phase,token)
 		else: await _ordered_travel(phase.steps,token)
 	if current(token):
 		board.snap_to(_after)
@@ -140,15 +145,15 @@ func _travel(phase: Dictionary, token: int) -> void:
 			if not current(token): board._release_view(view); return
 			view.position = board._cell_to_pixel(journey.from)
 			view.modulate.a = 0.0
-			tween.tween_property(view,"modulate:a",1.0,minf(0.1,journey.duration))
+			tween.tween_property(view,"modulate:a",1.0,minf(0.1,journey.duration)).set_delay(journey.start)
 		if view == null: continue
 		observations.append({"kind":"start","instance_id":journey.instance_id,"frame":Engine.get_process_frames(),"from":journey.from,"to":journey.to})
-		tween.tween_property(view,"position",board._cell_to_pixel(journey.to),journey.duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-		tween.tween_callback(_landed.bind(journey.instance_id,token)).set_delay(journey.duration)
+		tween.tween_property(view,"position",board._cell_to_pixel(journey.to),journey.duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN).set_delay(journey.start)
+		tween.tween_callback(_landed.bind(journey.instance_id,token)).set_delay(journey.start+journey.duration)
 		var bounce := AnimationSequencer.landing_bounce_duration
 		if bounce > 0.0:
-			tween.tween_property(view,"scale",Vector2(1.05,0.95),bounce * 0.5).set_delay(journey.duration)
-			tween.tween_property(view,"scale",Vector2.ONE,bounce * 0.5).set_delay(journey.duration + bounce * 0.5)
+			tween.tween_property(view,"scale",Vector2(1.05,0.95),bounce * 0.5).set_delay(journey.start+journey.duration)
+			tween.tween_property(view,"scale",Vector2.ONE,bounce * 0.5).set_delay(journey.start+journey.duration + bounce * 0.5)
 	if not await _wait(tween,token): return
 	# Publish the cell map together, after all moving instances have landed.
 	for journey in phase.journeys:
@@ -161,6 +166,23 @@ func _travel(phase: Dictionary, token: int) -> void:
 
 func _landed(instance_id: String, token: int) -> void:
 	if current(token): observations.append({"kind":"land","instance_id":instance_id,"frame":Engine.get_process_frames()})
+
+func _recovery(event: Dictionary, token: int) -> void:
+	observations.append({"kind":"recovery","frame":Engine.get_process_frames()})
+	if not event.recovered: return
+	var tween := _tween()
+	for item in event.before:
+		var view: TileView = _views_by_id.get(item.instance_id)
+		if view != null: tween.tween_property(view,"modulate:a",0.0,0.12)
+	if not await _wait(tween,token): return
+	for item in event.before: board._tile_views.erase(item.cell)
+	tween = _tween()
+	for item in event.after:
+		var view: TileView = _views_by_id.get(item.instance_id)
+		if view == null: continue
+		view.cell = item.cell; view.position = board._cell_to_pixel(item.cell); board._tile_views[item.cell] = view
+		tween.tween_property(view,"modulate:a",1.0,0.16)
+	await _wait(tween,token)
 
 func _ordered_travel(steps: Array, token: int) -> void:
 	# Custom topology fallback: preserve cell reservations and every path segment.

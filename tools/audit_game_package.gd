@@ -1,7 +1,7 @@
 extends SceneTree
 ## Run externally with the editor binary --main-pack GAME.pck --headless.
 ## Audits the exact exported resources, not the source project's dependencies.
-const ALLOWED_ROOTS := ["autoloads/", "core/board/", "core/rules/", "core/run/", "core/game/", "core/delivery/", "resources/definitions/", "resources/delivery/", "data/tiles/", "data/game/rules/", "data/game/layouts/", "data/game/rooms/", "data/presentation/", "scenes/board/", "scenes/tile/", "scenes/run/", "scenes/main/", "scenes/menu/", "scenes/debug/"]
+const ALLOWED_ROOTS := ["autoloads/", "core/board/", "core/rules/", "core/run/", "core/game/", "core/delivery/", "resources/definitions/", "resources/delivery/", "data/tiles/", "data/game/rules/", "data/game/layouts/", "data/game/rooms/", "data/presentation/", "scenes/board/", "scenes/tile/", "scenes/run/", "scenes/ui/", "scenes/main/", "scenes/menu/", "scenes/debug/"]
 var failures:Array[String]=[]
 func _initialize()->void:_run.call_deferred()
 func _run()->void:

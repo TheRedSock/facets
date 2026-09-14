@@ -8,7 +8,7 @@
     "B2": "simulation_implemented_and_verified",
     "B3": "simulation_implemented_and_verified",
     "B4": "simulation_implemented_and_verified",
-    "B5": "pending",
+    "B5": "functional_ui_and_playback_verified",
     "B6": "pending",
     "B7": "pending"
   },
@@ -25,5 +25,6 @@
   "inherited_cpu_acceptance": "open",
   "inherited_player_feel_acceptance": "open",
   "simulation_evidence": "artifacts/game/p2/simulation/checks/results.json",
-  "room_seed_evaluation": "100-seed automated corpus passed; human teaching and purposeful-tool review pending"
+  "room_seed_evaluation": "100-seed automated corpus passed; human teaching and purposeful-tool review pending",
+  "playback_evidence": "artifacts/game/p2/playback/checks/results.json"
 }

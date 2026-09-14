@@ -7,3 +7,4 @@
 script = ExtResource("1")
 
 [node name="RunScene" parent="." unique_id=1790347036 instance=ExtResource("2")]
+room_mode = true

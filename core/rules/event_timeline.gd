@@ -20,16 +20,24 @@ var cascade_steps: Array[Dictionary] = []
 var failure_code: String = ""
 var rule_facts: Array = []
 var work_count := 0
+var boundary_events: Array = []
 
 ## Presentation is derived solely from canonical facts; no rule evaluation here.
 static func from_facts(facts: Array) -> EventTimeline:
 	var result := EventTimeline.new()
 	result.rule_facts = facts
 	for fact in facts:
+		if fact.type in ["room_started","resource_spent","tool_activated","tool_allowance","craft_settled","objective_progress","room_result"]: result.boundary_events.append(fact)
 		if fact.type == "action_settled": result.work_count = fact.work
 		if fact.step < 0 or fact.type in ["action_settled","tile_consumed"]: continue
 		var step := result._projection_step(fact.step)
 		match fact.type:
+			"obstacle_damaged", "obstacle_broken", "lock_damaged", "lock_cleared":
+				if not step.has("overlay_events"): step.overlay_events = []
+				step.overlay_events.append(fact)
+			"board_rearranged":
+				if not step.has("recovery_events"): step.recovery_events = []
+				step.recovery_events.append(fact)
 			"match_committed":
 				step.cascade_index = fact.cascade; step.chain_index = fact.round
 				step.match_events.append(fact)
@@ -46,8 +54,11 @@ static func from_facts(facts: Array) -> EventTimeline:
 	for step in result.cascade_steps:
 		step.gravity_events.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return a.sequence < b.sequence)
 		for field in ["match_events","remove_events","upgrade_events","gravity_events","spawn_events"]: step[field] = GameValue.freeze(step[field])
+		for field in ["overlay_events","recovery_events"]:
+			if step.has(field): step[field] = GameValue.freeze(step[field])
 		step.make_read_only()
 	result.cascade_steps.make_read_only()
+	result.boundary_events = GameValue.freeze(result.boundary_events)
 	return result
 
 func _projection_step(index: int) -> Dictionary:

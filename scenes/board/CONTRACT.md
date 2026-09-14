@@ -39,3 +39,22 @@ lifecycles. `test_game_playback` covers application accounting/gates. The opt-in
 ActionProbe measures actual scene actions in source and the shipped executable;
 headless timing is not GPU/frame acceptance and final snapshots alone do not
 establish visual quality.
+## P2 committed room projection
+
+Typed root actions share ActionPlayer. Direct clearance/promotion have explicit
+effect steps even without matches; obstacle/lock facts advance the displayed
+overlay after their associated effect. Recovery fades the exact before/after ID
+mapping. Instant, skip and cancellation snap both layers to the committed board.
+EventTimeline retains economy/objective/result boundary facts separately from
+physical steps. None of these presentation projections advances rules.
+
+Ordinary downward room lanes remain concurrent. MotionPlan maintains obstacle
+occupancy per wave; refill below surviving rubble appears in place after that
+lane clears, while open lanes retain their incoming stacks. Custom topology keeps
+the existing ordered path fallback. Room serial-reference mode shares typed
+effects and selects ordered travel; it never fabricates a swap for a target tool.
+
+RunScene updates a detached RoomHudModel on changes, defers final counters while
+playback is active, and owns typed preview/confirm/cancel commands. Board mouse,
+keyboard and hints use the same authoritative admission. Loading, briefing,
+playback, modal, error and terminal input gates are independent.
