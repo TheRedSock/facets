@@ -3,6 +3,8 @@ extends SceneTree
 ## Audits the exact exported resources, not the source project's dependencies.
 const ALLOWED_ROOTS := ["autoloads/", "core/board/", "core/rules/", "core/run/", "core/game/", "core/delivery/", "resources/definitions/", "resources/delivery/", "data/tiles/", "data/game/rules/", "data/game/layouts/", "data/game/rooms/", "data/presentation/", "scenes/board/", "scenes/tile/", "scenes/run/", "scenes/ui/", "scenes/main/", "scenes/menu/", "scenes/debug/"]
 var failures:Array[String]=[]
+var presentation_sources: Dictionary = {}
+var presentation_imports: Dictionary = {}
 func _initialize()->void:_run.call_deferred()
 func _run()->void:
 	var args:={"pack":"","report":""}
@@ -12,6 +14,22 @@ func _run()->void:
 		args[pair[0]]=pair[1]
 	if args.pack.is_empty() or args.report.is_empty():printerr("FAIL: pack and report paths are required");quit(1);return
 	var main_files:Dictionary={};_inventory("res://",main_files)
+	var presentation: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/presentation/workshop_manifest.json"))
+	if not presentation is Dictionary or presentation.get("schema") != 1: failures.append("Missing/invalid presentation manifest")
+	else:
+		presentation_sources = presentation.resources
+		for source: String in presentation_sources:
+			if not ResourceLoader.exists(source): failures.append("Missing presentation resource: "+source)
+			var imported := ConfigFile.new()
+			if imported.load(source+".import") == OK:
+				# Export strips editor-only deps. Validate each retained remap against
+				# the exact accepted source path's importer identity instead.
+				var prefix := "res://.godot/imported/"+source.get_file()+"-"+source.md5_text()+"."
+				for key in imported.get_section_keys("remap"):
+					if key != "path" and not key.begins_with("path."): continue
+					var destination: String = imported.get_value("remap",key)
+					if not destination.begins_with(prefix): failures.append("Import source mismatch: "+source)
+					else: presentation_imports[destination] = true
 	if FileAccess.file_exists("res://core/lapidary/stone_compiler.gd"):failures.append("Source tree is accessible to package audit")
 	for path:String in main_files:
 		if not _allowed(path):failures.append("Unexpected main-package file: "+path)
@@ -57,7 +75,10 @@ static func _runtime_path(path:String)->bool:
 	for prefix:String in ALLOWED_ROOTS:
 		if path.begins_with("res://"+prefix):return true
 	return false
-static func _allowed(path:String)->bool:
+func _allowed(path:String)->bool:
+	if presentation_sources.has(path) or presentation_imports.has(path): return true
+	for source: String in presentation_sources:
+		if path == source+".import" or path == source+".remap": return true
 	if _runtime_path(path):return true
 	if path in ["res://project.binary","res://icon.svg","res://icon.svg.import","res://.godot/global_script_class_cache.cfg","res://.godot/uid_cache.bin"]:return true
 	return path.begins_with("res://.godot/exported/") or path.begins_with("res://.godot/imported/icon.svg-")

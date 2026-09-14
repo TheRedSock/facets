@@ -23,8 +23,17 @@ var _selected_tool := ""
 var _tool_cells: Array[Vector2i] = []
 var _preview_command: RoomCommand
 var _inspection := Vector2i(-1,-1)
+var _work_surface: WorkSurface
+var _audio: RoomAudio
+var _mute_button: Button
 
 func _ready() -> void:
+	TranslationServer.add_translation(preload("res://data/localization/en.tres"))
+	_audio = RoomAudio.new(); add_child(_audio)
+	board_scene.presentation_cue.connect(func(cue: String) -> void:
+		if run_controller.run_state != null and run_controller.run_state.room != null: _audio.play(cue))
+	_work_surface = WorkSurface.new(); _work_surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_work_surface); move_child(_work_surface,0); _work_surface.visible = false
 	run_controller.board_changed.connect(_on_board_changed)
 	run_controller.run_state_changed.connect(_on_run_state_changed)
 	board_scene.swap_requested.connect(_on_swap_requested)
@@ -39,9 +48,16 @@ func _ready() -> void:
 	_back_button = _button("Menu",8,_on_back_pressed)
 	_restart_button = _button("Restart",96,_on_restart_pressed)
 	_skip_button = _button("Skip",184,skip_playback)
+	_mute_button = _button("Sound",272,_toggle_sound)
+	_mute_button.disabled = _audio.streams.is_empty()
+	_mute_button.tooltip_text = "Sound candidates await listening review." if _audio.streams.is_empty() else "Mute game sounds"
+	var volume := HSlider.new(); volume.position = Vector2(364,10); volume.size = Vector2(110,24)
+	volume.min_value = 0; volume.max_value = 1; volume.step = 0.05; volume.value = RoomAudio.volume
+	volume.tooltip_text = "Sound volume"; volume.editable = not _audio.streams.is_empty()
+	volume.value_changed.connect(_audio.set_volume); add_child(volume)
 	_room_panel = RoomPanel.new()
 	_room_panel.anchor_left = 1.0; _room_panel.anchor_right = 1.0; _room_panel.anchor_bottom = 1.0
-	_room_panel.offset_left = -316; _room_panel.offset_right = -16; _room_panel.offset_top = 88; _room_panel.offset_bottom = -16
+	_room_panel.offset_left = -376; _room_panel.offset_right = -16; _room_panel.offset_top = 88; _room_panel.offset_bottom = -16
 	add_child(_room_panel)
 	_room_panel.begin_requested.connect(_begin_room)
 	_room_panel.tool_selected.connect(_select_tool)
@@ -57,6 +73,7 @@ func _button(label: String,x: float,callback: Callable) -> Button:
 	return button
 
 func _on_board_changed(board: BoardState) -> void:
+	_audio.cancel()
 	_delivery_generation += 1; var generation := _delivery_generation
 	_playback_generation += 1
 	board_scene.cancel_action_playback(false)
@@ -91,17 +108,20 @@ func _submit_command(command: Variant, begin: bool = false) -> void:
 	if board_scene.input_is_locked() and not (begin and board_scene._input_gates.keys().all(func(key: String) -> bool: return key == "briefing")): return
 	_playback_generation += 1; var token := _playback_generation
 	board_scene.set_input_gate("playback",true,token)
+	_audio.cancel()
 	_update_hud()
 	var started := Time.get_ticks_usec()
 	var result := run_controller.apply_action(command)
 	_last_sim_ms = (Time.get_ticks_usec() - started) / 1000.0
 	if not result.ok:
+		_audio.play("ui_reject")
 		if result.status == "failed":
 			_resolution_error = result.code; board_scene.set_input_gate("error",true)
 		elif command.to_dict().has("origin"): await board_scene.play_rejected_swap(command.to_dict().origin,command.to_dict().destination)
 		if token != _playback_generation or not is_inside_tree(): return
 		board_scene.set_input_gate("playback",false,token); _update_hud(); return
 	# State/cost/RNG/checkpoints are already committed before the first await.
+	if command is RoomCommand and command.data.kind != "swap": _audio.play("ui_accept")
 	_cancel_selection()
 	started = Time.get_ticks_usec()
 	await board_scene.play_committed_action(result,instant_playback)
@@ -111,6 +131,7 @@ func _submit_command(command: Variant, begin: bool = false) -> void:
 	run_controller.acknowledge(result.action_id,result.generation)
 	board_scene.set_input_gate("playback",false,token)
 	_update_hud()
+	if run_controller.run_state.phase in ["complete","failed"]: _audio.play("room_success" if run_controller.run_state.phase == "complete" else "room_failure")
 	if begin: board_scene.grab_focus()
 
 func _begin_room() -> void:
@@ -118,6 +139,7 @@ func _begin_room() -> void:
 
 func _select_tool(kind: String) -> void:
 	if board_scene.input_is_locked(): return
+	_audio.play("ui_nav")
 	_cancel_selection(); _selected_tool = kind; board_scene.target_mode = true
 	_room_panel.preview(RoomPanel.HELP[kind]+" Select a target, then confirm.",false,true)
 	board_scene.grab_focus()
@@ -175,10 +197,16 @@ func _show_hint() -> void:
 	board_scene.cursor_cell = swaps[0].origin; board_scene.grab_focus()
 
 func skip_playback() -> void:
+	_audio.cancel()
 	var prior := _playback_generation; _playback_generation += 1
 	board_scene.cancel_action_playback()
 	board_scene.set_input_gate("playback",false,prior)
 	_update_hud()
+
+func _toggle_sound() -> void:
+	_audio.set_muted(not RoomAudio.muted)
+	_mute_button.text = "Muted" if RoomAudio.muted else "Sound"
+	if not RoomAudio.muted: _audio.play("ui_nav")
 
 func _update_hud() -> void:
 	if hud_label == null: return
@@ -189,19 +217,22 @@ func _update_hud() -> void:
 	if state == null: return
 	var is_room := state.room != null
 	_room_panel.visible = is_room
-	board_scene.offset_right = -332 if is_room else 0
+	board_scene.offset_right = -392 if is_room else 0
 	board_scene.offset_top = 88 if is_room else 36
 	board_scene.offset_bottom = -16 if is_room else 0
 	if is_room:
+		theme = preload("res://assets/ui/themes/workshop.tres")
+		_work_surface.visible = true; get_node("Background").visible = false
 		var playing := board_scene._input_gates.has("playback")
 		if not playing or _hud_model.is_empty(): _hud_model = RoomHudModel.build(state,_inspection)
 		_room_panel.present(_hud_model,playing or _delivery_loading)
-		hud_label.text = "Work  %d     Craft  %d / %d" % [_hud_model.work,_hud_model.craft,_hud_model.capacity]
+		hud_label.text = tr("hud.resources").format({"work":_hud_model.work,"craft":_hud_model.craft,"capacity":_hud_model.capacity})
 		hud_label.offset_top = 42; hud_label.offset_bottom = 80
 		board_scene.set_input_gate("briefing",state.phase == "briefing")
 		board_scene.set_input_gate("terminal",state.phase in ["complete","failed"])
 		return
 	board_scene.set_input_gate("briefing",false); board_scene.set_input_gate("terminal",false)
+	_work_surface.visible = false; get_node("Background").visible = true
 	hud_label.offset_top = 4; hud_label.offset_bottom = 32
 	var status := ""
 	if state.phase == "budget_exhausted": status = " | No moves remaining — Restart"
@@ -224,6 +255,7 @@ func _prepare_forge_clips() -> bool:
 	return await forge.prepare_required(state.catalog.roster())
 
 func _show_delivery_error(message: String) -> void:
+	_audio.cancel()
 	_delivery_error = message; _delivery_loading = false
 	_playback_generation += 1
 	board_scene.set_input_gate("error",true)

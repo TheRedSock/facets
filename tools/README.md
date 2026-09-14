@@ -596,3 +596,27 @@ This creates a fresh runtime-only staging project, audits exact packaged paths,
 and probes the exported PCK. The actual release executable still needs its own
 interaction check. Codec reference generation and reviewed action-vector candidate
 capture live in tools/game; neither is an automatic test-golden updater.
+
+P2 room/presentation checks are registered alongside the game checks, including
+`check_presentation_content` and `test_game_room_playback`. Clean package staging
+copies explicit runtime sources and their UID/import metadata. Package auditing
+admits workshop imported paths only through the manifest's exact source remaps.
+
+The actual executable accepts `-- --room-probe=ABSOLUTE_REPORT.json` and optional
+`--room-screenshots`. This explicit probe plays Open seam seed 7, records timing
+and replay evidence, restarts, then exercises all three tool controls in separate
+authored probe rooms. Functional instant-tool cases are excluded from timings.
+Use `--resolution 1600x900` or `--resolution 1280x720` before `--` for native shots.
+The older `--action-probe` remains the identifiable legacy workload.
+
+Original sound candidate production (Python standard library only):
+
+```powershell
+python tools/game/build_prototype_sfx.py --recipes art_source/game/audio/prototype_sfx.json --output generated/game/sfx-material-candidates
+python tools/game/check_prototype_sfx.py generated/game/sfx-material-candidates
+```
+
+The generator never writes runtime assets. PCM/header/peak checks do not establish
+perceptual acceptance. The first melodic candidate was rejected; revised rhythmic
+impact/friction candidates await listening review. Provenance and that feedback
+are recorded in art_source/game/manifest.json.

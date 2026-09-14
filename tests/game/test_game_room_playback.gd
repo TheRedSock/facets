@@ -21,6 +21,20 @@ func _run() -> void:
 	check(scene.run_controller.run_state.digest() == before,"briefing input changes nothing")
 	await scene._begin_room()
 	check(scene.run_controller.run_state.phase == "ready" and not scene.board_scene.input_is_locked(),"Begin opens gameplay")
+	# Dummy driver verifies lifecycle/voice ownership, not perceptual sound quality.
+	var silent := AudioStreamWAV.new(); silent.format = AudioStreamWAV.FORMAT_16_BITS
+	silent.mix_rate = 48000; silent.data = PackedByteArray(); silent.data.resize(48000)
+	scene._audio.streams["match_commit"] = silent
+	scene._audio.set_muted(false)
+	for i in 30: scene._audio.play("match_commit")
+	check(scene._audio.voices.filter(func(v: AudioStreamPlayer) -> bool: return v.playing).size() <= 6,"bounded game voices")
+	var prior_generation := scene._audio.generation
+	scene._audio.cancel(); var played := scene._audio.cues_played
+	scene._audio.play("match_commit",prior_generation)
+	check(scene._audio.cues_played == played and scene._audio.voices.all(func(v: AudioStreamPlayer) -> bool: return not v.playing),"canceled generation cannot play stale cues")
+	scene._audio.set_muted(true); scene._audio.play("match_commit")
+	check(scene._audio.cues_played == played,"mute prevents playback")
+	scene._audio.set_muted(false)
 	var model := RoomHudModel.build(scene.run_controller.run_state)
 	check(model.is_read_only() and model.tools.all(func(t: Dictionary) -> bool: return t.reason == "Need %d Craft" % t.cost),"immutable HUD explains unaffordable tools")
 	Engine.time_scale = 40.0

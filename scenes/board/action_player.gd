@@ -80,6 +80,7 @@ func play(result: Dictionary, instant: bool = false) -> void:
 		var tile: TileState = result.before.get_tile(pos)
 		if tile != null and board._tile_views.has(pos): _views_by_id[tile.instance_id] = board._tile_views[pos]
 	if result.command.has("origin"):
+		board.presentation_cue.emit("tile_swap")
 		var a: Vector2i = result.command.origin; var b: Vector2i = result.command.destination
 		var first: TileView = board._tile_views.get(a); var second: TileView = board._tile_views.get(b)
 		if first == null or second == null: cancel(true); return
@@ -95,6 +96,8 @@ func play(result: Dictionary, instant: bool = false) -> void:
 			await _match(phase.step,token)
 			if not current(token): return
 			for event in phase.step.get("overlay_events",[]): board.apply_overlay_fact(event)
+			await _impact(phase.step.get("overlay_events",[]),token)
+			if not current(token): return
 			for event in phase.step.get("recovery_events",[]): await _recovery(event,token)
 		elif phase.concurrent and not serial_reference: await _travel(phase,token)
 		else: await _ordered_travel(phase.steps,token)
@@ -104,6 +107,7 @@ func play(result: Dictionary, instant: bool = false) -> void:
 		_views_by_id.clear()
 
 func _match(step: Dictionary, token: int) -> void:
+	if not step.match_events.is_empty(): board.presentation_cue.emit("match_commit")
 	observations.append({"kind":"match","frame":Engine.get_process_frames()})
 	var tween := _tween()
 	var targets := {}
@@ -123,6 +127,7 @@ func _match(step: Dictionary, token: int) -> void:
 		if view != null:
 			board._tile_views.erase(view.cell); board._release_view(view); _views_by_id.erase(event.instance_id)
 	if step.upgrade_events.is_empty(): return
+	board.presentation_cue.emit("tile_promoted")
 	tween = _tween()
 	for event in step.upgrade_events:
 		var view: TileView = _views_by_id.get(event.instance_id)
@@ -134,6 +139,18 @@ func _match(step: Dictionary, token: int) -> void:
 		view.scale = Vector2.ONE * AnimationSequencer.upgrade_scale_factor
 		tween.tween_property(view,"scale",Vector2.ONE,AnimationSequencer.upgrade_scale_duration)
 	await _wait(tween,token)
+
+func _impact(events: Array, token: int) -> void:
+	if events.is_empty(): return
+	board.impact_cells.clear()
+	for event in events:
+		if event.cell not in board.impact_cells: board.impact_cells.append(event.cell)
+		if event.type == "obstacle_damaged": board.presentation_cue.emit("obstacle_hit")
+		elif event.type == "obstacle_broken": board.presentation_cue.emit("obstacle_broken")
+	board.impact_alpha = 1.0
+	var tween := _tween(); tween.tween_property(board,"impact_alpha",0.0,0.16)
+	if not await _wait(tween,token): return
+	board.impact_cells.clear()
 
 func _travel(phase: Dictionary, token: int) -> void:
 	var tween := _tween()

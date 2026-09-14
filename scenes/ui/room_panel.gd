@@ -29,18 +29,20 @@ func _ready() -> void:
 	margin.add_child(scroll)
 	_body = VBoxContainer.new(); _body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_body.add_theme_constant_override("separation",10); scroll.add_child(_body)
-	_objective = _label(24); _description = _label(16)
-	_begin = _button("Begin",func() -> void: begin_requested.emit())
-	_allowance = _label(16)
+	_objective = _label(28); _description = _label(20)
+	_begin = _button(tr("ui.begin"),func() -> void: begin_requested.emit())
+	_allowance = _label(20)
 	for kind in NAMES:
 		var button := _button(NAMES[kind],func() -> void: tool_selected.emit(kind))
+		button.icon = load("res://assets/ui/icons/"+kind.trim_prefix("action.")+".svg")
+		button.expand_icon = true; button.add_theme_constant_override("icon_max_width",24)
 		_tools[kind] = button
-	_preview = _label(16)
-	_confirm = _button("Confirm target",func() -> void: confirm_requested.emit())
-	_cancel = _button("Cancel selection · Esc",func() -> void: cancel_requested.emit())
-	_hint = _button("Show a matching swap",func() -> void: hint_requested.emit())
-	_inspector = _label(16)
-	_collection = _label(14)
+	_preview = _label(20)
+	_confirm = _button(tr("ui.confirm"),func() -> void: confirm_requested.emit())
+	_cancel = _button(tr("ui.cancel"),func() -> void: cancel_requested.emit())
+	_hint = _button(tr("ui.hint"),func() -> void: hint_requested.emit())
+	_inspector = _label(20)
+	_collection = _label(18)
 
 func _label(font_size: int) -> Label:
 	var label := Label.new(); label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -52,7 +54,7 @@ func _button(text: String, callback: Callable) -> Button:
 
 func present(model: Dictionary, busy: bool) -> void:
 	if _body == null: return
-	_objective.text = "Open seam\n%d / %d rubble cleared" % [model.total-model.remaining,model.total]
+	_objective.text = tr("room.open_seam")+"\n"+tr("room.progress").format({"cleared":model.total-model.remaining,"total":model.total})
 	_description.text = "Match beside marked rubble twice to clear it. Matching swaps cost 1 Work. A line of four earns 1 Craft; five or an intersection earns 2."
 	if model.phase == "complete": _description.text = "Seam cleared. Every marked rubble is gone. Restart to try a different route."
 	elif model.phase == "failed": _description.text = "No Work remaining. Restart to try again." if model.reason == "work_exhausted" else "No moves or tools remain, and the board could not recover. Restart to try again."
@@ -60,7 +62,7 @@ func present(model: Dictionary, busy: bool) -> void:
 	_allowance.text = "One tool before your next matching swap." if model.allowance else "Tool used · make a matching swap to reopen."
 	for tool in model.tools:
 		var button: Button = _tools[tool.kind]
-		button.text = "%s · %d Craft" % [NAMES[tool.kind],tool.cost]
+		button.text = tr("ui.tool_cost").format({"tool":tr(tool.kind),"cost":tool.cost})
 		button.disabled = busy or not tool.reason.is_empty()
 		button.tooltip_text = HELP[tool.kind]+"\n"+(tool.reason if not tool.reason.is_empty() else "Tools cost no Work and earn no Craft.")
 	_hint.disabled = busy or model.phase != "ready"

@@ -9,3 +9,7 @@ data/lapidary/measurements/**/*.csv -text
 tests/fixtures/game_prototype_v1/* -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tests/game/goldens/*.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tests/game/p1-checkpoints.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Presentation manifests hash the authored bytes; keep checkout bytes portable.
+assets/ui/**/*.svg text eol=lf
+assets/ui/themes/*.tres text eol=lf
+data/localization/en.tres text eol=lf

@@ -1,0 +1,20 @@
+[gd_resource type="Translation" format=3]
+
+[resource]
+messages = {
+[&"", &"ui.audio"]: [&"Sound"],
+[&"", &"ui.skip"]: [&"Skip"],
+[&"", &"ui.restart"]: [&"Restart"],
+[&"", &"ui.menu"]: [&"Menu"],
+[&"", &"ui.hint"]: [&"Show a matching swap"],
+[&"", &"action.clear_target"]: [&"Chisel"],
+[&"", &"room.progress"]: [&"{cleared} / {total} rubble cleared"],
+[&"", &"room.open_seam"]: [&"Open seam"],
+[&"", &"hud.resources"]: [&"Work  {work}     Craft  {craft} / {capacity}"],
+[&"", &"action.promote_target"]: [&"Refine"],
+[&"", &"ui.cancel"]: [&"Cancel selection · Esc"],
+[&"", &"action.exchange"]: [&"Reposition"],
+[&"", &"ui.tool_cost"]: [&"{tool} · {cost} Craft"],
+[&"", &"ui.begin"]: [&"Begin"],
+[&"", &"ui.confirm"]: [&"Confirm target"]
+}

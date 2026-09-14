@@ -6,6 +6,7 @@ signal swap_requested(cell_a: Vector2i, cell_b: Vector2i)
 signal async_group_finished(group_id: int)
 signal delivery_failed(message:String)
 signal selection_canceled
+signal presentation_cue(cue: String)
 
 @export var tile_view_scene: PackedScene
 
@@ -28,6 +29,13 @@ var target_mode := false
 var cursor_cell := Vector2i.ZERO
 var target_cells: Array[Vector2i] = []
 var _overlay: Control
+var impact_cells: Array[Vector2i] = []
+var impact_alpha := 0.0:
+	set(value):
+		impact_alpha = value
+		if _overlay != null: _overlay.queue_redraw()
+const RUBBLE_INTACT = preload("res://assets/ui/board/rubble_intact.svg")
+const RUBBLE_CRACKED = preload("res://assets/ui/board/rubble_cracked.svg")
 
 func apply_overlay_fact(event: Dictionary) -> void:
 	if _board_state == null: return
@@ -58,6 +66,7 @@ func play_rejected_swap(a: Vector2i,b: Vector2i) -> void:
 
 func cancel_action_playback(snap: bool = true) -> void:
 	if _action_player != null: _action_player.cancel(snap)
+	impact_cells.clear(); impact_alpha = 0.0
 
 func snap_to(snapshot: BoardState) -> void:
 	_board_state = snapshot.duplicate_board()
@@ -104,12 +113,7 @@ func _draw_room_overlay() -> void:
 	for obstacle in _board_state.obstacles.values():
 		var rect := Rect2(_cell_to_pixel(obstacle.cell),Vector2(_cell_size))
 		var center := rect.get_center()
-		var radius := minf(rect.size.x,rect.size.y)*0.36
-		var points := PackedVector2Array([center+Vector2(-radius,-radius*0.6),center+Vector2(radius*0.5,-radius),center+Vector2(radius,radius*0.6),center+Vector2(-radius*0.6,radius)])
-		_overlay.draw_colored_polygon(points,Color("687078"))
-		_overlay.draw_polyline(PackedVector2Array([points[0],points[1],points[2],points[3],points[0]]),Color("b8b6ac"),2.0,true)
-		if obstacle.durability == 1:
-			_overlay.draw_polyline(PackedVector2Array([center+Vector2(0,-radius),center+Vector2(-8,0),center+Vector2(8,5),center+Vector2(0,radius)]),Color("202a35"),4.0,true)
+		_overlay.draw_texture_rect(RUBBLE_INTACT if obstacle.durability == 2 else RUBBLE_CRACKED,rect,false)
 		for pip in obstacle.durability: _overlay.draw_circle(center+Vector2((pip-0.5)*12,rect.size.y*0.38),3,Color("f2eadb"))
 	for pos in _board_state.all_cells():
 		if not _board_state.get_cell(pos).lock.is_empty(): _overlay.draw_rect(Rect2(_cell_to_pixel(pos)+Vector2(5,5),Vector2(_cell_size)-Vector2(10,10)),Color("d9b978"),false,3)
@@ -119,6 +123,12 @@ func _draw_room_overlay() -> void:
 	if has_focus():
 		var rect := Rect2(_cell_to_pixel(cursor_cell),Vector2(_cell_size))
 		_overlay.draw_rect(rect,Color("eaf6ff"),false,2); _overlay.draw_rect(rect.grow(-4),Color("eaf6ff"),false,1)
+	for i in mini(impact_cells.size(),4):
+		var rect := Rect2(_cell_to_pixel(impact_cells[i]),Vector2(_cell_size)).grow(-4)
+		_overlay.draw_rect(rect,Color(0.95,0.92,0.86,impact_alpha),false,2)
+		for chip in 3:
+			var center := rect.get_center()+Vector2((chip-1)*18,(chip%2)*16-8)*(2-impact_alpha)
+			_overlay.draw_colored_polygon(PackedVector2Array([center+Vector2(-3,3),center+Vector2(1,-4),center+Vector2(4,2)]),Color(0.72,0.71,0.67,impact_alpha))
 
 func set_targets(cells: Array[Vector2i]) -> void:
 	target_cells = cells.duplicate()
@@ -1134,6 +1144,7 @@ func _acquire_view(p_tile_id: StringName, p_tier: int, p_cell: Vector2i) -> Tile
 	view.custom_minimum_size = Vector2(_cell_size)
 	view.size = Vector2(_cell_size)
 	view.configure_from_data(p_tile_id, p_tier, p_cell)
+	view.set_tier_visible(_board_state != null and _board_state.room_board)
 	return view
 
 

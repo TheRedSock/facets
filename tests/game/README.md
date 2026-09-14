@@ -76,3 +76,9 @@ with mixed tools/swaps, canonical midpoint restore, stale-command rejection and
 complete replay. Its new evidence goes to artifacts/game/p2/simulation.
 These establish simulation behavior; player teaching, pacing, release performance
 and the separate intervention trial require their own evidence.
+
+`test_game_tools` additionally witnesses the inherited P0 match-4/match-5 Craft
+candidates using the frozen swaps. `test_game_room_playback` exercises typed
+effects in concurrent/serial/instant/skip modes, terminal/restart gates, keyboard
+target previews, rubble-pocket refill, and bounded audio/mute/cancellation using
+the dummy driver. Listening acceptance remains a separate human observation.

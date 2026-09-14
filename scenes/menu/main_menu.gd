@@ -6,6 +6,10 @@ extends Control
 
 func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--room-probe="):
+			visible = false
+			var probe := RoomProbe.new(); get_tree().root.add_child.call_deferred(probe)
+			probe.run.call_deferred(argument.trim_prefix("--room-probe=")); return
 		if argument.begins_with("--action-probe=") and not get_tree().root.has_meta("action_probe_started"):
 			get_tree().root.set_meta("action_probe_started",true)
 			visible = false

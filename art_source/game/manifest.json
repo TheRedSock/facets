@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "authorship": "Original vector geometry, procedural work surface and mathematical sound recipes authored for Facets; no third-party asset pack",
+  "visual_sources": [
+    "art_source/game/icons",
+    "art_source/game/board",
+    "assets/ui/themes/workshop.tres",
+    "scenes/ui/work_surface.gd"
+  ],
+  "visual_review": "Native screenshots reviewed during P2 implementation; final acceptance evidence is recorded separately under artifacts/game/p2/presentation",
+  "audio_generator": "facets-prototype-sfx-v2-material",
+  "audio_python": "3.14.2",
+  "audio_recipe": "art_source/game/audio/prototype_sfx.json",
+  "audio_candidate_manifest": "generated/game/sfx-material-candidates/manifest.json",
+  "audio_review": {
+    "first_candidate": "Rejected by user as too melodic",
+    "direction": "Rhythmic and sharp; rocks, minerals, grinding, cutting, shearing and sparkling",
+    "revised_candidate": "User: closer, but only tapping; wants an intermediate direction and supplied three reference MP3 files. Third revision pending."
+  },
+  "runtime_audio": "Not promoted while revised listening review is pending"
+}

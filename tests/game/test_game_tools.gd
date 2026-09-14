@@ -7,6 +7,27 @@ func _game(craft: int = 6) -> RunController:
 		[{"cell":Vector2i(1,2),"durability":2}],16,craft))
 
 func _run() -> void:
+	for fixture in GameFixtureAdapter.read_cases():
+		if fixture.id not in ["match_4","match_5"]: continue
+		# Preserve the frozen board/swap and add a supporting row of rubble.
+		var rows: Array = fixture.board.duplicate(true); var support: Array = []; var rubble: Array = []
+		for x in rows[0].size(): support.append(0); rubble.append({"cell":Vector2i(x,rows.size())})
+		rows.append(support)
+		var state := RoomTestSupport.fixture(rows,rubble,16,1)
+		state.streams = RngStreamBank.new(int(fixture.seed)); state.sync_adapters()
+		var game := RoomTestSupport.controller(state)
+		var result := game.apply_action(RoomCommand.exchange(game.run_state,GameFixtureAdapter.cell(fixture.swap[0]),GameFixtureAdapter.cell(fixture.swap[1])))
+		check(result.ok,fixture.id+" room transaction")
+		if not result.ok: continue
+		var components: Array = result.facts.filter(func(f: Dictionary) -> bool: return f.type == "match_committed")
+		var initial: Dictionary = components[0]
+		var context := ActionContext.new(state,RoomCommand.exchange(state,GameFixtureAdapter.cell(fixture.swap[0]),GameFixtureAdapter.cell(fixture.swap[1])))
+		var first := initial.duplicate(true); first.obstacle_targets = []
+		context.match_step({"match_events":[first],"upgrade_events":[],"chain_index":0,"cascade_index":0})
+		check(context.best_craft == int(fixture.expected.base_craft_candidate),fixture.id+" frozen first-component Craft candidate")
+		var earnings: Array = result.facts.filter(func(f: Dictionary) -> bool: return f.type == "craft_settled")
+		check(earnings.size() == 1 and earnings[0].base_candidate >= int(fixture.expected.base_craft_candidate),fixture.id+" settles strongest award once")
+		check(game.run_state.room.craft == 1+int(earnings[0].gain),fixture.id+" actual Craft credited")
 	for kind in ["action.clear_target","action.exchange","action.promote_target"]:
 		var game := _game()
 		var command := RoomCommand.target(game.run_state,kind,Vector2i(0,0))

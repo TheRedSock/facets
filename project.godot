@@ -39,6 +39,10 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/vsync/vsync_mode=3
 
+[internationalization]
+
+locale/fallback="en"
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

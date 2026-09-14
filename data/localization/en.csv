@@ -1,0 +1,16 @@
+keys,en
+hud.resources,Work  {work}     Craft  {craft} / {capacity}
+room.open_seam,Open seam
+room.progress,{cleared} / {total} rubble cleared
+action.exchange,Reposition
+action.clear_target,Chisel
+action.promote_target,Refine
+ui.tool_cost,{tool} · {cost} Craft
+ui.begin,Begin
+ui.confirm,Confirm target
+ui.cancel,Cancel selection · Esc
+ui.hint,Show a matching swap
+ui.menu,Menu
+ui.restart,Restart
+ui.skip,Skip
+ui.audio,Sound

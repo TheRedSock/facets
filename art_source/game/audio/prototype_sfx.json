@@ -1,0 +1,12 @@
+{
+  "ui_nav": {"seed":201,"seconds":0.035,"body_hz":950,"edge_hz":3800,"sharpness":0.9,"gain":0.19,"decay":160,"impacts":[[0,1]]},
+  "ui_accept": {"seed":202,"seconds":0.09,"body_hz":1250,"edge_hz":3500,"sharpness":1.1,"gain":0.20,"decay":120,"impacts":[[0,0.65],[0.04,1]]},
+  "ui_reject": {"seed":203,"seconds":0.13,"body_hz":700,"edge_hz":2100,"sharpness":0.8,"gain":0.18,"decay":75,"impacts":[[0,1],[0.045,0.7]]},
+  "tile_swap": {"seed":204,"seconds":0.085,"body_hz":1800,"edge_hz":4200,"sharpness":1.4,"gain":0.20,"decay":45,"grains_per_second":130,"impacts":[[0,0.65],[0.022,0.7]]},
+  "match_commit": {"seed":205,"seconds":0.12,"body_hz":550,"edge_hz":3200,"sharpness":1.1,"gain":0.25,"decay":80,"impacts":[[0,1],[0.022,0.5],[0.052,0.3]]},
+  "tile_promoted": {"seed":206,"seconds":0.24,"body_hz":2100,"edge_hz":5300,"sharpness":1.7,"gain":0.23,"decay":50,"grains_per_second":200,"impacts":[[0,0.5],[0.035,0.5],[0.07,0.65],[0.105,0.8],[0.16,0.45],[0.19,0.2]]},
+  "obstacle_hit": {"seed":207,"seconds":0.095,"body_hz":230,"edge_hz":2700,"sharpness":1.2,"gain":0.28,"decay":65,"impacts":[[0,1],[0.018,0.35]]},
+  "obstacle_broken": {"seed":208,"seconds":0.22,"body_hz":420,"edge_hz":3900,"sharpness":1.6,"gain":0.25,"decay":80,"grains_per_second":180,"impacts":[[0,1],[0.025,0.75],[0.066,0.6],[0.097,0.4],[0.143,0.25]]},
+  "room_success": {"seed":209,"seconds":0.30,"body_hz":1700,"edge_hz":6000,"sharpness":1.5,"gain":0.22,"decay":90,"grains_per_second":250,"impacts":[[0,1],[0.044,0.8],[0.112,0.65],[0.155,0.4],[0.217,0.25]]},
+  "room_failure": {"seed":210,"seconds":0.19,"body_hz":180,"edge_hz":1500,"sharpness":0.6,"gain":0.22,"decay":50,"impacts":[[0,1],[0.068,0.5]]}
+}

@@ -30,7 +30,7 @@ $runtimeFiles += @('project.godot', 'icon.svg')
 $sourceHashes = [ordered]@{}
 foreach ($relative in $runtimeFiles) {
     if ($relative -match '(^|/)\.\.(/|$)' -or [System.IO.Path]::IsPathRooted($relative)) { throw "Invalid runtime path: $relative" }
-    foreach ($suffix in @('', '.uid')) {
+    foreach ($suffix in @('', '.uid', '.import')) {
         $source = Join-Path $projectRoot ($relative + $suffix)
         if ($suffix -and -not (Test-Path -LiteralPath $source)) { continue }
         $destination = Join-Path $stageRoot ($relative + $suffix)

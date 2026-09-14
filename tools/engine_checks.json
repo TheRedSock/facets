@@ -1317,6 +1317,12 @@
       "timeout_seconds": 1800
     },
     {
+      "name": "check_presentation_content",
+      "args": ["--headless", "--script", "res://tools/game/check_presentation_content.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: check_presentation_content"
+    },
+    {
       "name": "test_game_room_playback",
       "args": ["--headless", "--script", "res://tests/game/test_game_room_playback.gd"],
       "mode": "cpu",

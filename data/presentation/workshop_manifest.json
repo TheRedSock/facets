@@ -1,0 +1,25 @@
+{
+  "audio_resources": [],
+  "schema": 1,
+  "audio_acceptance": "candidates only; listening pending",
+  "visual_acceptance": "pending native screenshot inspection",
+  "profile": "workshop_p2",
+  "authored": "Original procedural/vector artwork created for Facets",
+  "resources": {
+    "res://assets/ui/board/rubble_cracked.svg": "795473ecf831a182f608711467c061dbc48686f3f17315d0603aabc855d2f47c",
+    "res://assets/ui/board/rubble_intact.svg": "a2abb1586ce36fbd630231bdf960dd03669566435fb9692a50e1b9a066152341",
+    "res://assets/ui/icons/action_budget.svg": "93dd26af2a2df535464e8346b6d8e88d9763e42a4a013ce92e1ff15f12b90a97",
+    "res://assets/ui/icons/audio.svg": "d01a21d6596d476082925444db3db0989aa3c4d0d20a9e2f22267c62239096fc",
+    "res://assets/ui/icons/back.svg": "eaf0ea566fac12fa6902fd18506576914d856767373e988de61d8e8efef4238d",
+    "res://assets/ui/icons/clear_target.svg": "c6bebf8e2a72e24554e0f29b83664582a0e25088dba927c0e16e142f22229033",
+    "res://assets/ui/icons/confirm.svg": "e526aab7ecaa4144daf3b53f15b0c96df973a257c9b2dc400d53056e8c10e829",
+    "res://assets/ui/icons/exchange.svg": "bc0dbaba9ffdc3aecb13dfdfd60ab10e0ef2fe2035fa438cdc2f11f44491d962",
+    "res://assets/ui/icons/inspect.svg": "bb3a6c1f04b46e1ccd45ac089751cbcf67205f7705a9de6afeaf2ed1650f5c7d",
+    "res://assets/ui/icons/objective_clear.svg": "adc20ec2d15646070121f2cd47146cbdde77e18ac2c3d6b3f7071d543a78f8f9",
+    "res://assets/ui/icons/promote_target.svg": "9b3cd143f4681b88d8ab52b0dc744bbbf505a685fc240b4af398a857a974a4f1",
+    "res://assets/ui/icons/restart.svg": "2d311101b1dc13cca26bc24b491f30d22a53d3a7460c6c3b2c38b0c30a05c890",
+    "res://assets/ui/icons/tactic_charge.svg": "0f77f92a02f7f1fa74258542095a06fce6c544bfbdfd56b6fb520a048fdab6b6",
+    "res://assets/ui/themes/workshop.tres": "2515e42b048b2089aed753f124c9ad7e5b14639bbc2a0efd4846a30691e40a4b",
+    "res://data/localization/en.tres": "bbaec270e71d39e6bbf188e052aa5da9642e890823f809b4822536ac7539732d"
+  }
+}
