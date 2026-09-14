@@ -52,3 +52,13 @@ and replay use the canonical codec. Presentation and debug retention are exclude
 Rule facts retain immutable source/old/new snapshots, event/removal IDs, ancestry,
 assist classification and ordered path segments. Debug log truncation never
 reuses indexes. Save slots and complete expedition persistence belong to P3.
+# P2 command and replay extension
+
+RoomCommand admits Begin, normal swap, Reposition, Chisel and Refine with exact
+fields, revision and selected instance/obstacle identities. RoomActionLegality
+owns pure admission and tool enumeration. Room actions use simulation v2 and
+replay v2; legacy SwapCommand/replay v1 remain unchanged. All seeded shuffle draws
+explicitly call the SeededRng instance; the unqualified global RNG is forbidden.
+ActionContext carries causal facts and reward suppression during execution;
+RuleFactBuilder remains the legacy projection. See the
+[room protocol](../run/ROOM_CONTRACT.md) and [effect ownership](../game/CONTRACT.md).

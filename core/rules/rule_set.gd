@@ -22,11 +22,30 @@ func value(key: String) -> Variant:
 func to_dict() -> Dictionary:
 	return _data.duplicate(true)
 
+func is_room() -> bool:
+	return _data.simulation == "facets-sim-v2"
+
+static func room_defaults() -> Dictionary:
+	var data := DEFAULTS.duplicate(true)
+	data.simulation = "facets-sim-v2"
+	data.merge({"profile":"p2", "economy":"work_craft_v1", "obstacles":"component_rubble_v1",
+		"recovery":"low_tier_permutation_v1", "craft_capacity":6, "craft_gain_cap":3,
+		"exchange_cost":2, "clear_cost":2, "promote_cost":3, "max_recoveries":64})
+	return data
+
+static func for_room() -> RuleSet:
+	return RuleSet.new(room_defaults())
+
 static func admit(data: Variant) -> Dictionary:
-	if not data is Dictionary or data.size() != DEFAULTS.size(): return {"ok": false, "code": "rules_schema"}
-	for key in DEFAULTS:
-		if not data.has(key) or typeof(data[key]) != typeof(DEFAULTS[key]): return {"ok": false, "code": "rules_field", "field": key}
-		if DEFAULTS[key] is String and data[key] != DEFAULTS[key]: return {"ok": false, "code": "unsupported_policy", "field": key}
-		if DEFAULTS[key] is int and (data[key] < 0 or data[key] > DEFAULTS[key]): return {"ok": false, "code": "rules_limit", "field": key}
+	if not data is Dictionary: return {"ok": false, "code": "rules_schema"}
+	var defaults := room_defaults() if data.get("simulation") == "facets-sim-v2" else DEFAULTS
+	if data.size() != defaults.size(): return {"ok": false, "code": "rules_schema"}
+	for key in defaults:
+		if not data.has(key) or typeof(data[key]) != typeof(defaults[key]): return {"ok": false, "code": "rules_field", "field": key}
+		if defaults[key] is String and data[key] != defaults[key]: return {"ok": false, "code": "unsupported_policy", "field": key}
+		if defaults[key] is int and (data[key] < 0 or data[key] > defaults[key]): return {"ok": false, "code": "rules_limit", "field": key}
+	if defaults.has("profile"):
+		for key in ["craft_capacity","craft_gain_cap","exchange_cost","clear_cost","promote_cost"]:
+			if data[key] != defaults[key]: return {"ok":false,"code":"room_economy_policy"}
 	if data.swap_cost != 1 or data.max_openings < 1: return {"ok": false, "code": "rules_cost_or_opening"}
 	return {"ok": true, "rules": RuleSet.new(data)}

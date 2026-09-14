@@ -66,3 +66,13 @@ frames, input response, planned/observed playback and page loads, plus lifecycle
 checks. Functional completion is separate from its reported 5 ms CPU / 16.7 ms
 frame targets. Run the same opt-in probe in the actual release executable; the
 older delivered-view burst does not substitute for it.
+# P2 simulation checks
+
+Registered `test_game_room`, `test_game_tools` and `test_game_recovery` cover
+room/obstacle admission, P0 first/last-Work completion, transactional failure
+injection, identity-checked tools, suppression, allowance, bounded deterministic
+recovery and stream isolation. `test_game_room_replay` runs 100 explicit seeds
+with mixed tools/swaps, canonical midpoint restore, stale-command rejection and
+complete replay. Its new evidence goes to artifacts/game/p2/simulation.
+These establish simulation behavior; player teaching, pacing, release performance
+and the separate intervention trial require their own evidence.

@@ -2,7 +2,7 @@ class_name OpeningGenerator
 extends RefCounted
 
 ## Setup uses bounded rejection of local three-runs. Normal refill is unchanged.
-static func generate(layout: BoardLayoutResource, catalog: GameCatalog, streams: RngStreamBank, rules: RuleSet = null) -> Dictionary:
+static func generate(layout: BoardLayoutResource, catalog: GameCatalog, streams: RngStreamBank, rules: RuleSet = null, initial: BoardState = null) -> Dictionary:
 	if rules == null: rules = RuleSet.new()
 	var admitted := LayoutAdmission.admit(layout)
 	if not admitted.ok: return {"ok": false, "code": "invalid_layout", "issues": admitted.issues}
@@ -15,8 +15,12 @@ static func generate(layout: BoardLayoutResource, catalog: GameCatalog, streams:
 	for attempt in int(rules.value("max_openings")):
 		var board := BoardState.new()
 		board.apply_topology(admitted.topology)
+		if initial != null:
+			board.room_board = initial.room_board
+			board.obstacles = initial.obstacles.duplicate(true)
 		var failed := false
 		for pos in board.all_cells():
+			if not board.can_enter(pos): continue
 			var chosen: TileState = null
 			for draw in 64:
 				if not budget.spend(1): return {"ok": false, "code": budget.error}

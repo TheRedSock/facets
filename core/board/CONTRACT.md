@@ -39,3 +39,12 @@ Verification: tests/game/test_game_rules.gd, topology_cases.gd,
 test_game_state.gd, test_game_transaction.gd and retained smoke assertions.
 The nine foundation scenarios and 16×16 bounded envelope are correctness tests;
 transport room content and seals remain later work.
+# P2 obstacle occupancy
+
+Room boards serialize a separate obstacle map, including an empty map after the
+last break. Rubble occupies an active, gem-free, lock-free cell; it does not change
+topology. `can_enter` owns destination occupancy for movement, refill and opening
+generation. `obstacle_neighbors` snapshots orthogonal contacts, deduplicates by
+obstacle ID and returns row-major targets, with no portal extension. Admission
+checks exact obstacle payloads, unique cells and bounded positive durability.
+Legacy boards omit this layer entirely to preserve their canonical bytes.

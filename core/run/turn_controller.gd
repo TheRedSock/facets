@@ -22,9 +22,9 @@ func _init(catalog: GameCatalog = null) -> void:
 	spawn_resolver = SpawnResolver.new(catalog)
 	effect_resolver = EffectResolver.new(catalog)
 
-func execute_turn(board: BoardState, rng: SeededRng, supply: SpawnTableResource, event_log: EventLog, swap_cells: Array[Vector2i] = []) -> EventTimeline:
+func execute_turn(board: BoardState, rng: SeededRng, supply: SpawnTableResource, event_log: EventLog, swap_cells: Array[Vector2i] = [], context: ActionContext = null) -> EventTimeline:
 	var timeline := EventTimeline.new()
-	var budget := ResolutionBudget.new(rules)
+	var budget := context.budget if context != null else ResolutionBudget.new(rules)
 	var cascade := 0
 	var first := true
 	while true:
@@ -47,6 +47,7 @@ func execute_turn(board: BoardState, rng: SeededRng, supply: SpawnTableResource,
 					fact.sources = sources
 					fact.survivor = survivor
 					fact.survivor_id = board.get_tile(survivor).instance_id if survivor != null else ""
+					if context != null: fact.obstacle_targets = board.obstacle_neighbors(m.cells)
 					match_events.append(fact)
 				var plan := conflict_resolver.resolve(effect_planner.build_base_plan(matches, pair), board)
 				if not budget.spend(plan.size(), matches.size() + plan.size() * 2): return _failure(timeline, budget.error, budget)
@@ -56,12 +57,16 @@ func execute_turn(board: BoardState, rng: SeededRng, supply: SpawnTableResource,
 					"remove_events": effect_resolver.last_remove_events.duplicate(true), "upgrade_events": effect_resolver.last_upgrade_events.duplicate(true),
 					"gravity_events": [], "spawn_events": [], "board_hash": board.compute_hash() if capture_step_hashes else -1}
 				timeline.add_cascade_step(step)
+				if context != null:
+					context.match_step(step)
+					if fail_at == "after_obstacle": return _failure(timeline,"injected_after_obstacle",budget)
+					if not budget.error.is_empty(): return _failure(timeline,budget.error,budget)
 				first = false
 				chain += 1
 				if not budget.spend(board.size.x * board.size.y * 2): return _failure(timeline, budget.error, budget)
 				matches = match_classifier.classify(match_detector.find_matches(board))
 			cascade += 1
-		var settled := BoardSettler.resolve(board, rng, supply, spawn_resolver, budget, "normal_swap")
+		var settled := BoardSettler.resolve(board, rng, supply, spawn_resolver, budget, context.cause if context != null else "normal_swap")
 		if not settled.ok: return _failure(timeline, settled.code, budget)
 		if fail_at == "after_spawn": return _failure(timeline, "injected_after_spawn", budget)
 		var settled_hash := board.compute_hash() if capture_step_hashes and not settled.steps.is_empty() else -1
@@ -72,6 +77,7 @@ func execute_turn(board: BoardState, rng: SeededRng, supply: SpawnTableResource,
 			physical.upgrade_events = []
 			physical.board_hash = settled_hash
 			timeline.add_cascade_step(physical)
+			if context != null: context.physical_step(physical)
 		if not budget.spend(board.size.x * board.size.y * 2): return _failure(timeline, budget.error, budget)
 		if match_detector.find_matches(board).is_empty(): break
 	timeline.work_count = budget.work

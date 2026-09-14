@@ -6,6 +6,9 @@ var _cells: Array = []
 var spawn_policy: String = "fill_empty_cells"
 var next_instance: int = 1
 var id_namespace: String = "piece"
+## P2 obstacle layer; an obstacle occupies an active cell without a gem.
+var room_board := false
+var obstacles: Dictionary = {}
 
 ## Portal connections: "x,y,dx,dy" -> Vector2i target cell.
 ## When get_neighbor() is called for a cell+direction that has a portal entry,
@@ -20,6 +23,7 @@ func _init(board_size: Vector2i = Vector2i.ZERO) -> void:
 
 func resize(board_size: Vector2i) -> void:
 	size = board_size
+	obstacles.clear()
 	_cells.resize(size.x * size.y)
 	for index in _cells.size():
 		_cells[index] = CellState.open()
@@ -56,7 +60,7 @@ func get_tile(cell: Vector2i) -> TileState:
 ## Sets the tile at the given position. Does nothing if out of bounds or cell is blocked.
 func set_tile(cell: Vector2i, tile: TileState) -> void:
 	var cell_state: CellState = get_cell(cell)
-	if cell_state == null or cell_state.blocked:
+	if cell_state == null or cell_state.blocked or not obstacle_at(cell).is_empty():
 		return
 	if tile != null and tile.instance_id.is_empty():
 		tile.instance_id = "%s/%d" % [id_namespace, next_instance]
@@ -116,7 +120,7 @@ func move_tile(from: Vector2i, to: Vector2i) -> bool:
 	if from_cell == null or from_cell.tile == null:
 		return false
 	var to_cell: CellState = get_cell(to)
-	if to_cell == null or to_cell.blocked or to_cell.tile != null:
+	if to_cell == null or not can_enter(to):
 		return false
 	to_cell.tile = from_cell.tile
 	from_cell.tile = null
@@ -151,7 +155,27 @@ func get_effective_gravity(cell: Vector2i) -> Vector2i:
 
 func can_move_occupant(cell: Vector2i) -> bool:
 	var cs := get_cell(cell)
-	return cs != null and not cs.blocked and cs.tile != null and not cs.tile.immovable and cs.lock.is_empty()
+	return cs != null and not cs.blocked and cs.tile != null and not cs.tile.immovable and cs.lock.is_empty() and obstacle_at(cell).is_empty()
+
+func obstacle_at(cell: Vector2i) -> Dictionary:
+	for obstacle in obstacles.values():
+		if obstacle.cell == cell: return obstacle
+	return {}
+
+func can_enter(cell: Vector2i) -> bool:
+	var cs := get_cell(cell)
+	return cs != null and not cs.blocked and cs.tile == null and obstacle_at(cell).is_empty()
+
+func obstacle_neighbors(cells: Array) -> Array:
+	var targets := {}
+	for cell in cells:
+		for direction in LayoutAdmission.CARDINALS:
+			var neighbor := neighbor_for(cell, direction, "match")
+			var obstacle := obstacle_at(neighbor)
+			if not obstacle.is_empty(): targets[obstacle.id] = obstacle.duplicate(true)
+	var ordered := targets.values()
+	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return MatchClassifier.cell_less(a.cell, b.cell))
+	return ordered
 
 func neighbor_for(cell: Vector2i, direction: Vector2i, purpose: String) -> Vector2i:
 	if is_blocked(cell) or purpose not in ["match", "swap", "gravity", "fill"]: return Vector2i(-1, -1)
@@ -165,6 +189,8 @@ func duplicate_board() -> BoardState:
 	result.spawn_policy = spawn_policy
 	result.next_instance = next_instance
 	result.id_namespace = id_namespace
+	result.room_board = room_board
+	result.obstacles = obstacles.duplicate(true)
 	for i in _cells.size():
 		var source: CellState = _cells[i]
 		var target: CellState = result._cells[i]
@@ -180,7 +206,9 @@ func duplicate_board() -> BoardState:
 func to_dict() -> Dictionary:
 	var cells: Array = []
 	for cs in _cells: cells.append(cs.to_dict())
-	return {"size": size, "cells": cells, "portals": _portals.duplicate(true), "spawn_policy": spawn_policy, "next_instance": next_instance, "id_namespace": id_namespace}
+	var data := {"size": size, "cells": cells, "portals": _portals.duplicate(true), "spawn_policy": spawn_policy, "next_instance": next_instance, "id_namespace": id_namespace}
+	if room_board: data.obstacles = obstacles.duplicate(true)
+	return data
 
 
 ## Adds a portal connection. Gravity/movement from `from` in `direction` arrives at `to`.

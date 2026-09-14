@@ -38,7 +38,7 @@ func randf_range(from: float, to: float) -> float:
 func shuffle(array: Array) -> Array:
 	var copy := array.duplicate()
 	for i in range(copy.size() - 1, 0, -1):
-		var j := randi_range(0, i)
+		var j := self.randi_range(0, i)
 		var tmp = copy[i]
 		copy[i] = copy[j]
 		copy[j] = tmp

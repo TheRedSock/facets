@@ -68,3 +68,13 @@ explicit cost/cap and commit/failure boundaries, and new simulation/replay ident
 Do not accept input against the displayed intermediate board while RunState
 already contains the fully committed final board. Preserve the current atomic
 mode unless a separately versioned rule change is explicitly adopted.
+# P2 room extension
+
+See [ROOM_CONTRACT.md](ROOM_CONTRACT.md) for the versioned room protocol.
+`start_room` compiles an immutable authored room, installs rubble before opening
+generation and publishes a briefing. Begin is a recorded free command; all other
+commands use RoomTransaction and one shared ActionContext. RunState schema 2
+includes the room definition, current Craft/allowance, normal turns, recovery
+counts and failure reason. Full candidate admission precedes publication.
+RoomBoundaryResolver owns completion, Work exhaustion, tool-aware availability
+and recovery; restore validates boundaries without executing recovery.

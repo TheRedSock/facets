@@ -1,7 +1,9 @@
 class_name ActionTransaction
 extends RefCounted
 
-static func resolve(current: RunState, command: SwapCommand, fail_at: String = "") -> Dictionary:
+static func resolve(current: RunState, command: Variant, fail_at: String = "") -> Dictionary:
+	if current.room != null: return RoomTransaction.resolve(current,command,fail_at)
+	if not command is SwapCommand: return {"ok":false,"status":"rejected","code":"invalid_command"}
 	var legal := ActionLegality.can_apply(current.board,command,current.moves_remaining,current.phase)
 	if not legal.ok: return {"ok": false, "status": "rejected", "code": legal.code}
 	var before := current.board.duplicate_board()

@@ -18,6 +18,7 @@ var next_event := 1
 var next_removal := 1
 var opening_attempts := 0
 var terminal_recovered := {}
+var room: RoomState
 
 func sync_adapters() -> void:
 	board_size = board.size
@@ -27,10 +28,12 @@ func sync_adapters() -> void:
 	for i in 8: tier_tile_ids[i + 1] = StringName(catalog.roster()[i])
 
 func to_dict() -> Dictionary:
-	return {"schema": 1, "rules": rules.to_dict(), "catalog": catalog.to_dict(), "board": board.to_dict(),
+	var data := {"schema": 2 if room != null else 1, "rules": rules.to_dict(), "catalog": catalog.to_dict(), "board": board.to_dict(),
 		"resource.action_budget": moves_remaining, "rng": streams.capture(), "phase": phase,
 		"revision": revision, "next_action": next_action, "next_event": next_event, "next_removal": next_removal,
 		"opening_attempts": opening_attempts, "terminal_recovered": terminal_recovered.duplicate(true)}
+	if room != null: data.room = room.to_dict()
+	return data
 
 func digest() -> String:
 	return CanonicalCodec.digest(to_dict())
@@ -42,12 +45,17 @@ func duplicate_state() -> RunState:
 	copy.moves_remaining = moves_remaining; copy.phase = phase; copy.revision = revision
 	copy.next_action = next_action; copy.next_event = next_event; copy.next_removal = next_removal
 	copy.opening_attempts = opening_attempts; copy.terminal_recovered = terminal_recovered.duplicate(true)
+	if room != null: copy.room = room.duplicate_state()
 	copy.sync_adapters()
 	return copy
 
 static func restored(data: Variant, require_stable: bool = true) -> Dictionary:
-	if not StateAdmission.exact(data,["schema","rules","catalog","board","resource.action_budget","rng","phase","revision","next_action","next_event","next_removal","opening_attempts","terminal_recovered"]): return StateAdmission.fail("state_schema")
-	if not data.schema is int or data.schema != 1 or data.phase not in ["ready","budget_exhausted","no_legal_swaps"]: return StateAdmission.fail("state_version_or_phase")
+	var keys := ["schema","rules","catalog","board","resource.action_budget","rng","phase","revision","next_action","next_event","next_removal","opening_attempts","terminal_recovered"]
+	var is_room: bool = data is Dictionary and data.get("schema") is int and data.schema == 2
+	if is_room: keys.append("room")
+	if not StateAdmission.exact(data,keys): return StateAdmission.fail("state_schema")
+	var phases := ["briefing","ready","complete","failed"] if is_room else ["ready","budget_exhausted","no_legal_swaps"]
+	if not data.schema is int or data.schema not in [1,2] or data.phase not in phases: return StateAdmission.fail("state_version_or_phase")
 	for field in ["resource.action_budget","revision","next_action","next_event","next_removal","opening_attempts"]:
 		if not data[field] is int or data[field] < 0 or data[field] > 1000000000: return StateAdmission.fail("state_counter")
 	if data.next_action < 1 or data.next_event < 1 or data.next_removal < 1 or data.revision != data.next_action - 1 or data.next_event < data.next_action or data.next_removal > data.next_event or data.opening_attempts > 64: return StateAdmission.fail("state_allocator")
@@ -67,10 +75,21 @@ static func restored(data: Variant, require_stable: bool = true) -> Dictionary:
 	state.streams = streams_result.bank; state.moves_remaining = data["resource.action_budget"]; state.phase = data.phase
 	state.revision = data.revision; state.next_action = data.next_action; state.next_event = data.next_event; state.next_removal = data.next_removal
 	state.opening_attempts = data.opening_attempts; state.terminal_recovered = data.terminal_recovered.duplicate(true)
+	if state.rules.is_room() != is_room or state.board.room_board != is_room: return StateAdmission.fail("state_profile_mismatch")
+	if is_room:
+		var room_result := RoomState.restored(data.room,state.catalog,state.board)
+		if not room_result.ok: return room_result
+		state.room = room_result.room
+		if state.moves_remaining + state.room.normal_turns != state.room.definition.data.work: return StateAdmission.fail("room_turn_budget")
+		if state.room.normal_turns > state.revision or state.room.recovery_count > state.revision or state.room.recovery_attempts > state.room.recovery_count * 64: return StateAdmission.fail("room_counter_consistency")
 	state.sync_adapters()
 	if require_stable:
 		var physics := BoardPhysics.new()
 		if physics._has_move(state.board,state.board.all_cells()) or not physics.find_spawn_eligible_cells(state.board).is_empty() or not MatchDetector.new().find_matches(state.board).is_empty(): return StateAdmission.fail("unstable_snapshot")
-		var expected_phase := "budget_exhausted" if state.moves_remaining == 0 else ("no_legal_swaps" if not ActionLegality.has_legal_swap(state.board) else "ready")
-		if state.phase != expected_phase: return StateAdmission.fail("inconsistent_phase")
+		if is_room:
+			var issue := RoomBoundaryResolver.validate(state)
+			if not issue.is_empty(): return StateAdmission.fail(issue)
+		else:
+			var expected_phase := "budget_exhausted" if state.moves_remaining == 0 else ("no_legal_swaps" if not ActionLegality.has_legal_swap(state.board) else "ready")
+			if state.phase != expected_phase: return StateAdmission.fail("inconsistent_phase")
 	return {"ok": true, "state": state}

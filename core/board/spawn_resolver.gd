@@ -17,7 +17,7 @@ func _init(admitted_catalog: GameCatalog = null) -> void:
 func populate_board(board: BoardState, rng: SeededRng, spawn_table: SpawnTableResource) -> bool:
 	if not _admit_supply(spawn_table): return false
 	for cell in board.all_cells():
-		board.set_tile(cell, _spawn_tile(rng, spawn_table))
+		if board.can_enter(cell): board.set_tile(cell, _spawn_tile(rng, spawn_table))
 	return true
 
 
@@ -35,7 +35,7 @@ func refill_spawn_entries(
 	if not _admit_supply(spawn_table): return -1
 	var spawned := 0
 	for pos in spawn_cells:
-		if not board.is_blocked(pos) and board.get_tile(pos) == null:
+		if board.can_enter(pos):
 			var tile := _spawn_tile(rng, spawn_table)
 			board.set_tile(pos, tile)
 			last_spawn_events.append({

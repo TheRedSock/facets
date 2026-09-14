@@ -55,11 +55,11 @@ func _primary_target(board: BoardState, pos: Vector2i) -> Vector2i:
 	if direction == Vector2i.ZERO: direction = Vector2i.DOWN
 	var target := board.get_neighbor(pos,direction)
 	var destination := board.get_cell(target)
-	return target if destination != null and not destination.blocked and destination.tile == null else Vector2i(-1,-1)
+	return target if destination != null and board.can_enter(target) else Vector2i(-1,-1)
 
 func _fill_source(board: BoardState, pos: Vector2i) -> Vector2i:
 	var cell := board.get_cell(pos)
-	if cell == null or cell.blocked or cell.tile != null: return Vector2i(-1,-1)
+	if cell == null or not board.can_enter(pos): return Vector2i(-1,-1)
 	for direction in cell.fill_sources:
 		var source := board.neighbor_for(pos, direction, "fill")
 		if source != Vector2i(-1,-1) and board.can_move_occupant(source): return source
@@ -84,6 +84,6 @@ func _settle_order(board: BoardState) -> Array[Vector2i]:
 func find_spawn_eligible_cells(board: BoardState) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	for pos in board.all_cells():
-		if board.get_tile(pos) != null: continue
+		if not board.can_enter(pos): continue
 		if board.spawn_policy == "fill_empty_cells" or (board.spawn_policy == "entry_only" and board.get_cell(pos).is_spawn_entry): cells.append(pos)
 	return cells

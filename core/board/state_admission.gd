@@ -11,7 +11,10 @@ static func vector_record(data: Variant) -> bool:
 	return exact(data,["x","y"]) and data.x is int and data.y is int and data.x >= -2147483648 and data.x <= 2147483647 and data.y >= -2147483648 and data.y <= 2147483647
 
 static func board(data: Variant, catalog: GameCatalog) -> Dictionary:
-	if not exact(data,["size","cells","portals","spawn_policy","next_instance","id_namespace"]): return fail("board_schema")
+	var keys := ["size","cells","portals","spawn_policy","next_instance","id_namespace"]
+	var room_board: bool = data is Dictionary and data.has("obstacles")
+	if room_board: keys.append("obstacles")
+	if not exact(data,keys): return fail("board_schema")
 	if not data.size is Vector2i or not data.cells is Array or not data.portals is Dictionary or not data.spawn_policy is String or not data.next_instance is int or data.next_instance < 1 or data.next_instance > 1000000000 or not GameValue.valid_id(data.id_namespace): return fail("board_types")
 	var size: Vector2i = data.size
 	if size.x < 1 or size.y < 1 or size.x > 16 or size.y > 16 or data.cells.size() != size.x * size.y or data.portals.size() > size.x * size.y * 4: return fail("board_bounds")
@@ -71,6 +74,17 @@ static func board(data: Variant, catalog: GameCatalog) -> Dictionary:
 		result.get_cell(pos).tags = data.cells[i].tags.duplicate(true)
 		result.get_cell(pos).lock = data.cells[i].lock.duplicate(true)
 		result.get_cell(pos).tile = occupants[i]
+	if room_board:
+		if not data.obstacles is Dictionary or data.obstacles.size() > size.x * size.y: return fail("obstacle_schema")
+		result.room_board = true
+		var occupied := {}
+		for id in data.obstacles:
+			var obstacle: Variant = data.obstacles[id]
+			if not GameValue.valid_id(id) or not exact(obstacle,["id","cell","kind","durability"]): return fail("obstacle_schema")
+			if obstacle.id != id or not obstacle.cell is Vector2i or obstacle.kind != "rubble" or not obstacle.durability is int or obstacle.durability < 1 or obstacle.durability > 2: return fail("obstacle_value")
+			if not result.can_enter(obstacle.cell) or occupied.has(obstacle.cell) or not result.get_cell(obstacle.cell).lock.is_empty(): return fail("obstacle_occupancy")
+			occupied[obstacle.cell] = true
+			result.obstacles[id] = obstacle.duplicate(true)
 	return {"ok": true, "board": result}
 
 static func tile(data: Variant, catalog: GameCatalog) -> Dictionary:

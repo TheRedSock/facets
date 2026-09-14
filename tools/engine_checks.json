@@ -1268,6 +1268,24 @@
       "completion": "CHECK_COMPLETE: test_rng_cross_platform"
     },
     {
+      "name": "test_game_tools",
+      "args": ["--headless", "--script", "res://tests/game/test_game_tools.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_tools"
+    },
+    {
+      "name": "test_game_recovery",
+      "args": ["--headless", "--script", "res://tests/game/test_game_recovery.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_recovery"
+    },
+    {
+      "name": "test_game_room",
+      "args": ["--headless", "--script", "res://tests/game/test_game_room.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_room"
+    },
+    {
       "name": "test_game_rules",
       "args": [
         "--headless",
@@ -1296,6 +1314,13 @@
       ],
       "mode": "cpu",
       "completion": "CHECK_COMPLETE: test_game_transaction",
+      "timeout_seconds": 1800
+    },
+    {
+      "name": "test_game_room_replay",
+      "args": ["--headless", "--script", "res://tests/game/test_game_room_replay.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_game_room_replay",
       "timeout_seconds": 1800
     },
     {

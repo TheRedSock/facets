@@ -46,6 +46,28 @@ func start_new_run(config: Dictionary = {}) -> bool:
 	_publish_session(state)
 	return true
 
+func start_room(resource: RoomDefinitionResource = null, seed_value: int = 1001, profile: RuleSet = null) -> bool:
+	if resource == null: resource = load("res://data/game/rooms/open_seam.tres")
+	var catalog_result := GameBootstrap.catalog()
+	if not catalog_result.ok: last_error = catalog_result.code; return false
+	var admitted := RoomDefinition.compile(resource,catalog_result.catalog)
+	if not admitted.ok: last_error = admitted.code; return false
+	var rules := profile if profile != null else RuleSet.for_room()
+	var rule_result := RuleSet.admit(rules.to_dict())
+	if not rule_result.ok or not rules.is_room(): last_error = "invalid_room_rules"; return false
+	var opening := OpeningGenerator.generate(admitted.board.layout_resource(),catalog_result.catalog,RngStreamBank.new(seed_value),rules,admitted.board)
+	if not opening.ok: last_error = opening.code; return false
+	var state := RunState.new()
+	state.board = opening.board; state.catalog = catalog_result.catalog; state.rules = rules
+	state.streams = opening.streams; state.opening_attempts = opening.attempts
+	state.moves_remaining = admitted.definition.data.work; state.phase = "briefing"
+	state.room = RoomState.new(); state.room.definition = admitted.definition; state.room.craft = admitted.definition.data.craft
+	state.sync_adapters()
+	var restored := RunState.restored(state.to_dict())
+	if not restored.ok: last_error = restored.code; return false
+	_publish_session(state)
+	return true
+
 func _publish_session(state: RunState) -> void:
 	run_state = state; rng = state.streams.stream("board")
 	generation += 1; last_error = ""; last_result = {}; _adapter_result = {}; _adapter_acknowledged = true
@@ -55,6 +77,7 @@ func _publish_session(state: RunState) -> void:
 
 func reroll_board(seed_override: int = -1) -> bool:
 	if run_state == null: return start_new_run()
+	if run_state.room != null: last_error = "room_reroll_unsupported"; return false
 	var next_seed := seed_override if seed_override >= 0 else run_state.run_seed + 1
 	return start_new_run({"catalog":run_state.catalog,"rules":run_state.rules,"board_layout":run_state.board.layout_resource(),
 		"starting_moves":maxi(1,run_state.moves_remaining),"seed":next_seed})
@@ -62,15 +85,17 @@ func reroll_board(seed_override: int = -1) -> bool:
 func restart() -> bool:
 	return restore_snapshot(_initial)
 
-func can_apply_action(command: SwapCommand) -> Dictionary:
+func can_apply_action(command: Variant) -> Dictionary:
 	if run_state == null: return {"ok":false,"code":"no_session"}
+	if run_state.room != null: return RoomActionLegality.can_apply(run_state,command)
+	if not command is SwapCommand: return {"ok":false,"code":"invalid_command"}
 	return ActionLegality.can_apply(run_state.board,command,run_state.moves_remaining,run_state.phase)
 
 func enumerate_legal_swaps() -> Array[SwapCommand]:
 	if run_state == null: return []
 	return ActionLegality.enumerate_legal_swaps(run_state.board,run_state.moves_remaining,run_state.phase)
 
-func apply_action(command: SwapCommand, expected_revision: int = -1, fail_at: String = "") -> Dictionary:
+func apply_action(command: Variant, expected_revision: int = -1, fail_at: String = "") -> Dictionary:
 	if run_state == null: return {"ok":false,"status":"rejected","code":"no_session"}
 	if expected_revision >= 0 and expected_revision != run_state.revision: return {"ok":false,"status":"rejected","code":"stale_revision"}
 	var result := ActionTransaction.resolve(run_state,command,fail_at)
@@ -98,7 +123,7 @@ func restore_bytes(bytes: PackedByteArray) -> bool:
 	return restore_snapshot(decoded.value)
 
 func export_replay() -> Dictionary:
-	return {"version":"facets-replay-v1","initial":_initial.duplicate(true),"initial_digest":CanonicalCodec.digest(_initial),"commands":_commands.duplicate(true)}
+	return {"version":"facets-replay-v2" if run_state != null and run_state.room != null else "facets-replay-v1","initial":_initial.duplicate(true),"initial_digest":CanonicalCodec.digest(_initial),"commands":_commands.duplicate(true)}
 
 ## Transitional API: begin commits once; resolve/finalize never run rules.
 func begin_swap(a: Vector2i, b: Vector2i) -> bool:

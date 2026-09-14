@@ -4,10 +4,10 @@
   "policy_contract": "core/run/ROOM_CONTRACT.md",
   "batches": {
     "B0": "policy_frozen",
-    "B1": "pending",
-    "B2": "pending",
-    "B3": "pending",
-    "B4": "pending",
+    "B1": "simulation_implemented_and_verified",
+    "B2": "simulation_implemented_and_verified",
+    "B3": "simulation_implemented_and_verified",
+    "B4": "simulation_implemented_and_verified",
     "B5": "pending",
     "B6": "pending",
     "B7": "pending"
@@ -23,5 +23,7 @@
   "player_sessions": "pending",
   "intervention_trial": "required_after_room",
   "inherited_cpu_acceptance": "open",
-  "inherited_player_feel_acceptance": "open"
+  "inherited_player_feel_acceptance": "open",
+  "simulation_evidence": "artifacts/game/p2/simulation/checks/results.json",
+  "room_seed_evaluation": "100-seed automated corpus passed; human teaching and purposeful-tool review pending"
 }
