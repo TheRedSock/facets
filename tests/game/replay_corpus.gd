@@ -56,8 +56,6 @@ static func run(test: SceneTree) -> void:
 		report.max_work = work_counts.max(); report.max_segments = segment_counts.max()
 	report.assertion_failures = test.failures.size() - initial_failures
 	report.status = "pass" if report.failures.is_empty() and report.assertion_failures == 0 and report.seeds.size() == 100 else "fail"
-	DirAccess.make_dir_recursive_absolute("res://artifacts/game/p1-implementation")
-	var file := FileAccess.open("res://artifacts/game/p1-implementation/replay-corpus.json",FileAccess.WRITE)
-	file.store_string(JSON.stringify(report,"\t")); file.close()
+	test.write_report("replay-corpus.json",report)
 	test.check(report.status == "pass", "100-seed corpus no discarded failures")
 	print("Replay timing: p95=%s ms max=%s ms" % [report.get("p95_action_ms"),report.get("max_action_ms")])

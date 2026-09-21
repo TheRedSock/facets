@@ -13,3 +13,4 @@ tests/game/p1-checkpoints.json -text whitespace=blank-at-eol,blank-at-eof,space-
 assets/ui/**/*.svg text eol=lf
 assets/ui/themes/*.tres text eol=lf
 data/localization/en.tres text eol=lf
+tests/game/p2-reference.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

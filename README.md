@@ -7,9 +7,11 @@ board objectives and branching runs.
 ## What is here
 
 The repository contains an offline gem-authoring/rendering pipeline, runtime
-asset delivery, and an early playable board demonstration. The proposed roguelike
-prototype adds rooms, family reactions, rewards and carryover; the design documents
-describe intended work, not features already present in the demo.
+asset delivery, and a playable atomic P2 room with rubble, Work, Craft and tools.
+P2 engineering closeout and the intervention experiment are underway. Family
+reactions, rewards, carryover and expedition persistence are planned P3 work.
+Player learning, difficulty and feel remain unmeasured; the user is the sole
+reviewer during this stage, with broader testing deferred.
 
 The [documentation index](docs/README.md) routes the current design and engine
 reports. The [prototype build plan](docs/PROTOTYPE_BUILD_PLAN.md) records phase
@@ -18,7 +20,7 @@ preserves the initial rules and review evidence.
 
 ## Run and develop
 
-Open `project.godot` in Godot 4.6. The project menu provides the board demo and Gem
+Open `project.godot` in Godot 4.6. The project menu provides the tactical room and Gem
 Atelier. Tool scripts specify their tested Godot executable and export-template
 requirements; check them when configuring another workstation.
 

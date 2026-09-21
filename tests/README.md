@@ -7,6 +7,12 @@ Every Godot stage must report its own completion marker. Exit-zero exceptions,
 automatic quit before completion, and missing markers fail validation.
 `tests/test_check_result.ps1` verifies the stage-result classifier.
 
+Each invocation writes a fresh timestamped directory under `artifacts/checks/`.
+Use `-OutputRoot <new-directory>` for a named evidence run. Nonempty destinations
+reject before execution. Report-producing stages receive their own destinations;
+`run.json` records expected/completed stages and source stability. Historical
+reports must never be used as scratch output or overwritten by a rerun.
+
 Numerical tests distinguish source-data regression, analytic/reference evidence,
 GPU backend agreement and visual acceptance. A parsed script is not an executed
 test; a supported physical mechanism is not necessarily an accepted visual preset.

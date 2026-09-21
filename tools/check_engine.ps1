@@ -4,12 +4,13 @@ param(
     [switch]$CrystalPrecision,
     [string]$ReferencePython = '',
     [string]$AnalysisPython = 'python',
+    [string]$OutputRoot = '',
     [string[]]$Only = @(),
     [switch]$List
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$logRoot = Join-Path $projectRoot 'artifacts/checks'
+$logRoot = if ($OutputRoot) { [IO.Path]::GetFullPath($OutputRoot, $projectRoot) } else { Join-Path $projectRoot ('artifacts/checks/' + (Get-Date -Format 'yyyyMMdd-HHmmss-ffff')) }
 . (Join-Path $PSScriptRoot 'check_result.ps1')
 . (Join-Path $PSScriptRoot 'check_process.ps1')
 $registry = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'engine_checks.json') -Raw | ConvertFrom-Json
@@ -24,6 +25,7 @@ if ($Only.Count) {
     }
 }
 if ($List) { $stages | Select-Object name,mode,completion; exit 0 }
+if ((Test-Path -LiteralPath $logRoot) -and @(Get-ChildItem -LiteralPath $logRoot -Force).Count) { throw "Check output directory must be new or empty: $logRoot" }
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 $failed = @()
 $results = @()
@@ -37,8 +39,17 @@ function Get-CheckedSourceDigest {
     return $records -join "`n"
 }
 $sourceBefore = Get-CheckedSourceDigest
+$sourceBefore | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot 'source-before.txt')
 foreach ($stage in $stages) {
     $arguments = @('--audio-driver', 'Dummy', '--path', $projectRoot, '--log-file', (Join-Path $logRoot ($stage.name + '.godot.log'))) + $stage.args
+    if ($stage.report_root_arg) {
+        if ('--' -notin $arguments) { $arguments += '--' }
+        $arguments += '--report-root=' + (Join-Path $logRoot $stage.name).Replace('\','/')
+    }
+    if ($stage.report_argument) {
+        if ('--' -notin $arguments) { $arguments += '--' }
+        $arguments += $stage.report_argument + '=' + (Join-Path $logRoot ($stage.name + '.json')).Replace('\','/')
+    }
     $started = Get-Date
     $timeout = if ($stage.timeout_seconds) { [int]$stage.timeout_seconds } elseif ($stage.mode -eq 'cpu') { 300 } else { 1800 }
     $execution = Invoke-BoundedCheckProcess -Executable $Godot -Arguments $arguments -TimeoutSeconds $timeout
@@ -86,10 +97,13 @@ if ($ReferencePython -and $failed.Count -eq 0 -and $Only.Count -eq 0) {
         else { Write-Output "PASS $name" }
     }
 }
-if ($sourceBefore -cne (Get-CheckedSourceDigest)) {
+$sourceAfter = Get-CheckedSourceDigest
+$sourceAfter | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot 'source-after.txt')
+if ($sourceBefore -cne $sourceAfter) {
     $failed += 'source_changed_during_validation'
     Write-Output 'FAIL source_changed_during_validation: rerun against a stable source tree'
 }
+[ordered]@{schema=1; output_root=$logRoot; source_stable=($sourceBefore -ceq $sourceAfter); expected_stages=@($stages.name); completed_stages=@($results.name); failed=@($failed); godot=$Godot; status=$(if ($failed.Count) {'failed'} else {'passed'})} | ConvertTo-Json -Depth 6 | Set-Content -Encoding utf8 -LiteralPath (Join-Path $logRoot 'run.json')
 if ($failed.Count -gt 0) { Write-Output "Failed checks: $($failed -join ', ')"; exit 1 }
 Write-Output "ENGINE_CHECKS_COMPLETE: $($stages.Count) Godot stages"
 exit 0

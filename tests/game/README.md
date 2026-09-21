@@ -38,7 +38,7 @@ an explicit version decision; tests must not rewrite goldens to pass.
 seeds.json fixes 100 seeds and an ordered legal-command policy independent of
 rule RNG. Each run records every accepted state/event checkpoint, fresh replay
 and midpoint snapshot continuation. No failed seed is discarded. The report is
-artifacts/game/p1-implementation/replay-corpus.json. Same-build equality is the
+the check runner's new output directory. Same-build equality is the
 claim; RNG build mismatches reject. The proposed 5 ms p95 is measured and assessed,
 not presumed. test_game_playback uses the real RunScene/BoardScene adapter for
 sequential, instant, skip, restart, rejected bounce, delivery error and destruction.
@@ -73,7 +73,13 @@ room/obstacle admission, P0 first/last-Work completion, transactional failure
 injection, identity-checked tools, suppression, allowance, bounded deterministic
 recovery and stream isolation. `test_game_room_replay` runs 100 explicit seeds
 with mixed tools/swaps, canonical midpoint restore, stale-command rejection and
-complete replay. Its new evidence goes to artifacts/game/p2/simulation.
+complete replay. Its new evidence goes to the runner's unique output directory,
+including canonical per-seed replays and every accepted checkpoint. Direct
+invocations also choose a fresh directory unless `--report-root=` is supplied.
+`p2-reference.json` freezes the 100-seed, 1,194 gameplay-action (+100 Begin)
+characterization from unchanged P2 semantics before closeout corrections. Each
+run compares all state/event pairs to it. This cross-revision reference supplements
+the hand-authored semantic assertions; it is not an independent rules oracle.
 These establish simulation behavior; player teaching, pacing, release performance
 and the separate intervention trial require their own evidence.
 

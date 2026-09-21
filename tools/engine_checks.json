@@ -1330,6 +1330,7 @@
     },
     {
       "name": "test_game_room_replay",
+      "report_root_arg": true,
       "args": ["--headless", "--script", "res://tests/game/test_game_room_replay.gd"],
       "mode": "cpu",
       "completion": "CHECK_COMPLETE: test_game_room_replay",
@@ -1337,6 +1338,7 @@
     },
     {
       "name": "test_game_replay",
+      "report_root_arg": true,
       "args": [
         "--headless",
         "--script",
@@ -1354,7 +1356,8 @@
     },
     {
       "name": "game_action_probe",
-      "args": ["--", "--action-probe=res://artifacts/game/p1a/registered-action-probe.json"],
+      "args": [],
+      "report_argument": "--action-probe",
       "mode": "gpu",
       "completion": "CHECK_COMPLETE: action_probe"
     },

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "started_from": "43ab9c9",
+  "review_policy": "User is sole reviewer; one build and form. Human sessions and acceptance deferred, potentially until after P5. No human learning, difficulty or feel claim.",
+  "baseline": {
+    "evidence": "artifacts/game/p2-closeout/20260921-implementation/s0-baseline/run.json",
+    "completed_stages": 18,
+    "source_stable": true,
+    "p1_checkpoints": 2000,
+    "p2_gameplay_actions": 1194,
+    "p2_begin_commands": 100,
+    "p2_outcomes": {"complete": 77, "failed": 23},
+    "p1_debug_action_p95_ms": 47.6,
+    "p2_debug_action_p95_ms": 53.71,
+    "performance_target_met": false
+  },
+  "steps": {
+    "S0.1": "preserved baseline; unique output routing; frozen P2 characterization",
+    "S0.2": "current documentation reconciled; frozen baseline untouched",
+    "S0.3-S0.4": "audit underway",
+    "C1": "pending",
+    "C2": "pending; CPU gate open",
+    "C3": "build and form pending; human sessions deferred",
+    "T0-T2": "pending",
+    "T3": "review material pending; human sessions deferred",
+    "T4": "pending; retain atomic production default",
+    "R0": "pending"
+  }
+}
