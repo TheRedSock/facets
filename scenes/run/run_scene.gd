@@ -265,7 +265,8 @@ func _show_delivery_error(message: String) -> void:
 	_update_hud()
 
 func _start_run() -> void:
-	var started := run_controller.start_room(null,7) if room_mode else run_controller.start_new_run({"seed":randi_range(1,999999)})
+	var room_seed := int(get_tree().root.get_meta("review_seed",7))
+	var started := run_controller.start_room(null,room_seed) if room_mode else run_controller.start_new_run({"seed":randi_range(1,999999)})
 	if not started:
 		_resolution_error = run_controller.last_error
 		board_scene.set_input_gate("error",true)

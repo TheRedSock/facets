@@ -23,13 +23,20 @@ func _ready() -> void:
 		var voice := AudioStreamPlayer.new(); voice.bus = "UI" if i < 2 else "GameSFX"
 		add_child(voice); voices.append(voice)
 	var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/presentation/workshop_manifest.json"))
+	load_manifest(manifest)
+
+func load_manifest(manifest: Variant) -> bool:
+	cancel(); streams.clear(); last_error = ""
 	if not manifest is Dictionary or manifest.get("schema") != 1:
-		last_error = "Invalid room presentation manifest"; return
+		last_error = "Invalid room presentation manifest"; return false
+	for path in manifest.get("resources",{}):
+		if not ResourceLoader.exists(path): last_error = "Missing presentation resource: "+str(path); return false
 	for path: String in manifest.get("audio_resources",[]):
 		if not ResourceLoader.exists(path): last_error = "Missing sound: "+path; continue
 		var stream: AudioStream = load(path)
 		if stream == null: last_error = "Cannot load sound: "+path; continue
 		streams[path.get_file().get_basename()] = stream
+	return last_error.is_empty()
 
 func cancel() -> void:
 	generation += 1

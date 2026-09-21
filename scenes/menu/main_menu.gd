@@ -6,6 +6,10 @@ extends Control
 
 func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--closeout-probe=") and not get_tree().root.has_meta("closeout_probe_started"):
+			get_tree().root.set_meta("closeout_probe_started",true); visible = false
+			var probe := CloseoutProbe.new(); get_tree().root.add_child.call_deferred(probe)
+			probe.run.call_deferred(argument.trim_prefix("--closeout-probe=")); return
 		if argument.begins_with("--room-probe="):
 			visible = false
 			var probe := RoomProbe.new(); get_tree().root.add_child.call_deferred(probe)
@@ -65,6 +69,19 @@ func _ready() -> void:
 	play_btn.add_theme_font_size_override("font_size", 24)
 	play_btn.pressed.connect(_on_play)
 	vbox.add_child(play_btn)
+	if "--review" in OS.get_cmdline_user_args():
+		var seeds := OptionButton.new()
+		for seed_value in [7,1,8]: seeds.add_item("Open seam · seed %d" % seed_value,seed_value)
+		get_tree().root.set_meta("review_seed",7)
+		seeds.item_selected.connect(func(index: int): get_tree().root.set_meta("review_seed",seeds.get_item_id(index)))
+		vbox.add_child(seeds)
+		var trial_button := Button.new(); trial_button.text = "Intervention comparison"; trial_button.custom_minimum_size.y = 48
+		trial_button.pressed.connect(func():
+			visible = false
+			var view := InterventionView.new()
+			view.back_requested.connect(func(): visible = true)
+			get_tree().root.add_child(view))
+		vbox.add_child(trial_button)
 
 	if OS.has_feature("editor"):
 		# ---- Gem Atelier (lapidary designer) ----

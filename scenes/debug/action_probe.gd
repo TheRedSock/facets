@@ -21,11 +21,13 @@ func _process(_delta: float) -> void:
 
 func run(report_path: String) -> void:
 	var corpus := "--probe-corpus" in OS.get_cmdline_user_args()
+	var room_corpus := "--probe-room-corpus" in OS.get_cmdline_user_args()
 	var serial := "--probe-serial" in OS.get_cmdline_user_args()
 	var report := {"schema":"facets-action-probe-v1","godot":Engine.get_version_info().string,"editor":OS.has_feature("editor"),
 		"executable":OS.get_executable_path(),"os":OS.get_name(),"cpu":OS.get_processor_name(),"display":DisplayServer.get_name(),
 		"mode":"corpus" if corpus else ("serial" if serial else "concurrent"),"warmup_frames":30,"actions":[],"failures":_failures}
-	if corpus: await _corpus(report)
+	if room_corpus: await _room_corpus(report)
+	elif corpus: await _corpus(report)
 	else: await _playback(report,serial)
 	report.status = "pass" if _failures.is_empty() else "fail"
 	var output := FileAccess.open(report_path,FileAccess.WRITE)
@@ -34,6 +36,49 @@ func run(report_path: String) -> void:
 	output.store_string(JSON.stringify(report,"\t")); output.close()
 	print("CHECK_COMPLETE: action_probe")
 	get_tree().quit(0 if _failures.is_empty() else 1)
+
+func _room_corpus(report: Dictionary) -> void:
+	report.mode = "p2-mixed-v1"; report.outcomes = {}
+	var timings: Array = []; var queries: Array = []; var startups: Array = []; var begins: Array = []
+	var by_kind := {}; var recovery: Array = []
+	for seed_value in range(1,101):
+		var game := RunController.new(); var start := Time.get_ticks_usec()
+		if not game.start_room(null,seed_value): _failures.append(game.last_error); continue
+		startups.append((Time.get_ticks_usec()-start)/1000.0)
+		start = Time.get_ticks_usec(); var begun := game.apply_action(RoomCommand.begin(0))
+		begins.append((Time.get_ticks_usec()-start)/1000.0)
+		if not begun.ok: _failures.append(begun.code); continue
+		for turn in 40:
+			if game.run_state.phase != "ready": break
+			start = Time.get_ticks_usec()
+			var tools := RoomActionLegality.tools(game.run_state); var swaps := game.enumerate_legal_swaps()
+			queries.append((Time.get_ticks_usec()-start)/1000.0)
+			var command: RoomCommand
+			if not tools.is_empty() and (turn%3 == 0 or swaps.is_empty()): command = tools[(seed_value+turn*17)%tools.size()]
+			elif not swaps.is_empty():
+				var swap := swaps[(seed_value+turn*13)%swaps.size()]; command = RoomCommand.exchange(game.run_state,swap.origin,swap.destination)
+			else: _failures.append("ready_without_actions"); break
+			start = Time.get_ticks_usec(); var result := game.apply_action(command)
+			var elapsed := (Time.get_ticks_usec()-start)/1000.0
+			if not result.ok: _failures.append(result.code); break
+			timings.append(elapsed)
+			if not by_kind.has(command.data.kind): by_kind[command.data.kind] = []
+			by_kind[command.data.kind].append(elapsed)
+			var segments := 0
+			for fact in result.facts:
+				if fact.type == "tile_moved": segments += fact.path.size()
+			var recovered: bool = result.facts.any(func(f: Dictionary) -> bool: return f.type == "board_rearranged")
+			if recovered: recovery.append(elapsed)
+			report.actions.append({"seed":seed_value,"index":turn,"kind":command.data.kind,"sim_ms":elapsed,
+				"state_digest":result.state_digest,"event_digest":result.event_digest,"facts":result.facts.size(),"work":result.timeline.work_count,"segments":segments,"recovery":recovered})
+		report.outcomes[game.run_state.phase] = report.outcomes.get(game.run_state.phase,0)+1
+		if game.run_state.phase not in ["complete","failed"]: _failures.append("incomplete_room/%d" % seed_value)
+		if seed_value%10 == 0: print("P2 action corpus: %d/100" % seed_value); await get_tree().process_frame
+	report.simulation = _stats(timings); report.legal_query = _stats(queries); report.startup = _stats(startups); report.begin = _stats(begins)
+	report.by_kind = {}; report.recovery = _stats(recovery)
+	for kind in by_kind: report.by_kind[kind] = _stats(by_kind[kind])
+	report.target_5ms_met = report.simulation.p95 <= 5.0
+	if report.actions.size() != 1194: _failures.append("incomplete_p2_corpus")
 
 func _corpus(report: Dictionary) -> void:
 	var timings: Array = []

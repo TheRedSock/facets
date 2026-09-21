@@ -609,6 +609,24 @@ authored probe rooms. Functional instant-tool cases are excluded from timings.
 Use `--resolution 1600x900` or `--resolution 1280x720` before `--` for native shots.
 The older `--action-probe` remains the identifiable legacy workload.
 
+P2 closeout release verification, after creating a fresh package:
+
+```powershell
+./tools/game/verify_closeout_release.ps1 -Package generated/desktop/NEW_BUILD -OutputRoot artifacts/game/NEW_RELEASE_CHECK
+```
+
+The output destination must be empty. This runs the actual executable through
+lifecycle/error/recovery cases, both native resolutions, frozen P1/P2 corpora and
+the isolated trial at 30/60/120 FPS. Missing/corrupt-pack checks use separate
+copies and preserve the original package hashes. `release.json` distinguishes
+completed functional checks from the 5 ms CPU and 16.7 ms frame targets. Reports
+include raw frames, input-to-view-change observations (not display latency),
+work/facts and payload estimates; font/scene/driver overhead is not measured.
+
+Launch `Facets.exe -- --review` for the optional sole-reviewer entry: seeds 7/1/8
+and Atomic/Paused/400 ms/800 ms comparison. Normal Play remains atomic P2. The
+trial is authored diagnostic content, not an expedition feature or human finding.
+
 Original sound candidate production (Python standard library only):
 
 ```powershell
