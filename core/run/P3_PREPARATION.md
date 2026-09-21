@@ -1,6 +1,20 @@
 # P3 preparation contract — reserved, unimplemented
 
-These are the concrete contracts for the next phase, not implemented gameplay. The user deferred human testing; atomic production remains the current scope. CPU closeout still requires an explicit disposition. The planned data and acceptance cases are in `tests/game/p3-preparation.json`; structural preparation checks do not claim P3 mechanics pass.
+Successor direction, 2026-09-21: [merge-window preparation](MERGE_WINDOW_PREPARATION.md)
+now governs the proposed resolution foundation before P3. It adds repeated paid
+interventions, intervention-before-automatic-match precedence and isolated default
+lookahead. This is design, not implemented behavior. Its
+[acceptance specifications](../../tests/game/MERGE_WINDOW_ACCEPTANCE.md) require
+reconciling the older atomic assumptions below before P3 activation.
+
+The retained package below still owns planned rooms, families, rewards and carry.
+Its whole-action rollback, Craft settlement, action scopes, stable phases and
+reserved protocol names are historical proposals requiring the successor G5
+audit; they must not override the new batch/window contract. The planned data
+and cases in `tests/game/p3-preparation.json` remain unchanged until that audit.
+Their structural checks do not claim P3 gameplay passes. The old 5 ms CPU gate
+remains failed historical evidence; successor readiness requires new measured
+deadline exits. Human evaluation remains deferred under the sole-reviewer policy.
 
 ## Contract decisions
 
@@ -147,4 +161,3 @@ board views during transition until cancellation/commit releases them. Exercise
 both boards and choice previews as live page owners. Failed/retried loads keep
 displayed choices and last committed run/RNG unchanged. P3 UI/FX/audio additions
 follow accepted P2 material cues; their audition is distinct from mechanics.
-

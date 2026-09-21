@@ -1,5 +1,12 @@
 # Isolated intervention trial
 
+Direction amendment, 2026-09-21: the separately proposed
+[merge-window successor](MERGE_WINDOW_PREPARATION.md) supports repeated
+board-wide paid interventions before automatic matches, with one discardable
+default-result candidate. It has not been implemented. This file continues to
+describe the existing one-window trial exactly; its checks do not establish
+successor streaming, timing or gameplay behavior.
+
 `InterventionTrial` owns the separately versioned
 `facets-intervention-trial-v1` state/replay envelope and the rules profiles
 `trial-paused-v1`, `trial-24-v1`, `trial-48-v1`. Its embedded P2 RuleSet supplies
