@@ -10,55 +10,57 @@
       "status": "passed",
       "evidence": "artifacts/game/merge-readiness/g0-baseline-r2/run.json"
     },
-    [
-      {
-        "id": "G1",
-        "status": "pending"
-      },
-      {
-        "id": "G2",
-        "status": "pending"
-      },
-      {
-        "id": "G3",
-        "status": "pending"
-      },
-      {
-        "id": "G4",
-        "status": "pending"
-      },
-      {
-        "id": "G5",
-        "status": "pending"
-      },
-      {
-        "id": "G6",
-        "status": "pending"
-      },
-      {
-        "id": "G7",
-        "status": "pending"
-      }
-    ]
+    {
+      "id": "G1",
+      "status": "passed",
+      "evidence": "artifacts/game/merge-readiness/g1-r4/run.json"
+    },
+    {
+      "id": "G2",
+      "status": "pending"
+    },
+    {
+      "id": "G3",
+      "status": "pending"
+    },
+    {
+      "id": "G4",
+      "status": "pending"
+    },
+    {
+      "id": "G5",
+      "status": "pending"
+    },
+    {
+      "id": "G6",
+      "status": "pending"
+    },
+    {
+      "id": "G7",
+      "status": "pending"
+    }
   ],
   "cases": [
     {
       "id": "MW01",
       "assertion": "Single legal equilibrium swap publishes exactly one complete merge batch, parks before any newly created match/gravity, and charges normal Work once.",
       "owner": "kernel",
-      "status": "pending"
+      "status": "kernel_verified",
+      "evidence": "g1-r4/test_merge_kernel"
     },
     {
       "id": "MW02",
       "assertion": "Two disjoint simultaneous matches resolve in canonical order in one batch with one board-wide window; survivor/component identity is fixed before reactions.",
       "owner": "kernel",
-      "status": "pending"
+      "status": "kernel_verified",
+      "evidence": "g1-r4/test_merge_kernel"
     },
     {
       "id": "MW03",
       "assertion": "Promotion makes an automatic match. Pass resolves it next without gravity and opens another window.",
       "owner": "kernel",
-      "status": "pending"
+      "status": "kernel_verified",
+      "evidence": "g1-r4/test_merge_kernel"
     },
     {
       "id": "MW04",
@@ -118,13 +120,15 @@
       "id": "MW13",
       "assertion": "Last-Work completion wins before another decision. Zero-Work nonterminal state finishes required automatic work before loss. Holes never trigger recovery; recovery occurs only at equilibrium. No optional gravity/refill after terminal commitment.",
       "owner": "kernel",
-      "status": "pending"
+      "status": "kernel_verified",
+      "evidence": "g1-r4/test_merge_kernel"
     },
     {
       "id": "MW14",
       "assertion": "Technical cascade/chain/fact/work limits remain effective across automatic continuations. Injected failure discards the unpublished batch and reservation; prior published states/costs/facts remain intact. New paid moves reset only their specified scopes.",
       "owner": "kernel",
-      "status": "pending"
+      "status": "kernel_verified",
+      "evidence": "g1-r4/test_merge_kernel"
     },
     {
       "id": "MW15",

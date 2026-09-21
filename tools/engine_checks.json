@@ -1279,7 +1279,14 @@
       "mode": "cpu",
       "completion": "CHECK_COMPLETE: test_game_recovery"
     },
-    {
+      {
+        "name": "test_merge_kernel",
+        "args": ["--headless", "--script", "res://tests/game/test_merge_kernel.gd"],
+        "mode": "cpu",
+        "report_root_arg": true,
+        "completion": "CHECK_COMPLETE: test_merge_kernel"
+      },
+      {
         "name": "test_p3_preparation",
         "args": ["--headless", "--script", "res://tests/game/test_p3_preparation.gd"],
         "mode": "cpu",
