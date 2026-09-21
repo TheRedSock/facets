@@ -1280,6 +1280,12 @@
       "completion": "CHECK_COMPLETE: test_game_recovery"
     },
     {
+        "name": "test_p3_preparation",
+        "args": ["--headless", "--script", "res://tests/game/test_p3_preparation.gd"],
+        "mode": "cpu",
+        "completion": "CHECK_COMPLETE: test_p3_preparation"
+      },
+      {
         "name": "test_intervention_playback",
         "report_root_arg": true,
         "args": ["--headless", "--script", "res://tests/game/test_intervention_playback.gd"],

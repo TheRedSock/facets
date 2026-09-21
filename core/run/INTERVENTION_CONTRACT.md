@@ -53,3 +53,10 @@ line at `(1,3),(1,4),(1,5)`. Separate fixtures cover an automatic chain and no
 opportunity. Registered tests distinguish unit/semantic evidence from actual
 release playback and human preference. Human sessions are deferred by the user;
 atomic production remains the default pending any later adoption review.
+
+Closeout disposition (2026-09-21): decline adoption into P3 production for this
+milestone; retain this isolated implementation and review entry for later
+evaluation. This is an engineering scope decision under the user's deferred
+human-review policy, not a finding that players prefer atomic actions. P3
+reactions and persistence therefore target whole atomic actions. Reopening
+adoption requires an explicit decision and new compatibility review.
