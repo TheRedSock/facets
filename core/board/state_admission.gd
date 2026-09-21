@@ -27,7 +27,7 @@ static func board(data: Variant, catalog: GameCatalog) -> Dictionary:
 		var raw: Variant = data.cells[i]
 		if not exact(raw,["blocked","gravity_direction","is_spawn_entry","fill_sources","tags","lock","tile"]): return fail("cell_schema")
 		if not raw.blocked is bool or not raw.is_spawn_entry is bool or not vector_record(raw.gravity_direction) or not raw.fill_sources is Array or not raw.tags is Dictionary or not raw.lock is Dictionary: return fail("cell_types")
-		if CanonicalCodec.encode(raw.tags).is_empty() or raw.tags.size() > 64: return fail("cell_tags")
+		if raw.tags.size() > 64 or (not raw.tags.is_empty() and CanonicalCodec.encode(raw.tags).is_empty()): return fail("cell_tags")
 		if not raw.lock.is_empty() and (not exact(raw.lock,["kind","durability"]) or raw.lock.kind not in ["seal","movement_lock"] or not raw.lock.durability is int or raw.lock.durability < 1 or raw.lock.durability > 1000000): return fail("lock_schema")
 		var pos := Vector2i(i % size.x,i / size.x)
 		if raw.blocked:
@@ -90,7 +90,7 @@ static func board(data: Variant, catalog: GameCatalog) -> Dictionary:
 static func tile(data: Variant, catalog: GameCatalog) -> Dictionary:
 	if not exact(data,["instance_id","tile_id","match_group","tier","family_tags","status_flags","protected","gravity_override","immovable","unmatchable","merge_target_id"]): return fail("tile_schema")
 	if not GameValue.valid_id(data.instance_id) or not data.tier is int or data.tier < 1 or data.tier > 8 or not data.family_tags is Array or not data.status_flags is Dictionary or not data.protected is bool or not data.immovable is bool or not data.unmatchable is bool or not vector_record(data.gravity_override): return fail("tile_types")
-	if data.protected or data.merge_target_id != "" or data.status_flags.size() > 64 or CanonicalCodec.encode(data.status_flags).is_empty(): return fail("unsupported_tile_state")
+	if data.protected or data.merge_target_id != "" or data.status_flags.size() > 64 or (not data.status_flags.is_empty() and CanonicalCodec.encode(data.status_flags).is_empty()): return fail("unsupported_tile_state")
 	var definition := catalog.definition(data.tier)
 	for tag in data.family_tags:
 		if not (tag is String or tag is StringName): return fail("family_tag_type")

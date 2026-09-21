@@ -11,6 +11,9 @@ var _error := ""
 var _nodes := 0
 var _writer := StreamPeerBuffer.new()
 var _strings := {}
+## Only short string wire values are cached, never mutable state or hashes.
+## Bounded to <=4096 entries, each <=137 wire bytes plus key/container overhead.
+static var _short_strings := {}
 
 static func encode(value: Variant) -> PackedByteArray:
 	var codec := CanonicalCodec.new()
@@ -49,10 +52,17 @@ func _write(value: Variant, depth: int) -> void:
 		TYPE_INT: _writer.put_u8(2); _integer(value)
 		TYPE_STRING, TYPE_STRING_NAME:
 			var string := str(value)
-			if not _strings.has(string): _strings[string] = string.to_utf8_buffer()
-			var bytes: PackedByteArray = _strings[string]
-			if bytes.size() > 1048576: _error = "codec_string_limit"; return
-			_writer.put_u8(3); _integer(bytes.size()); _writer.put_data(bytes)
+			if _short_strings.has(string): _writer.put_data(_short_strings[string])
+			else:
+				if not _strings.has(string):
+					var bytes := string.to_utf8_buffer()
+					if bytes.size() > 1048576: _error = "codec_string_limit"; return
+					var wire := PackedByteArray(); wire.resize(9)
+					wire[0] = 3; wire.encode_s64(1,bytes.size())
+					wire.append_array(bytes)
+					if bytes.size() <= 128 and _short_strings.size() < 4096: _short_strings[string] = wire
+					_strings[string] = wire
+				_writer.put_data(_strings[string])
 		TYPE_VECTOR2I:
 			_writer.put_u8(4); _integer(value.x); _integer(value.y)
 		TYPE_ARRAY:

@@ -1,6 +1,8 @@
 class_name GameValue
 extends RefCounted
 
+static var _id_pattern := RegEx.create_from_string("\\A[A-Za-z0-9._/-]{1,128}\\z")
+
 static func freeze(value: Variant) -> Variant:
 	if value is Dictionary:
 		var result := {}
@@ -15,7 +17,5 @@ static func freeze(value: Variant) -> Variant:
 	return value
 
 static func valid_id(value: Variant) -> bool:
-	if not (value is String or value is StringName) or str(value).is_empty() or str(value).length() > 128: return false
-	for c in str(value):
-		if c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._/-": return false
-	return true
+	if not (value is String or value is StringName): return false
+	return _id_pattern.search(str(value)) != null

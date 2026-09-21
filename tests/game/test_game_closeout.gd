@@ -16,6 +16,16 @@ class LastCandidateRng extends SeededRng:
 func _initialize() -> void: _run.call_deferred()
 
 func _run() -> void:
+	for i in range(1,256):
+		var c := String.chr(i)
+		check(GameValue.valid_id(c) == (c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._/-"),"native ID predicate character %d" % i)
+	check(not GameValue.valid_id(1) and not GameValue.valid_id("") and not GameValue.valid_id("a\n") and not GameValue.valid_id("a".repeat(129)),"ID type/length/absolute end")
+	check(GameValue.valid_id(StringName("a".repeat(128))),"ID inclusive length and StringName")
+	var wire := CanonicalCodec.encode({"é":"Unicode\ttest","same":["same","same"]})
+	check(CanonicalCodec.decode(wire).ok,"short-string wire cache preserves Unicode/control characters")
+	for i in 4200: CanonicalCodec.encode("cache/%d" % i)
+	check(CanonicalCodec._short_strings.size() <= 4096,"short-string cache bounded")
+	check(CanonicalCodec.encode({"é":"Unicode\ttest","same":["same","same"]}) == wire,"cache capacity cannot change bytes")
 	var coverage: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://tests/game/closeout-audit-fields.json"))
 	var field_ids := {}
 	for row in coverage.fields: field_ids[row.requirement] = true

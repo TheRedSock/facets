@@ -22,12 +22,13 @@
     "S0.2": "current documentation reconciled; frozen baseline untouched",
     "S0.3-S0.4": "complete: source/invariant audit and cumulative 63-field ownership; see closeout-audit-fields.json",
     "C1": "complete: focused and integrated 19-stage run pass; all P1/P2 frozen checkpoints preserved; RoomProbe quantiles corrected",
-    "C2": "pending; CPU gate open",
+    "C2": "bounded encoding/ID optimizations verified against all frozen P1/P2 pairs; release coverage and CPU disposition pending",
     "C3": "build and form pending; human sessions deferred",
     "T0-T2": "pending",
     "T3": "review material pending; human sessions deferred",
     "T4": "pending; retain atomic production default",
     "R0": "pending"
   },
-  "c1_evidence": "artifacts/game/p2-closeout/20260921-implementation/c1-integrated/run.json"
+  "c1_evidence": "artifacts/game/p2-closeout/20260921-implementation/c1-integrated/run.json",
+  "optimization_evidence": "artifacts/game/p2-closeout/20260921-implementation/trial-corpus/run.json"
 }
