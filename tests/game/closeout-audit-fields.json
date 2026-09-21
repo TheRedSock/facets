@@ -1,0 +1,575 @@
+{
+  "schema": 1,
+  "evidence_root": "artifacts/game/p2-closeout/20260921-implementation",
+  "baseline_ledger": "tests/game/fixture-disposition.json",
+  "cases": 23,
+  "fields": [
+    {
+      "requirement": "match_3.component_sizes",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_3.survivor",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_3.promoted_tier",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_3.removed_count",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_4.component_sizes",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_4.survivor",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_4.promoted_tier",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_4.removed_count",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_4.base_craft_candidate",
+      "phase": "P2",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_tools.gd",
+      "evidence": "s0-baseline/test_game_tools.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_5.component_sizes",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_5.survivor",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_5.promoted_tier",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_5.removed_count",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_5.base_craft_candidate",
+      "phase": "P2",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_tools.gd",
+      "evidence": "s0-baseline/test_game_tools.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_l.component_sizes",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_l.survivor",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_l.intersection",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_t.component_sizes",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_t.survivor",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "match_t.intersection",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "multi_intersection.component_sizes",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "multi_intersection.survivor",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "multi_intersection.unique_member_count",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "first_action_win.room_result",
+      "phase": "P2",
+      "source": "core/run/room_boundary_resolver.gd:finish",
+      "test": "tests/game/test_game_room.gd",
+      "evidence": "s0-baseline/test_game_room.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "first_action_win.work",
+      "phase": "P2",
+      "source": "core/run/room_boundary_resolver.gd:finish",
+      "test": "tests/game/test_game_room.gd",
+      "evidence": "s0-baseline/test_game_room.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "first_action_win.marked_rubble_remaining",
+      "phase": "P2",
+      "source": "core/run/room_boundary_resolver.gd:finish",
+      "test": "tests/game/test_game_room.gd",
+      "evidence": "s0-baseline/test_game_room.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "first_action_win.completion_count",
+      "phase": "P2",
+      "source": "core/run/room_boundary_resolver.gd:finish",
+      "test": "tests/game/test_game_room.gd",
+      "evidence": "s0-baseline/test_game_room.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "last_action_win.room_result",
+      "phase": "P2",
+      "source": "core/run/room_boundary_resolver.gd:finish",
+      "test": "tests/game/test_game_room.gd",
+      "evidence": "s0-baseline/test_game_room.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "last_action_win.work",
+      "phase": "P2",
+      "source": "core/run/room_boundary_resolver.gd:finish",
+      "test": "tests/game/test_game_room.gd",
+      "evidence": "s0-baseline/test_game_room.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "last_action_win.marked_rubble_remaining",
+      "phase": "P2",
+      "source": "core/run/room_boundary_resolver.gd:finish",
+      "test": "tests/game/test_game_room.gd",
+      "evidence": "s0-baseline/test_game_room.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "last_action_win.completion_count",
+      "phase": "P2",
+      "source": "core/run/room_boundary_resolver.gd:finish",
+      "test": "tests/game/test_game_room.gd",
+      "evidence": "s0-baseline/test_game_room.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "occupied_spawn_entry.eligible_cells",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "entry_refill_settles.occupied_cells",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_transaction.gd",
+      "evidence": "s0-baseline/test_game_transaction.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "entry_refill_settles.spawn_origins",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_transaction.gd",
+      "evidence": "s0-baseline/test_game_transaction.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "entry_refill_settles.all_events_root_cause",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_transaction.gd",
+      "evidence": "s0-baseline/test_game_transaction.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "outlet_delivery.room_result",
+      "phase": "P3",
+      "source": "P3 objective resolver (planned)",
+      "test": null,
+      "evidence": null,
+      "disposition": "deliberately deferred",
+      "closure": "Implement in owning phase; do not count as current coverage"
+    },
+    {
+      "requirement": "outlet_delivery.extracted_count",
+      "phase": "P3",
+      "source": "P3 objective resolver (planned)",
+      "test": null,
+      "evidence": null,
+      "disposition": "deliberately deferred",
+      "closure": "Implement in owning phase; do not count as current coverage"
+    },
+    {
+      "requirement": "outlet_delivery.removed_count",
+      "phase": "P3",
+      "source": "P3 objective resolver (planned)",
+      "test": null,
+      "evidence": null,
+      "disposition": "deliberately deferred",
+      "closure": "Implement in owning phase; do not count as current coverage"
+    },
+    {
+      "requirement": "outlet_delivery.carry_excludes_cell",
+      "phase": "P3",
+      "source": "P3 objective resolver (planned)",
+      "test": null,
+      "evidence": null,
+      "disposition": "deliberately deferred",
+      "closure": "Implement in owning phase; do not count as current coverage"
+    },
+    {
+      "requirement": "locked_swap_rejected.accepted",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "locked_swap_rejected.state_and_rng_unchanged",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "locked_gem_matches.component_sizes",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "locked_gem_matches.survivor",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "locked_gem_matches.seal_removed_before_merge",
+      "phase": "P6",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": null,
+      "evidence": null,
+      "disposition": "deliberately deferred",
+      "closure": "Implement in owning phase; do not count as current coverage"
+    },
+    {
+      "requirement": "recovery_possible.legal_swaps_before",
+      "phase": "P1",
+      "source": "core/run/recovery_resolver.gd:recover",
+      "test": "tests/game/test_game_recovery.gd",
+      "evidence": "s0-baseline/test_game_recovery.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "recovery_possible.preserve_multiset",
+      "phase": "P2",
+      "source": "core/run/recovery_resolver.gd:recover",
+      "test": "tests/game/test_game_recovery.gd",
+      "evidence": "s0-baseline/test_game_recovery.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "recovery_possible.work_delta",
+      "phase": "P2",
+      "source": "core/run/recovery_resolver.gd:recover",
+      "test": "tests/game/test_game_recovery.gd",
+      "evidence": "s0-baseline/test_game_recovery.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "recovery_possible.craft_delta",
+      "phase": "P2",
+      "source": "core/run/recovery_resolver.gd:recover",
+      "test": "tests/game/test_game_recovery.gd",
+      "evidence": "s0-baseline/test_game_recovery.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "recovery_impossible.legal_swaps_before",
+      "phase": "P1",
+      "source": "core/run/recovery_resolver.gd:recover",
+      "test": "tests/game/test_game_recovery.gd",
+      "evidence": "s0-baseline/test_game_recovery.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "recovery_impossible.result",
+      "phase": "P2",
+      "source": "core/run/recovery_resolver.gd:recover",
+      "test": "tests/game/test_game_recovery.gd",
+      "evidence": "s0-baseline/test_game_recovery.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "recovery_impossible.state_preserved",
+      "phase": "P2",
+      "source": "core/run/recovery_resolver.gd:recover",
+      "test": "tests/game/test_game_recovery.gd",
+      "evidence": "s0-baseline/test_game_recovery.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "portal_not_match_adjacency.component_sizes",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "zero_gravity_fallback.direction",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "status_value_hash.hash_must_change",
+      "phase": "P1",
+      "source": "core/run/run_state.gd:to_dict; core/rules/canonical_codec.gd:digest",
+      "test": "tests/game/test_game_state.gd",
+      "evidence": "s0-baseline/test_game_state.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "portal_hash.hash_must_change",
+      "phase": "P1",
+      "source": "core/run/run_state.gd:to_dict; core/rules/canonical_codec.gd:digest",
+      "test": "tests/game/test_game_state.gd",
+      "evidence": "s0-baseline/test_game_state.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "distant_swap_rejected.accepted",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "distant_swap_rejected.state_and_rng_unchanged",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "same_cell_rejected.accepted",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "same_cell_rejected.state_and_rng_unchanged",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "empty_swap_rejected.accepted",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "empty_swap_rejected.state_and_rng_unchanged",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "blocked_swap_unrelated_match.accepted",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    },
+    {
+      "requirement": "blocked_swap_unrelated_match.state_and_rng_unchanged",
+      "phase": "P1",
+      "source": "core/run/turn_controller.gd:execute_turn; core/board/",
+      "test": "tests/game/test_game_rules.gd",
+      "evidence": "s0-baseline/test_game_rules.log",
+      "disposition": "confirmed; original expected field preserved",
+      "closure": "Retain exact frozen expectation on shared-code changes"
+    }
+  ]
+}

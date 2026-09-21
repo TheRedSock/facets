@@ -68,6 +68,13 @@ frame targets. Run the same opt-in probe in the actual release executable; the
 older delivered-view burst does not substitute for it.
 # P2 simulation checks
 
+`test_game_closeout` verifies the cumulative 63-field P0 ownership ledger, P2
+leaf identity and malformed admission, same-tier Reposition, the Refine T5
+boundary, tool-only readiness, integrated shared-target component damage, and
+last-candidate recovery inclusion. The latter uses a labelled candidate-order
+double; real-RNG stream/replay checks remain separate. High-tier and locked
+pieces are preserved. Probe p50/p95 use nearest rank, including small samples.
+
 Registered `test_game_room`, `test_game_tools` and `test_game_recovery` cover
 room/obstacle admission, P0 first/last-Work completion, transactional failure
 injection, identity-checked tools, suppression, allowance, bounded deterministic
@@ -91,3 +98,4 @@ the dummy driver. Dense-impact checks cover duplicate coalescing, the four-impac
 cap and reserved UI/result voices. Headless teardown allows one mixer interval
 after releasing the scene. The third cue set was accepted by the user on
 2026-09-14; dense in-game listening remains a separate human observation.
+`tools/game/profile_actions.gd` records repeated stage costs separately from complete transactions. It does not turn the sum of microbenchmarks into a complete-action claim. External admission and canonical identity remain mandatory.

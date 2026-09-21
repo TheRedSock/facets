@@ -116,9 +116,7 @@ func _picture(path: String, label: String) -> void:
 	get_viewport().get_texture().get_image().save_png(path+"."+label+".png")
 
 func _stats(values: Array) -> Dictionary:
-	if values.is_empty(): return {}
-	var sorted := values.duplicate(); sorted.sort()
-	return {"count":sorted.size(),"p50":sorted[int((sorted.size()-1)*0.5)],"p95":sorted[int((sorted.size()-1)*0.95)],"max":sorted[-1]}
+	return ActionProbe._stats(values)
 
 func _finish(path: String, report: Dictionary) -> void:
 	report.status = "passed" if failures.is_empty() else "failed"; report.failures = failures

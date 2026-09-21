@@ -152,5 +152,5 @@ func _ready_board() -> bool:
 static func _stats(values: Array) -> Dictionary:
 	if values.is_empty(): return {"count":0,"p95":0.0,"max":0.0,"over_16_7":0}
 	var sorted := values.duplicate(); sorted.sort()
-	return {"count":values.size(),"p95":sorted[mini(sorted.size()-1,int(ceil(sorted.size()*0.95))-1)],"max":sorted[-1],
+	return {"count":values.size(),"quantile":"nearest_rank","p50":sorted[int(ceil(sorted.size()*0.5))-1],"p95":sorted[mini(sorted.size()-1,int(ceil(sorted.size()*0.95))-1)],"max":sorted[-1],
 		"over_16_7":values.filter(func(value: float) -> bool: return value > 16.7).size()}

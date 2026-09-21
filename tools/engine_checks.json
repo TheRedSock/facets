@@ -1280,7 +1280,13 @@
       "completion": "CHECK_COMPLETE: test_game_recovery"
     },
     {
-      "name": "test_game_room",
+        "name": "test_game_closeout",
+        "args": ["--headless", "--script", "res://tests/game/test_game_closeout.gd"],
+        "mode": "cpu",
+        "completion": "CHECK_COMPLETE: test_game_closeout"
+      },
+      {
+        "name": "test_game_room",
       "args": ["--headless", "--script", "res://tests/game/test_game_room.gd"],
       "mode": "cpu",
       "completion": "CHECK_COMPLETE: test_game_room"
