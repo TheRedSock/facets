@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "profile": "p3-ready-merge-v1",
+  "simulation": "facets-sim-merge-v1",
+  "content": "facets-p2-merge-content-v1",
+  "session": "facets-resolution-session-v1",
+  "replay": "facets-replay-merge-v1",
+  "clock_hz": 60,
+  "swap_ticks": 9,
+  "merge_ticks": 20,
+  "minimum_gravity_ms": 100,
+  "maximum_committed_queue": 2,
+  "maximum_default_candidates": 1,
+  "policy": "intervention_before_automatic_match",
+  "default_swap_work": 1,
+  "normal_performance": {
+    "feedback_p95_us": 16700,
+    "feedback_max_us": 33400,
+    "main_thread_p95_us": 5000,
+    "main_thread_max_us": 16700,
+    "ready_ratio_p95_per_mille": 250,
+    "ready_ratio_max_per_mille": 500,
+    "deadline_misses": 0,
+    "default_handoff_p95_us": 16700,
+    "default_handoff_max_us": 33400,
+    "frame_p95_us": 16700,
+    "required_compute_stress": 2,
+    "seed_count": 100,
+    "repetitions": 3
+  }
+}
