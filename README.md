@@ -8,8 +8,9 @@ board objectives and branching runs.
 
 The repository contains an offline gem-authoring/rendering pipeline, runtime
 asset delivery, and a playable atomic P2 room with rubble, Work, Craft and tools.
-P2 engineering closeout and the intervention experiment are underway. Family
-reactions, rewards, carryover and expedition persistence are planned P3 work.
+P2 engineering checks and an isolated intervention comparison are implemented;
+the measured CPU target remains open. Family reactions, rewards, carryover and
+expedition persistence are specified in the [P3 preparation contract](core/run/P3_PREPARATION.md).
 Player learning, difficulty and feel remain unmeasured; the user is the sole
 reviewer during this stage, with broader testing deferred.
 

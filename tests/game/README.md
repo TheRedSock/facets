@@ -108,3 +108,16 @@ cap and reserved UI/result voices. Headless teardown allows one mixer interval
 after releasing the scene. The third cue set was accepted by the user on
 2026-09-14; dense in-game listening remains a separate human observation.
 `tools/game/profile_actions.gd` records repeated stage costs separately from complete transactions. It does not turn the sum of microbenchmarks into a complete-action claim. External admission and canonical identity remain mandatory.
+
+`test_p3_preparation` validates the reserved P3 specification against inherited
+fixtures, distinct reward pools, authored room/staging cells, protocol versions,
+save-field inventory and available delivery bindings. Its 14 acceptance case
+specifications are requirements for future executable P3 tests, not passing
+implementations. See [the preparation contract](../../core/run/P3_PREPARATION.md).
+
+The actual release matrix is `tools/game/verify_closeout_release.ps1`. It runs
+the shipped executable at both native sizes, compares all frozen P1/P2 action
+pairs, checks trial replay equivalence at 30/60/120 FPS and exercises isolated
+missing/corrupt pack copies. Functional completion, CPU/frame targets and human
+evaluation have separate statuses. The tracked `closeout-status.json` records
+the latest disposition; ignored reports retain exact measurements and failures.
