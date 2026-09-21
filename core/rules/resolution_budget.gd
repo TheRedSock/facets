@@ -4,11 +4,15 @@ var rules: RuleSet
 var work := 0
 var facts := 0
 var error := ""
+## Scheduling cancellation is injected only for detached successor candidates.
+## It is never serialized into mechanical identity or enabled in legacy runs.
+var cancelled := Callable()
 
 func _init(profile: RuleSet = null) -> void:
 	rules = profile if profile != null else RuleSet.new()
 
 func spend(visits: int, segments: int = 0) -> bool:
+	if cancelled.is_valid() and cancelled.call(): error = "cancelled"; return false
 	work += visits
 	facts += segments
 	if work > int(rules.value("max_work")): error = "work_cap"

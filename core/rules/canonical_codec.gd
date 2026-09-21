@@ -15,6 +15,11 @@ var _strings := {}
 ## Bounded to <=4096 entries, each <=137 wire bytes plus key/container overhead.
 static var _short_strings := {}
 
+## Call on the main thread before launching the first simulation worker. Once
+## sealed, shared entries are immutable; unknown strings use each codec's cache.
+static func seal_shared_cache() -> void:
+	if not _short_strings.is_read_only(): _short_strings.make_read_only()
+
 static func encode(value: Variant) -> PackedByteArray:
 	var codec := CanonicalCodec.new()
 	codec._writer.put_data("FAC1".to_ascii_buffer())
@@ -60,7 +65,7 @@ func _write(value: Variant, depth: int) -> void:
 					var wire := PackedByteArray(); wire.resize(9)
 					wire[0] = 3; wire.encode_s64(1,bytes.size())
 					wire.append_array(bytes)
-					if bytes.size() <= 128 and _short_strings.size() < 4096: _short_strings[string] = wire
+					if not _short_strings.is_read_only() and bytes.size() <= 128 and _short_strings.size() < 4096: _short_strings[string] = wire
 					_strings[string] = wire
 				_writer.put_data(_strings[string])
 		TYPE_VECTOR2I:

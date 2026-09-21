@@ -22,7 +22,8 @@
     },
     {
       "id": "G3",
-      "status": "pending"
+      "status": "passed",
+      "evidence": "artifacts/game/merge-readiness/g3-r3/run.json"
     },
     {
       "id": "G4",
@@ -167,31 +168,36 @@
       "id": "MW19",
       "assertion": "Default automatic-match speculation commits only on pass. On intervention its board, RNG, IDs, Work, Craft, facts and injected branch failure are discarded. Accepted intervention equals the synchronous non-speculative reference; selecting a failed default invokes the specified failure policy.",
       "owner": "executor",
-      "status": "pending"
+      "status": "executor_verified",
+      "evidence": "g3-r3/test_merge_executor"
     },
     {
       "id": "MW20",
       "assertion": "Default gravity/refill speculation has MW19 isolation, including RNG-consuming refills. Clock ticks do not invalidate its mechanical base or get overwritten by it; final publication binds the current decision/transcript digest. A cancelled speculative job yields promptly to paid input at the latest legal receipt tick.",
       "owner": "executor",
-      "status": "pending"
+      "status": "executor_verified",
+      "evidence": "g3-r3/test_merge_executor"
     },
     {
       "id": "MW21",
       "assertion": "Inject delayed, duplicate and wrong-generation completions across restart/menu/restore/room re-entry. None publish or touch freed views. Worker shutdown is bounded; repeated lifecycle cycles leak no jobs.",
       "owner": "executor",
-      "status": "pending"
+      "status": "executor_verified",
+      "evidence": "g3-r3/test_merge_executor"
     },
     {
       "id": "MW22",
       "assertion": "Commit state, charged cost, replay record and batch visibility atomically. Failures before/at publication never leave half a commit; provisional swap feedback visibly returns to the last committed board on failure.",
       "owner": "executor",
-      "status": "pending"
+      "status": "executor_verified",
+      "evidence": "g3-r3/test_merge_executor"
     },
     {
       "id": "MW23",
       "assertion": "Queue capacity never exceeds two committed batches plus one detached default candidate and one reserved command. Underflow holds a coherent state and records starvation; backpressure never crosses an unresolved decision.",
       "owner": "executor",
-      "status": "pending"
+      "status": "executor_verified",
+      "evidence": "g3-r3/test_merge_executor"
     },
     {
       "id": "MW24",

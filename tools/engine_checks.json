@@ -1294,6 +1294,12 @@
         "completion": "CHECK_COMPLETE: test_merge_commands"
       },
       {
+        "name": "test_merge_executor",
+        "args": ["--headless", "--script", "res://tests/game/test_merge_executor.gd"],
+        "mode": "cpu",
+        "completion": "CHECK_COMPLETE: test_merge_executor"
+      },
+      {
         "name": "test_p3_preparation",
         "args": ["--headless", "--script", "res://tests/game/test_p3_preparation.gd"],
         "mode": "cpu",
