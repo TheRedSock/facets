@@ -7,9 +7,12 @@ board objectives and branching runs.
 ## What is here
 
 The repository contains an offline gem-authoring/rendering pipeline, runtime
-asset delivery, and a playable atomic P2 room with rubble, Work, Craft and tools.
-P2 engineering checks and an isolated intervention comparison are implemented;
-the measured CPU target remains open. Family reactions, rewards, carryover and
+asset delivery, and playable P2 rooms with rubble, Work, Craft and tools.
+The [merge-window successor](core/run/MERGE_WINDOW_PREPARATION.md) adds repeated
+interventions and incremental resolution; its readiness ledger distinguishes
+implemented behavior from outstanding release gates. Atomic P2 and the earlier
+isolated comparison remain controls; their whole-action CPU target remains open.
+Family reactions, rewards, carryover and
 expedition persistence are specified in the [P3 preparation contract](core/run/P3_PREPARATION.md).
 Player learning, difficulty and feel remain unmeasured; the user is the sole
 reviewer during this stage, with broader testing deferred.

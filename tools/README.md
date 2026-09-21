@@ -623,9 +623,11 @@ completed functional checks from the 5 ms CPU and 16.7 ms frame targets. Reports
 include raw frames, input-to-view-change observations (not display latency),
 work/facts and payload estimates; font/scene/driver overhead is not measured.
 
-Launch `Facets.exe -- --review` for the optional sole-reviewer entry: seeds 7/1/8
-and Atomic/Paused/400 ms/800 ms comparison. Normal Play remains atomic P2. The
-trial is authored diagnostic content, not an expedition feature or human finding.
+Launch `Facets.exe -- --review` for the optional sole-reviewer entries: the
+merge-redirection practice board and the earlier seeds 7/1/8,
+Atomic/Paused/400 ms/800 ms comparison. The menu labels the original P2 room
+and merge-intervention room separately. The earlier trial is authored diagnostic
+content, not an expedition feature or human finding.
 
 Original sound candidate production (Python standard library only):
 
@@ -641,3 +643,30 @@ are selected in the runtime manifest, with uncompressed PCM import settings.
 Recipes, reference-only file hashes and listening feedback are recorded in
 art_source/game/manifest.json. Generate future experiments in a new candidate
 directory; keep accepted recipes and outputs together until a replacement is reviewed.
+
+Merge-window successor release verification:
+
+```powershell
+./tools/check_merge_release.ps1 -Package generated/desktop/NEW_BUILD -Output artifacts/game/NEW_CPU_RUN
+./tools/check_merge_release.ps1 -Package generated/desktop/NEW_BUILD -Output artifacts/game/NEW_NATIVE_RUN -Mode native -Width 1600 -Height 900
+```
+
+CPU defaults are the frozen 100 seeds × five policies × three repetitions. It
+accelerates decision clocks while measuring the real detached worker, copying,
+validation, hashes and publication. Native mode uses actual presentation timing;
+its fixed assisted/fault witnesses are separate from performance samples. Use
+`-Multiplier 2` for required modeled compute stress. `-Mode characterization`
+measures near-cap boards and 1×/4×/8× diagnostic reaction candidate dispatch;
+those are neither ordinary gameplay gates nor future authored content.
+Registered `test_merge_load` additionally executes 1×/4×/8× independent active
+promotion waves, with full admission and hashes per wave. Its conservative
+cost characterization is separate from candidate dispatch, whose once-per-scope
+rules suppress repeated applications; neither is a measured P3 content budget.
+
+Every output directory must be new. Reports retain raw intervals, all failed
+seeds, package SHA-256 before/after, power/graphics profile and repetition
+identity. `-GpuIndex` is an explicit alternative profile; a passing alternative
+must never be reported as a pass for the default GPU. Memory monitoring bounds
+whole-process worker/snapshot/renderer use and labels serialized snapshot sizes
+separately from heap allocation. The [successor ledger](../tests/game/merge-readiness-status.json)
+is the authority for which release exits have actually passed.

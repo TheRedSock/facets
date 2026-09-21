@@ -1441,6 +1441,29 @@
       ],
       "mode": "cpu",
       "completion": "CHECK_COMPLETE: test_game_playback"
+    },
+    {
+      "name": "merge_cpu_smoke",
+      "args": ["--headless", "--", "--merge-seeds=3", "--merge-repetitions=1"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: merge_probe",
+      "report_argument": "--merge-probe",
+      "timeout_seconds": 300
+    },
+    {
+      "name": "merge_characterization",
+      "args": ["--headless", "--", "--merge-characterization"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: merge_probe",
+      "report_argument": "--merge-probe",
+      "timeout_seconds": 300
+    },
+    {
+      "name": "test_merge_load",
+      "args": ["--headless", "--script", "res://tests/game/test_merge_load.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_merge_load",
+      "report_root_arg": true
     }
   ]
 }

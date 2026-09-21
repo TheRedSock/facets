@@ -5,6 +5,7 @@ $cases = @(
     @{ Code = 0; Text = 'CHECK_COMPLETE: fixture'; Marker = 'CHECK_COMPLETE: fixture'; Expected = $true },
     @{ Code = 1; Text = 'CHECK_COMPLETE: fixture'; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },
     @{ Code = 0; Text = "SCRIPT ERROR: failure`nCHECK_COMPLETE: fixture"; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },
+    @{ Code = 0; Text = "WARNING: ObjectDB instances leaked at exit`nCHECK_COMPLETE: fixture"; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },
     @{ Code = 0; Text = "ERROR: Failed to read the root certificate store.`nCHECK_COMPLETE: fixture"; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },
     @{ Code = 0; Text = 'CHECK_COMPLETE: another_test'; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },
     @{ Code = 0; Text = 'CHECK_COMPLETE: fixture_suffix'; Marker = 'CHECK_COMPLETE: fixture'; Expected = $false },

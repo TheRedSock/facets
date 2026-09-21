@@ -37,11 +37,17 @@
     },
     {
       "id": "G6",
-      "status": "pending"
+      "status": "in_progress",
+      "evidence": [
+        "artifacts/game/merge-readiness/g6-cpu-final-r1/run.json",
+        "artifacts/game/merge-readiness/g6-native-720-r2/run.json",
+        "artifacts/game/merge-readiness/g6-native-900-r1/run.json"
+      ]
     },
     {
       "id": "G7",
-      "status": "pending"
+      "status": "in_progress",
+      "evidence": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     }
   ],
   "cases": [
@@ -98,7 +104,8 @@
       "id": "MW08",
       "assertion": "Where semantics are unchanged, passing all successor windows reaches the legacy board/resources/RNG under the explicit semantic projection. Deliberate early-terminal differences have hand-explained exact successor expectations, never projected-away board mismatches. Original P1/P2 and trial controls still match their own exact bytes.",
       "owner": "compatibility",
-      "status": "pending"
+      "status": "compatibility_verified",
+      "evidence": "g7-final-controls-r1/test_merge_kernel + frozen test_game_replay/test_game_room_replay"
     },
     {
       "id": "MW09",
@@ -218,6 +225,20 @@
       "owner": "persistence",
       "status": "restore_and_seams_verified",
       "evidence": "g5-r4"
+    },
+    {
+      "id": "MW26",
+      "assertion": "Diagnostic dispatcher verifies move/room/run scopes, frozen source family, live target revalidation, tool suppression and intervention context.",
+      "owner": "p3_contract",
+      "status": "restore_and_seams_verified",
+      "evidence": "g5-r4/test_merge_seams"
+    },
+    {
+      "id": "MW27",
+      "assertion": "Every successor phase has an explicit P3 objective, carry and save disposition; future fixture inventory remains structural.",
+      "owner": "p3_contract",
+      "status": "restore_and_seams_verified",
+      "evidence": "g5-r4/test_p3_preparation"
     },
     {
       "id": "MW28",

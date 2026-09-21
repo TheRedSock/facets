@@ -81,7 +81,25 @@ func _run() -> void:
 	check(session.apply(RoomCommand.exchange(session.state,Vector2i(2,3),Vector2i(1,3))).ok,"discount transcript input")
 	_roundtrip(session,"discounted intervention accounting")
 	await _failure()
+	await _early_default_clock()
 	finish("test_merge_replay")
+
+func _early_default_clock() -> void:
+	var game := RunController.new(); game.start_room(null,1); game.apply_action(RoomCommand.begin(0))
+	game.run_state.streams = RngStreamBank.new(9007199254740993)
+	var session := MergeSession.new(); session.start(game.run_state.to_dict())
+	var swap := ActionLegality.enumerate_legal_swaps(session.state.board)[0]
+	session.apply(RoomCommand.exchange(session.state,swap.origin,swap.destination))
+	var executor := MergeExecutor.new(session)
+	check(executor.prepare_default(),"default may begin before first drawn merge frame")
+	var end := Time.get_ticks_msec()+3000
+	while executor.default_result.is_empty() and Time.get_ticks_msec() < end:
+		executor.poll(); await process_frame
+	session.presented(); session.tick(20)
+	check(executor.release_window().ok and session.phase == "gravity","early default releases gravity at live expiry")
+	check(session.clock.started and session.clock.tick == 20,"private pre-presentation clock never overwrites live decision")
+	_roundtrip(session,"early speculative gravity clock")
+	check(executor.shutdown(),"early default worker stops")
 
 func _rejections(session: MergeSession) -> void:
 	var saved := session.snapshot()

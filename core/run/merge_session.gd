@@ -88,6 +88,7 @@ func prepare(command: RoomCommand = null, fail_at: String = "", cancelled: Calla
 	if not admission.ok: return admission
 	var started := Time.get_ticks_usec()
 	var copy := _detached()
+	var copied := Time.get_ticks_usec()
 	if cancelled.is_valid() and cancelled.call(): return StateAdmission.fail("cancelled")
 	var before := state.board.duplicate_board()
 	var first_fact := copy.context.facts.size() if copy.context != null else 0
@@ -116,7 +117,9 @@ func prepare(command: RoomCommand = null, fail_at: String = "", cancelled: Calla
 		copy.context.modifier_scope = copy.modifiers.reward_scope; copy.context.modifier_context = copy.modifiers.reward_context; copy.context.modifier_family = copy.modifiers.reward_family
 	copy.context.direct_batch = command != null
 	copy.context.budget.cancelled = cancelled
+	var rooted := Time.get_ticks_usec()
 	var result := copy._advance(pair,command == null and phase == "gravity",fail_at)
+	var resolved := Time.get_ticks_usec()
 	if not result.ok: return result
 	copy.batch_id += 1; copy.state.revision += 1; copy.state.next_action += 1
 	copy.context.emit("batch_committed",{"batch_id":copy.batch_id,"phase":copy.phase})
@@ -125,16 +128,20 @@ func prepare(command: RoomCommand = null, fail_at: String = "", cancelled: Calla
 	var raw := copy.state.to_dict(); raw.room.normal_turns -= copy.discount_spent
 	var validated := RunState.restored(raw,false)
 	if not validated.ok: return StateAdmission.fail("merge_invariant/"+validated.code)
+	var admitted_at := Time.get_ticks_usec()
 	if cancelled.is_valid() and cancelled.call(): return StateAdmission.fail("cancelled")
 	var facts: Array = GameValue.freeze(copy.context.facts.slice(first_fact))
 	copy.last_batch = {"ok":true,"before":before,"after":copy.state.board.duplicate_board(),"facts":facts,
 		"timeline":EventTimeline.from_facts(facts),"kind":result.kind,"command":command.to_dict() if command != null else {},
 		"action_id":copy.move_id,"revision":copy.state.revision,"batch_id":copy.batch_id,
 		"state_digest":CanonicalCodec.digest(copy.mechanical_snapshot()),"event_digest":CanonicalCodec.digest(facts)}
+	if copy.last_batch.state_digest.is_empty() or copy.last_batch.event_digest.is_empty(): return StateAdmission.fail("merge_codec_failure")
 	copy.context.budget.cancelled = Callable()
 	if cancelled.is_valid() and cancelled.call(): return StateAdmission.fail("cancelled")
 	return {"ok":true,"candidate":copy,"base_revision":state.revision,"base_window":window_id,
-		"command":command.to_dict() if command != null else {},"compute_us":Time.get_ticks_usec()-started}
+		"command":command.to_dict() if command != null else {},"compute_us":Time.get_ticks_usec()-started,
+		"stages_us":{"copy":copied-started,"root":rooted-copied,"resolve":resolved-rooted,
+			"admit":admitted_at-resolved,"project_hash":Time.get_ticks_usec()-admitted_at}}
 
 func _advance(pair: Array[Vector2i], after_gravity: bool, fail_at: String) -> Dictionary:
 	var matched := MergeKernel.resolve_match(context,cursor,pair,fail_at)
@@ -171,7 +178,12 @@ func publish(prepared: Dictionary, pass_window: bool = false) -> bool:
 	var old_clock := clock.duplicate(true)
 	var candidate: MergeSession = prepared.candidate
 	for key in ["state","context","phase","cursor","move_id","batch_id","window_id","last_batch","discount_spent","discount_charges","reward_bonus"]: set(key,candidate.get(key))
-	clock = candidate.clock.duplicate(true); clock.sequence = old_clock.sequence+1; clock.assisted = old_clock.assisted
+	# A default may have been copied before this window was first drawn. Its
+	# private clock is never authority over the current presentation decision.
+	clock = old_clock
+	if phase == "merge_window" and window_id > prepared.base_window:
+		clock.started = false; clock.tick = 0; clock.paused = false
+	clock.sequence += 1
 	history.append(GameValue.freeze(entry))
 	reservation = {}
 	return true

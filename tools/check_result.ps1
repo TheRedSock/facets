@@ -3,7 +3,7 @@ function Get-GodotCheckResult {
     # Godot progress messages contain ANSI styling even in redirected output.
     $Output = [regex]::Replace($Output, '\x1B\[[0-9;]*m', '')
     $environmentErrors = @($Output -split "`r?`n" | Where-Object { $_ -match '^ERROR: (Failed to read the root certificate store\.|Could not create editor (data|config|cache) directory:)' })
-    $errors = @($Output -split "`r?`n" | Where-Object { $_ -match '^\s*(SCRIPT ERROR:|ERROR:|FAIL(:|\b)|FAILED\b)' })
+    $errors = @($Output -split "`r?`n" | Where-Object { $_ -match '^\s*(SCRIPT ERROR:|ERROR:|FAIL(:|\b)|FAILED\b|WARNING: ObjectDB instances leaked)' })
     $complete = @($Output -split "`r?`n" | Where-Object { $_.Trim() -eq $Completion }).Count -gt 0
     if ($Completion -eq 'first_scan_filesystem') {
         $complete = $Output -match '\[ DONE \].*first_scan_filesystem'

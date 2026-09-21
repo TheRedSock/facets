@@ -111,7 +111,7 @@ after releasing the scene. The third cue set was accepted by the user on
 
 `test_p3_preparation` validates the reserved P3 specification against inherited
 fixtures, distinct reward pools, authored room/staging cells, protocol versions,
-save-field inventory and available delivery bindings. Its 14 acceptance case
+save-field inventory and available delivery bindings. Its 18 acceptance case
 specifications are requirements for future executable P3 tests, not passing
 implementations. See [the preparation contract](../../core/run/P3_PREPARATION.md).
 
@@ -121,3 +121,30 @@ pairs, checks trial replay equivalence at 30/60/120 FPS and exercises isolated
 missing/corrupt pack copies. Functional completion, CPU/frame targets and human
 evaluation have separate statuses. The tracked `closeout-status.json` records
 the latest disposition; ignored reports retain exact measurements and failures.
+
+## Merge-window successor
+
+The [successor acceptance inventory](MERGE_WINDOW_ACCEPTANCE.md) and
+[readiness ledger](merge-readiness-status.json) separate focused correctness from
+release performance and final readiness. Registered `test_merge_kernel`,
+`test_merge_commands`, `test_merge_executor`, `test_merge_playback`,
+`test_merge_native`, `test_merge_replay` and `test_merge_seams` cover their named
+owners. `test_merge_native` needs `-Gpu` and uses synthetic delivery fixtures;
+it does not substitute for the actual packaged assets.
+
+`merge_cpu_smoke` runs 15 editor rooms through the worker with accelerated
+decision clocks. `merge_characterization` measures bounded diagnostic reaction
+dispatch and admitted 8/12/16-cell-wide boards separately from ordinary targets.
+`test_merge_load` characterizes independent active promotion waves with linearly
+increasing applied-effect counts, including copies, admission and hashes for
+each wave. These intentionally heavy cases report misses without relaxing the
+ordinary profile or claiming unimplemented P3 content is inexpensive.
+The release runner [check_merge_release.ps1](../../tools/check_merge_release.ps1)
+checks actual executable identity, completion, every failed interval and exact
+repetition digests. Native mode measures rendered view changes after completed
+keyboard/mouse gestures, aggregates main-thread callbacks by frame, and then runs
+assisted/fault/lifecycle witnesses outside the unassisted measurements.
+
+The frozen successor redirection vector covers deliberate new semantics. Legacy
+P0/P1/P2 and trial goldens stay unchanged. Keep every failed report; a renderer
+or GPU override is a distinct recorded profile, never evidence for another GPU.

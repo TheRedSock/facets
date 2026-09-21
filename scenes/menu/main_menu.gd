@@ -6,6 +6,11 @@ extends Control
 
 func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--merge-probe=") and not get_tree().root.has_meta("merge_probe_started"):
+			get_tree().root.set_meta("merge_probe_started",true)
+			visible = false
+			var probe := MergeProbe.new(); get_tree().root.add_child.call_deferred(probe)
+			probe.run.call_deferred(argument.trim_prefix("--merge-probe=")); return
 		if argument.begins_with("--closeout-probe=") and not get_tree().root.has_meta("closeout_probe_started"):
 			get_tree().root.set_meta("closeout_probe_started",true); visible = false
 			var probe := CloseoutProbe.new(); get_tree().root.add_child.call_deferred(probe)
@@ -64,7 +69,7 @@ func _ready() -> void:
 
 	# ---- Play button ----
 	var play_btn := Button.new()
-	play_btn.text = "Play"
+	play_btn.text = "Play · original P2"
 	play_btn.custom_minimum_size = Vector2(300, 56)
 	play_btn.add_theme_font_size_override("font_size", 24)
 	play_btn.pressed.connect(_on_play)
@@ -77,6 +82,15 @@ func _ready() -> void:
 		get_tree().root.add_child(view))
 	vbox.add_child(reactive)
 	if "--review" in OS.get_cmdline_user_args():
+		var practice := Button.new(); practice.text = "Practice · redirect a merge"; practice.custom_minimum_size.y = 48
+		practice.pressed.connect(func():
+			visible = false
+			var view := MergeRoomView.new(); view.practice_mode = true
+			var state := InterventionFixture.create(16,"automatic_chain")
+			state.board.set_tile(Vector2i(1,2),state.catalog.create_tile(2)); view.initial_override = state.to_dict()
+			view.back_requested.connect(func(): visible = true)
+			get_tree().root.add_child(view))
+		vbox.add_child(practice)
 		var seeds := OptionButton.new()
 		for seed_value in [7,1,8]: seeds.add_item("Open seam · seed %d" % seed_value,seed_value)
 		get_tree().root.set_meta("review_seed",7)

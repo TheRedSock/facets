@@ -116,11 +116,13 @@ func release_window() -> Dictionary:
 	return _publish(done,true)
 
 func _publish(done: Dictionary, release: bool = false) -> Dictionary:
+	var began := Time.get_ticks_usec()
 	var result: Dictionary = done.result
 	var committed: bool = result.ok and session.publish(result,release)
 	var now := Time.get_ticks_usec()
 	metrics.append({"kind":done.kind,"service_us":done.service_us,"ready_us":done.ready_us,
-		"submitted_us":done.submitted_us,"published_us":now,"latency_us":now-done.submitted_us,"committed":committed})
+		"submitted_us":done.submitted_us,"published_us":now,"latency_us":now-done.submitted_us,"committed":committed,
+		"publication_us":now-began,"stages_us":result.get("stages_us",{})})
 	if not committed:
 		session.reservation = {}
 		if result.ok: return {"ok":false,"status":"rejected","code":"stale_publication"}

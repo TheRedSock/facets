@@ -59,6 +59,15 @@ func _disjoint() -> void:
 	check(upper != null and lower != null and upper.tier == 4 and lower.tier == 3,"both exact survivors promoted once")
 
 func _caps() -> void:
+	var malformed := _session()
+	malformed.apply(InterventionFixture.command(malformed.state)); malformed.presented(); malformed.tick(20)
+	# Simulate an incorrectly implemented future reaction emitting an unsupported
+	# wire type. A complete state hash is mandatory even for internal candidates.
+	malformed.context.facts.append({"type":"diagnostic_bad_fact","value":0.5})
+	var original_state := malformed.state.digest(); var original_context := malformed.context.capture()
+	var rejected := malformed.prepare()
+	check(not rejected.ok and rejected.code == "merge_codec_failure","unencodable complete candidate never publishes an empty hash")
+	check(malformed.state.digest() == original_state and malformed.context.capture() == original_context,"codec rejection preserves state, RNG, accounting and context")
 	var initial := InterventionFixture.create(16,"automatic_chain")
 	var rules := initial.rules.to_dict(); rules.max_chains = 0
 	initial.rules = RuleSet.new(rules)
@@ -108,11 +117,27 @@ func _terminal() -> void:
 	state.room.definition = room.definition
 	state.board.remove_tile(Vector2i(3,2)); state.board.obstacles = room.board.obstacles.duplicate(true)
 	state.board.set_tile(Vector2i(3,5),state.catalog.create_tile(3))
+	# Hand-authored terminal expectation: the three T1 gems in column 3
+	# merge into the moved gem at row 4, the adjacent last rubble breaks,
+	# and the two consumed cells plus the former rubble cell remain empty.
+	# No automatic settling/refill is permitted after this new terminal boundary.
+	var expected := state.board.duplicate_board()
+	expected.swap_cells(Vector2i(3,3),Vector2i(2,3))
+	expected.remove_tile(Vector2i(2,1)); expected.remove_tile(Vector2i(2,2))
+	var promoted := state.catalog.create_tile(2)
+	promoted.instance_id = expected.get_tile(Vector2i(2,3)).instance_id
+	expected.set_tile(Vector2i(2,3),promoted); expected.obstacles.erase("rubble/end")
 	check(session.start(state.to_dict()),"terminal fixture admission")
 	var rng := session.state.streams.capture()
 	check(session.apply(InterventionFixture.command(session.state)).ok,"terminal root commits")
 	check(session.phase == "complete" and session.state.moves_remaining == 0,"MW13 completion wins final Work")
 	check(session.state.streams.capture() == rng and session.window_id == 0,"terminal merge stops before refill or another window")
+	check(session.state.board.to_dict() == expected.to_dict(),"MW08 exact hand-authored terminal board, IDs and allocator")
+	var legacy := RunController.new()
+	check(legacy.restore_snapshot(state.to_dict()),"early-terminal legacy control admits unchanged initial state")
+	check(legacy.apply_action(InterventionFixture.command(legacy.run_state)).ok,"early-terminal legacy control executes")
+	check(legacy.run_state.phase == "complete" and legacy.run_state.board.to_dict() != expected.to_dict(),"MW08 explicitly retained legacy post-completion settling difference")
+	check(legacy.run_state.moves_remaining == session.state.moves_remaining and legacy.run_state.room.craft == session.state.room.craft,"terminal difference does not hide Work/Craft mismatch")
 
 func _pass_corpus() -> void:
 	var samples := 0
