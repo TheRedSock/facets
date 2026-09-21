@@ -58,3 +58,8 @@ RunScene updates a detached RoomHudModel on changes, defers final counters while
 playback is active, and owns typed preview/confirm/cancel commands. Board mouse,
 keyboard and hints use the same authoritative admission. Loading, briefing,
 playback, modal, error and terminal input gates are independent.
+
+A synchronous `snap_to` supersedes pending layout rebuilds before acquiring its
+views. Callers that publish immediate readiness, including the intervention
+comparison, must have those views constructed before enabling Start. A delayed
+rebuild must not recycle an active ActionPlayer's instance-to-view ownership.

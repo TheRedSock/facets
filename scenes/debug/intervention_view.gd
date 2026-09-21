@@ -81,7 +81,8 @@ func restart() -> void:
 	var prepared: bool = await get_node("/root/GemForge").prepare_required(_initial.catalog.roster())
 	if token != _generation or not is_inside_tree(): return
 	if not prepared or not audio.last_error.is_empty(): error = audio.last_error if not audio.last_error.is_empty() else get_node("/root/GemForge").last_error; _refresh(); return
-	board.set_board_state(_initial.board.duplicate_board()); board.visible = true
+	# Ready means the initial views already exist, including on immediate restart.
+	board.snap_to(_initial.board); board.visible = true
 	ready_for_start = true; _refresh()
 
 func start_opening() -> void:

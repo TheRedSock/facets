@@ -69,6 +69,12 @@ func cancel_action_playback(snap: bool = true) -> void:
 	impact_cells.clear(); impact_alpha = 0.0
 
 func snap_to(snapshot: BoardState) -> void:
+	# A synchronous snapshot supersedes any queued layout rebuild. Letting that
+	# callback run during the next action can recycle views owned by its player.
+	if is_inside_tree() and get_tree().process_frame.is_connected(_run_scheduled_layout_refresh):
+		get_tree().process_frame.disconnect(_run_scheduled_layout_refresh)
+	_layout_refresh_scheduled = false
+	_layout_refresh_needs_rebuild = false
 	_board_state = snapshot.duplicate_board()
 	_compute_layout()
 	_rebuild_all()

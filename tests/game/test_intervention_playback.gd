@@ -17,7 +17,9 @@ func _run() -> void:
 		Engine.max_fps = fps
 		var view := InterventionView.new(); view.mode = 2; view.automatic_clock = false; view.reduced_motion = fps == 120
 		root.add_child(view); await _loaded(view)
+		check(view.board._tile_views.size() == 23 and not view.board._layout_refresh_needs_rebuild,"ready publishes every initial view without a pending rebuild")
 		await view.start_opening()
+		if not view.reduced_motion: check(view.board._action_player.observations.any(func(o: Dictionary) -> bool: return o.kind == "match"),"opening visibly plays its prefix rather than snapping past missing views")
 		check(view.trial.phase == "window" and view.trial.clock.started and view.trial.clock.tick == 0,"visible boundary hands off clock at %d FPS" % fps)
 		check(view.board._board_state.digest() == view.trial.state.board.digest(),"prefix view equals authoritative parked board")
 		await view.apply_event(view.trial.event("advance",{"tick":7}))
@@ -35,6 +37,10 @@ func _run() -> void:
 		check(view.trial.clock.paused and view.trial.clock.tick == 0,"200ms render stall freezes last visible tick")
 		check(view.trial.snapshot().transcript[-1].input.reason == "render_stall","stall is explicitly recorded as assisted")
 		view.automatic_clock = false
+		view.restart(); await _loaded(view); await view.start_opening()
+		await view.apply_event(view.trial.event("advance",{"tick":24}))
+		check(view.trial.phase == "stable" and view.trial.interventions == 0,"expiry plays the unmodified continuation")
+		check(view.board._board_state.digest() == view.trial.state.board.digest() and not view.playing,"expiry playback reaches exact settled view")
 		view.restart(); await _loaded(view)
 		check(view.trial == null and not view.playing,"restart discards pending window and stale clock")
 		view.start_opening(); var player := view.board._action_player
