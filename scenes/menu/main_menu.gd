@@ -69,6 +69,13 @@ func _ready() -> void:
 	play_btn.add_theme_font_size_override("font_size", 24)
 	play_btn.pressed.connect(_on_play)
 	vbox.add_child(play_btn)
+	var reactive := Button.new(); reactive.text = "Play · merge interventions"; reactive.custom_minimum_size.y = 48
+	reactive.pressed.connect(func():
+		visible = false
+		var view := MergeRoomView.new()
+		view.back_requested.connect(func(): visible = true)
+		get_tree().root.add_child(view))
+	vbox.add_child(reactive)
 	if "--review" in OS.get_cmdline_user_args():
 		var seeds := OptionButton.new()
 		for seed_value in [7,1,8]: seeds.add_item("Open seam · seed %d" % seed_value,seed_value)

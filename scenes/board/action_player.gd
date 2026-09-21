@@ -49,6 +49,21 @@ func _wait(tween: Tween, token: int) -> bool:
 func _wake() -> void:
 	wake.emit()
 
+## Reduced motion preserves the caller's gravity interval while replacing travel
+## with a two-sided fade of the exact committed board. No simulation runs here.
+func reduced_gravity(result: Dictionary, seconds: float) -> void:
+	cancel(false)
+	var token := epoch; _after = result.after
+	var tween := _tween()
+	for view: TileView in board._tile_views.values(): tween.tween_property(view,"modulate:a",0.0,seconds*0.5)
+	if not await _wait(tween,token): return
+	board.snap_to(_after)
+	tween = _tween()
+	for view: TileView in board._tile_views.values():
+		view.modulate.a = 0.0; tween.tween_property(view,"modulate:a",1.0,seconds*0.5)
+	if not await _wait(tween,token): return
+	_after = null
+
 func invalid(a: Vector2i, b: Vector2i) -> void:
 	cancel(false)
 	var token := epoch

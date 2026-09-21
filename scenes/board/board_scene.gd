@@ -28,6 +28,8 @@ var _action_player: ActionPlayer
 var target_mode := false
 var cursor_cell := Vector2i.ZERO
 var target_cells: Array[Vector2i] = []
+## Optional streaming consumer owns motion retargeting during a layout change.
+var external_layout := Callable()
 var _overlay: Control
 var impact_cells: Array[Vector2i] = []
 var impact_alpha := 0.0:
@@ -47,6 +49,8 @@ func apply_overlay_fact(event: Dictionary) -> void:
 	if _overlay != null: _overlay.queue_redraw()
 
 func set_input_gate(reason: String, blocked: bool, owner: int = 0) -> void:
+	if reason == "merge" and blocked and not _input_locked:
+		_drag_origin = Vector2i(-1,-1); _drag_completed = false; _deselect()
 	if blocked: _input_gates[reason] = owner
 	elif _input_gates.get(reason) == owner: _input_gates.erase(reason)
 
@@ -208,7 +212,9 @@ func _run_scheduled_layout_refresh() -> void:
 	_compute_layout()
 	if not is_inside_tree():
 		return
-	if needs_rebuild:
+	if external_layout.is_valid():
+		external_layout.call()
+	elif needs_rebuild:
 		_rebuild_all()
 	else:
 		_reposition_all()

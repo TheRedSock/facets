@@ -27,7 +27,8 @@
     },
     {
       "id": "G4",
-      "status": "pending"
+      "status": "passed",
+      "evidence": "artifacts/game/merge-readiness/g4-r6/run.json"
     },
     {
       "id": "G5",
@@ -144,25 +145,29 @@
       "id": "MW15",
       "assertion": "New promoted identity and hit map exist on the first merge frame. A completed gesture before decoration ends can move it; live/ghost ownership remains correct through pooling, overlap and resize. Consumed ghosts cannot be selected.",
       "owner": "playback",
-      "status": "pending"
+      "status": "native_playback_verified",
+      "evidence": "g4-r6/test_merge_native"
     },
     {
       "id": "MW16",
       "assertion": "Remote legal swaps work while another merge decorates. Accepted feedback begins promptly without a board-wide decorative wait; competing gestures cannot both consume the same window.",
       "owner": "playback",
-      "status": "pending"
+      "status": "native_playback_verified",
+      "evidence": "g4-r6/test_merge_native"
     },
     {
       "id": "MW17",
       "assertion": "Receipt tick 19 accepts; tick 20 expires. Pointer-down at 19 and completion at 20 expires. An on-time receipt survives worker delay; invalid attempts do not reset or freeze the deadline.",
       "owner": "clock",
-      "status": "pending"
+      "status": "native_playback_verified",
+      "evidence": "g4-r6/test_merge_native"
     },
     {
       "id": "MW18",
       "assertion": "Identical admitted transcript at 30/60/120 FPS produces identical mechanical checkpoints. Focus/stall pause, restore, reduced motion, practice and skip follow their explicit policies; assisted records cannot appear as unassisted performance evidence.",
       "owner": "clock",
-      "status": "pending"
+      "status": "native_playback_verified",
+      "evidence": "g4-r6/test_merge_native"
     },
     {
       "id": "MW19",

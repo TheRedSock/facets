@@ -1,0 +1,214 @@
+class_name MergeRoomView
+extends Control
+signal back_requested
+var seed_value := 1
+var initial_override := {}
+var reduced_motion := false
+var automatic_clock := true
+var begun := false
+var session: MergeSession
+var executor: MergeExecutor
+var clock_adapter: MergeClock
+var board: BoardScene
+var player: MergePlayer
+var audio: RoomAudio
+var error := ""
+var queue: Array = []
+var telemetry: Array = []
+var frame_us: Array = []
+var starvation := 0
+var _epoch := 0
+var _motion_deadline := 0
+var _waiting_since := 0
+var _window_handoff := false
+var _tool := ""
+var _tool_origin := Vector2i(-1,-1)
+var _status: Label
+var _tool_buttons: Array[Button] = []
+var _begin: Button
+var _window_bar: ProgressBar
+
+func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	theme = load("res://assets/ui/themes/workshop.tres")
+	var background := ColorRect.new(); background.color = Color("141a22")
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); add_child(background)
+	var margin := MarginContainer.new(); margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in ["left","top","right","bottom"]: margin.add_theme_constant_override("margin_"+side,20)
+	add_child(margin)
+	var body := VBoxContainer.new(); margin.add_child(body)
+	var bar := HBoxContainer.new(); body.add_child(bar)
+	_button(bar,"Menu",func(): back_requested.emit(); queue_free())
+	_button(bar,"Restart",restart)
+	var reduced := CheckButton.new(); reduced.text = "Reduced motion"
+	reduced.button_pressed = reduced_motion; bar.add_child(reduced)
+	reduced.toggled.connect(func(value: bool): reduced_motion = value; player.reduced_motion = value)
+	_button(bar,"Pause / resume",func(): clock_adapter.pause(not session.clock.paused,"manual") if clock_adapter != null else false)
+	_button(bar,"Pass window",func(): clock_adapter.pass_now() if clock_adapter != null else false)
+	_button(bar,"Sound / mute",func(): audio.set_muted(not RoomAudio.muted))
+	var split := HBoxContainer.new(); split.size_flags_vertical = Control.SIZE_EXPAND_FILL; body.add_child(split)
+	board = load("res://scenes/board/board_scene.tscn").instantiate()
+	board.custom_minimum_size = Vector2(400,400); board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	split.add_child(board)
+	var panel := VBoxContainer.new(); panel.custom_minimum_size.x = 300; split.add_child(panel)
+	var title := Label.new(); title.text = "Open seam · reactive play"; title.add_theme_font_size_override("font_size",24); panel.add_child(title)
+	_status = Label.new(); _status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; _status.custom_minimum_size.x = 300; panel.add_child(_status)
+	_window_bar = ProgressBar.new(); _window_bar.max_value = 20; _window_bar.show_percentage = false
+	_window_bar.custom_minimum_size.y = 12; panel.add_child(_window_bar)
+	var instructions := Label.new(); instructions.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	instructions.custom_minimum_size.x = 300
+	instructions.text = "Clear the marked rubble. Swap adjacent gems to make a match.\n\nDuring a merge, you can make another match anywhere — including moving the upgraded gem before its next automatic match. Each swap costs 1 Work.\n\nNo input lets the next match or gravity continue. Take your time once the board settles."
+	panel.add_child(instructions)
+	_begin = _button(panel,"Begin room",func(): _begin.hide(); begun = true; _refresh())
+	for item in [["Exchange · 2 Craft","action.exchange"],["Clear · 2 Craft","action.clear_target"],["Promote · 3 Craft","action.promote_target"]]:
+		var kind: String = item[1]
+		_tool_buttons.append(_button(panel,item[0],func(): _tool = kind; _tool_origin = Vector2i(-1,-1); board.target_mode = true; _refresh()))
+	audio = RoomAudio.new(); add_child(audio); board.presentation_cue.connect(audio.play)
+	board.swap_requested.connect(request_swap); board.cell_pressed.connect(_target)
+	board.delivery_failed.connect(func(message: String): _fail(message))
+	player = MergePlayer.new(board); player.reduced_motion = reduced_motion
+	player.motion_finished.connect(_motion_done)
+	board.external_layout = func():
+		if player.motion_busy and session != null: session.clock.assisted = true
+		player.relayout()
+	restart.call_deferred()
+
+func _button(parent: Node, label: String, callback: Callable) -> Button:
+	var button := Button.new(); button.text = label; button.custom_minimum_size.y = 40
+	button.pressed.connect(callback); parent.add_child(button); return button
+
+func restart() -> void:
+	_epoch += 1; var epoch := _epoch
+	begun = false; error = ""; queue.clear(); _window_handoff = false; _motion_deadline = 0; _waiting_since = 0
+	_tool = ""; board.target_mode = false; board.set_input_gate("merge",true)
+	if executor != null and not executor.shutdown(): _fail("Worker shutdown timed out"); return
+	player.cancel(); audio.cancel()
+	session = MergeSession.new()
+	var initial := initial_override
+	if initial.is_empty():
+		var game := RunController.new()
+		if not game.start_room(null,seed_value): _fail(game.last_error); return
+		game.apply_action(RoomCommand.begin(0)); initial = game.run_state.to_dict()
+	if not session.start(initial): _fail("Room state could not be admitted"); return
+	executor = MergeExecutor.new(session); clock_adapter = MergeClock.new(session); clock_adapter.automatic = automatic_clock
+	board.visible = false; _refresh()
+	var loaded: bool = await get_node("/root/GemForge").prepare_required(session.state.catalog.roster())
+	if epoch != _epoch or not is_inside_tree(): return
+	if not loaded or not audio.last_error.is_empty(): _fail("Required room presentation could not load"); return
+	player.reset(session.state.board); board.visible = true; _begin.show(); _refresh()
+
+func request_swap(a: Vector2i, b: Vector2i) -> void:
+	var received := Time.get_ticks_usec()
+	if not can_input(): return
+	clock_adapter.advance(received)
+	var command := RoomCommand.exchange(session.state,a,b)
+	var result := executor.submit(command)
+	if not result.ok:
+		telemetry.append({"kind":"rejected","code":result.code,"us":received}); return
+	board.set_input_gate("merge",true); _waiting_since = 0
+	_motion_deadline = received+150000
+	player.begin_swap(command)
+	telemetry.append({"kind":"input","received_us":received,"feedback_us":Time.get_ticks_usec(),"deadline_us":_motion_deadline})
+	_refresh()
+
+func _target(pos: Vector2i) -> void:
+	if not can_input() or _tool.is_empty() or session.phase != "ready": return
+	var command: RoomCommand
+	if _tool == "action.exchange":
+		if _tool_origin == Vector2i(-1,-1): _tool_origin = pos; return
+		command = RoomCommand.exchange(session.state,_tool_origin,pos,true)
+	else:
+		var layer := "obstacle" if not session.state.board.obstacle_at(pos).is_empty() else ("lock" if not session.state.board.get_cell(pos).lock.is_empty() else "gem")
+		command = RoomCommand.target(session.state,_tool,pos,layer)
+	var accepted := executor.submit(command)
+	if accepted.ok:
+		_tool = ""; board.target_mode = false; board.set_input_gate("merge",true)
+		# Tool feedback receives the same fixed calculation interval as a swap.
+		_motion_deadline = Time.get_ticks_usec()+150000
+	_refresh()
+
+func can_input() -> bool:
+	return begun and error.is_empty() and session != null and session.phase in ["ready","merge_window"] and session.reservation.is_empty() and queue.is_empty() and not player.motion_busy and not _window_handoff and not session.clock.paused and (session.phase == "ready" or (session.clock.started and session.clock.tick < 20))
+
+func _process(delta: float) -> void:
+	if session == null or executor == null or not begun or not error.is_empty(): return
+	var began := Time.get_ticks_usec(); frame_us.append(int(delta*1000000))
+	clock_adapter.advance(began)
+	var result := executor.poll()
+	if not result.is_empty():
+		if not result.ok: _fail(result.code); return
+		if result.status == "committed":
+			if queue.size() >= 2: _fail("Presentation queue overflow"); return
+			queue.append(result.batch)
+			telemetry.append({"kind":"candidate_ready","us":Time.get_ticks_usec(),"batch":result.batch.batch_id,"deadline_us":_motion_deadline})
+	if session.phase == "merge_window" and session.clock.started and session.clock.tick >= 20 and session.reservation.is_empty() and not player.motion_busy and not _window_handoff:
+		board.set_input_gate("merge",true)
+		result = executor.release_window()
+		if result.ok: queue.append(result.batch); _waiting_since = 0
+		elif result.get("status") != "waiting": _fail(result.code); return
+		else: _starved("default",began)
+	if not queue.is_empty() and not player.motion_busy and Time.get_ticks_usec() >= _motion_deadline:
+		var batch: Dictionary = queue.pop_front(); _motion_deadline = 0; _waiting_since = 0
+		_present(batch)
+	elif queue.is_empty() and _motion_deadline > 0 and began >= _motion_deadline and not session.reservation.is_empty(): _starved("command",began)
+	if session.phase == "merge_window": executor.prepare_default()
+	_refresh()
+	telemetry.append({"kind":"main_frame","us":Time.get_ticks_usec()-began})
+
+func _starved(kind: String, now: int) -> void:
+	if _waiting_since != 0: return
+	_waiting_since = now; starvation += 1
+	telemetry.append({"kind":"starvation","phase":kind,"us":now})
+
+func _present(batch: Dictionary) -> void:
+	board.set_input_gate("merge",true)
+	if batch.kind == "merge":
+		player.show_merge(batch)
+		if session.phase == "merge_window": _start_window()
+	elif batch.kind == "gravity":
+		_motion_deadline = Time.get_ticks_usec()+int(player.gravity_seconds(batch)*1000000)
+		player.play_gravity(batch)
+		executor.continue_gravity()
+	else:
+		player.reset(batch.after); _refresh()
+
+func _start_window() -> void:
+	_window_handoff = true; var epoch := _epoch
+	if DisplayServer.get_name() == "headless": await get_tree().process_frame
+	else: await RenderingServer.frame_post_draw
+	if epoch != _epoch or not is_inside_tree(): return
+	clock_adapter.presented(Time.get_ticks_usec()); _window_handoff = false
+	telemetry.append({"kind":"window_presented","window":session.window_id,"us":Time.get_ticks_usec()})
+	_refresh()
+
+func _motion_done() -> void: pass
+
+func _refresh() -> void:
+	if _status == null: return
+	if not error.is_empty(): _status.text = error; return
+	if session == null or not board.visible: _status.text = "Loading gems…"; return
+	_status.text = "Work %d   Craft %d\nMarked rubble: %d\n%s" % [session.state.moves_remaining,session.state.room.craft,session.state.room.remaining(session.state.board),
+		"Merge — swap now" if can_input() and session.phase == "merge_window" else session.phase.capitalize()]
+	_window_bar.visible = session.phase == "merge_window" and session.clock.started and not player.motion_busy
+	_window_bar.value = 20-session.clock.tick
+	if session.clock.paused: _status.text += "\nPaused — assisted attempt"
+	if not _tool.is_empty(): _status.text += "\nChoose a tool target"
+	board.set_input_gate("merge",not can_input())
+	for button in _tool_buttons: button.disabled = not can_input() or session.phase != "ready"
+
+func _fail(message: String) -> void:
+	error = message; begun = false
+	if executor != null: executor.cancel()
+	if player != null and session != null: player.reset(session.state.board)
+	if board != null: board.set_input_gate("merge",true)
+	_refresh()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and clock_adapter != null: clock_adapter.pause(true,"focus")
+
+func _exit_tree() -> void:
+	_epoch += 1
+	if executor != null: executor.shutdown()
+	if player != null: player.cancel()
+
+
