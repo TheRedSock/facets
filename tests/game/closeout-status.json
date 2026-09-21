@@ -87,5 +87,17 @@
     "decision_package": "plans/P2_CPU_DECISION.md",
     "cpu_decision": "pending",
     "human_testing": "deferred by user, potentially until after P5"
+  },
+  "completion_audit": {
+    "identity_evidence": "artifacts/game/p2-closeout/20260921-implementation/current-identity-audit.json",
+    "current_runtime_sources": 231,
+    "package_copies_match": 2,
+    "review_zip_matches": true,
+    "legacy_gpu_evidence": "artifacts/game/p2-closeout/20260921-implementation/final-legacy-gpu/run.json",
+    "legacy_gpu_actions": 20,
+    "legacy_gpu_functional_pass": true,
+    "process_control": "artifacts/game/p2-closeout/20260921-implementation/final-process-control.log",
+    "completion_classifier": "artifacts/game/p2-closeout/20260921-implementation/final-result-classifier.log",
+    "cpu_decision": "still pending; no inferred waiver"
   }
 }
