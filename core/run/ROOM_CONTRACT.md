@@ -57,8 +57,9 @@ UI gate. Published room phases are briefing, ready, complete and failed.
   commands; normal-turn count counts swaps only. Stable state identity includes
   all implemented room/economy/obstacle/counter data, not UI clocks or selections.
 - P2 snapshots/replay restore only complete stable room boundaries. No disk-save
-  UI or real resolver continuation is claimed. P3 production continuation policy
-  waits for the required paused/timed trial and explicit adoption decision.
+  UI is implemented. The isolated [intervention trial](INTERVENTION_CONTRACT.md)
+  owns a separately versioned real continuation; normal room actions remain
+  atomic. Human adoption review is deferred under the user's current review policy.
 
 Verification must keep original codec/action vectors and all 2,000 P1 checkpoint
 pairs. New room, tool, recovery, replay and playback cases belong in tests/game.

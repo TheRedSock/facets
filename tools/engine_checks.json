@@ -1280,6 +1280,19 @@
       "completion": "CHECK_COMPLETE: test_game_recovery"
     },
     {
+        "name": "test_intervention_playback",
+        "report_root_arg": true,
+        "args": ["--headless", "--script", "res://tests/game/test_intervention_playback.gd"],
+        "mode": "cpu",
+        "completion": "CHECK_COMPLETE: test_intervention_playback"
+      },
+      {
+        "name": "test_intervention_trial",
+        "args": ["--headless", "--script", "res://tests/game/test_intervention_trial.gd"],
+        "mode": "cpu",
+        "completion": "CHECK_COMPLETE: test_intervention_trial"
+      },
+      {
         "name": "test_game_closeout",
         "args": ["--headless", "--script", "res://tests/game/test_game_closeout.gd"],
         "mode": "cpu",

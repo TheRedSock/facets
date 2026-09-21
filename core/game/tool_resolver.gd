@@ -1,11 +1,11 @@
 class_name ToolResolver
 extends RefCounted
 
-static func apply(context: ActionContext, command: RoomCommand) -> bool:
+static func apply(context: ActionContext, command: RoomCommand, reset_step: bool = true) -> bool:
 	var state := context.state
 	var board := state.board
 	var data := command.data
-	context.step = 0
+	context.step = 0 if reset_step else context.step+1
 	if data.kind in ["swap","action.exchange"]:
 		var first := board.get_tile(data.origin).to_dict()
 		var second := board.get_tile(data.destination).to_dict()

@@ -68,6 +68,15 @@ frame targets. Run the same opt-in probe in the actual release executable; the
 older delivered-view burst does not substitute for it.
 # P2 simulation checks
 
+`test_intervention_trial` covers the isolated real continuation: authored
+opportunities, exact atomic pass/expiry, complete pending snapshot admission,
+stale/invalid purity, additional Work/shared Craft, deadline ties, focus pause,
+failure/prefix recovery and an ordinary-room pass corpus. `test_intervention_playback`
+uses the actual comparison view at 30/60/120 frame caps, reduced motion, recorded
+stall pauses and destruction during prefix/draw handoff. Leaked resources fail
+the registered stage even when assertions pass. These do not establish human
+preference; the user's broader evaluation is deferred.
+
 `test_game_closeout` verifies the cumulative 63-field P0 ownership ledger, P2
 leaf identity and malformed admission, same-tier Reposition, the Refine T5
 boundary, tool-only readiness, integrated shared-target component damage, and

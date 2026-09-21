@@ -1,0 +1,45 @@
+extends "res://tests/game/game_test.gd"
+
+func _initialize() -> void: _run.call_deferred()
+
+func _loaded(view: InterventionView) -> void:
+	for frame in 180:
+		await process_frame
+		if view.ready_for_start: return
+	check(false,"trial view delivery completes: "+view.error)
+
+func _run() -> void:
+	var fixture := GemDeliveryFixture.create(report_path("assets"),load("res://data/presentation/default.tres"))
+	check(root.get_node("GemForge").open_library(fixture.library,fixture.catalog),"trial art fixture opens")
+	Engine.time_scale = 40
+	var expected := ""
+	for fps in [30,60,120]:
+		Engine.max_fps = fps
+		var view := InterventionView.new(); view.mode = 2; view.automatic_clock = false; view.reduced_motion = fps == 120
+		root.add_child(view); await _loaded(view)
+		await view.start_opening()
+		check(view.trial.phase == "window" and view.trial.clock.started and view.trial.clock.tick == 0,"visible boundary hands off clock at %d FPS" % fps)
+		check(view.board._board_state.digest() == view.trial.state.board.digest(),"prefix view equals authoritative parked board")
+		await view.apply_event(view.trial.event("advance",{"tick":7}))
+		await view.apply_event(view.trial.event("pause",{"paused":true,"reason":"focus"}))
+		await process_frame; await process_frame # Rendering during pause has no input authority.
+		await view.apply_event(view.trial.event("pause",{"paused":false,"reason":"focus"}))
+		await view.apply_event(view.trial.event("decide",{"command":view.trial.offers[0],"tick":12}))
+		var digest := CanonicalCodec.digest(view.trial.snapshot())
+		if expected.is_empty(): expected = digest
+		check(digest == expected,"identical admitted stream under render FPS and reduced motion")
+		check(view.board._board_state.digest() == view.trial.state.board.digest() and not view.playing,"continuation playback reaches exact settled view")
+		view.restart(); await _loaded(view); await view.start_opening()
+		view.automatic_clock = true; view._previous_us = Time.get_ticks_usec()-200000
+		view._advance_clock(Time.get_ticks_usec())
+		check(view.trial.clock.paused and view.trial.clock.tick == 0,"200ms render stall freezes last visible tick")
+		check(view.trial.snapshot().transcript[-1].input.reason == "render_stall","stall is explicitly recorded as assisted")
+		view.automatic_clock = false
+		view.restart(); await _loaded(view)
+		check(view.trial == null and not view.playing,"restart discards pending window and stale clock")
+		view.start_opening(); var player := view.board._action_player
+		view.queue_free(); await process_frame; await process_frame
+		check(player._tweens.is_empty() and player._views_by_id.is_empty(),"navigation cancels all prefix playback awaits")
+	Engine.max_fps = 120; Engine.time_scale = 1
+	await create_timer(0.1).timeout
+	finish("test_intervention_playback")

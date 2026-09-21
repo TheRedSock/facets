@@ -62,3 +62,12 @@ explicitly call the SeededRng instance; the unqualified global RNG is forbidden.
 ActionContext carries causal facts and reward suppression during execution;
 RuleFactBuilder remains the legacy projection. See the
 [room protocol](../run/ROOM_CONTRACT.md) and [effect ownership](../game/CONTRACT.md).
+# Closeout implementation notes
+
+Canonical encoding may cache only the wire encoding of short immutable strings:
+at most 4,096 entries, each at most 128 UTF-8 payload bytes. It caches no mutable
+state or digest; capacity/eviction cannot affect encoded bytes. Native ID
+validation preserves the exact ASCII character set and 1–128 length bound.
+Empty metadata maps need no codec call to prove serializability. External full
+admission, complete state/fact hashing and original independent vectors remain
+mandatory; these optimizations do not change a protocol version.
