@@ -6,6 +6,9 @@ var classification := "equilibrium"
 var entitlement := 0
 var raw_bonus := 0
 var uses := {}
+var direct_batch := true
+var modifier_bonus := 0
+var modifier_trigger := "direct"
 
 func _init(candidate: RunState, command: RoomCommand, identity: int, origin: String) -> void:
 	move_id = identity
@@ -17,9 +20,13 @@ func emit(kind: String, payload: Dictionary, ancestry: Variant = -1) -> int:
 	if id != 0:
 		facts.back().root_action_id = move_id
 		facts.back().move_context = classification
+		facts.back().direct_input_batch = direct_batch
 	return id
 
 func settle_increment() -> void:
+	if reward_eligible and not uses.has("intervention_reward") and MergeModifiers.matches(classification,direct_batch,modifier_trigger):
+		raw_bonus += modifier_bonus
+		uses.intervention_reward = true
 	var total := mini(int(state.rules.value("craft_gain_cap")), best_craft + raw_bonus) if reward_eligible else 0
 	var delta := maxi(0, total - entitlement)
 	var old := state.room.craft
@@ -36,13 +43,14 @@ func capture() -> Dictionary:
 		"raw_bonus":raw_bonus,"uses":uses.duplicate(true),"cause":cause,"reward_eligible":reward_eligible,
 		"best_craft":best_craft,"root":root,"parent":parent,"step":step,"component_index":component_index,
 		"segment":segment,"depths":depths,"facts":facts.duplicate(true),"work":budget.work,
-		"fact_count":budget.facts,"error":budget.error}
+		"fact_count":budget.facts,"error":budget.error,"direct_batch":direct_batch,
+		"modifier_bonus":modifier_bonus,"modifier_trigger":modifier_trigger}
 
 static func from_capture(candidate: RunState, data: Dictionary) -> MergeMoveContext:
 	var next_event := candidate.next_event
 	var result := MergeMoveContext.new(candidate,RoomCommand.begin(candidate.revision),data.move_id,data.classification)
 	candidate.next_event = next_event
-	for key in ["entitlement","raw_bonus","uses","cause","reward_eligible","best_craft","root","parent","step","component_index","segment","facts"]:
+	for key in ["entitlement","raw_bonus","uses","cause","reward_eligible","best_craft","root","parent","step","component_index","segment","facts","direct_batch","modifier_bonus","modifier_trigger"]:
 		result.set(key,data[key].duplicate(true) if data[key] is Array or data[key] is Dictionary else data[key])
 	result._depths.clear()
 	for item in data.depths: result._depths[item[0]] = item[1]

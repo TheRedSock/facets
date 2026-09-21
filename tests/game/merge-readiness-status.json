@@ -17,7 +17,8 @@
     },
     {
       "id": "G2",
-      "status": "pending"
+      "status": "passed",
+      "evidence": "artifacts/game/merge-readiness/g2-r3/run.json"
     },
     {
       "id": "G3",
@@ -66,25 +67,29 @@
       "id": "MW04",
       "assertion": "The same promoted survivor can legally move out of that pending match into a hand-authored stronger match. Accepted intervention denies the original automatic match; only the new board's rescan resolves. Compare with MW03.",
       "owner": "commands",
-      "status": "pending"
+      "status": "reference_verified",
+      "evidence": "g2-r3/test_merge_commands"
     },
     {
       "id": "MW05",
       "assertion": "A legal match elsewhere is accepted; an unrelated invalid swap is rejected even though a pending automatic match exists elsewhere. Untouched pending matches belong to the new active move scope when subsequently resolved.",
       "owner": "commands",
-      "status": "pending"
+      "status": "reference_verified",
+      "evidence": "g2-r3/test_merge_commands"
     },
     {
       "id": "MW06",
       "assertion": "A constructed sequence supports at least four successive interventions, including a promoted-gem move and a remote match. Each legal command gets a fresh move ID, normal cost/turn accounting and a new window; no one-window cap.",
       "owner": "commands",
-      "status": "pending"
+      "status": "reference_verified",
+      "evidence": "g2-r3/test_merge_commands"
     },
     {
       "id": "MW07",
       "assertion": "Same occupied match neighborhood and resources in equilibrium versus a parked board with holes elsewhere produce equal default price/base effects. Only admitted context and resulting causal metadata differ. Empty, locked, stale and nonadjacent endpoints reject purely.",
       "owner": "commands",
-      "status": "pending"
+      "status": "reference_verified",
+      "evidence": "g2-r3/test_merge_commands"
     },
     {
       "id": "MW08",
@@ -96,25 +101,29 @@
       "id": "MW09",
       "assertion": "No-input automatic batches share one Craft entitlement cap; repeated paid moves get fresh caps. Capacity-clipped entitlement is consumed, not reclaimed after spending. No duplicate awards at publication/replay.",
       "owner": "accounting",
-      "status": "pending"
+      "status": "reference_verified",
+      "evidence": "g2-r3/test_merge_commands"
     },
     {
       "id": "MW10",
       "assertion": "A tool-caused merge opens a swap window. Pass preserves tool suppression; paid intervention starts fresh normal eligibility/tool allowance without rewarding old tool facts. Tool commands themselves reject in a merge window.",
       "owner": "accounting",
-      "status": "pending"
+      "status": "reference_verified",
+      "evidence": "g2-r3/test_merge_commands"
     },
     {
       "id": "MW11",
       "assertion": "Intervention context propagates through its automatic descendants; direct-batch-only predicates exclude later cascades. A later paid move replaces active context while preserving earlier fact ancestry and room/run uses.",
       "owner": "accounting",
-      "status": "pending"
+      "status": "reference_verified",
+      "evidence": "g2-r3/test_merge_commands"
     },
     {
       "id": "MW12",
       "assertion": "Diagnostic intervention discount consumes a finite charge using integer units; ordinary moves retain base price. Diagnostic reward fires exactly at its declared scope. Missing charge, insufficient funds, stale quote and illegal move consume nothing.",
       "owner": "accounting",
-      "status": "pending"
+      "status": "reference_verified",
+      "evidence": "g2-r3/test_merge_commands"
     },
     {
       "id": "MW13",

@@ -22,6 +22,7 @@ var last_batch := {}
 var discount_spent := 0
 var discount_charges := 0
 var reward_bonus := 0
+var modifiers: Dictionary = MergeModifiers.DEFAULTS
 
 func start(value: Dictionary) -> bool:
 	var admitted := RunState.restored(value)
@@ -32,6 +33,14 @@ func start(value: Dictionary) -> bool:
 	move_id = 0; batch_id = 0; window_id = 0; error = ""; history = []; last_batch = {}
 	clock = {"started":false,"tick":0,"sequence":0,"paused":false,"assisted":false}
 	discount_spent = 0; discount_charges = 0; reward_bonus = 0
+	modifiers = GameValue.freeze(MergeModifiers.DEFAULTS)
+	return true
+
+func configure_modifiers(value: Dictionary) -> bool:
+	if phase != "ready" or batch_id != 0: return false
+	var admitted := MergeModifiers.admit(value)
+	if not admitted.ok: return false
+	modifiers = admitted.value; discount_charges = modifiers.discount_charges; reward_bonus = modifiers.reward_bonus
 	return true
 
 func quote(command: RoomCommand) -> Dictionary:
@@ -40,7 +49,7 @@ func quote(command: RoomCommand) -> Dictionary:
 	if phase == "merge_window" and (not clock.started or clock.paused or clock.tick >= WINDOW_TICKS): return StateAdmission.fail("window_closed")
 	if phase == "merge_window" and command.data.kind != "swap": return StateAdmission.fail("window_swap_only")
 	if command.data.kind == "begin_room": return StateAdmission.fail("already_started")
-	var cost := 0 if phase == "merge_window" and discount_charges > 0 else 1
+	var cost := MergeModifiers.price("intervention" if phase == "merge_window" else "equilibrium",discount_charges)
 	# The small ready view changes only the admission budget; board identity stays exact.
 	var query := RunState.new()
 	query.board = state.board; query.room = state.room; query.rules = state.rules
@@ -84,7 +93,8 @@ func prepare(command: RoomCommand = null, fail_at: String = "") -> Dictionary:
 		if fail_at == "after_cost": return StateAdmission.fail("injected_after_cost")
 		if not ToolResolver.apply(copy.context,command): return StateAdmission.fail("root_effect")
 		if command.data.kind in ["swap","action.exchange"]: pair.assign([command.data.origin,command.data.destination])
-		if admission.context == "intervention": copy.context.raw_bonus = copy.reward_bonus
+		copy.context.modifier_bonus = copy.reward_bonus; copy.context.modifier_trigger = copy.modifiers.reward_trigger
+	copy.context.direct_batch = command != null
 	var result := copy._advance(pair,command == null and phase == "gravity",fail_at)
 	if not result.ok: return result
 	copy.batch_id += 1; copy.state.revision += 1; copy.state.next_action += 1
@@ -147,7 +157,7 @@ func _detached() -> MergeSession:
 	var result := MergeSession.new()
 	result.state = state.duplicate_state()
 	if context != null: result.context = MergeMoveContext.from_capture(result.state,context.capture())
-	for key in ["phase","move_id","batch_id","window_id","discount_spent","discount_charges","reward_bonus"]: result.set(key,get(key))
+	for key in ["phase","move_id","batch_id","window_id","discount_spent","discount_charges","reward_bonus","modifiers"]: result.set(key,get(key))
 	result.cursor = cursor.duplicate(true); result.clock = clock.duplicate(true)
 	return result
 
@@ -155,4 +165,4 @@ func mechanical_snapshot() -> Dictionary:
 	return {"version":VERSION,"simulation":SIMULATION,"profile":PROFILE,"content":CONTENT,"state":state.to_dict(),
 		"phase":phase,"cursor":cursor.duplicate(true),"move_id":move_id,"batch_id":batch_id,"window_id":window_id,
 		"context":context.capture() if context != null else {},"discount_spent":discount_spent,
-		"discount_charges":discount_charges,"reward_bonus":reward_bonus}
+		"discount_charges":discount_charges,"reward_bonus":reward_bonus,"modifiers":modifiers}
