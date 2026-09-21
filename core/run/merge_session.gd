@@ -24,6 +24,8 @@ var discount_charges := 0
 var reward_bonus := 0
 var modifiers: Dictionary = MergeModifiers.DEFAULTS
 var reservation := {}
+var clock_notes: Array = []
+var failure := {}
 
 func start(value: Dictionary) -> bool:
 	var admitted := RunState.restored(value)
@@ -36,6 +38,7 @@ func start(value: Dictionary) -> bool:
 	discount_spent = 0; discount_charges = 0; reward_bonus = 0
 	modifiers = GameValue.freeze(MergeModifiers.DEFAULTS)
 	reservation = {}
+	clock_notes = []; failure = {}
 	return true
 
 func configure_modifiers(value: Dictionary) -> bool:
@@ -69,7 +72,7 @@ func presented() -> bool:
 
 func tick(value: int) -> bool:
 	if not reservation.is_empty() or phase != "merge_window" or not clock.started or clock.paused or value < clock.tick or value > WINDOW_TICKS: return false
-	clock.tick = value; clock.sequence += 1
+	clock.tick = value
 	return true
 
 func reserve(command: RoomCommand) -> Dictionary:
@@ -91,7 +94,10 @@ func prepare(command: RoomCommand = null, fail_at: String = "", cancelled: Calla
 	var pair: Array[Vector2i] = []
 	if command != null:
 		copy.move_id += 1
+		var room_uses: Dictionary = copy.context.room_uses if copy.context != null else {}
+		var run_uses: Dictionary = copy.context.run_uses if copy.context != null else {}
 		copy.context = MergeMoveContext.new(copy.state,command,copy.move_id,admission.context)
+		copy.context.room_uses = room_uses; copy.context.run_uses = run_uses
 		copy.context.budget.cancelled = cancelled
 		copy.cursor = {"cascade":0,"chain":0}; first_fact = 0
 		if command.data.kind == "swap":
@@ -107,6 +113,7 @@ func prepare(command: RoomCommand = null, fail_at: String = "", cancelled: Calla
 		if not ToolResolver.apply(copy.context,command): return StateAdmission.fail("root_effect")
 		if command.data.kind in ["swap","action.exchange"]: pair.assign([command.data.origin,command.data.destination])
 		copy.context.modifier_bonus = copy.reward_bonus; copy.context.modifier_trigger = copy.modifiers.reward_trigger
+		copy.context.modifier_scope = copy.modifiers.reward_scope; copy.context.modifier_context = copy.modifiers.reward_context; copy.context.modifier_family = copy.modifiers.reward_family
 	copy.context.direct_batch = command != null
 	copy.context.budget.cancelled = cancelled
 	var result := copy._advance(pair,command == null and phase == "gravity",fail_at)
@@ -159,6 +166,8 @@ func publish(prepared: Dictionary, pass_window: bool = false) -> bool:
 	var receipt: Dictionary = reservation if not reservation.is_empty() else clock
 	var entry := {"command":prepared.command,"window":window_id,"tick":receipt.tick,"sequence":receipt.sequence,
 		"assisted":clock.assisted,"state_digest":prepared.candidate.last_batch.state_digest,"event_digest":prepared.candidate.last_batch.event_digest}
+	entry.clock = clock.duplicate(true)
+	entry.record_digest = CanonicalCodec.digest({"previous":history.back().record_digest if not history.is_empty() else "", "entry":entry})
 	var old_clock := clock.duplicate(true)
 	var candidate: MergeSession = prepared.candidate
 	for key in ["state","context","phase","cursor","move_id","batch_id","window_id","last_batch","discount_spent","discount_charges","reward_bonus"]: set(key,candidate.get(key))
@@ -166,6 +175,13 @@ func publish(prepared: Dictionary, pass_window: bool = false) -> bool:
 	history.append(GameValue.freeze(entry))
 	reservation = {}
 	return true
+
+func record_failure(command: Dictionary, injection: String, code: String) -> void:
+	failure = {"command":command,"injection":injection,"code":code,"phase":phase}
+	reservation = {}; error = code; phase = "diagnostic"
+
+func snapshot() -> Dictionary:
+	return MergeReplay.capture(self)
 
 func apply(command: RoomCommand = null, fail_at: String = "") -> Dictionary:
 	var result := prepare(command,fail_at)

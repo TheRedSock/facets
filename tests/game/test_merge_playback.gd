@@ -58,6 +58,10 @@ func _run() -> void:
 		view.board.size = Vector2(520,570)
 		await process_frame; await process_frame
 		check(view.board._tile_views[Vector2i(1,3)] == promoted and promoted.position == view.board._cell_to_pixel(Vector2i(1,3)),"resize preserves live identity and anchor")
+		var saved := view.session.snapshot()
+		check(view.restore_session(saved) and view.session.clock.paused and view.session.clock.assisted,"MW24 native parked restore presents committed board paused")
+		check(view.board._board_state.to_dict() == view.session.state.board.to_dict(),"restored visible input board exact")
+		view.clock_adapter.pause(false,"manual")
 		view.clock_adapter.pause(true,"focus"); var tick: int = view.session.clock.tick
 		view.clock_adapter.automatic = true; view.clock_adapter.advance(Time.get_ticks_usec()+30000)
 		check(view.session.clock.paused and view.session.clock.tick == tick and not view.can_input(),"MW18 focus pause freezes deadline and input")

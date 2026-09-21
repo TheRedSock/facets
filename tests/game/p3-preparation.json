@@ -1,47 +1,560 @@
 {
   "schema": 1,
   "status": "preparatory acceptance specification; P3 gameplay is not implemented",
-  "profile": "p3",
-  "simulation": "facets-sim-v3",
-  "state_schema": 3,
-  "replay": "facets-replay-v3",
-  "save": "facets-save-v1",
-  "content": "facets-p3-content-v1",
-  "production_action_model": "atomic",
-  "supported_controls": ["facets-replay-v1", "facets-replay-v2"],
-  "roster": ["quartz", "amethyst", "peridot", "topaz", "sapphire", "emerald", "ruby", "diamond"],
-  "families": {"quartz":"quartz", "amethyst":"quartz", "sapphire":"corundum", "ruby":"corundum", "emerald":"beryl", "aquamarine":"beryl"},
-  "replacement": {"tier":5,"before":"sapphire","after":"aquamarine","preserve_instance":true,"emit_triggers":false},
-  "supply": {"targets":[1,2,3,4],"weights":[4,3,2,1]},
-  "carry": {"maximum":2,"minimum_tier":4,"staging":[[3,0],[4,0]],"order":"recorded selection order","clear_temporary_status":true},
-  "rooms": [
-    {"id":"open_seam","size":[8,8],"work":16,"kind":"clear_marked_rubble","rubble":[[2,2],[5,3],[2,5],[5,6]],"durability":2,"outlets":[],"minimum_tier":0,"demand":0},
-    {"id":"deep_seam","size":[8,8],"work":16,"kind":"clear_marked_rubble","rubble":[[4,1],[2,2],[5,3],[2,5],[6,5],[5,6]],"durability":2,"outlets":[],"minimum_tier":0,"demand":0},
-    {"id":"commission","size":[8,8],"work":16,"kind":"extract","rubble":[],"durability":2,"outlets":[[2,7],[5,7]],"minimum_tier":3,"demand":3},
-    {"id":"vault","size":[8,8],"work":20,"kind":"extract","rubble":[[2,6],[5,6]],"durability":2,"outlets":[[2,7],[5,7]],"minimum_tier":5,"demand":1}
+  "profile": "p3-merge",
+  "simulation": "facets-sim-p3-merge-v1",
+  "state_schema": 4,
+  "replay": "facets-replay-p3-merge-v1",
+  "save": "facets-save-p3-merge-v1",
+  "content": "facets-p3-merge-content-v1",
+  "production_action_model": "incremental_merge_windows",
+  "supported_controls": [
+    "facets-replay-v1",
+    "facets-replay-v2",
+    "facets-replay-merge-v1"
   ],
-  "outlet_policy":"Own cell must be unblocked and its occupant unlocked. Adjacent rubble blocks physical travel; it does not create an invisible remote lock.",
-  "routes":[["open_seam","deep_seam","vault"],["open_seam","commission","vault"]],
-  "reward_pool":["aquamarine","steady_hand","beryl_bridge","next_room_craft"],
-  "permanent_rewards":["aquamarine","steady_hand","beryl_bridge"],
-  "reward_screen_size":3,
-  "bridge_starter_access":"emerald",
-  "save_phases":["briefing","ready","carry_selection","reward_selection","route_selection","next_room_ready","results"],
-  "save_fields":["version","content_identity","catalog","rules","run_id","room_index","room_definition","phase","board","objective_progress","ordered_carry","settings","room_uses","work","craft","entry_bonus","rng","instance_allocator","action_allocator","event_allocator","removal_allocator","revision","offers","selected_reward","route_cards","selected_route","replay_cursor","checkpoints"],
-  "fixtures":[
-    {"id":"quartz_shared_cap","input":{"eligible_quartz_matches":2,"strongest_base":2,"craft_before":4},"expected":{"raw_bonus":1,"capped_award":3,"actual_gain":2,"craft_after":6}},
-    {"id":"corundum_replaces_base","input":{"contacts_with_one_rubble":3,"durability":2,"components":1},"expected":{"damage_facts":1,"damage":2,"break_facts":1}},
-    {"id":"beryl_lowest_yx","input":{"survivor":[2,2],"neighbors":[{"cell":[1,2],"tier":3},{"cell":[2,1],"tier":1},{"cell":[3,2],"tier":1}]},"expected":{"target":[2,1],"spent_uses":1}},
-    {"id":"beryl_no_target","input":{"eligible_targets":0},"expected":{"spent_uses":0}},
-    {"id":"beryl_terminal_no_survivor","input":{"synthetic_source_family":"beryl","tier":8,"survivor":null},"expected":{"spent_uses":0,"promotions":0}},
-    {"id":"tool_and_extraction_suppression","input":{"cause":"tool_or_extraction","quartz_matches":2,"beryl_matches":1},"expected":{"new_craft_candidates":0,"family_uses":0,"retain_prior_eligible_earnings":true}},
-    {"id":"ordered_extraction_stops_at_demand","input":{"remaining_demand":1,"work":0,"qualified_cells":[[5,7],[2,7]]},"expected":{"removed_cells":[[2,7]],"removed_count":1,"room_result":"complete","refills_after_completion":0}},
-    {"id":"carry_conversion","input":{"id":"expedition/91","tier":5,"definition":"sapphire","reward":"aquamarine"},"expected":{"id":"expedition/91","tier":5,"definition":"aquamarine","triggers":0}},
-    {"id":"entry_craft","input":{"carried_craft":6,"one_time_bonus":1},"expected":{"craft":4,"bonus_consumed_once":true}},
-    {"id":"steady_hand_rejection","input":{"first_chisel":"invalid_target"},"expected":{"spent_room_use":false,"craft_spent":0}},
-    {"id":"full_cap_rollback","input":{"failure_after":"family_effect_or_extraction_or_entry"},"expected":{"state_rng_allocators_replay_unchanged":true}},
-    {"id":"exact_save_rng","input":{"integer_text":"9007199254740993"},"expected":{"roundtrip_integer_text":"9007199254740993","reroll":false}},
-    {"id":"frozen_outlet_delivery","input":{"source":"tests/fixtures/game_prototype_v1/cases.json#outlet_delivery"},"expected":{"room_result":"complete","extracted_count":1,"removed_count":1,"carry_excludes_cell":[1,2]}},
-    {"id":"interrupted_save","input":{"injection_points":["before_write","partial_temp","after_flush","after_verify","before_replace","after_backup"]},"expected":{"prior_or_new_slot_admitted":true,"silent_new_run":false}}
-  ]
+  "roster": [
+    "quartz",
+    "amethyst",
+    "peridot",
+    "topaz",
+    "sapphire",
+    "emerald",
+    "ruby",
+    "diamond"
+  ],
+  "families": {
+    "quartz": "quartz",
+    "amethyst": "quartz",
+    "sapphire": "corundum",
+    "ruby": "corundum",
+    "emerald": "beryl",
+    "aquamarine": "beryl"
+  },
+  "replacement": {
+    "tier": 5,
+    "before": "sapphire",
+    "after": "aquamarine",
+    "preserve_instance": true,
+    "emit_triggers": false
+  },
+  "supply": {
+    "targets": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "weights": [
+      4,
+      3,
+      2,
+      1
+    ]
+  },
+  "carry": {
+    "maximum": 2,
+    "minimum_tier": 4,
+    "staging": [
+      [
+        3,
+        0
+      ],
+      [
+        4,
+        0
+      ]
+    ],
+    "order": "recorded selection order",
+    "clear_temporary_status": true
+  },
+  "rooms": [
+    {
+      "id": "open_seam",
+      "size": [
+        8,
+        8
+      ],
+      "work": 16,
+      "kind": "clear_marked_rubble",
+      "rubble": [
+        [
+          2,
+          2
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          5,
+          6
+        ]
+      ],
+      "durability": 2,
+      "outlets": [],
+      "minimum_tier": 0,
+      "demand": 0
+    },
+    {
+      "id": "deep_seam",
+      "size": [
+        8,
+        8
+      ],
+      "work": 16,
+      "kind": "clear_marked_rubble",
+      "rubble": [
+        [
+          4,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          5,
+          6
+        ]
+      ],
+      "durability": 2,
+      "outlets": [],
+      "minimum_tier": 0,
+      "demand": 0
+    },
+    {
+      "id": "commission",
+      "size": [
+        8,
+        8
+      ],
+      "work": 16,
+      "kind": "extract",
+      "rubble": [],
+      "durability": 2,
+      "outlets": [
+        [
+          2,
+          7
+        ],
+        [
+          5,
+          7
+        ]
+      ],
+      "minimum_tier": 3,
+      "demand": 3
+    },
+    {
+      "id": "vault",
+      "size": [
+        8,
+        8
+      ],
+      "work": 20,
+      "kind": "extract",
+      "rubble": [
+        [
+          2,
+          6
+        ],
+        [
+          5,
+          6
+        ]
+      ],
+      "durability": 2,
+      "outlets": [
+        [
+          2,
+          7
+        ],
+        [
+          5,
+          7
+        ]
+      ],
+      "minimum_tier": 5,
+      "demand": 1
+    }
+  ],
+  "outlet_policy": "Own cell must be unblocked and its occupant unlocked. Adjacent rubble blocks physical travel; it does not create an invisible remote lock.",
+  "routes": [
+    [
+      "open_seam",
+      "deep_seam",
+      "vault"
+    ],
+    [
+      "open_seam",
+      "commission",
+      "vault"
+    ]
+  ],
+  "reward_pool": [
+    "aquamarine",
+    "steady_hand",
+    "beryl_bridge",
+    "next_room_craft"
+  ],
+  "permanent_rewards": [
+    "aquamarine",
+    "steady_hand",
+    "beryl_bridge"
+  ],
+  "reward_screen_size": 3,
+  "bridge_starter_access": "emerald",
+  "save_phases": [
+    "briefing",
+    "ready",
+    "carry_selection",
+    "reward_selection",
+    "route_selection",
+    "next_room_ready",
+    "results",
+    "merge_window",
+    "gravity",
+    "reserved_command",
+    "diagnostic"
+  ],
+  "save_fields": [
+    "version",
+    "content_identity",
+    "catalog",
+    "rules",
+    "run_id",
+    "room_index",
+    "room_definition",
+    "phase",
+    "board",
+    "objective_progress",
+    "ordered_carry",
+    "settings",
+    "room_uses",
+    "work",
+    "craft",
+    "entry_bonus",
+    "rng",
+    "instance_allocator",
+    "action_allocator",
+    "event_allocator",
+    "removal_allocator",
+    "revision",
+    "offers",
+    "selected_reward",
+    "route_cards",
+    "selected_route",
+    "replay_cursor",
+    "checkpoints",
+    "resolution_session",
+    "move_id",
+    "batch_id",
+    "window_id",
+    "cursor",
+    "entitlement",
+    "move_uses",
+    "run_uses",
+    "reservation",
+    "window_clock",
+    "assistance",
+    "decision_chain"
+  ],
+  "fixtures": [
+    {
+      "id": "quartz_shared_cap",
+      "input": {
+        "eligible_quartz_matches": 2,
+        "strongest_base": 2,
+        "craft_before": 4
+      },
+      "expected": {
+        "raw_bonus": 1,
+        "capped_award": 3,
+        "actual_gain": 2,
+        "craft_after": 6
+      }
+    },
+    {
+      "id": "corundum_replaces_base",
+      "input": {
+        "contacts_with_one_rubble": 3,
+        "durability": 2,
+        "components": 1
+      },
+      "expected": {
+        "damage_facts": 1,
+        "damage": 2,
+        "break_facts": 1
+      }
+    },
+    {
+      "id": "beryl_lowest_yx",
+      "input": {
+        "survivor": [
+          2,
+          2
+        ],
+        "neighbors": [
+          {
+            "cell": [
+              1,
+              2
+            ],
+            "tier": 3
+          },
+          {
+            "cell": [
+              2,
+              1
+            ],
+            "tier": 1
+          },
+          {
+            "cell": [
+              3,
+              2
+            ],
+            "tier": 1
+          }
+        ]
+      },
+      "expected": {
+        "target": [
+          2,
+          1
+        ],
+        "spent_uses": 1
+      }
+    },
+    {
+      "id": "beryl_no_target",
+      "input": {
+        "eligible_targets": 0
+      },
+      "expected": {
+        "spent_uses": 0
+      }
+    },
+    {
+      "id": "beryl_terminal_no_survivor",
+      "input": {
+        "synthetic_source_family": "beryl",
+        "tier": 8,
+        "survivor": null
+      },
+      "expected": {
+        "spent_uses": 0,
+        "promotions": 0
+      }
+    },
+    {
+      "id": "tool_and_extraction_suppression",
+      "input": {
+        "cause": "tool_or_extraction",
+        "quartz_matches": 2,
+        "beryl_matches": 1
+      },
+      "expected": {
+        "new_craft_candidates": 0,
+        "family_uses": 0,
+        "retain_prior_eligible_earnings": true
+      }
+    },
+    {
+      "id": "ordered_extraction_stops_at_demand",
+      "input": {
+        "remaining_demand": 1,
+        "work": 0,
+        "qualified_cells": [
+          [
+            5,
+            7
+          ],
+          [
+            2,
+            7
+          ]
+        ]
+      },
+      "expected": {
+        "removed_cells": [
+          [
+            2,
+            7
+          ]
+        ],
+        "removed_count": 1,
+        "room_result": "complete",
+        "refills_after_completion": 0
+      }
+    },
+    {
+      "id": "carry_conversion",
+      "input": {
+        "id": "expedition/91",
+        "tier": 5,
+        "definition": "sapphire",
+        "reward": "aquamarine"
+      },
+      "expected": {
+        "id": "expedition/91",
+        "tier": 5,
+        "definition": "aquamarine",
+        "triggers": 0
+      }
+    },
+    {
+      "id": "entry_craft",
+      "input": {
+        "carried_craft": 6,
+        "one_time_bonus": 1
+      },
+      "expected": {
+        "craft": 4,
+        "bonus_consumed_once": true
+      }
+    },
+    {
+      "id": "steady_hand_rejection",
+      "input": {
+        "first_chisel": "invalid_target"
+      },
+      "expected": {
+        "spent_room_use": false,
+        "craft_spent": 0
+      }
+    },
+    {
+      "id": "unpublished_batch_cap_rollback",
+      "input": {
+        "failure_after": "family_effect_or_extraction"
+      },
+      "expected": {
+        "unpublished_state_rng_allocators_replay_unchanged": true,
+        "published_prefix_preserved": true
+      }
+    },
+    {
+      "id": "exact_save_rng",
+      "input": {
+        "integer_text": "9007199254740993"
+      },
+      "expected": {
+        "roundtrip_integer_text": "9007199254740993",
+        "reroll": false
+      }
+    },
+    {
+      "id": "frozen_outlet_delivery",
+      "input": {
+        "source": "tests/fixtures/game_prototype_v1/cases.json#outlet_delivery"
+      },
+      "expected": {
+        "room_result": "complete",
+        "extracted_count": 1,
+        "removed_count": 1,
+        "carry_excludes_cell": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": "interrupted_save",
+      "input": {
+        "injection_points": [
+          "before_write",
+          "partial_temp",
+          "after_flush",
+          "after_verify",
+          "before_replace",
+          "after_backup"
+        ]
+      },
+      "expected": {
+        "prior_or_new_slot_admitted": true,
+        "silent_new_run": false
+      }
+    },
+    {
+      "id": "room_entry_atomic_rollback",
+      "input": {
+        "failure_after": "entry_preparation"
+      },
+      "expected": {
+        "prior_run_rng_bonus_carry_unchanged": true
+      }
+    },
+    {
+      "id": "intervention_new_scope",
+      "input": {
+        "next_input": "paid_intervention",
+        "prior_cause": "tool"
+      },
+      "expected": {
+        "retain_room_run_uses": true,
+        "fresh_move_uses": true,
+        "normal_reward_eligibility": true
+      }
+    },
+    {
+      "id": "parked_save",
+      "input": {
+        "pending_automatic_match": true,
+        "tick": 7,
+        "phase": "merge_window"
+      },
+      "expected": {
+        "speculative_facts": 0,
+        "restore_tick": 7,
+        "paused": true,
+        "assisted": true
+      }
+    },
+    {
+      "id": "reserved_save",
+      "input": {
+        "phase": "reserved_command",
+        "cost_committed": false
+      },
+      "expected": {
+        "resume_from_committed_base": true,
+        "charge_once": true
+      }
+    }
+  ],
+  "phase_disposition": {
+    "empty": "no admitted save",
+    "ready": "committed snapshot",
+    "merge_window": "parked complete context; resume paused and assisted",
+    "gravity": "committed end board and pending scan",
+    "reserved_command": "committed base plus immutable accepted ticket; resume exactly once",
+    "complete": "atomic carry or results transition",
+    "failed": "atomic results transition",
+    "diagnostic": "committed prefix plus verified failure",
+    "publication": "capture only after synchronous publication returns"
+  },
+  "objective_boundaries": {
+    "clear_marked_rubble": "after merge, before offering input or optional gravity",
+    "extract": "occupancy and match equilibrium, before ready input/recovery/exhaustion",
+    "precedence": "completed objective wins on final Work",
+    "carry": "committed terminal board; holes do not force additional gravity"
+  }
 }

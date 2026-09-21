@@ -1,7 +1,8 @@
 # Merge-window successor acceptance specifications
 
-Status: proposed, 2026-09-21. These are fixture specifications, not registered
-tests or passing results. Implement and register executable checks during the
+Status: execution underway, 2026-09-22. These are the required fixture
+specifications; [the readiness ledger](merge-readiness-status.json) identifies
+implemented checks and outstanding release evidence. Implement and register checks during the
 [successor goal](../../plans/P3_READINESS_SUCCESSOR.md). The
 [owning contract](../../core/run/MERGE_WINDOW_PREPARATION.md) defines behavior.
 Preserve existing P0/P1/P2 and trial goldens unchanged.
@@ -48,7 +49,7 @@ stages only after their implementations and completion markers exist.
 | MW29 | Injected slow computation and cancellation exercise deadline recovery. Normal frozen workloads and required 2x-compute stress have zero starvation; intentionally excessive delays produce honest misses, closed input and later full-duration windows. | performance |
 | MW30 | Actual packaged executable verifies keyboard/mouse, terminal/restart/menu, reduced motion, focus loss, repeated windows, automatic redirection and gravity default at both native display sizes. Package manifest matches tested source and delivered bytes. | release |
 
-## Performance acceptance proposal to freeze at G0
+## Performance acceptance frozen at G0
 
 The old complete-action 5 ms p95 remains a failed historical metric. It cannot be
 relabelled as passing because a different subset is measured. Successor readiness

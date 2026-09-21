@@ -1,0 +1,9 @@
+{
+	"initial_digest": "f86becfe26ef36c6938c2bedccbcb769f3be16bdb8ffa2cc4316d2a834bf1a41",
+	"pass_event_digest": "849b8658b1dbfb0eb38fe3b4cc390ca98bacace60c10096413c44cb6364d7b78",
+	"pass_state_digest": "0970a774e1929385da62b2a4b8276eda21c1f98ca31c2f2f9521871f13b80a2e",
+	"profile": "p3-ready-merge-v1",
+	"redirect_event_digest": "a0e74c1b29a62c33c723b83362b1cc4f04885713f5fba1db7cbf6be2f579def0",
+	"redirect_session_digest": "ca31234d910ac4fa4f1243f87394ab897e22765f253500a9fceb9755e2313689",
+	"redirect_state_digest": "e337abafd9d25daf507a47ce2ce0db34e309df5a8b1a92240e548d0a06538f53"
+}

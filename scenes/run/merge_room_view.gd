@@ -69,7 +69,9 @@ func _ready() -> void:
 	player = MergePlayer.new(board); player.reduced_motion = reduced_motion
 	player.motion_finished.connect(_motion_done)
 	board.external_layout = func():
-		if player.motion_busy and session != null: session.clock.assisted = true
+		if player.motion_busy and session != null:
+			session.clock.assisted = true
+			session.clock_notes.append({"kind":"assist","reason":"resize","window":session.window_id,"tick":session.clock.tick})
 		player.relayout()
 	restart.call_deferred()
 
@@ -110,6 +112,23 @@ func request_swap(a: Vector2i, b: Vector2i) -> void:
 	player.begin_swap(command)
 	telemetry.append({"kind":"input","received_us":received,"feedback_us":Time.get_ticks_usec(),"deadline_us":_motion_deadline})
 	_refresh()
+
+func restore_session(value: Dictionary) -> bool:
+	var admitted := MergeReplay.restored(value)
+	if not admitted.ok: return false
+	if executor != null and not executor.shutdown(): return false
+	_epoch += 1; queue.clear(); _window_handoff = false; _motion_deadline = 0; _waiting_since = 0
+	session = admitted.session; clock_adapter = MergeClock.new(session); clock_adapter.automatic = automatic_clock
+	executor = MergeExecutor.new(session); player.reset(session.state.board)
+	_tool = ""; board.target_mode = false; error = ""; begun = true; _begin.hide()
+	if not session.reservation.is_empty():
+		var command := RoomCommand.parse(session.reservation.command)
+		_motion_deadline = Time.get_ticks_usec()+150000
+		if command.data.kind == "swap": player.begin_swap(command)
+		executor.resume_reserved()
+	elif session.phase == "gravity": executor.continue_gravity()
+	_refresh()
+	return true
 
 func _target(pos: Vector2i) -> void:
 	if not can_input() or _tool.is_empty() or session.phase != "ready": return
@@ -210,5 +229,3 @@ func _exit_tree() -> void:
 	_epoch += 1
 	if executor != null: executor.shutdown()
 	if player != null: player.cancel()
-
-

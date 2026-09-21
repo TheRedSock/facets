@@ -4,7 +4,8 @@ func _initialize() -> void: _run.call_deferred()
 
 func _run() -> void:
 	var spec: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://tests/game/p3-preparation.json"))
-	check(spec.profile == "p3" and spec.simulation not in [RuleSet.DEFAULTS.simulation,RuleSet.room_defaults().simulation],"reserved P3 identity cannot silently reuse controls")
+	check(spec.profile == "p3-merge" and spec.simulation not in [RuleSet.DEFAULTS.simulation,RuleSet.room_defaults().simulation,MergeSession.SIMULATION],"reserved expedition identity cannot silently reuse controls or standalone successor")
+	check(spec.production_action_model == "incremental_merge_windows" and spec.state_schema == 4,"P3 explicitly incorporates new continuation state")
 	check(spec.roster == GameBootstrap.catalog().catalog.roster(),"preparation starts with actual starter roster")
 	var definition: TileDefinitionResource = load("res://data/tiles/aquamarine.tres")
 	check(definition.tier == int(spec.replacement.tier),"replacement resource has intended tier")
@@ -40,7 +41,11 @@ func _run() -> void:
 		for reward in second: unique[reward] = true
 		check(unique.size() == second.size(),"fallback never duplicated: "+first)
 	check(spec.bridge_starter_access in spec.roster and spec.families[spec.bridge_starter_access] == "beryl","Beryl Bridge already has starter Emerald access")
-	check(spec.save_phases.size() == 7 and "reward_selection" in spec.save_phases and "route_selection" in spec.save_phases,"stable selection phases included in persistence")
+	check(spec.save_phases.size() == 11 and "reward_selection" in spec.save_phases and "route_selection" in spec.save_phases,"stable and parked phases included in persistence")
+	for phase in ["empty","ready","merge_window","gravity","reserved_command","complete","failed","diagnostic","publication"]:
+		check(spec.phase_disposition.has(phase) and not spec.phase_disposition[phase].is_empty(),"MW27 explicit phase disposition "+phase)
+	for field in ["resolution_session","move_id","batch_id","window_id","cursor","entitlement","move_uses","run_uses","reservation","window_clock","assistance","decision_chain"]:
+		check(field in spec.save_fields,"MW27 pending identity inventory "+field)
 	for field in ["rng","offers","entry_bonus","ordered_carry","instance_allocator","replay_cursor"]: check(field in spec.save_fields,"complete save inventory includes "+field)
 	var ids := {}
 	for fixture in spec.fixtures:

@@ -32,7 +32,8 @@
     },
     {
       "id": "G5",
-      "status": "pending"
+      "status": "passed",
+      "evidence": "artifacts/game/merge-readiness/g5-r4/run.json"
     },
     {
       "id": "G6",
@@ -208,13 +209,15 @@
       "id": "MW24",
       "assertion": "Restore every committed phase, pending automatic match, gravity boundary and reserved-command snapshot; rebuild a reservation from its immutable command/base, never from serialized worker objects. Replay also covers multiple interventions, expiry, terminal and diagnostic failure.",
       "owner": "persistence",
-      "status": "pending"
+      "status": "restore_and_seams_verified",
+      "evidence": "g5-r4"
     },
     {
       "id": "MW25",
       "assertion": "Corrupt/missing context, wrong profile, allocator collision, stale window and truncated transcript reject without live-state mutation. Preserve exact integers above 2^53 and complete RNG state. Altered assist/tick decisions change the relevant identity.",
       "owner": "persistence",
-      "status": "pending"
+      "status": "restore_and_seams_verified",
+      "evidence": "g5-r4"
     },
     {
       "id": "MW28",

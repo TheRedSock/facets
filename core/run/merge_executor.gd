@@ -91,7 +91,8 @@ func _work() -> void:
 		_running = false
 		if not _stopping and job.generation == _generation:
 			_completed = {"generation":job.generation,"kind":job.kind,"result":result,
-				"submitted_us":job.submitted_us,"service_us":computed,"ready_us":Time.get_ticks_usec()}
+				"submitted_us":job.submitted_us,"service_us":computed,"ready_us":Time.get_ticks_usec(),
+				"command":job.command.to_dict() if job.command != null else {},"injection":job.failure}
 		else: discarded += 1
 		_mutex.unlock()
 
@@ -123,9 +124,14 @@ func _publish(done: Dictionary, release: bool = false) -> Dictionary:
 	if not committed:
 		session.reservation = {}
 		if result.ok: return {"ok":false,"status":"rejected","code":"stale_publication"}
-		session.error = result.code; session.phase = "diagnostic"
+		session.record_failure(done.command,done.injection,result.code)
 		return {"ok":false,"status":"failed","code":result.code}
 	return {"ok":true,"status":"committed","batch":session.last_batch}
+
+func resume_reserved() -> bool:
+	if session.reservation.is_empty() or _stopping or busy(): return false
+	_queue("command",RoomCommand.parse(session.reservation.command))
+	return true
 
 func cancel() -> void:
 	_mutex.lock()

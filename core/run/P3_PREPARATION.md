@@ -1,27 +1,24 @@
 # P3 preparation contract — reserved, unimplemented
 
-Successor direction, 2026-09-21: [merge-window preparation](MERGE_WINDOW_PREPARATION.md)
-now governs the proposed resolution foundation before P3. It adds repeated paid
-interventions, intervention-before-automatic-match precedence and isolated default
-lookahead. This is design, not implemented behavior. Its
-[acceptance specifications](../../tests/game/MERGE_WINDOW_ACCEPTANCE.md) require
-reconciling the older atomic assumptions below before P3 activation.
-
-The retained package below still owns planned rooms, families, rewards and carry.
-Its whole-action rollback, Craft settlement, action scopes, stable phases and
-reserved protocol names are historical proposals requiring the successor G5
-audit; they must not override the new batch/window contract. The planned data
-and cases in `tests/game/p3-preparation.json` remain unchanged until that audit.
-Their structural checks do not claim P3 gameplay passes. The old 5 ms CPU gate
-remains failed historical evidence; successor readiness requires new measured
-deadline exits. Human evaluation remains deferred under the sole-reviewer policy.
+G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
+accounting, executor and streaming room now provide the resolution foundation.
+Replay/restore and P3 seams are being verified under the
+[merge-window contract](MERGE_WINDOW_PREPARATION.md). Full readiness still needs
+the G6/G7 release/performance exits. Families, rooms beyond P2, expedition and
+disk Continue below remain specified P3 work, not implemented gameplay.
+The earlier atomic specification is checksum-archived locally before this edit.
+The old complete-action 5 ms failure remains historical evidence. The user is
+the sole current reviewer; broader human evaluation remains deferred.
 
 ## Contract decisions
 
 ### Run ownership and identity
 
-Reserve profile `p3`, simulation `facets-sim-v3`, state schema 3, replay
-`facets-replay-v3`, save `facets-save-v1`, content `facets-p3-content-v1`.
+Reserve profile `p3-merge`, simulation `facets-sim-p3-merge-v1`, state schema 4,
+replay `facets-replay-p3-merge-v1`, save `facets-save-p3-merge-v1`, content
+`facets-p3-merge-content-v1`. These deliberately replace the unused atomic P3
+reservations. Embed a versioned resolution session; do not reinterpret RunState
+v2 as an unsettled expedition or silently load the old P3 proposal as this schema.
 Codec FAC1, `facets-stream-v1`, `legacy_scan_v1`, matching and survivor policies
 remain unchanged unless implementation finds a concrete incompatibility.
 Support legacy P1/P2 in their original entry paths with exact frozen snapshots
@@ -35,8 +32,11 @@ Use a single run namespace and instance allocator across rooms; no reset to
 Every accepted boundary command records revision, stable IDs, complete state/event
 digests and any choice IDs. Invalid/stale commands are pure rejection.
 
-Phases: `briefing`, `ready`, `carry_selection`, `reward_selection`,
-`route_selection`, `next_room_ready`, `results`. Failure transitions to results
+Phases: `briefing`, `ready`, `merge_window`, `gravity`, `reserved_command`,
+`diagnostic`, `carry_selection`, `reward_selection`, `route_selection`,
+`next_room_ready`, `results`. Reserved command is derived from an admitted ticket
+over the last committed ready/window state; it is not a half-applied move.
+Failure transitions to results
 with an explicit reason; completion of a nonfinal room enters carry selection.
 No gameplay input during selection. `confirm_carry` accepts zero, one or two
 ordered eligible IDs; `choose_reward`, `choose_route`, `enter_room` consume
@@ -65,8 +65,10 @@ Quartz: first eligible source-family match reserves +1 raw bonus and its one-use
 flag. Beryl: choose the lowest tier eligible orthogonal live gem next to the live
 survivor, breaking ties `(y,x)`; range T1–3, or T1–4 with Bridge. Revalidate ID,
 tier and eligibility at application; only a committed promotion spends use.
-No target does not spend use. Upgrade-created matches resolve before gravity,
-sharing family flags. Corundum: replace the component's adjacent damage with 2;
+No target does not spend use. Upgrade-created matches resolve before gravity
+only after their preceding window expires. A paid intervention can redirect them;
+rescan the new board. Automatic continuations share family flags; a new paid move
+receives fresh per-move uses. Corundum: replace the component's adjacent damage with 2;
 do not schedule a separate extra one-point hit. Each component hits each frozen
 target once, capped by its live durability.
 
@@ -75,13 +77,20 @@ absence of a survivor. Quartz/Corundum can operate if such a source is authored;
 Beryl cannot select without a survivor. Generic removal and subtype facts share
 one removal ID and cannot double-pay. No prototype generic removal income.
 
-One ActionContext tracks strongest base, raw bonuses, family-used flags and all
-work/fact/cascade/reaction limits. Final eligible gain is
-`min(3, strongest_base + raw_bonus)`, then clipped to capacity 6. Track and emit
-base, raw bonus, capped award and actual gain independently. Tools/setup/
-extraction descendants suppress family/Craft earnings. Suppressing a later
-continuation does not erase legitimate earlier candidates. Technical cap failure
-rolls back the entire production action; it never silently truncates effects.
+Each paid move owns strongest base, raw bonuses, per-move family flags and
+automatic work/fact/cascade/reaction limits. Expiry retains that scope. Each merge
+settles only the newly earned increase in `min(3, strongest_base + raw_bonus)`,
+clipped to capacity 6; already clipped entitlement is consumed permanently.
+Room/run uses survive new paid moves; room uses reset on committed room entry.
+All facts retain engine-derived equilibrium/intervention context, with a separate
+direct-batch predicate. Sources use their frozen pre-promotion family identity.
+
+Tools/setup/extraction descendants suppress family/Craft earnings without erasing
+already committed gains. A new paid swap during a tool/extraction-caused merge
+gets its normal fresh eligible scope. Tool commands remain equilibrium-only.
+Failure rolls back the unpublished batch only; published board, costs, RNG and
+replay records remain committed. Unpublished room entry/reward transactions still
+retain their entire prior run on failure. Caps never silently truncate effects.
 
 ### Carry, reward and opening
 
@@ -115,7 +124,7 @@ an insufficient pool is a content error, not a duplicated reward screen.
 
 Steady Hand's first accepted Chisel in a room costs 1 instead of 2; invalid or
 canceled previews do not spend it. Bridge affects only Beryl's target range,
-sharing the normal once-per-action family budget. Supply stays T1–4 with weights
+sharing the normal once-per-paid-move family budget. Supply stays T1–4 with weights
 4/3/2/1; replacing the T5 roster entry does not introduce T5 into refill supply.
 
 ### Objectives and flow
@@ -135,18 +144,36 @@ At a stable boundary, qualifying unlocked outlet occupants are removed in `(y,x)
 order, one unique removal identity and demand unit each. Stop immediately when
 demand completes, before any further extraction/refill/hazard/recovery. Otherwise
 settle/refill/match under inherited suppression within the same action and limits,
-then evaluate again. A completed objective wins on final Work. Extraction is not
+then evaluate again. Extraction is checked after all pending merges and physical
+motion settle, before equilibrium input/recovery or Work-exhaustion loss. It does
+not remove a gem during an intervention window. Clear-rubble completion is checked
+after a committed merge and may stop before gravity. A completed objective wins
+on final Work. Completion immediately closes input and establishes the immutable
+room outcome for carry selection, even if unused holes remain. Extraction is not
 merge consumption or T8 recovery and cannot later be carried. Emit facts that
 presentation can explain; scenes never count delivery independently.
 
-### Stable saves and asset preparation
+### Committed-boundary saves and asset preparation
 
-Save all seven stable phases, including pending carry/reward/route decisions.
-No mid-action disk save in production. Complete envelope: version/content identity,
+Save all eleven declared phases, including parked merge windows, committed
+gravity states, reserved commands, diagnostic prefixes and carry/reward/route
+decisions. Never save an unpublished candidate or speculative default. Complete
+envelope: version/content identity,
 catalog/rules, run/room identity, board/topology/objective progress, ordered carry,
 settings and room uses, Craft/Work/entry bonus, complete streams and counters,
-persisted offer/route IDs/order/selection, revision and replay cursor/checkpoints.
+persisted offer/route IDs/order/selection, mechanical revision, move/batch/window
+IDs, active context and entitlement, per-move/room/run uses, pending cursor,
+accepted input ticket, window clock/assistance, complete ordered decision chain
+and replay checkpoints. Accepted reservations resume exactly once from their
+committed base; private candidates are recomputed. A restored timed window is
+paused and assisted. No offline clock charge or rollback to an older equilibrium.
 Presentation volume/mute/reduced motion are separate preferences.
+
+`empty`/loading has no new admitted state to save. Synchronous publication cannot
+be interrupted by a save callback; capture after it returns. Room `complete` and
+`failed` map atomically to carry/results as applicable. Diagnostics preserve the
+valid prefix and failure record with explicit recovery controls, not free replay
+of an already committed move. The fixture package owns every phase disposition.
 
 Use canonical bytes inside a bounded checksummed envelope. Validate magic,
 length/checksum/version/content and full state before changing the active run.

@@ -1,7 +1,10 @@
 # Merge-window resolution — proposed successor contract
 
-Status: design, 2026-09-21. Nothing in this document is an implemented or measured
-claim. The existing atomic P1/P2 runtime and one-window trial remain controls.
+Status: G0-G5 implementation and focused acceptance, 2026-09-22. Incremental
+resolution, repeated paid inputs, worker/default lookahead, streaming presentation
+and replay/restore are implemented. G6 performance and G7 release acceptance are
+still pending; no P3-readiness or human-feel pass is claimed. Existing atomic
+P1/P2 and the one-window trial remain controls.
 Implementation and acceptance belong to [the successor goal](../../plans/P3_READINESS_SUCCESSOR.md).
 This proposal replaces the atomic-only assumption for the next P3-readiness
 experiment; it does not silently change the shipped P2 or frozen P0 behavior.
@@ -126,11 +129,11 @@ event ancestry still preserves already committed facts from earlier moves.
 
 ## Logical timing contract
 
-Proposed initial profile: swap feedback 9 ticks (150 ms), merge window 20 ticks
+Frozen G0 profile: swap feedback 9 ticks (150 ms), merge window 20 ticks
 (333.333 ms), clock 60 Hz. The current player uses a 150 ms swap and approximately
 180 ms removal plus 150 ms upgrade; the successor overlaps input with that merge
 interval instead of appending the trial's 400/800 ms wait. These are initial
-tuning values to freeze at G0, not established player preferences.
+tuning values frozen at G0, not established player preferences.
 
 `window_presented` at the first actionable merge frame starts tick zero exactly
 once. Accept receipt tick < 20; expiry wins a tie at tick 20. Engine input events
@@ -211,7 +214,10 @@ Audit current shared catalog/resources, static codec caches and callbacks before
 enabling it. Prepared immutable DTOs and worker-owned codec/context state cross
 the boundary; do not share mutable GDScript dictionaries by convention alone.
 
-Suggested interfaces (names to confirm at G0):
+Implemented owners are MergeSession, MergeKernel, MergeMoveContext, MergeExecutor,
+MergeReplay, MergeClock, MergePlayer and MergeRoomView. The conceptual interfaces
+below describe their responsibilities; batches are transferred candidate/packet
+records rather than another mutable global service:
 
 - `ResolutionSession`: authoritative phases, committed state, active move scope,
   reservations, expected base revision and cancellation generation.
@@ -251,10 +257,10 @@ separate from mechanical identity except recorded window/assist decisions.
 
 ## Compatibility and P3 reconciliation
 
-Reserve profile `p3-ready-merge-v1`, simulation `facets-sim-merge-v1`, content
+Implemented profile `p3-ready-merge-v1`, simulation `facets-sim-merge-v1`, content
 `facets-p2-merge-content-v1`, session envelope `facets-resolution-session-v1`
-and replay `facets-replay-merge-v1`. They are reserved proposals, not registered
-runtime capabilities. Do not load an unsettled successor state as RunState v2.
+and replay `facets-replay-merge-v1`. The embedded P2 structural state is admitted
+inside this complete envelope; it is not an unsettled RunState v2 save.
 Preserve FAC1 and RNG/settling versions if their bytes/behavior remain unchanged.
 P3's final version names must explicitly incorporate this model before reference
 capture; the previously reserved atomic P3 identities do not prove compatibility.
@@ -292,4 +298,5 @@ provide the tracked fixture inventory and performance exits. Complete G0 contrac
 reconciliation, G1 batch kernel, G2 paid inputs/accounting, G3 executor/lookahead,
 G4 streaming room, G5 restore/P3 audit, G6 measured correction and G7 release
 handoff in that order, checkpointing verified implementations. The local goal
-plan expands those batches; none is completed by publishing this design.
+plan and tracked readiness ledger distinguish focused checks from final release
+acceptance. Publishing this contract alone establishes no runtime result.

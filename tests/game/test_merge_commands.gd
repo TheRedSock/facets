@@ -38,6 +38,12 @@ func _run() -> void:
 	check(session.move_id == 2 and session.state.room.normal_turns == 2 and session.state.moves_remaining == 14,"MW07 intervention uses normal paid-move accounting")
 	check(session.last_batch.facts.all(func(f: Dictionary) -> bool: return f.move_context == "intervention" and f.root_action_id == 2 and f.direct_input_batch),"MW11 direct intervention facts typed")
 	check(old_facts.all(func(f: Dictionary) -> bool: return f.move_context == "equilibrium" and f.root_action_id == 1),"old fact ancestry remains its own scope")
+	var vector := {"profile":MergeSession.PROFILE,"initial_digest":CanonicalCodec.digest(session.initial),
+		"pass_state_digest":CanonicalCodec.digest(pass_session.mechanical_snapshot()),"pass_event_digest":pass_session.last_batch.event_digest,
+		"redirect_state_digest":CanonicalCodec.digest(session.mechanical_snapshot()),"redirect_event_digest":session.last_batch.event_digest,
+		"redirect_session_digest":CanonicalCodec.digest(session.snapshot())}
+	check(vector == JSON.parse_string(FileAccess.get_file_as_string("res://tests/game/goldens/merge-redirection-v1.json")),"reviewed automatic-versus-stronger-match checkpoint vector")
+	write_report("redirection-vector.json",vector)
 	_pure_rejections()
 	_accounting()
 	_repeated_and_remote()

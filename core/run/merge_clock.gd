@@ -7,7 +7,9 @@ var _previous_us := 0
 var _elapsed_us := 0
 var decisions: Array = []
 
-func _init(model: MergeSession) -> void: session = model
+func _init(model: MergeSession) -> void:
+	session = model; decisions = session.clock_notes
+	_elapsed_us = int((session.clock.tick*1000000+59)/60); _previous_us = Time.get_ticks_usec()
 
 func presented(now_us: int) -> bool:
 	if not session.presented(): return false

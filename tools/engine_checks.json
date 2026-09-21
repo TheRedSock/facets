@@ -1314,6 +1314,18 @@
         "completion": "CHECK_COMPLETE: test_merge_playback"
       },
       {
+        "name": "test_merge_replay",
+        "args": ["--headless", "--script", "res://tests/game/test_merge_replay.gd"],
+        "mode": "cpu",
+        "completion": "CHECK_COMPLETE: test_merge_replay"
+      },
+      {
+        "name": "test_merge_seams",
+        "args": ["--headless", "--script", "res://tests/game/test_merge_seams.gd"],
+        "mode": "cpu",
+        "completion": "CHECK_COMPLETE: test_merge_seams"
+      },
+      {
         "name": "test_p3_preparation",
         "args": ["--headless", "--script", "res://tests/game/test_p3_preparation.gd"],
         "mode": "cpu",
