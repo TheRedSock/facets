@@ -1473,6 +1473,18 @@
       "timeout_seconds": 300
     },
     {
+      "name": "test_p3_replay",
+      "args": ["--headless", "--script", "res://tests/game/test_p3_replay.gd"],
+      "mode": "cpu", "report_root_arg": true,
+      "completion": "CHECK_COMPLETE: test_p3_replay"
+    },
+    {
+      "name": "test_p3_flow",
+      "args": ["--headless", "--script", "res://tests/game/test_p3_flow.gd"],
+      "mode": "cpu", "report_root_arg": true, "timeout_seconds": 1800,
+      "completion": "CHECK_COMPLETE: test_p3_flow"
+    },
+    {
       "name": "test_p3_extraction",
       "args": ["--headless", "--script", "res://tests/game/test_p3_extraction.gd"],
       "mode": "cpu",

@@ -28,7 +28,7 @@ static func create(seed: int) -> Dictionary:
 	var run := ExpeditionState.new(); run.seed_value = seed; run.run_id = "expedition/"+str(seed)
 	var catalog_result := P3Content.catalog()
 	if not catalog_result.ok: return catalog_result
-	var room := RoomDefinition.compile(load("res://data/game/rooms/open_seam.tres"),catalog_result.catalog)
+	var room := P3Rooms.definition("open_seam",catalog_result.catalog)
 	if not room.ok: return room
 	var prepared := run.prepare_entry(room.definition)
 	if not prepared.ok: return prepared
@@ -110,9 +110,90 @@ func confirm_carry(ids: Array, expected_revision: int) -> Dictionary:
 	for id in ids:
 		if not id is String or not available.has(id): return StateAdmission.fail("carry_stale_or_duplicate")
 		chosen.append(available[id]); available.erase(id)
-	carry = chosen; phase = "reward_selection"
+	var pool := reward_pool()
+	if pool.size() < 3: return StateAdmission.fail("reward_pool_exhausted")
+	var streams: RngStreamBank = RngStreamBank.restored(state.streams.capture()).bank
+	var choices := streams.stream("rewards").shuffle(pool).slice(0,3)
+	carry = chosen; phase = "reward_selection"; offers = choices; state.streams = streams
 	_record({"kind":"confirm_carry","ids":ids.duplicate()})
 	return {"ok":true}
+
+func reward_pool() -> Array:
+	var result: Array = ["next_room_craft"]
+	for id in ["aquamarine","steady_hand","beryl_bridge"]:
+		if id not in current().settings: result.append(id)
+	result.sort()
+	return result
+
+func choose_reward(id: String, expected_revision: int, assets_ready: bool = true) -> Dictionary:
+	if phase != "reward_selection" or expected_revision != revision() or id not in offers: return StateAdmission.fail("reward_phase_or_choice")
+	if not assets_ready: return StateAdmission.fail("reward_assets")
+	selected_reward = id
+	if id == "next_room_craft": entry_bonus += 1
+	else: state.settings.append(id)
+	if room_index == 0:
+		route_cards = ["deep_seam","commission"]; phase = "route_selection"
+	else: phase = "next_room_ready"
+	_record({"kind":"choose_reward","id":id})
+	return {"ok":true}
+
+func choose_route(id: String, expected_revision: int) -> Dictionary:
+	if phase != "route_selection" or expected_revision != revision() or id not in route_cards: return StateAdmission.fail("route_phase_or_choice")
+	selected_route = id; phase = "next_room_ready"
+	_record({"kind":"choose_route","id":id})
+	return {"ok":true}
+
+func prepare_next(fail_at: String = "") -> Dictionary:
+	if phase != "next_room_ready": return StateAdmission.fail("entry_phase")
+	var catalog_result := P3Content.catalog(state.settings)
+	if not catalog_result.ok: return catalog_result
+	var room := P3Rooms.definition(selected_route if room_index == 0 else "vault",catalog_result.catalog)
+	if not room.ok: return room
+	return prepare_entry(room.definition,fail_at)
+
+static func restored(value: Variant, pause_timed: bool = true) -> Dictionary:
+	if not StateAdmission.exact(value,["mechanical","history","session","room_entry"]) or not value.mechanical is Dictionary or not value.history is Array or value.history.is_empty() or value.history.size() > 32 or not value.session is Dictionary or not value.room_entry is Dictionary: return StateAdmission.fail("expedition_schema")
+	if not value.mechanical.get("seed") is int or value.mechanical.get("schema") != 4 or value.mechanical.get("simulation") != P3Content.SIMULATION or value.mechanical.get("content") != P3Content.CONTENT: return StateAdmission.fail("expedition_version")
+	var original := CanonicalCodec.encode(value)
+	if original.is_empty(): return StateAdmission.fail("expedition_codec")
+	var created := create(value.mechanical.seed)
+	if not created.ok: return created
+	var run: ExpeditionState = created.run
+	if CanonicalCodec.encode(run.history[0]) != CanonicalCodec.encode(value.history[0]): return StateAdmission.fail("expedition_initial")
+	for index in range(1,value.history.size()):
+		var entry: Variant = value.history[index]
+		if not entry is Dictionary or not entry.get("command") is Dictionary or not entry.command.get("kind") is String: return StateAdmission.fail("expedition_command")
+		var command: Dictionary = entry.command; var result := {"ok":false}
+		match command.kind:
+			"begin_room": result = run.begin(run.revision())
+			"room_outcome":
+				if run.session == null or not command.get("resolution") is Dictionary: return StateAdmission.fail("expedition_outcome")
+				var restored_session := MergeReplay.restored(command.resolution,false)
+				if not restored_session.ok: return restored_session
+				if CanonicalCodec.encode(restored_session.session.initial) != CanonicalCodec.encode(run.session.initial): return StateAdmission.fail("expedition_room_initial")
+				run.session = restored_session.session; result = run.finish_room()
+			"confirm_carry":
+				if not command.get("ids") is Array: return StateAdmission.fail("expedition_carry")
+				result = run.confirm_carry(command.ids,run.revision())
+			"choose_reward":
+				if not command.get("id") is String: return StateAdmission.fail("expedition_reward")
+				result = run.choose_reward(command.id,run.revision())
+			"choose_route":
+				if not command.get("id") is String: return StateAdmission.fail("expedition_route")
+				result = run.choose_route(command.id,run.revision())
+			"enter_room": result = {"ok":run.publish_entry(run.prepare_next())}
+		if not result.ok: return StateAdmission.fail("expedition_rejected/"+command.kind)
+		if CanonicalCodec.encode(run.history.back()) != CanonicalCodec.encode(entry): return StateAdmission.fail("expedition_checkpoint")
+	if run.session != null:
+		var restored_session := MergeReplay.restored(value.session,false)
+		if not restored_session.ok: return restored_session
+		if CanonicalCodec.encode(restored_session.session.initial) != CanonicalCodec.encode(run.session.initial): return StateAdmission.fail("expedition_current_initial")
+		run.session = restored_session.session
+	elif not value.session.is_empty(): return StateAdmission.fail("expedition_unexpected_session")
+	if CanonicalCodec.encode(run.snapshot()) != original: return StateAdmission.fail("expedition_mismatch")
+	if pause_timed and run.session != null:
+		run.session = MergeReplay.restored(value.session,true).session
+	return {"ok":true,"run":run}
 
 func _record(command: Dictionary) -> void:
 	state.revision += 1; state.next_action += 1

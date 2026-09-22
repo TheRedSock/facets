@@ -7,6 +7,8 @@ var room_view: MergeRoomView
 var selected: Array = []
 var panel: VBoxContainer
 var error := ""
+var _generation := 0
+var _loading := false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -27,6 +29,7 @@ func label(text: String) -> void:
 	panel.add_child(control)
 
 func show_phase() -> void:
+	_generation += 1; _loading = false
 	for child in get_children(): remove_child(child); child.queue_free()
 	room_view = null
 	if run != null and run.phase == "playing":
@@ -46,11 +49,12 @@ func show_phase() -> void:
 	panel = VBoxContainer.new(); panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL; scroll.add_child(panel)
 	label("FACETS · Expedition")
 	button("Menu",func(): back_requested.emit(); queue_free())
-	if not error.is_empty(): label(error); button("Restart expedition",restart); return
+	if not error.is_empty(): label(error)
+	if run == null: button("Restart expedition",restart); return
 	label("Room %d · %s" % [run.room_index+1,run.current().room.definition.data.id.capitalize()])
 	match run.phase:
 		"briefing":
-			label("%d Work · %d Craft\nClear marked rubble. Carry up to two T4+ gems after completion.\nStaging: row 1, columns 4 and 5, in your selected order." % [run.state.moves_remaining,run.state.room.craft])
+			label("%d Work · %d Craft\n%s\nStaging: row 1, columns 4 and 5, in your selected order." % [run.state.moves_remaining,run.state.room.craft,objective_text(run.state.room.definition.data)])
 			button("Begin room",func():
 				var result := run.begin(run.revision())
 				if not result.ok: error = result.code
@@ -70,12 +74,62 @@ func show_phase() -> void:
 				var result := run.confirm_carry(selected,run.revision())
 				if not result.ok: error = result.code
 				show_phase())
-		"reward_selection": label("Carry confirmed. Reward and route flow is the next implementation batch.")
+		"reward_selection":
+			label("Choose one reward. These three offers are fixed for this room.")
+			for id in run.offers:
+				var preview := P3Content.preview(id,run.state.settings,run.carry)
+				label(preview.description)
+				if id == "aquamarine":
+					var text := ""
+					for item in preview.ladder: text += "T%d %s → %s   " % [item.tier,item.before.id,item.after.id]
+					label(text)
+					for converted in preview.carry: label("Carry %s: T%d %s → %s" % [converted.before.instance_id,converted.before.tier,converted.before.tile_id,converted.after.tile_id])
+				button("Choose "+str(id).capitalize(),choose_reward.bind(id))
+		"route_selection":
+			label("Choose the second room")
+			for id in run.route_cards:
+				var spec: Dictionary = P3Rooms.SPECS[id]
+				label("%s · %d Work · %d rubble\n%s" % [str(id).capitalize(),spec.work,spec.rubble.size(),objective_text(spec)])
+				button("Take "+str(id).capitalize(),func():
+					var result := run.choose_route(id,run.revision())
+					if not result.ok: error = result.code
+					show_phase())
+		"next_room_ready":
+			label("Carry keeps its IDs and tiers. Entry Craft: %d. The next room is prepared before this run changes." % mini(6,clampi(run.state.room.craft,1,3)+run.entry_bonus))
+			button("Enter next room",enter_next)
 		"results":
 			label("Expedition complete" if run.state.phase == "complete" else "Expedition ended · "+run.state.room.failure_reason)
+			if run.state.room.deliveries.any(func(d: Dictionary) -> bool: return d.tier >= 6): label("Distinction · delivered a T6+ gem")
 			button("Restart expedition",restart)
 	var first := panel.find_children("*","Button",true,false)
 	if not first.is_empty(): first[0].grab_focus()
+
+func objective_text(data: Dictionary) -> String:
+	if data.objective == "extract": return "Deliver %d T%d+ gems through the marked bottom outlets. Own-cell obstacles and locks block delivery; adjacent rubble blocks travel." % [data.demand,data.minimum_tier]
+	return "Clear all marked two-hit rubble. Match beside it or use Chisel."
+
+func choose_reward(id: String) -> void:
+	if _loading: return
+	_loading = true; var generation := _generation; var revision := run.revision()
+	var settings := run.state.settings.duplicate()
+	if id != "next_room_craft": settings.append(id)
+	var catalog: GameCatalog = P3Content.catalog(settings).catalog
+	get_node("/root/GemForge").request_required(catalog.roster(),func(ready: bool):
+		if not is_inside_tree() or generation != _generation: return
+		var result := run.choose_reward(id,revision,ready)
+		error = "" if result.ok else "Reward could not load: "+result.code
+		show_phase())
+
+func enter_next() -> void:
+	if _loading: return
+	var prepared := run.prepare_next()
+	if not prepared.ok: error = prepared.code; show_phase(); return
+	_loading = true; var generation := _generation
+	get_node("/root/GemForge").request_required(prepared.candidate.catalog.roster(),func(ready: bool):
+		if not is_inside_tree() or generation != _generation: return
+		if not run.publish_entry(prepared,ready): error = "Room assets could not load. Choices and carry were retained."
+		else: error = ""
+		show_phase())
 
 func restart() -> void:
 	var result := ExpeditionState.create(seed_value)

@@ -26,6 +26,13 @@ stops at demand and suppresses descendants. Merge windows retain outlet occupant
 `test_p3_extraction` executes the inherited P0 outlet fixture, gate/order/final-Work,
 rollback and complete replay witnesses. The view marks outlets and delivery tiers.
 
+P3.5: `P3Rooms` freezes all four authored definitions. Expedition selections,
+persisted reward offers, both routes and final results are implemented with
+complete external replay admission. Successful seed-7 command witnesses for
+both routes are frozen under `tests/fixtures/p3_expedition_v1`; seed-1 first-swap
+policy witnesses a real loss. `test_p3_flow` covers every reachable reward pair.
+These establish reachability and deterministic execution, not player balance.
+
 G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.
 Replay/restore and P3 seams are verified under the
