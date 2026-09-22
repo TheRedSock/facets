@@ -94,6 +94,9 @@ static func restored(data: Variant, require_stable: bool = true) -> Dictionary:
 		var room_result := RoomState.restored(data.room,state.catalog,state.board)
 		if not room_result.ok: return room_result
 		state.room = room_result.room
+		if state.room.definition.data.schema == 2 and not state.rules.is_p3(): return StateAdmission.fail("objective_profile")
+		for delivery in state.room.deliveries:
+			if delivery.removal_id >= state.next_removal: return StateAdmission.fail("delivery_allocator")
 		if state.moves_remaining + state.room.normal_turns != state.room.definition.data.work: return StateAdmission.fail("room_turn_budget")
 		if state.room.normal_turns > state.revision or state.room.recovery_count > state.revision or state.room.recovery_attempts > state.room.recovery_count * 64: return StateAdmission.fail("room_counter_consistency")
 	state.sync_adapters()

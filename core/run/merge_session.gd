@@ -150,7 +150,7 @@ func _advance(pair: Array[Vector2i], after_gravity: bool, fail_at: String) -> Di
 	var matched := MergeKernel.resolve_match(context,cursor,pair,fail_at)
 	if not matched.ok: return matched
 	if matched.matched:
-		if state.room.remaining(state.board) == 0:
+		if state.room.definition.data.objective == "clear_marked_rubble" and state.room.remaining(state.board) == 0:
 			state.phase = "complete"; phase = "complete"
 			context.emit("room_result",{"phase":"complete","reason":"","remaining":0})
 		else:
@@ -161,6 +161,15 @@ func _advance(pair: Array[Vector2i], after_gravity: bool, fail_at: String) -> Di
 		var gravity := MergeKernel.resolve_gravity(context,cursor,fail_at)
 		if not gravity.ok: return gravity
 		if gravity.moved:
+			phase = "gravity"
+			return {"ok":true,"kind":"gravity"}
+	if state.rules.is_p3():
+		var extracted := ExtractionResolver.collect(context)
+		if not extracted.ok: return extracted
+		if fail_at == "after_extraction": return StateAdmission.fail("injected_after_extraction")
+		if extracted.removed and state.room.remaining(state.board) > 0:
+			var gravity := MergeKernel.resolve_gravity(context,cursor,fail_at)
+			if not gravity.ok: return gravity
 			phase = "gravity"
 			return {"ok":true,"kind":"gravity"}
 	if not RoomBoundaryResolver.finish(context): return StateAdmission.fail(context.budget.error)

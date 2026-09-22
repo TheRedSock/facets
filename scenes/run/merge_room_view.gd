@@ -158,6 +158,8 @@ func _assets_loaded(loaded: bool, epoch: int) -> void:
 	if epoch != _epoch or not is_inside_tree(): return
 	if not loaded or not audio.last_error.is_empty(): _fail("Required room presentation could not load"); return
 	player.reset(session.state.board); board.visible = true; _begin.show(); _refresh()
+	board.outlet_cells = session.state.room.definition.data.get("outlets",[])
+	board.outlet_tier = session.state.room.definition.data.get("minimum_tier",0)
 	if external_session != null: begun = true; _begin.hide(); _refresh()
 
 func request_swap(a: Vector2i, b: Vector2i) -> void:
@@ -338,6 +340,9 @@ func _present(batch: Dictionary) -> void:
 	# Reduced gravity is only a fade, so the streaming owner supplies those cues.
 	if batch.kind != "gravity" or reduced_motion: player.present_fact_cues(batch.facts)
 	for fact in batch.facts:
+		if fact.type == "tile_extracted":
+			_notice = "Delivered T%d gem through an outlet" % fact.tier
+			audio.play("ui_accept")
 		if fact.type == "room_result":
 			board.presentation_cue.emit("room_success" if fact.phase == "complete" else "room_failure")
 			break
@@ -365,7 +370,8 @@ func _refresh() -> void:
 	if _status == null: return
 	if not error.is_empty(): _status.text = error; return
 	if session == null or not board.visible: _status.text = "Loading gems…"; return
-	_status.text = "Work %d   Craft %d\nMarked rubble: %d\n%s" % [session.state.moves_remaining,session.state.room.craft,session.state.room.remaining(session.state.board),
+	var objective := "Marked rubble" if session.state.room.definition.data.objective == "clear_marked_rubble" else "Deliveries remaining (T%d+)" % session.state.room.definition.data.minimum_tier
+	_status.text = "Work %d   Craft %d\n%s: %d\n%s" % [session.state.moves_remaining,session.state.room.craft,objective,session.state.room.remaining(session.state.board),
 		"Merge — swap now" if can_input() and session.phase == "merge_window" else session.phase.capitalize()]
 	_window_bar.visible = session.phase == "merge_window" and session.clock.started and not player.motion_busy
 	_window_bar.value = 20-session.clock.tick
@@ -375,6 +381,7 @@ func _refresh() -> void:
 	if not _notice.is_empty(): _status.text += "\n"+_notice
 	if session.state.rules.is_p3():
 		_status.text += "\n\nQuartz (T1–2): +1 Craft once per paid move.\nCorundum (T5/7): 2 rubble damage.\nBeryl (T6): promotes the lowest adjacent T1–3 once per paid move.\nTools suppress families and Craft."
+		if session.state.room.definition.data.objective == "extract": _status.text += "\n\nCyan outlets collect unlocked qualifying gems after all merges and falling settle. Each gem fills one delivery."
 	_cancel_button.disabled = _tool.is_empty() and input_buffer.pending.is_empty() and input_buffer.selected_id.is_empty()
 	if _buffer_overlay != null: _buffer_overlay.queue_redraw()
 	board.set_input_gate("merge",not can_input())

@@ -1473,6 +1473,12 @@
       "timeout_seconds": 300
     },
     {
+      "name": "test_p3_extraction",
+      "args": ["--headless", "--script", "res://tests/game/test_p3_extraction.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_p3_extraction"
+    },
+    {
       "name": "test_p3_view",
       "args": ["--headless", "--script", "res://tests/game/test_p3_view.gd"],
       "mode": "cpu",

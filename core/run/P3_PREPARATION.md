@@ -20,6 +20,12 @@ prepared entry without changing the prior run. Selection decisions retain
 global revisions/event/action IDs; room sessions start from that run identity.
 Reward/route transitions and whole-expedition external admission follow in P3.5.
 
+P3.4: typed schema-2 room objectives and unique delivery records are implemented
+for P3 only. `ExtractionResolver` runs at equilibrium before recovery/exhaustion,
+stops at demand and suppresses descendants. Merge windows retain outlet occupants.
+`test_p3_extraction` executes the inherited P0 outlet fixture, gate/order/final-Work,
+rollback and complete replay witnesses. The view marks outlets and delivery tiers.
+
 G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.
 Replay/restore and P3 seams are verified under the

@@ -28,6 +28,8 @@ var _action_player: ActionPlayer
 var target_mode := false
 var cursor_cell := Vector2i.ZERO
 var target_cells: Array[Vector2i] = []
+var outlet_cells: Array = []
+var outlet_tier := 0
 ## Optional streaming consumer owns motion retargeting during a layout change.
 var external_layout := Callable()
 ## Optional owner may collect gestures while action input stays locked.
@@ -122,6 +124,10 @@ func _ready() -> void:
 
 func _draw_room_overlay() -> void:
 	if _board_state == null: return
+	for pos in outlet_cells:
+		var rect := Rect2(_cell_to_pixel(pos)+Vector2(4,4),Vector2(_cell_size)-Vector2(8,8))
+		_overlay.draw_rect(rect,Color("80dbcf"),false,3)
+		_overlay.draw_string(get_theme_default_font(),rect.position+Vector2(5,19),"T%d+" % outlet_tier,HORIZONTAL_ALIGNMENT_LEFT,-1,16,Color("c5fff7"))
 	for obstacle in _board_state.obstacles.values():
 		var rect := Rect2(_cell_to_pixel(obstacle.cell),Vector2(_cell_size))
 		var center := rect.get_center()
