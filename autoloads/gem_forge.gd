@@ -54,6 +54,12 @@ func get_frame(tile_id:StringName,role:StringName,index:int)->AtlasTexture:
 
 ## Keep the declared upcoming pages alive until the next preparation. The run
 ## awaits readiness before displaying tiles or beginning its next presentation.
+## Navigation-safe request: this persistent service owns the coroutine, and a
+## freed scene's callback is never invoked. Callers still check their generation.
+func request_required(tile_ids:Array,completed:Callable)->void:
+	var prepared:bool=await prepare_required(tile_ids)
+	if completed.is_valid():completed.call(prepared)
+
 func prepare_required(tile_ids:Array,roles:Array[StringName]=GemPresentationIndex.REQUIRED_ROLES)->bool:
 	assets_ready=false
 	if not _ensure_open():return false

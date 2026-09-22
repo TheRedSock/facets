@@ -30,6 +30,8 @@ var cursor_cell := Vector2i.ZERO
 var target_cells: Array[Vector2i] = []
 ## Optional streaming consumer owns motion retargeting during a layout change.
 var external_layout := Callable()
+## Optional owner may collect gestures while action input stays locked.
+var external_input := Callable()
 var _overlay: Control
 var impact_cells: Array[Vector2i] = []
 var impact_alpha := 0.0:
@@ -1007,6 +1009,7 @@ func _start_upgrade_settle(view: TileView, duration: float) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if external_input.is_valid() and external_input.call(event): return
 	if _input_locked:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:

@@ -37,6 +37,18 @@ func _stop_decoration(id: String) -> void:
 	var view: TileView = live.get(id)
 	if view != null: view.scale = Vector2.ONE
 
+func input_views() -> Dictionary:
+	if _gravity_after != null:
+		if board._action_player != null and not board._action_player._views_by_id.is_empty():
+			return board._action_player._views_by_id
+		# Reduced gravity swaps the visible snapshot midway through its fade.
+		var views := {}
+		for pos in board._tile_views:
+			var tile := board._board_state.get_tile(pos)
+			if tile != null: views[tile.instance_id] = board._tile_views[pos]
+		return views
+	return live
+
 func begin_swap(command: RoomCommand, seconds: float = 0.15) -> void:
 	_swap = command; motion_busy = true; _swap_ends_us = Time.get_ticks_usec()+int(seconds*1000000)
 	for id in [command.data.origin_id,command.data.destination_id]: _stop_decoration(id)

@@ -1,5 +1,10 @@
 # P1 game checks
 
+Successor input feedback: `test_merge_input` and `test_merge_input_native` verify
+tool cancellation/affordability, committed sound cues, and one identity-following
+buffer during swaps/gravity, with normal admission, replay and lifecycle cleanup.
+The owning policy is in [the merge contract](../../core/run/MERGE_WINDOW_PREPARATION.md).
+
 Run the registered `test_game_rules`, `test_game_state`, `test_game_transaction`,
 `test_game_replay`, `test_game_playback` and `test_game_motion` stages through tools/check_engine.ps1
 after import. Every stage has a required completion marker and nonzero failure

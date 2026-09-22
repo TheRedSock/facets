@@ -61,6 +61,47 @@ func late_gravity() -> void:
 	view.queue_free(); await tree.process_frame; await tree.process_frame
 	check(worker == null or not worker._thread.is_started(),"late_gravity_worker_released")
 
+func buffer_gravity() -> void:
+	for reduced in [false,true]:
+		var view := MergeRoomView.new(); view.initial_override = InterventionFixture.create().to_dict()
+		view.automatic_clock = false; view.reduced_motion = reduced; tree.root.add_child(view)
+		if await loaded(view):
+			view.request_swap(Vector2i(3,3),Vector2i(2,3))
+			if await window(view,1):
+				# Reference preparation is outside performance measurements. Find an
+				# existing pair that remains a legal swap after this gravity packet.
+				var gravity := view.session.prepare()
+				var next: Dictionary = gravity.candidate.prepare()
+				var future: MergeSession = next.candidate
+				var pair: RoomCommand
+				var existing := view.player.live.keys()
+				for swap in ActionLegality.enumerate_legal_swaps(future.state.board):
+					var command := RoomCommand.exchange(future.state,swap.origin,swap.destination)
+					if command.data.origin_id in existing and command.data.destination_id in existing: pair = command; break
+				check(pair != null,"gravity_buffer_fixture_has_surviving_pair")
+				if pair != null:
+					view.session.tick(20)
+					var until := Time.get_ticks_msec()+5000
+					while view.player._gravity_after == null and Time.get_ticks_msec() < until: await tree.process_frame
+					check(view.can_buffer() and not view.can_input(),"gravity_collects_intent_without_early_admission")
+					var views := view.player.input_views()
+					check(views.has(pair.data.origin_id) and views.has(pair.data.destination_id),"gravity_hit_map_contains_selected_live_ids")
+					# Real mouse gesture addresses the currently drawn poses.
+					if views.has(pair.data.origin_id) and views.has(pair.data.destination_id):
+						var press := InputEventMouseButton.new(); press.button_index = MOUSE_BUTTON_LEFT; press.pressed = true
+						press.position = view.board._board_offset+views[pair.data.origin_id].position+Vector2(view.board._cell_size)*0.5
+						view.board._gui_input(press)
+						var drag := InputEventMouseMotion.new(); drag.button_mask = MOUSE_BUTTON_MASK_LEFT
+						drag.position = view.board._board_offset+views[pair.data.destination_id].position+Vector2(view.board._cell_size)*0.5
+						view.board._gui_input(drag)
+					check(not view.input_buffer.pending.is_empty() and view.session.move_id == 1,"gravity_gesture_is_only_buffered")
+					until = Time.get_ticks_msec()+5000
+					while (view.session.move_id < 2 or not view.can_input()) and Time.get_ticks_msec() < until: await tree.process_frame
+					check(view.session.move_id == 2 and view.input_buffer.pending.is_empty(),"gravity_buffer_admitted_once_at_next_opportunity")
+					check(view.session.context.classification == ("equilibrium" if future.phase == "ready" else "intervention"),"gravity_buffer_context_derived_at_admission")
+					check(MergeReplay.restored(view.session.snapshot()).ok,"gravity_buffer_replays_without_pending_intent")
+		view.queue_free(); await tree.process_frame; await tree.process_frame
+
 func run(scene_tree: SceneTree, report_path: String = "") -> Dictionary:
 	tree = scene_tree
 	var state := InterventionFixture.create(16,"automatic_chain")
@@ -154,5 +195,6 @@ func run(scene_tree: SceneTree, report_path: String = "") -> Dictionary:
 			check(menu.visible and not worker._thread.is_started(),"menu_navigation_shuts_down_worker")
 	menu.queue_free(); await tree.process_frame
 	await late_gravity()
+	await buffer_gravity()
 	await tree.create_timer(0.2).timeout
 	return {"observations":observations,"failures":failures}

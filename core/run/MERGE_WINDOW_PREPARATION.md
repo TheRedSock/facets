@@ -45,8 +45,10 @@ snapshot remains input authority throughout the window.
 Gravity hold is a resolver condition, not a blanket input-enabled flag. Input is
 open in `ready` and `merge_window`; it is closed while a newly accepted swap is
 reserved/resolving/animating, during gravity, loading, errors and terminal states.
-Every merge window accepts at most one command. This bounds the input buffer;
-the next merge opens another window, with no cap on repeated paid interventions.
+Every merge window accepts at most one command. A separate presentation buffer
+can hold one unadmitted gesture during swap/gravity motion; it grants no rule
+input authority. The next merge opens another window, with no cap on repeated
+paid interventions.
 
 ## Resolution cycle
 
@@ -126,6 +128,32 @@ gesture may be accepted before the promoted gem's decorative animation ends.
 Capture its window/revision/IDs at acceptance and recheck at the worker boundary.
 Visible acknowledgment marks the buffered/accepted move; it is not silently
 retargeted if a view is pooled or the screen is resized.
+
+User-approved amendment, 2026-09-22: during swap/gravity motion (including a
+late result's coherent hold), collect one completed mouse or keyboard swap.
+Hit-testing follows currently drawn live gem poses; ghosts are excluded. Store
+the two stable gem IDs, not their old cells or an already-priced command. A newer
+complete gesture replaces the pending pair. Cyan outlines/link and a status
+message indicate the buffer; Escape, right-click or Cancel clears it.
+
+At the first eligible merge window or equilibrium, resolve both IDs on the
+current committed board and run ordinary full command admission exactly once.
+Missing gems, nonadjacency, locks, invalid matches or insufficient resources
+cancel visibly and spend nothing; never retry silently at a later window or
+substitute replacement gems. A legal buffer uses the full normal swap animation
+and a new calculation deadline starting at actual admission. Its normal cost
+and equilibrium/intervention classification derive from that phase. Queue-time
+acknowledgment and admission-time feedback are separate telemetry events.
+
+Incomplete gestures do not reserve future input. Focus loss, pause, terminal
+state, error, restart, menu and restore discard unadmitted intent. Snapshots and
+replays retain the resulting admitted command/tick, not a presentation gesture
+that has spent nothing; restore cannot unexpectedly execute an old buffer.
+This adapter amendment leaves simulation/session/replay wire identities and
+original profiles unchanged. Legacy P2/trial controls do not acquire buffering.
+Registered `test_merge_input` and `test_merge_input_native` cover the extension;
+packaged release witnesses additionally exercise gravity buffering in both
+normal and reduced motion.
 
 All simultaneous disjoint match components form one published merge batch and
 one board-wide window. Pending automatic matches are rescanned after intervention;

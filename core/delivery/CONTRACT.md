@@ -13,6 +13,10 @@ game state from asset names. The default catalog is `data/presentation/default.t
 GemForge opens metadata transactionally with `open_library(path, catalog)`.
 Failed admission preserves the previous library. `prepare_required(tiles, roles)`
 validates and retains the declared upcoming page set before the run shows tiles.
+Navigation-sensitive consumers can use `request_required(tiles, callback)`:
+the persistent service owns loading and calls only a still-valid callback.
+The consumer checks its generation before publishing; no coroutine is left
+suspended on a freed room during restart/loading cancellation.
 Run startup includes the selected ladder and reachable upgrades. Missing packs,
 roles, corrupt pages and memory admission failures produce loading errors. There
 is no production substitute image; synthetic assets exist only in test fixtures.

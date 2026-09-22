@@ -33,6 +33,8 @@ var _tool_buttons: Array[Button] = []
 var _begin: Button
 var _cancel_button: Button
 var _notice := ""
+var input_buffer := MergeInputBuffer.new()
+var _buffer_overlay: Control
 var _window_bar: ProgressBar
 
 func _ready() -> void:
@@ -50,7 +52,9 @@ func _ready() -> void:
 	var reduced := CheckButton.new(); reduced.text = "Reduced motion"
 	reduced.button_pressed = reduced_motion; bar.add_child(reduced)
 	reduced.toggled.connect(func(value: bool): reduced_motion = value; player.reduced_motion = value)
-	_button(bar,"Pause / resume",func(): clock_adapter.pause(not session.clock.paused,"manual") if clock_adapter != null else false)
+	_button(bar,"Pause / resume",func():
+		input_buffer.clear()
+		if clock_adapter != null: clock_adapter.pause(not session.clock.paused,"manual"))
 	_button(bar,"Pass window",func(): clock_adapter.pass_now() if clock_adapter != null else false)
 	_button(bar,"Sound / mute",func(): audio.set_muted(not RoomAudio.muted))
 	_cancel_button = _button(bar,"Cancel selection",_cancel_selection)
@@ -75,6 +79,14 @@ func _ready() -> void:
 	audio = RoomAudio.new(); add_child(audio); board.presentation_cue.connect(audio.play)
 	board.swap_requested.connect(request_swap); board.cell_pressed.connect(_target)
 	board.selection_canceled.connect(_cancel_selection)
+	board.external_input = _buffer_input
+	_buffer_overlay = Control.new(); _buffer_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	board.add_child(_buffer_overlay)
+	_buffer_overlay.draw.connect(func(): input_buffer.draw(_buffer_overlay,board,player.input_views()))
+	input_buffer.queued.connect(func():
+		_notice = "Swap buffered · will try next opportunity"
+		telemetry.append({"kind":"buffer_queued","us":Time.get_ticks_usec()})
+		_refresh())
 	board.delivery_failed.connect(func(message: String): _fail(message))
 	player = MergePlayer.new(board); player.reduced_motion = reduced_motion
 	player.motion_finished.connect(_motion_done)
@@ -94,6 +106,7 @@ func restart() -> void:
 	begun = false; error = ""; queue.clear(); _window_handoff = false; _motion_deadline = 0; _waiting_since = 0
 	_tool = ""; board.target_mode = false; board.set_input_gate("merge",true)
 	_notice = ""; board.set_targets([])
+	input_buffer.clear()
 	if executor != null and not executor.shutdown(): _fail("Worker shutdown timed out"); return
 	player.cancel(); audio.cancel()
 	session = MergeSession.new()
@@ -106,7 +119,12 @@ func restart() -> void:
 	executor = MergeExecutor.new(session); clock_adapter = MergeClock.new(session); clock_adapter.automatic = automatic_clock
 	if practice_mode: clock_adapter.automatic = false
 	board.visible = false; _refresh()
-	var loaded: bool = await get_node("/root/GemForge").prepare_required(session.state.catalog.roster())
+	# Loading is owned by the persistent service, not a suspended room method
+	# that can be abandoned by immediate restart/navigation.
+	var roster := session.state.catalog.roster()
+	get_node("/root/GemForge").request_required(roster,_assets_loaded.bind(epoch))
+
+func _assets_loaded(loaded: bool, epoch: int) -> void:
 	if epoch != _epoch or not is_inside_tree(): return
 	if not loaded or not audio.last_error.is_empty(): _fail("Required room presentation could not load"); return
 	player.reset(session.state.board); board.visible = true; _begin.show(); _refresh()
@@ -114,6 +132,7 @@ func restart() -> void:
 func request_swap(a: Vector2i, b: Vector2i) -> void:
 	var received := Time.get_ticks_usec()
 	if not can_input(): return
+	input_buffer.clear()
 	clock_adapter.advance(received)
 	var command := RoomCommand.exchange(session.state,a,b)
 	var result := executor.submit(command)
@@ -134,6 +153,7 @@ func restore_session(value: Dictionary) -> bool:
 	if not admitted.ok: return false
 	if executor != null and not executor.shutdown(): return false
 	_epoch += 1; queue.clear(); _window_handoff = false; _motion_deadline = 0; _waiting_since = 0
+	input_buffer.clear(); _notice = ""; board.set_targets([])
 	session = admitted.session; clock_adapter = MergeClock.new(session); clock_adapter.automatic = automatic_clock
 	if practice_mode: clock_adapter.automatic = false
 	executor = MergeExecutor.new(session); player.reset(session.state.board)
@@ -162,6 +182,7 @@ func _select_tool(kind: String) -> void:
 	_tool = kind; board.target_mode = true; board.grab_focus(); _refresh()
 
 func _cancel_selection() -> void:
+	input_buffer.clear()
 	_tool = ""; _tool_origin = Vector2i(-1,-1); board.target_mode = false
 	board._deselect(); board.set_targets([]); _notice = ""; _refresh()
 
@@ -189,10 +210,40 @@ func _target(pos: Vector2i) -> void:
 func can_input() -> bool:
 	return begun and application_focused and error.is_empty() and session != null and session.phase in ["ready","merge_window"] and session.reservation.is_empty() and queue.is_empty() and not player.motion_busy and not _window_handoff and not session.clock.paused and (session.phase == "ready" or (session.clock.started and session.clock.tick < 20))
 
+func can_buffer() -> bool:
+	return begun and application_focused and error.is_empty() and session != null and session.phase not in ["complete","failed","diagnostic"] and not session.clock.paused and _tool.is_empty() and (player.motion_busy or _motion_deadline > 0 or _window_handoff)
+
+func _buffer_input(event: InputEvent) -> bool:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_cancel_selection(); board.accept_event(); return true
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		_cancel_selection(); board.accept_event(); return true
+	if not can_buffer(): return false
+	input_buffer.handle(event,board,player.input_views()); _buffer_overlay.queue_redraw()
+	return true
+
+func _consume_buffer() -> void:
+	if not can_input(): return
+	var buffered := input_buffer.take(session.state.board)
+	if buffered.is_empty(): return
+	if not buffered.ok:
+		_notice = "Buffered swap cancelled — a selected gem disappeared"
+		audio.play("ui_reject"); telemetry.append({"kind":"buffer_cancelled","code":buffered.code}); return
+	var command := RoomCommand.exchange(session.state,buffered.origin,buffered.destination)
+	var legal := session.quote(command)
+	if not legal.ok:
+		_notice = "Buffered swap cancelled — no longer a legal move"
+		audio.play("ui_reject"); telemetry.append({"kind":"buffer_cancelled","code":legal.code}); return
+	telemetry.append({"kind":"buffer_admitted","queued_us":buffered.intent.queued_us,"us":Time.get_ticks_usec(),"window":session.window_id})
+	request_swap(buffered.origin,buffered.destination)
+
 func _process(delta: float) -> void:
 	if session == null or executor == null or not begun or not error.is_empty(): return
 	var began := Time.get_ticks_usec(); frame_us.append(int(delta*1000000))
 	clock_adapter.advance(began)
+	if session.clock.paused or session.phase in ["complete","failed","diagnostic"]:
+		if not input_buffer.pending.is_empty(): _notice = "Buffered swap cancelled"
+		input_buffer.clear()
 	var result := executor.poll()
 	if not result.is_empty():
 		if not result.ok: _fail(result.code); return
@@ -216,6 +267,7 @@ func _process(delta: float) -> void:
 	elif queue.is_empty() and _motion_deadline > 0 and began >= _motion_deadline:
 		if not session.reservation.is_empty(): _starved("command",began)
 		elif session.phase == "gravity" and executor.busy(): _starved("gravity",began)
+	_consume_buffer()
 	if session.phase == "merge_window": executor.prepare_default()
 	_refresh()
 	telemetry.append({"kind":"main_frame","us":Time.get_ticks_usec()-began})
@@ -267,6 +319,7 @@ func _start_window() -> void:
 		session.clock_notes.append({"kind":"assist","reason":"practice","window":session.window_id,"tick":0})
 	if not application_focused: clock_adapter.pause(true,"focus")
 	telemetry.append({"kind":"window_presented","window":session.window_id,"us":Time.get_ticks_usec()})
+	_consume_buffer()
 	_refresh()
 	_record_main(Time.get_ticks_usec()-began)
 
@@ -284,13 +337,15 @@ func _refresh() -> void:
 	elif practice_mode: _status.text += "\nPractice — no deadline. Use Pass window to continue.\n\nFirst swap: row 4, column 4 left. Then move the upgraded gem left again. Restart and pass the first window to compare."
 	if not _tool.is_empty(): _status.text += "\nChoose a tool target · Esc or Cancel to return to swaps"
 	if not _notice.is_empty(): _status.text += "\n"+_notice
-	_cancel_button.disabled = _tool.is_empty()
+	_cancel_button.disabled = _tool.is_empty() and input_buffer.pending.is_empty() and input_buffer.selected_id.is_empty()
+	if _buffer_overlay != null: _buffer_overlay.queue_redraw()
 	board.set_input_gate("merge",not can_input())
 	for button in _tool_buttons:
 		var reason := _tool_reason(button.get_meta("kind"))
 		button.disabled = not reason.is_empty(); button.tooltip_text = reason
 
 func _fail(message: String) -> void:
+	input_buffer.clear()
 	error = message; begun = false
 	if executor != null: executor.cancel()
 	if player != null and session != null: player.reset(session.state.board)
@@ -299,6 +354,7 @@ func _fail(message: String) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		input_buffer.clear(); _notice = ""
 		application_focused = false
 		if clock_adapter != null: clock_adapter.pause(true,"focus")
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN: application_focused = true
