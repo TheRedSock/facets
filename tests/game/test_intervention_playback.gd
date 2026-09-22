@@ -51,6 +51,10 @@ func _run() -> void:
 		check(player._tweens.is_empty() and player._views_by_id.is_empty(),"navigation cancels all prefix playback awaits")
 	Engine.max_fps = 120; Engine.time_scale = 1
 	# Audio uses real time even while this test accelerates animation by 40x.
-	# Let the mixer drain stopped reduced-motion voices before engine shutdown.
-	await create_timer(0.5).timeout
+	# The current frame still carries its accelerated delta after time_scale is
+	# reset; a SceneTreeTimer created here can expire immediately. Drain against
+	# monotonic wall time so stopped voices reach mixer cleanup before shutdown.
+	var drain_began := Time.get_ticks_usec()
+	while Time.get_ticks_usec()-drain_began < 500000: await process_frame
+	check(Time.get_ticks_usec()-drain_began >= 500000,"real half-second mixer drain despite prior accelerated frame delta")
 	finish("test_intervention_playback")
