@@ -93,6 +93,12 @@ mixed near-expiry inputs. Give policy decisions a separate RNG stream. Cover
 the existing P1/P2 boards and fixed mandatory semantic witnesses, including
 recovery/tool/objective cases that ordinary policy runs might never reach.
 Record counts by command and transition; a category with no samples is unmeasured.
+Native gesture attempts must be attributed to explicit admission or rejection.
+Only an admitted swap can start a swap-feedback sample; a rejected near-expiry
+gesture cannot be timed against later gravity movement. Retain rejection codes
+and attempted/accepted/expired counts, and fail unexpected rejection. Drain
+completed main-thread frame records throughout a probe so ordinary-room bounded
+telemetry cannot silently truncate its performance population.
 Report p50/p95/p99/max, nearest-rank quantiles, raw intervals and every failed seed.
 Warm-up is explicit and excludes no gameplay interval after the declared start.
 

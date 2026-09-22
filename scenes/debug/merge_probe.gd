@@ -209,6 +209,16 @@ func _loaded(view: MergeRoomView) -> bool:
 		if view.board != null and view.board.visible and view.player.live.size() > 0: return true
 	failures.append("load_timeout"); return false
 
+static func observed_gesture(view: MergeRoomView, command: RoomCommand, keyboard: bool) -> Dictionary:
+	var first := view.telemetry.size()
+	var received := Time.get_ticks_usec()
+	gesture(view,command,keyboard)
+	for event in view.telemetry.slice(first):
+		if event.kind == "input": return {"accepted":true,"received_us":received}
+		if event.kind == "rejected": return {"accepted":false,"code":event.code}
+	if command.data.kind != "swap" and not view.session.reservation.is_empty(): return {"accepted":true,"received_us":received}
+	return {"accepted":false,"code":"gesture_not_admitted"}
+
 static func gesture(view: MergeRoomView, command: RoomCommand, keyboard: bool) -> void:
 	if command.data.kind != "swap":
 		view._tool = command.data.kind
@@ -248,11 +258,17 @@ func _native(report: Dictionary) -> void:
 		var last_window := -1; var selected: RoomCommand; var next_tick := 0
 		var watched: TileView; var old_position := Vector2.ZERO; var receipt := 0
 		var metric_index := 0; var presented_index := 0; var input_count := 0
+		var accepted_count := 0; var expired_count := 0
 		var available := {}; var previous := Time.get_ticks_usec()
 		var until := Time.get_ticks_msec()+180000
 		while Time.get_ticks_msec() < until:
 			await RenderingServer.frame_post_draw
 			var now := Time.get_ticks_usec(); frames.append(now-previous)
+			# Drain completed frames before the ordinary room's bounded telemetry
+			# evicts them. The current frame can still receive post-draw callbacks.
+			for frame in view.main_frame_us.keys():
+				if frame < Engine.get_process_frames():
+					main_times.append(view.main_frame_us[frame]); view.main_frame_us.erase(frame)
 			if now-previous > 50000:
 				print("NATIVE_STALL: ",now-previous," now=",now," render=",now-_pre_render_us," phase=",view.session.phase," tick=",view.session.clock.tick," main=",view.main_frame_us.get(Engine.get_process_frames(),0)," focus=",DisplayServer.window_is_focused()," default=",not view.executor.default_result.is_empty()," trace=",_process_trace)
 			previous = now
@@ -287,15 +303,29 @@ func _native(report: Dictionary) -> void:
 			else: selected = choose(view.session,policy,rng)
 			if selected == null: failures.append(policy+"/no_action"); break
 			if Time.get_ticks_usec()-policy_began > 10000: print("SLOW_POLICY: ",Time.get_ticks_usec()-policy_began)
+			if receipt != 0: failures.append(policy+"/feedback_superseded")
+			receipt = 0
 			if selected.data.kind == "swap":
-				watched = view.player.live.get(selected.data.origin_id); old_position = watched.position; receipt = Time.get_ticks_usec()
-			gesture(view,selected,input_count%2 == 0); input_count += 1; selected = null
+				watched = view.player.live.get(selected.data.origin_id); old_position = watched.position
+			var attempt := observed_gesture(view,selected,input_count%2 == 0); input_count += 1
+			if attempt.accepted:
+				accepted_count += 1
+				if selected.data.kind == "swap": receipt = attempt.received_us
+			else:
+				samples.append({"kind":"rejected_gesture","policy":policy,"code":attempt.code})
+				# A frame/policy step can cross expiry after observing tick 19.
+				# Rejection is not a swap whose feedback can be timed against
+				# unrelated later gravity movement. Keep every rejected attempt.
+				if attempt.code == "window_closed": expired_count += 1
+				else: failures.append(policy+"/gesture/"+attempt.code)
+			selected = null
 		if receipt != 0: failures.append(policy+"/missing_visible_feedback")
 		if view.session.phase not in ["complete","failed"]: failures.append(policy+"/nonterminal")
 		if view.starvation != 0: failures.append(policy+"/starvation/"+str(view.starvation))
 		if int(forge.delivery_report().page_loads) != warm_loads: failures.append(policy+"/cold_load")
 		main_times.append_array(view.main_frame_us.values())
 		native_rooms.append({"policy":policy,"phase":view.session.phase,"starvation":view.starvation,"inputs":input_count,
+			"accepted_inputs":accepted_count,"expired_inputs":expired_count,
 			"assisted":view.session.clock.assisted,"digest":CanonicalCodec.digest(view.session.mechanical_snapshot()),
 			"complete_snapshot_encoded_bytes":CanonicalCodec.encode(view.session.snapshot()).size()})
 		var replayed := MergeReplay.restored(view.session.snapshot(),false)

@@ -44,6 +44,7 @@ func _run() -> void:
 			check(cues == ["obstacle_hit","obstacle_broken"],"simultaneous rubble cues coalesce")
 		view.queue_free(); await process_frame; await process_frame
 	await _buffer_cases(cases)
+	await _probe_receipts(cases)
 	await cases.buffer_gravity()
 	for observation in cases.observations: check(observation.passed,observation.case)
 	await create_timer(0.5).timeout
@@ -57,6 +58,27 @@ func _drag_ids(view: MergeRoomView, first: String, second: String) -> void:
 	var motion := InputEventMouseMotion.new(); motion.button_mask = MOUSE_BUTTON_MASK_LEFT
 	motion.position = view.board._board_offset+views[second].position+Vector2(view.board._cell_size)*0.5
 	view.board._gui_input(motion)
+
+func _probe_receipts(cases: MergeReleaseCases) -> void:
+	var initial := InterventionFixture.create(16,"automatic_chain")
+	initial.board.set_tile(Vector2i(1,2),initial.catalog.create_tile(2))
+	var view := MergeRoomView.new(); view.initial_override = initial.to_dict()
+	view.automatic_clock = false; root.add_child(view)
+	if await cases.loaded(view):
+		var command := RoomCommand.exchange(view.session.state,Vector2i(3,3),Vector2i(2,3))
+		var accepted := MergeProbe.observed_gesture(view,command,true)
+		check(accepted.accepted and accepted.received_us > 0 and view.player.motion_busy,"release probe times an admitted gesture's own swap")
+		if await cases.window(view,1):
+			command = RoomCommand.exchange(view.session.state,Vector2i(2,3),Vector2i(1,3))
+			view.session.tick(19)
+			view.clock_adapter.automatic = true
+			view.clock_adapter._elapsed_us = 333334
+			view.clock_adapter._previous_us = Time.get_ticks_usec()
+			var work := view.session.state.moves_remaining
+			var rejected := MergeProbe.observed_gesture(view,command,false)
+			check(not rejected.accepted and rejected.code == "window_closed" and not rejected.has("received_us"),"expired gesture cannot be timed against later unrelated movement")
+			check(view.session.reservation.is_empty() and not view.player.motion_busy and view.session.state.moves_remaining == work,"expired probe gesture starts no swap and spends nothing")
+	view.queue_free(); await process_frame; await process_frame
 
 func _buffer_cases(cases: MergeReleaseCases) -> void:
 	for reduced in [false,true]:
