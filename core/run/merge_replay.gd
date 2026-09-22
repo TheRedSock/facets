@@ -27,7 +27,9 @@ static func restored(value: Variant, pause_timed: bool = true) -> Dictionary:
 	if original.is_empty(): return StateAdmission.fail("merge_snapshot_codec")
 	var session := MergeSession.new()
 	if not session.start(value.initial): return StateAdmission.fail("merge_snapshot_initial")
-	if not value.mechanical.get("modifiers") is Dictionary or not session.configure_modifiers(value.mechanical.modifiers): return StateAdmission.fail("merge_snapshot_modifiers")
+	if session.state.rules.is_p3() and session.phase == "gravity":
+		if value.mechanical.get("modifiers") != MergeModifiers.DEFAULTS: return StateAdmission.fail("merge_snapshot_modifiers")
+	elif not value.mechanical.get("modifiers") is Dictionary or not session.configure_modifiers(value.mechanical.modifiers): return StateAdmission.fail("merge_snapshot_modifiers")
 	for entry in value.history:
 		if not StateAdmission.exact(entry,["command","window","tick","sequence","assisted","state_digest","event_digest","clock","record_digest"]): return StateAdmission.fail("merge_replay_entry")
 		if not entry.command is Dictionary or not entry.window is int or entry.window != session.window_id or not _clock_valid(entry.clock,session.clock): return StateAdmission.fail("merge_replay_clock")

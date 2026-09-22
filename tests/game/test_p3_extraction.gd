@@ -51,17 +51,26 @@ func _run() -> void:
 		var integrated := extraction(InterventionFixture.create(1),[Vector2i(0,5)],5,demand)
 		integrated.board.set_tile(Vector2i(0,5),integrated.catalog.create_tile(5))
 		var session := MergeSession.new(); check(session.start(integrated.to_dict()),"integrated extraction starts")
-		check(session.apply(InterventionFixture.command(session.state)).ok,"last paid swap commits before extraction")
-		check(session.phase == "merge_window" and session.state.room.deliveries.is_empty(),"outlets never collect in intervention window")
+		check(session.phase == "gravity" and not session.quote(InterventionFixture.command(session.state)).ok,"Begin blocks paid input while opening extraction is pending")
 		for step in 150:
-			if session.phase in ["complete","failed"]: break
+			if session.phase in ["complete","failed","ready"]: break
 			if session.phase == "merge_window": session.presented(); session.tick(20)
 			var before := CanonicalCodec.encode(session.snapshot())
 			var rejected := session.prepare(null,"after_extraction")
 			if not rejected.ok: check(CanonicalCodec.encode(session.snapshot()) == before,"extraction failure rolls back unpublished batch")
 			var result := session.apply(); check(result.ok,"extraction continuation commits")
 			if not result.ok: break
-		check(session.phase == ("complete" if demand == 1 else "failed"),"demand determines final Work result")
+		check(session.phase == ("complete" if demand == 1 else "ready") and session.state.moves_remaining == 1,"opening collection is free and demand determines completion")
 		check(session.state.room.deliveries.size() == 1,"one unique integrated delivery")
 		check(MergeReplay.restored(session.snapshot(),false).ok,"full extraction replay/restore")
+	var window_state := extraction(InterventionFixture.create(),[Vector2i(2,3)],5,1)
+	for cell in window_state.board.all_cells():
+		var tile := window_state.board.get_tile(cell)
+		if tile != null and tile.tier in [1,4]:
+			var replacement := window_state.catalog.create_tile(4 if tile.tier == 1 else 1)
+			replacement.instance_id = tile.instance_id; window_state.board.set_tile(cell,replacement)
+	var window := MergeSession.new(); check(window.start(window_state.to_dict()),"promotion-outlet fixture starts without eligible opening")
+	check(window.apply(InterventionFixture.command(window.state)).ok,"outlet promotion commits")
+	check(window.phase == "merge_window" and ExtractionResolver.pending(window.state) and window.state.room.deliveries.is_empty(),"qualifying outlet gem waits through intervention window")
+	check(MergeReplay.restored(window.snapshot(),false).ok,"pending outlet window restores exactly")
 	finish("test_p3_extraction")

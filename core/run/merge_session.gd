@@ -40,6 +40,11 @@ func start(value: Dictionary) -> bool:
 	modifiers = GameValue.freeze(MergeModifiers.DEFAULTS)
 	reservation = {}
 	clock_notes = []; failure = {}
+	if state.rules.is_p3() and ExtractionResolver.pending(state):
+		# Begin has admitted this opening. Resolve its free, suppressed stable
+		# boundary before granting input; no paid Work or setup family rewards.
+		context = MergeMoveContext.new(state,RoomCommand.begin(state.revision),move_id,"equilibrium")
+		phase = "gravity"
 	return true
 
 func configure_modifiers(value: Dictionary) -> bool:

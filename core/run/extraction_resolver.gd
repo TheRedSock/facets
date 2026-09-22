@@ -1,6 +1,13 @@
 class_name ExtractionResolver
 extends RefCounted
 ## Called only after matches and physical motion settle, never at a window.
+static func pending(state: RunState) -> bool:
+	if state.room.definition.data.objective != "extract" or state.room.remaining(state.board) == 0: return false
+	for cell in state.room.definition.data.outlets:
+		var tile := state.board.get_tile(cell)
+		if tile != null and tile.tier >= state.room.definition.data.minimum_tier and state.board.obstacle_at(cell).is_empty() and state.board.get_cell(cell).lock.is_empty(): return true
+	return false
+
 static func collect(context: MergeMoveContext) -> Dictionary:
 	var state := context.state; var room := state.room
 	if room.definition.data.objective != "extract": return {"ok":true,"removed":false}

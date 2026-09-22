@@ -1,7 +1,9 @@
 extends "res://tests/game/game_test.gd"
 func _initialize() -> void: _run.call_deferred()
 func _run() -> void:
-	for route in ["deep_seam","commission"]:
+	var historical := CanonicalCodec.decode(FileAccess.get_file_as_bytes("res://tests/fixtures/p3_expedition_v1/commission.fac"))
+	check(historical.ok and not ExpeditionState.restored(historical.value,false).ok,"pre-decision commission reference is explicitly incompatible")
+	for route in ["deep_seam","commission-opening"]:
 		var decoded := CanonicalCodec.decode(FileAccess.get_file_as_bytes("res://tests/fixtures/p3_expedition_v1/"+route+".fac"))
 		check(decoded.ok,"canonical expedition reference decodes")
 		if not decoded.ok: continue

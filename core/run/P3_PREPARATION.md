@@ -187,7 +187,10 @@ demand completes, before any further extraction/refill/hazard/recovery. Otherwis
 settle/refill/match under inherited suppression within the same action and limits,
 then evaluate again. Extraction is checked after all pending merges and physical
 motion settle, before equilibrium input/recovery or Work-exhaustion loss. It does
-not remove a gem during an intervention window. Clear-rubble completion is checked
+not remove a gem during an intervention window. Extraction also runs
+at the stable boundary on Begin for qualifying opening occupants, before the first
+paid input (user-confirmed 2026-09-22). This free setup scope suppresses earnings.
+Clear-rubble completion is checked
 after a committed merge and may stop before gravity. A completed objective wins
 on final Work. Completion immediately closes input and establishes the immutable
 room outcome for carry selection, even if unused holes remain. Extraction is not
