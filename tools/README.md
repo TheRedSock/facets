@@ -628,7 +628,8 @@ pass does not close the default profile's timing gate.
 
 For unattended Windows merge measurements use
 `tools/game/check_merge_environment.ps1 -Package <build> -Output <fresh-report>`.
-It invokes the actual native release probe with a temporary thread-scoped
+It invokes the actual release probe (native by default; `-Mode cpu` for the
+full corpus, with optional `-Seeds`/`-Repetitions`) with a temporary thread-scoped
 display/system keep-awake request and records 100 ms idle/input-desktop/focus/
 screensaver observations. The request is released in `finally`; it changes no
 power plan or user input. `-AllowIdle` is an explicit comparison with no request,

@@ -1,7 +1,7 @@
 # CPU completion observer and readiness boundaries — 2026-09-22
 
-This correction is implemented and focused checks pass; full release acceptance
-is pending. No thresholds, simulation rules, animations or historical results
+This correction and the full normal CPU corpus pass; final stress/native/control
+and delivery acceptance is pending. No thresholds, simulation rules, animations or historical results
 have been changed.
 
 ## Evidence and correction
@@ -49,3 +49,39 @@ scope stricter; mechanical/replay identities and animation durations are unchang
 
 Full frozen release corpus, stress and final native confirmation remain required
 before this correction can establish G6 readiness.
+
+## Full normal release corpus
+
+Runtime checkpoint `7156cc9`; immutable package `generated/desktop/merge-readiness-r6`;
+build manifest `artifacts/package-build/20260922-104131-9366/report.json`.
+The same-build smoke and former-polling control both passed (command p95
+24.154 and 22.262 ms respectively). This pair does not establish a speedup.
+
+`r6-cpu-full/release/run.json` passed all frozen normal targets across three
+repetitions × 100 seeds × five policies: **1,500 rooms, 51,873 batches**, with
+zero deadline misses or engine errors. `r6-cpu-full-audit.json` independently
+recalculates every raw deadline, count and nearest-rank latency percentile and
+matches all final mechanical digests, phases, batch and intervention counts to
+the preserved full reference in `g6-cpu-final-r1`. Scheduling cancellation counts
+are not mechanical identity and are deliberately not compared as gameplay.
+
+| Normal r6 measurement | p95 | Maximum |
+|---|---:|---:|
+| Command ready latency | 20.803 ms | 54.628 ms |
+| Command ready / available interval | 0.138687 | 0.364187 |
+| Gravity follower ready latency | 23.916 ms | 54.766 ms |
+| Gravity ready / available interval | 0.063575 | 0.164181 |
+| Default ready latency | 25.121 ms | 56.193 ms |
+| Main scheduling per operation | 2.057 ms | 5.571 ms |
+| Command completion to publication | 0.856 ms | 2.303 ms |
+
+Main per-operation figures are not native per-frame totals. Whole-process peak
+working set was 412,200,960 bytes; sampled private peak was 305,123,328 bytes,
+including retained raw probe records, worker/snapshots and engine allocations.
+The temporary awake request acquired and released successfully; 9,454 environment
+samples are retained. No global power preference changed.
+
+The fresh normal-profile CPU margin failure is closed on this measured package.
+Full r6 2× stress, final native measurements, integrated affected controls and
+new delivery verification remain pending. Prior reports and failed gates remain
+historical evidence; P3 readiness is not yet declared.

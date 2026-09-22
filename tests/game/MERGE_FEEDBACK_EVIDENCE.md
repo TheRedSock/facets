@@ -1,5 +1,9 @@
 # Input feedback and stall investigation — 2026-09-22
 
+Later [observer/boundary correction evidence](MERGE_HEADROOM_EVIDENCE.md) records
+a passing full normal CPU corpus. The measurements below remain scoped to the
+feedback builds; final r6 stress/native/control and delivery checks are pending.
+
 The requested tool/sound fixes and one pending swap are implemented and verified.
 The second-long stall is strongly associated with the overnight screen-off power
 state; its exact internal blocking operation is not proven. Full P3 readiness

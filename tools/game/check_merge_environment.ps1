@@ -1,6 +1,8 @@
 param(
     [Parameter(Mandatory)][string]$Package,
     [Parameter(Mandatory)][string]$Output,
+    [ValidateSet('cpu','native','characterization')][string]$Mode = 'native',
+    [int]$Seeds = 100, [int]$Repetitions = 3,
     [int]$GpuIndex = 0,
     [int]$Width = 1280, [int]$Height = 720,
     [int]$Multiplier = 1,
@@ -67,7 +69,7 @@ public static class FacetsEnvironmentProbe {
 $began=Get-Date
 [FacetsEnvironmentProbe]::Start(-not $AllowIdle)
 try {
-    & (Join-Path $PSScriptRoot '../check_merge_release.ps1') -Package $Package -Output (Join-Path $outputPath 'release') -Mode native -GpuIndex $GpuIndex -Width $Width -Height $Height -Multiplier $Multiplier
+    & (Join-Path $PSScriptRoot '../check_merge_release.ps1') -Package $Package -Output (Join-Path $outputPath 'release') -Mode $Mode -Seeds $Seeds -Repetitions $Repetitions -GpuIndex $GpuIndex -Width $Width -Height $Height -Multiplier $Multiplier
 } finally {
     [FacetsEnvironmentProbe]::Stop()
     [FacetsEnvironmentProbe]::samples|ConvertTo-Json -Depth 4|Set-Content (Join-Path $outputPath 'environment-samples.json') -Encoding utf8

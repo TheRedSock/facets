@@ -1,5 +1,8 @@
 # Merge-window readiness evidence
 
+The latest [CPU observer and boundary correction](MERGE_HEADROOM_EVIDENCE.md)
+passes the full normal corpus; final r6 release re-verification remains pending.
+
 Later user-feedback fixes and the power-aware stall investigation are recorded
 in [the follow-up evidence](MERGE_FEEDBACK_EVIDENCE.md). That report supersedes
 the remaining-failure diagnosis below: awake native checks pass, while a fresh

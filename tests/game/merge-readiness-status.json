@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "P3 readiness under merge-window successor G0-G7",
-  "status": "readiness_not_met_current_cpu_headroom",
+  "status": "final_release_reverification_pending",
   "profile": "merge-profile-v1.json",
   "source_baseline": "d5e0445",
   "gates": [
@@ -37,7 +37,7 @@
     },
     {
       "id": "G6",
-      "status": "not_passed_current_cpu_headroom",
+      "status": "normal_cpu_verified_final_stress_native_pending",
       "evidence": [
         "artifacts/game/merge-readiness/g6-cpu-final-r1/run.json",
         "artifacts/game/merge-readiness/g6-cpu-r5-smoke/run.json",
@@ -56,12 +56,15 @@
         "artifacts/game/merge-readiness/feedback-final-900/release/run.json",
         "artifacts/game/merge-readiness/feedback-native-720-2x/release/run.json",
         "artifacts/game/merge-readiness/feedback-native-900-2x/release/run.json",
-        "artifacts/game/merge-readiness/stall-power-timeline.json"
+        "artifacts/game/merge-readiness/stall-power-timeline.json",
+        "artifacts/game/merge-readiness/r6-cpu-full/release/run.json",
+        "artifacts/game/merge-readiness/r6-cpu-full-audit.json",
+        "artifacts/game/merge-readiness/r6-cpu-full/environment.json"
       ]
     },
     {
       "id": "G7",
-      "status": "functional_and_delivery_verified_readiness_pending_G6",
+      "status": "prior_delivery_verified_final_candidate_pending",
       "evidence": [
         "artifacts/game/merge-readiness/g7-final-controls-r1/run.json",
         "artifacts/game/merge-readiness/g6-gravity-r1/run.json",
@@ -292,7 +295,7 @@
       "id": "MW28",
       "assertion": "Swap-to-merge, gravity-to-merge, automatic-merge-to-merge and expiry-to-gravity meet the frozen end-to-end deadlines in the release corpus; queue, admission, hashes and publication are included.",
       "owner": "performance",
-      "status": "native_recheck_verified_cpu_headroom_not_passed",
+      "status": "normal_cpu_verified_final_native_pending",
       "evidence": [
         "artifacts/game/merge-readiness/g6-cpu-final-r1/run.json",
         "artifacts/game/merge-readiness/g6-cpu-r5-smoke/run.json",
@@ -311,14 +314,17 @@
         "artifacts/game/merge-readiness/feedback-final-900/release/run.json",
         "artifacts/game/merge-readiness/feedback-native-720-2x/release/run.json",
         "artifacts/game/merge-readiness/feedback-native-900-2x/release/run.json",
-        "artifacts/game/merge-readiness/stall-power-timeline.json"
+        "artifacts/game/merge-readiness/stall-power-timeline.json",
+        "artifacts/game/merge-readiness/r6-cpu-full/release/run.json",
+        "artifacts/game/merge-readiness/r6-cpu-full-audit.json",
+        "artifacts/game/merge-readiness/r6-cpu-full/environment.json"
       ]
     },
     {
       "id": "MW29",
       "assertion": "Injected slow computation and cancellation exercise deadline recovery. Normal frozen workloads and required 2x-compute stress have zero starvation; intentionally excessive delays produce honest misses, closed input and later full-duration windows.",
       "owner": "performance",
-      "status": "recovery_and_stress_verified_with_recorded_build_scopes",
+      "status": "prior_stress_verified_r6_recheck_pending",
       "evidence": [
         "artifacts/game/merge-readiness/g6-gravity-r1/run.json",
         "artifacts/game/merge-readiness/g6-cpu-stress2x-r2/run.json",
@@ -332,7 +338,7 @@
       "id": "MW30",
       "assertion": "Actual packaged executable verifies keyboard/mouse, terminal/restart/menu, reduced motion, focus loss, repeated windows, automatic redirection and gravity default at both native display sizes. Package manifest matches tested source and delivered bytes.",
       "owner": "release",
-      "status": "release_and_delivery_verified",
+      "status": "prior_release_verified_r6_delivery_pending",
       "evidence": [
         "artifacts/game/merge-readiness/g6-native-r5-720/probe.json",
         "artifacts/game/merge-readiness/g6-native-r5-900/probe.json",
@@ -348,9 +354,9 @@
   ],
   "human_evaluation": "deferred; sole optional reviewer",
   "historical_complete_action_5ms": "failed; not the successor measurement",
-  "runtime_checkpoint": "4cf3aff86cca0552a2b04d5fb4147ba7d3dc0171",
+  "runtime_checkpoint": "7156cc9",
   "delivery": "generated/desktop/facets-feedback-review-20260922.zip",
-  "remaining_exit": "Awake native profiles pass; prior long-stall measurements overlap Modern Standby. Current CPU command readiness p95 40.454ms exceeds the unchanged 37.5ms headroom target; unchanged r5 control also fails at 40.016ms. No deadline misses. Resolve and reverify the margin before full readiness.",
+  "remaining_exit": "r6 full normal CPU corpus and independent raw/reference audit pass. Full r6 2x stress is running; final native profiles, integrated affected controls and r6 delivery verification remain required. Earlier failures remain preserved; no targets waived.",
   "feedback_update": {
     "status": "implemented_and_verified",
     "tool_sound_checkpoint": "d6a5ef7",
@@ -364,5 +370,20 @@
       "feedback-final-source"
     ],
     "details": "tests/game/MERGE_FEEDBACK_EVIDENCE.md"
+  },
+  "candidate_package": "generated/desktop/merge-readiness-r6",
+  "delivery_runtime_checkpoint": "4cf3aff",
+  "timing_correction": {
+    "deadline_misses": 0,
+    "command_ratio_p95": 0.138686666666667,
+    "normal_rooms": 1500,
+    "historical_final_digests_match": true,
+    "command_ready_max_us": 54628,
+    "normal_batches": 51873,
+    "command_ready_p95_us": 20803,
+    "observer": "worker_semaphore; native frame polling unchanged",
+    "details": "tests/game/MERGE_HEADROOM_EVIDENCE.md",
+    "checkpoint": "7156cc9",
+    "command_ratio_max": 0.364186666666667
   }
 }
