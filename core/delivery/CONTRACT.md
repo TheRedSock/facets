@@ -21,6 +21,15 @@ Run startup includes the selected ladder and reachable upgrades. Missing packs,
 roles, corrupt pages and memory admission failures produce loading errors. There
 is no production substitute image; synthetic assets exist only in test fixtures.
 
+The P3 expedition preflights reward conversions, carried gems and the next room
+before publishing the choice or entry. The previous room's views stay owned
+until the replacement presentation is ready; choice previews are additional
+live owners, not a replacement for accounting the old board. Generation checks
+and weak preview-row callbacks discard canceled loads. Failure preserves the
+committed run, displayed offers and RNG; retry uses the same proposed choice.
+Packaged P3 lifecycle checks exercise overlapping pages, failed preflight/retry,
+Continue, restart and navigation at both supported review sizes.
+
 The LRU owns at most 32 MiB by default. View and prefetch references can outlive
 LRU ownership, so weak residency tracking counts all live uploads, including old
 libraries held during replacement. A live page is reused after LRU eviction.

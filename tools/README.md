@@ -714,11 +714,18 @@ Native mode selects seeds 1,6,11,20,31 across its five policies. Begin's free
 opening extraction is measured against the 150ms input computation allowance;
 later gravity intervals use their actual preceding motion. Animations and
 ordinary reserve thresholds are unchanged.
+The native P3 timing callback includes terminal `ExpeditionState.finish_room`
+publication, so the measured main-frame work includes expedition ownership.
 
 `check_p3_release.ps1 -Mode native` drives complete expedition reference commands
 through real views/controls, verifies state/event checkpoints, saves and resumes,
 and exercises choice/load/cancellation ownership. `-Mode tuning` writes complete
 replays for the fixed 200 seed/policy combinations. Both require a fresh output.
+Tuning accepts the immutable names `p3-production-v1` and
+`p3-seeds-1-100-v1`; unknown names reject. Reports retain Work/Craft earned,
+clipped and spent, tools, families, rubble damage, promotion/extraction ranks,
+rearrangements, terminal outcomes and complete replay digests. Losses remain in
+the corpus and are distinct from a runner or replay failure.
 Use `game/check_merge_environment.ps1 -Mode p3native` or `-Mode p3tuning` for the
 same scoped awake/window observer used by timing checks. Current P3 completion
 is tracked separately in [P3 status](../tests/game/P3_IMPLEMENTATION_STATUS.md).

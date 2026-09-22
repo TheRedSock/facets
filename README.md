@@ -7,16 +7,14 @@ board objectives and branching runs.
 ## What is here
 
 The repository contains an offline gem-authoring/rendering pipeline, runtime
-asset delivery, and playable P2 rooms with rubble, Work, Craft and tools.
-The [merge-window successor](core/run/MERGE_WINDOW_PREPARATION.md) adds repeated
-interventions and incremental resolution. Its [P3 readiness checks](tests/game/MERGE_FINAL_READINESS.md)
-pass on the declared current-machine profile, with one verified build and optional
-review form delivered. Atomic P2 and the earlier
-isolated comparison remain controls; their whole-action CPU target remains open.
-P3 family reactions, four authored rooms, rewards, carryover and disk Continue
-are implemented under the [P3 contract](core/run/P3_PREPARATION.md).
-The [P3 implementation status](tests/game/P3_IMPLEMENTATION_STATUS.md) separates
-verified behavioral checkpoints from remaining release engineering exits.
+asset delivery, and a playable P3 expedition with families, four authored rooms,
+rewards, carryover and disk Continue under the [P3 contract](core/run/P3_PREPARATION.md).
+The [merge-window successor](core/run/MERGE_WINDOW_PREPARATION.md) provides repeated
+paid interventions and incremental resolution. [P3 engineering verification](tests/game/P3_FINAL_VERIFICATION.md)
+passes on the declared current-machine profile and links the tested build and
+optional review form. [Implementation checkpoints](tests/game/P3_IMPLEMENTATION_STATUS.md)
+map requirements to behavioral coverage. Atomic P2 and the earlier isolated
+comparison remain controls; their whole-action CPU target remains open.
 Player learning, difficulty and feel remain unmeasured; the user is the sole
 reviewer during this stage, with broader testing deferred.
 

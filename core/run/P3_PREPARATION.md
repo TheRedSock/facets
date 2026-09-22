@@ -1,7 +1,7 @@
 # P3 implementation contract
 
-Current execution status: P3.1–P3.6 are implemented and checkpointed. P3.7 UI and
-diagnostics are implemented; release engineering verification is in progress.
+Current execution status: P3.1–P3.7 are implemented and checkpointed. Required
+engineering exits pass on the [declared profile](../../tests/game/P3_FINAL_VERIFICATION.md).
 See [the current evidence map](../../tests/game/P3_IMPLEMENTATION_STATUS.md).
 The batch notes below preserve what each checkpoint established.
 
@@ -10,7 +10,7 @@ bounded `FamilyDispatcher`, family accounting and source-family reactions are
 implemented. `test_p3_families` executes these behavioral requirements; the
 original preparation fixture remains a structural specification. A P3 family
 room is accessible beside the unchanged controls. Later expedition/reward/save
-batches and their release-load engineering exits remain open.
+batches and their release-load engineering exits were still open at that checkpoint.
 
 P3.2: Aquamarine replacement and carry/ladder previews, Steady Hand effective
 pricing with accepted-only room use, and Bridge's T4 target range are implemented.
@@ -44,6 +44,16 @@ Continue reports invalid/incompatible data or recovery explicitly and admits
 the complete replay before replacing a run. All eleven committed phases,
 reservation exactly-once resume, assisted timed restore, signed >2^53 values
 and six interrupted-write points pass `test_p3_save`. Preferences remain separate.
+
+P3.7 implementation: expedition controls support keyboard and mouse, retained
+board/choice preview ownership, asset preflight, failure/retry and manual disk
+Continue. A committed terminal batch publishes its expedition outcome before
+the visual tail finishes. Saving such a boundary normalizes a detached snapshot
+to carry/results without mutating the live run; admission rejects unnormalized
+terminal saves. Presentation callbacks never determine the mechanical outcome.
+Packaged lifecycle probes, named deterministic tuning and P3 content-load
+measurement are separate tools; their measured exits are recorded in the status
+map, rather than inferred from this implementation inventory.
 
 Historical G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.

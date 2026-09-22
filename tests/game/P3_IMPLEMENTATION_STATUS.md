@@ -1,8 +1,8 @@
 # P3 implementation and evidence
 
-P3.1–P3.6 are implemented. P3.7 integrated presentation, delivery ownership,
-native lifecycle probes and deterministic tuning are under verification.
-**P3 engineering completion is not yet claimed.** Human learning, balance,
+All seven P3 implementation batches and required engineering exits are complete
+on the declared current-machine profile; see [the measured evidence](P3_FINAL_VERIFICATION.md).
+Human learning, balance,
 listening and reaction comfort remain deferred under the sole-reviewer policy.
 
 ## Checkpoints
@@ -16,6 +16,9 @@ listening and reaction comfort remain deferred under the sole-reviewer policy.
 | P3.5 authored flow/replays | `931784c` | `b5-flow-r2`, `b5-final` |
 | P3.6 save/recovery | `4af1757` | `b6-r2` |
 | User-confirmed opening extraction | `b40f31b` | `opening-confirmed-r1`, `opening-confirmed-r2` |
+| P3.7 integrated views and release diagnostics | `437e46c` | `b7-ui-r2`, `native-ui-r5` |
+| Terminal ownership, preview/input and tuning corrections | `64b689e` | `b7-audit-r1`, final r6 native/tuning evidence |
+| Accelerated legacy test drain correction | `c7a1b47` | `final-cleanup-r6`, five corrected verbose diagnostics |
 
 The old commission reference is preserved and explicitly incompatible; its
 separately named corrected reference collects qualifying opening gems on Begin.
@@ -25,6 +28,10 @@ Deep-seam reference bytes remain unchanged. See the fixture directory README.
 
 `test_p3_preparation` remains structural. Each named specification now has
 executable assertions in the following registered owners:
+
+The frozen preparation JSON's "not implemented" status describes its handoff
+date; it is preserved as historical specification text. This status map and the
+behavioral evidence below describe the current implementation.
 
 | Specification | Behavioral owner |
 |---|---|
@@ -43,17 +50,19 @@ three-room successes. `test_p3_replay` re-executes complete frozen success and
 real Work-exhaustion failure checkpoints. Save tests cover all eleven declared
 phases and all six file interruption points; recovery never silently rerolls.
 
-## Release evidence in progress
+## Release evidence
 
-`native-ui-r4` passes actual executable keyboard/mouse routes at 1280×720,
-complete replay, retained old-board owners, live previews, reward-load rejection
-and retry, persisted-choice Continue, restart and menu cleanup. The expanded
-matrix adds every reward pair, zero/one/two carry and parked-window Continue.
+`native-ui-720-r6` and `native-ui-900-r6` each pass 283 actual-executable
+assertions, including complete routes/replays, every reward pair, 0/1/2 carry,
+retained board/preview ownership, failure/retry, Continue and routed input.
 Earlier failures are retained: r1 mouse-coordinate probe error, r2 asynchronous
 preview capture/lifecycle errors, r3 strict WeakRef typing caught during import.
-`b7-ui-r2` passes source parsing, view previews and clean headless shutdown.
-
-Final integrated controls, CPU and 2× workload, native timing at both sizes,
-expanded lifecycle, tuning, source-stable package and review bundle remain open.
+The 39-stage integrated matrix is closed with the separately verified legacy
+test-drain correction; ten legacy actual-release stages pass. Normal CPU, all
+four native timing profiles, final-package CPU smoke and 200 tuning runs pass.
+The full doubled-computation corpus also passes: 1,500 rooms / 64,542 batches,
+zero deadline failures and exact equality to every normal-corpus outcome.
+The final verification report links the one tested build, optional review form,
+source/package identity audits and retained raw evidence.
 The historical whole-action 5ms failure and editor harness stalls are unchanged
 claims; old readiness evidence is not evidence of implemented P3 load.

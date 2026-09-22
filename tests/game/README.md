@@ -1,4 +1,4 @@
-# P1 game checks
+# Game checks
 
 `test_p3_families` executes the separate P3 profile: frozen source families,
 Quartz clipping/shared entitlement, Corundum replacement/deduplicated contacts,
@@ -123,8 +123,9 @@ after releasing the scene. The third cue set was accepted by the user on
 `test_p3_preparation` validates the reserved P3 specification against inherited
 fixtures, distinct reward pools, authored room/staging cells, protocol versions,
 save-field inventory and available delivery bindings. Its 18 acceptance case
-specifications are requirements for future executable P3 tests, not passing
-implementations. See [the preparation contract](../../core/run/P3_PREPARATION.md).
+specifications remain structural evidence. Their executable behavioral owners
+are now mapped in [P3 status](P3_IMPLEMENTATION_STATUS.md); preparation-test
+success alone does not establish gameplay. See [the contract](../../core/run/P3_PREPARATION.md).
 
 The actual release matrix is `tools/game/verify_closeout_release.ps1`. It runs
 the shipped executable at both native sizes, compares all frozen P1/P2 action
