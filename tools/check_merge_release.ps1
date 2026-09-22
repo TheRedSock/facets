@@ -7,6 +7,7 @@ param(
     [string]$Policies = 'all-pass,first,survivor,remote,mixed',
     [switch]$Reduced,
     [switch]$CpuPolling,
+    [switch]$P3Load,
     [int]$MaxFps = -1,
     [switch]$AlwaysOnTop,
     [int]$GpuIndex = -1
@@ -44,6 +45,7 @@ if ($Mode -eq 'native') { $arguments += @('--merge-native','--review') }
 if ($Mode -eq 'characterization') { $arguments += '--merge-characterization' }
 if ($Reduced) { $arguments += '--merge-reduced' }
 if ($CpuPolling) { $arguments += '--merge-cpu-polling' }
+if ($P3Load) { $arguments += '--p3-load' }
 $execution = Invoke-BoundedCheckProcess -Executable (Join-Path $packagePath 'Facets.exe') -Arguments $arguments -TimeoutSeconds 7200 -WorkingDirectory $packagePath
 $execution.output | Set-Content -Encoding utf8 (Join-Path $outputPath 'probe.log')
 $checked = Get-GodotCheckResult -ExitCode $execution.exit_code -Output $execution.output -Completion 'CHECK_COMPLETE: merge_probe'

@@ -10,6 +10,9 @@ var error := ""
 var _generation := 0
 var _loading := false
 var store := ExpeditionSave.new()
+var retained_room: MergeRoomView
+var diagnostic_practice := false
+var preview_pending := false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -30,15 +33,25 @@ func label(text: String) -> void:
 	panel.add_child(control)
 
 func show_phase() -> void:
-	_generation += 1; _loading = false
-	for child in get_children(): remove_child(child); child.queue_free()
+	_generation += 1; _loading = false; preview_pending = false
+	# Retain actual old board views through choice/preflight/new-board load.
+	if is_instance_valid(room_view):
+		if is_instance_valid(retained_room): retained_room.queue_free()
+		retained_room = room_view; retained_room.hide(); retained_room.set_process(false)
+	for child in get_children():
+		if child == retained_room: continue
+		remove_child(child); child.queue_free()
 	room_view = null
 	if run != null and run.phase == "playing":
 		room_view = MergeRoomView.new(); room_view.p3_mode = true; room_view.external_session = run.session
+		room_view.practice_mode = diagnostic_practice
 		room_view.back_requested.connect(func(): back_requested.emit(); queue_free())
 		room_view.restart_requested.connect(restart)
 		room_view.save_requested.connect(save_run)
 		room_view.continue_requested.connect(continue_run)
+		room_view.presentation_ready.connect(func():
+			if is_instance_valid(retained_room): retained_room.queue_free()
+			retained_room = null)
 		room_view.room_finished.connect(func():
 			var result := run.finish_room()
 			if not result.ok: error = result.code
@@ -48,7 +61,7 @@ func show_phase() -> void:
 	var margin := MarginContainer.new(); margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left","top","right","bottom"]: margin.add_theme_constant_override("margin_"+side,36)
 	add_child(margin)
-	var scroll := ScrollContainer.new(); margin.add_child(scroll)
+	var scroll := ScrollContainer.new(); scroll.follow_focus = true; margin.add_child(scroll)
 	panel = VBoxContainer.new(); panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL; scroll.add_child(panel)
 	label("FACETS · Expedition")
 	button("Menu",func(): back_requested.emit(); queue_free())
@@ -57,6 +70,12 @@ func show_phase() -> void:
 	if not error.is_empty(): label(error)
 	if run == null: button("Restart expedition",restart); return
 	label("Room %d · %s" % [run.room_index+1,run.current().room.definition.data.id.capitalize()])
+	if run.phase in ["briefing","carry_selection","reward_selection","next_room_ready"]:
+		var tiles: Array = []
+		var catalog := run.current().catalog
+		if run.phase == "reward_selection": catalog = P3Content.catalog(run.state.settings+["aquamarine"] if "aquamarine" not in run.state.settings else run.state.settings).catalog
+		for tier in range(1,9): tiles.append({"id":catalog.definition(tier).id,"tier":tier})
+		preview_tiles(tiles)
 	match run.phase:
 		"briefing":
 			label("%d Work · %d Craft\n%s\nStaging: row 1, columns 4 and 5, in your selected order." % [run.state.moves_remaining,run.state.room.craft,objective_text(run.state.room.definition.data)])
@@ -69,6 +88,7 @@ func show_phase() -> void:
 			label("Choose up to two remaining T4+ gems in staging order. Choosing none is allowed.")
 			for tile in run.eligible_carry():
 				var control := CheckButton.new(); control.text = "T%d %s · %s" % [tile.tier,tile.tile_id,tile.instance_id]
+				control.set_meta("gem_id",tile.instance_id)
 				control.toggled.connect(func(on: bool):
 					if on:
 						if selected.size() >= 2: control.set_pressed_no_signal(false)
@@ -108,6 +128,23 @@ func show_phase() -> void:
 			button("Restart expedition",restart)
 	var first := panel.find_children("*","Button",true,false)
 	if not first.is_empty(): first[0].grab_focus()
+
+func preview_tiles(tiles: Array) -> void:
+	var row := HFlowContainer.new(); panel.add_child(row)
+	var row_reference: WeakRef = weakref(row); preview_pending = true
+	var generation := _generation
+	var ids := tiles.map(func(tile: Dictionary) -> StringName: return StringName(tile.id))
+	get_node("/root/GemForge").request_required(ids,func(ready: bool):
+		if not is_inside_tree() or generation != _generation: return
+		preview_pending = false
+		var holder: HFlowContainer = row_reference.get_ref()
+		if holder == null: return
+		if not ready:
+			label("Gem previews unavailable; choices remain unchanged. Retry by reopening this screen.")
+			return
+		for tile in tiles:
+			var gem := TileView.new(); gem.custom_minimum_size = Vector2(72,72)
+			holder.add_child(gem); gem.set_tier_visible(true); gem.configure_from_data(StringName(tile.id),tile.tier,Vector2i.ZERO))
 
 func objective_text(data: Dictionary) -> String:
 	if data.objective == "extract": return "Deliver %d T%d+ gems through the marked bottom outlets. Own-cell obstacles and locks block delivery; adjacent rubble blocks travel." % [data.demand,data.minimum_tier]

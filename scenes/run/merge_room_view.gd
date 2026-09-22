@@ -5,6 +5,7 @@ signal room_finished
 signal restart_requested
 signal save_requested
 signal continue_requested
+signal presentation_ready
 var external_session: MergeSession
 var _reported_terminal := false
 var seed_value := 1
@@ -43,6 +44,8 @@ var _notice := ""
 var input_buffer := MergeInputBuffer.new()
 var _buffer_overlay: Control
 var _window_bar: ProgressBar
+var _title: Label
+var _instructions: Label
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -53,7 +56,7 @@ func _ready() -> void:
 	for side in ["left","top","right","bottom"]: margin.add_theme_constant_override("margin_"+side,20)
 	add_child(margin)
 	var body := VBoxContainer.new(); margin.add_child(body)
-	var bar := HBoxContainer.new(); body.add_child(bar)
+	var bar := HFlowContainer.new(); body.add_child(bar)
 	_button(bar,"Menu",func(): back_requested.emit(); queue_free())
 	_button(bar,"Restart expedition" if external_session != null else "Restart",func():
 		if external_session != null: restart_requested.emit()
@@ -75,8 +78,9 @@ func _ready() -> void:
 	board = load("res://scenes/board/board_scene.tscn").instantiate()
 	board.custom_minimum_size = Vector2(400,400); board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	split.add_child(board)
-	var panel := VBoxContainer.new(); panel.custom_minimum_size.x = 300; split.add_child(panel)
-	var title := Label.new(); title.text = "Open seam · reactive play"; title.add_theme_font_size_override("font_size",24); panel.add_child(title)
+	var scroll := ScrollContainer.new(); scroll.custom_minimum_size.x = 510; split.add_child(scroll)
+	var panel := VBoxContainer.new(); panel.custom_minimum_size.x = 488; panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL; scroll.add_child(panel)
+	_title = Label.new(); _title.text = "Reactive play"; _title.add_theme_font_size_override("font_size",24); panel.add_child(_title)
 	_status = Label.new(); _status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; _status.custom_minimum_size.x = 300; panel.add_child(_status)
 	_window_bar = ProgressBar.new(); _window_bar.max_value = 20; _window_bar.show_percentage = false
 	_window_bar.custom_minimum_size.y = 12; panel.add_child(_window_bar)
@@ -84,7 +88,11 @@ func _ready() -> void:
 	instructions.custom_minimum_size.x = 300
 	instructions.text = "Clear the marked rubble. Swap adjacent gems to make a match.\n\nDuring a merge, you can make another match anywhere — including moving the upgraded gem before its next automatic match. Each swap costs 1 Work.\n\nNo input lets the next match or gravity continue. Take your time once the board settles."
 	panel.add_child(instructions)
-	_begin = _button(panel,"Begin room",func(): _begin.hide(); begun = true; _refresh())
+	_instructions = instructions
+	_begin = _button(panel,"Begin room",func():
+		_begin.hide(); begun = true
+		if session.phase == "gravity": executor.continue_gravity()
+		_refresh())
 	for item in [["Exchange · 2 Craft","action.exchange"],["Clear · 2 Craft","action.clear_target"],["Promote · 3 Craft","action.promote_target"]]:
 		var kind: String = item[1]
 		var button := _button(panel,item[0],_select_tool.bind(kind))
@@ -174,6 +182,7 @@ func _assets_loaded(loaded: bool, epoch: int) -> void:
 			executor.resume_reserved()
 		elif session.phase == "gravity": executor.continue_gravity()
 		_refresh()
+	presentation_ready.emit()
 
 func request_swap(a: Vector2i, b: Vector2i) -> void:
 	var received := Time.get_ticks_usec()
@@ -383,17 +392,21 @@ func _refresh() -> void:
 	if _status == null: return
 	if not error.is_empty(): _status.text = error; return
 	if session == null or not board.visible: _status.text = "Loading gems…"; return
+	_title.text = str(session.state.room.definition.data.id).capitalize()
+	_instructions.text = "Swap adjacent gems to match. Each swap costs 1 Work. During every merge, swap anywhere to redirect the next match. Tools are available once the board settles.\n\nMouse: click or drag. Keyboard: arrows and Enter; Esc cancels."
 	var objective := "Marked rubble" if session.state.room.definition.data.objective == "clear_marked_rubble" else "Deliveries remaining (T%d+)" % session.state.room.definition.data.minimum_tier
 	_status.text = "Work %d   Craft %d\n%s: %d\n%s" % [session.state.moves_remaining,session.state.room.craft,objective,session.state.room.remaining(session.state.board),
 		"Merge — swap now" if can_input() and session.phase == "merge_window" else session.phase.capitalize()]
 	_window_bar.visible = session.phase == "merge_window" and session.clock.started and not player.motion_busy
 	_window_bar.value = 20-session.clock.tick
 	if session.clock.paused: _status.text += "\nPaused — assisted attempt"
-	elif practice_mode: _status.text += "\nPractice — no deadline. Use Pass window to continue.\n\nFirst swap: row 4, column 4 left. Then move the upgraded gem left again. Restart and pass the first window to compare."
+	elif practice_mode:
+		_status.text += "\nPractice — no deadline. Use Pass window to continue."
+		if not p3_mode: _status.text += "\n\nFirst swap: row 4, column 4 left. Then move the upgraded gem left again. Restart and pass the first window to compare."
 	if not _tool.is_empty(): _status.text += "\nChoose a tool target · Esc or Cancel to return to swaps"
 	if not _notice.is_empty(): _status.text += "\n"+_notice
 	if session.state.rules.is_p3():
-		_status.text += "\n\nQuartz (T1–2): +1 Craft once per paid move.\nCorundum (T5/7): 2 rubble damage.\nBeryl (T6): promotes the lowest adjacent T1–3 once per paid move.\nTools suppress families and Craft."
+		_status.text += "\n\nQuartz T1–2: +1 Craft once per paid move.\nCorundum %s: 2 rubble damage.\nBeryl %s: promotes the lowest adjacent T1–%d once per paid move.\nTools suppress families and Craft." % ["T7" if "aquamarine" in session.state.settings else "T5/7","T5/6" if "aquamarine" in session.state.settings else "T6",4 if "beryl_bridge" in session.state.settings else 3]
 		if session.state.room.definition.data.objective == "extract": _status.text += "\n\nCyan outlets collect unlocked qualifying gems after all merges and falling settle. Each gem fills one delivery."
 	_cancel_button.disabled = _tool.is_empty() and input_buffer.pending.is_empty() and input_buffer.selected_id.is_empty()
 	if _buffer_overlay != null: _buffer_overlay.queue_redraw()

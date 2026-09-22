@@ -1,5 +1,10 @@
 # P3 implementation contract
 
+Current execution status: P3.1–P3.6 are implemented and checkpointed. P3.7 UI and
+diagnostics are implemented; release engineering verification is in progress.
+See [the current evidence map](../../tests/game/P3_IMPLEMENTATION_STATUS.md).
+The batch notes below preserve what each checkpoint established.
+
 P3.1 implementation, 2026-09-22: separate `P3Content` and schema-4 rules/state,
 bounded `FamilyDispatcher`, family accounting and source-family reactions are
 implemented. `test_p3_families` executes these behavioral requirements; the

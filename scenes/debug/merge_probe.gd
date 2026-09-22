@@ -65,6 +65,9 @@ func run(path: String) -> void:
 		"executable":OS.get_executable_path(),"editor":OS.has_feature("editor"),"cpu":OS.get_processor_name(),
 		"compute_multiplier":_multiplier,"fps_cap":Engine.max_fps,"display":str(DisplayServer.window_get_size()),
 		"vsync":DisplayServer.window_get_vsync_mode(),"warmup":"one excluded seed-101 all-pass room before corpus"}
+	if "--p3-load" in OS.get_cmdline_user_args():
+		report.profile = P3Content.PROFILE
+		report.content_workload = "four authored P3 rooms; all eight setting combinations; zero/one/two declared incoming T4/T5 gems; continuous per-room merge accounting"
 	var began := Time.get_ticks_usec()
 	if "--merge-native" in OS.get_cmdline_user_args():
 		report.mode = "native"
@@ -104,13 +107,21 @@ func _cpu_room(seed_number: int, policy: String, repetition: int, measured: bool
 	if not game.start_room(null,seed_number): failures.append("room_start"); return
 	game.apply_action(RoomCommand.begin(0))
 	var session := MergeSession.new()
-	if not session.start(game.run_state.to_dict()): failures.append("session_start"); return
+	var initial := game.run_state.to_dict()
+	if "--p3-load" in OS.get_cmdline_user_args():
+		var workload := P3Workload.create(seed_number)
+		if not workload.ok: failures.append("p3_workload/"+workload.code); return
+		initial = workload.state.to_dict()
+	if not session.start(initial): failures.append("session_start"); return
 	var polling := "--merge-cpu-polling" in OS.get_cmdline_user_args()
 	var notice := Semaphore.new()
 	var executor := MergeExecutor.new(session,null if polling else notice); executor.compute_multiplier = _multiplier
 	var rng := SeededRng.new(); rng.reseed(900000+seed_number)
 	var tags := {"seed":seed_number,"policy":policy,"repetition":repetition}
-	var prior_gravity := 0; var count := 0; var intervention_count := 0
+	if session.state.rules.is_p3(): tags.merge({"room_id":session.state.room.definition.data.id,"settings":session.state.settings})
+	# Begin setup is admitted under the same 150ms computation allowance as a
+	# new input; subsequent gravity uses its actual preceding motion interval.
+	var prior_gravity := 150000; var count := 0; var intervention_count := 0
 	while session.phase in ["ready","merge_window","gravity"] and count < 500:
 		# A completion can be polled before its posted notification is consumed.
 		# Drain only between jobs; a superseded default may also wake the observer.
@@ -246,6 +257,11 @@ func _native(report: Dictionary) -> void:
 	var policies := option("--merge-policies","all-pass,first,survivor,remote,mixed").split(",")
 	for policy in policies:
 		var view := MergeRoomView.new(); view.seed_value = int(option("--merge-native-seed","1"))
+		if "--p3-load" in OS.get_cmdline_user_args():
+			view.seed_value = [1,6,11,20,31][policies.find(policy)%5]
+			var workload := P3Workload.create(view.seed_value)
+			if not workload.ok: failures.append("p3_workload/"+workload.code); continue
+			view.initial_override = workload.state.to_dict(); view.p3_mode = true
 		view.reduced_motion = "--merge-reduced" in OS.get_cmdline_user_args()
 		get_tree().root.add_child(view)
 		if not await _loaded(view): view.queue_free(); continue
@@ -253,6 +269,7 @@ func _native(report: Dictionary) -> void:
 		var forge := get_node("/root/GemForge")
 		var warm_loads: int = forge.delivery_report().page_loads
 		view.executor.compute_multiplier = _multiplier
+		var initial_batch := view.session.batch_id
 		view._begin.pressed.emit()
 		var rng := SeededRng.new(); rng.reseed(900000+view.seed_value)
 		var last_window := -1; var selected: RoomCommand; var next_tick := 0
@@ -283,9 +300,9 @@ func _native(report: Dictionary) -> void:
 					available[visible_batch.batch+1] = view._motion_deadline-visible_batch.us
 			while metric_index < view.executor.metrics.size():
 				var metric: Dictionary = view.executor.metrics[metric_index].duplicate(true); metric_index += 1
-				metric.policy = policy; metric.batch = metric_index
+				metric.policy = policy; metric.batch = metric_index+initial_batch
 				if metric.kind != "default":
-					metric.available_us = available.get(metric_index,150000)
+					metric.available_us = available.get(metric.batch,150000)
 					metric.ratio = metric.latency_us/float(maxi(1,metric.available_us))
 					if metric.latency_us > metric.available_us: failures.append(policy+"/native_deadline/"+str(metric_index))
 					if _multiplier == 1 and metric.ratio > 0.5: failures.append(policy+"/native_headroom/"+str(metric_index))

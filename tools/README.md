@@ -706,3 +706,19 @@ must never be reported as a pass for the default GPU. Memory monitoring bounds
 whole-process worker/snapshot/renderer use and labels serialized snapshot sizes
 separately from heap allocation. The [successor ledger](../tests/game/merge-readiness-status.json)
 is the authority for which release exits have actually passed.
+
+For implemented P3, `check_merge_release.ps1 -P3Load` measures four authored room
+definitions, all eight settings combinations and 0/1/2 incoming-gem fixtures.
+Those synthetic starts measure content load; they are not expedition wins.
+Native mode selects seeds 1,6,11,20,31 across its five policies. Begin's free
+opening extraction is measured against the 150ms input computation allowance;
+later gravity intervals use their actual preceding motion. Animations and
+ordinary reserve thresholds are unchanged.
+
+`check_p3_release.ps1 -Mode native` drives complete expedition reference commands
+through real views/controls, verifies state/event checkpoints, saves and resumes,
+and exercises choice/load/cancellation ownership. `-Mode tuning` writes complete
+replays for the fixed 200 seed/policy combinations. Both require a fresh output.
+Use `game/check_merge_environment.ps1 -Mode p3native` or `-Mode p3tuning` for the
+same scoped awake/window observer used by timing checks. Current P3 completion
+is tracked separately in [P3 status](../tests/game/P3_IMPLEMENTATION_STATUS.md).

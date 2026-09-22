@@ -1,11 +1,12 @@
 param(
     [Parameter(Mandatory)][string]$Package,
     [Parameter(Mandatory)][string]$Output,
-    [ValidateSet('cpu','native','characterization','closeout')][string]$Mode = 'native',
+    [ValidateSet('cpu','native','characterization','closeout','p3native','p3tuning')][string]$Mode = 'native',
     [int]$Seeds = 100, [int]$Repetitions = 3,
     [int]$GpuIndex = 0,
     [int]$MaxFps = -1,
     [switch]$AlwaysOnTop,
+    [switch]$P3Load,
     [int]$Width = 1280, [int]$Height = 720,
     [int]$Multiplier = 1,
     [switch]$AllowIdle
@@ -89,8 +90,10 @@ $began=Get-Date
 try {
     if($Mode -eq 'closeout') {
         & (Join-Path $PSScriptRoot 'verify_closeout_release.ps1') -Package $Package -OutputRoot (Join-Path $outputPath 'release') -GpuIndex $GpuIndex -AlwaysOnTop:$AlwaysOnTop
+    } elseif ($Mode -in @('p3native','p3tuning')) {
+        & (Join-Path $PSScriptRoot '../check_p3_release.ps1') -Package $Package -Output (Join-Path $outputPath 'release') -Mode $Mode.Substring(2) -GpuIndex $GpuIndex -AlwaysOnTop:$AlwaysOnTop -Width $Width -Height $Height
     } else {
-    & (Join-Path $PSScriptRoot '../check_merge_release.ps1') -Package $Package -Output (Join-Path $outputPath 'release') -Mode $Mode -Seeds $Seeds -Repetitions $Repetitions -GpuIndex $GpuIndex -MaxFps $MaxFps -AlwaysOnTop:$AlwaysOnTop -Width $Width -Height $Height -Multiplier $Multiplier
+    & (Join-Path $PSScriptRoot '../check_merge_release.ps1') -Package $Package -Output (Join-Path $outputPath 'release') -Mode $Mode -Seeds $Seeds -Repetitions $Repetitions -GpuIndex $GpuIndex -MaxFps $MaxFps -AlwaysOnTop:$AlwaysOnTop -Width $Width -Height $Height -Multiplier $Multiplier -P3Load:$P3Load
     }
 } finally {
     [FacetsEnvironmentProbe]::Stop()

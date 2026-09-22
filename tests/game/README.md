@@ -163,3 +163,15 @@ assisted/fault/lifecycle witnesses outside the unassisted measurements.
 The frozen successor redirection vector covers deliberate new semantics. Legacy
 P0/P1/P2 and trial goldens stay unchanged. Keep every failed report; a renderer
 or GPU override is a distinct recorded profile, never evidence for another GPU.
+
+## Implemented P3
+
+[P3 status and behavioral mapping](P3_IMPLEMENTATION_STATUS.md) routes the
+registered family/settings/entry/extraction/flow/replay/save/view tests.
+`check_p3_release.ps1` executes packaged keyboard/mouse expedition witnesses,
+save/Continue, choices and lifecycle cases. Its explicit reference inputs are
+copied and hashed in each evidence directory; no source project is loaded.
+Native diagnostic playbacks use assisted timing and cannot certify frame gates.
+`-Mode tuning` runs immutable `first-v1` and `mixed-v1` policies on every integer
+seed 1 through 100, stores every complete replay and verifies every checkpoint.
+Policy outcomes are diagnostic measurements, not human difficulty judgments.

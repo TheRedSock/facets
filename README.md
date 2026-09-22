@@ -13,8 +13,10 @@ interventions and incremental resolution. Its [P3 readiness checks](tests/game/M
 pass on the declared current-machine profile, with one verified build and optional
 review form delivered. Atomic P2 and the earlier
 isolated comparison remain controls; their whole-action CPU target remains open.
-Family reactions, rewards, carryover and
-expedition persistence are specified in the [P3 preparation contract](core/run/P3_PREPARATION.md).
+P3 family reactions, four authored rooms, rewards, carryover and disk Continue
+are implemented under the [P3 contract](core/run/P3_PREPARATION.md).
+The [P3 implementation status](tests/game/P3_IMPLEMENTATION_STATUS.md) separates
+verified behavioral checkpoints from remaining release engineering exits.
 Player learning, difficulty and feel remain unmeasured; the user is the sole
 reviewer during this stage, with broader testing deferred.
 

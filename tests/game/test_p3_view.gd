@@ -7,5 +7,8 @@ func _run() -> void:
 	check(view.panel != null and view.error.is_empty(),"briefing controls constructed")
 	var controls := view.panel.find_children("*","Button",true,false)
 	check(controls.size() >= 2,"keyboard-focusable menu and begin controls")
-	view.queue_free(); await process_frame
+	var deadline := Time.get_ticks_msec()+10000
+	while view.find_children("*","TileView",true,false).size() != 8 and Time.get_ticks_msec() < deadline: await process_frame
+	check(view.find_children("*","TileView",true,false).size() == 8,"all eight delivered ladder previews are live owners")
+	view.queue_free(); await process_frame; await process_frame
 	finish("test_p3_view")

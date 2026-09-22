@@ -6,6 +6,10 @@ extends Control
 
 func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--p3-probe=") and not get_tree().root.has_meta("p3_probe_started"):
+			get_tree().root.set_meta("p3_probe_started",true); visible = false
+			var probe := P3Probe.new(); get_tree().root.add_child.call_deferred(probe)
+			probe.run.call_deferred(argument.trim_prefix("--p3-probe=")); return
 		if argument.begins_with("--merge-probe=") and not get_tree().root.has_meta("merge_probe_started"):
 			get_tree().root.set_meta("merge_probe_started",true)
 			visible = false
