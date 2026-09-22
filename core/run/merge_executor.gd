@@ -86,7 +86,9 @@ func _work() -> void:
 		var until := Time.get_ticks_usec()+extra
 		# Diagnostic delay has sub-millisecond cancellation checkpoints and never
 		# sleeps the renderer. Normal computation checks cancellation in its budget.
-		while Time.get_ticks_usec() < until and not cancel.call(): OS.delay_usec(mini(500,until-Time.get_ticks_usec()))
+		while Time.get_ticks_usec() < until and not cancel.call():
+			# Time can cross the deadline between the loop guard and this read.
+			OS.delay_usec(clampi(until-Time.get_ticks_usec(),0,500))
 		_mutex.lock()
 		_running = false
 		if not _stopping and job.generation == _generation:

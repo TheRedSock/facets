@@ -26,6 +26,41 @@ func window(view: MergeRoomView, id: int) -> bool:
 		if view.session.window_id == id and view.can_input(): return true
 	check(false,"fixture_window_timeout/"+str(id)); return false
 
+func late_gravity() -> void:
+	var view := MergeRoomView.new(); view.initial_override = InterventionFixture.create().to_dict(); view.automatic_clock = false
+	tree.root.add_child(view)
+	if await loaded(view):
+		MergeProbe.gesture(view,InterventionFixture.command(view.session.state),false)
+		if await window(view,1):
+			var until := Time.get_ticks_msec()+5000
+			while view.executor.default_result.is_empty() and Time.get_ticks_msec() < until: await tree.process_frame
+			var ready := not view.executor.default_result.is_empty()
+			check(ready,"late_gravity_default_ready")
+			if ready:
+				var batch: Dictionary = view.executor.default_result.result.candidate.last_batch
+				check(batch.kind == "gravity","late_gravity_fixture_has_physical_packet")
+				# Delay only the demand job following the already prepared gravity.
+				view.executor.injected_delay_us = MergeProbe.gravity_us(batch)+1000000
+				view.session.tick(20)
+				until = Time.get_ticks_msec()+5000
+				while view.session.phase != "gravity" and Time.get_ticks_msec() < until: await tree.process_frame
+				view.executor.injected_delay_us = 0
+				var checkpoint := CanonicalCodec.digest(view.session.mechanical_snapshot())
+				until = Time.get_ticks_msec()+5000
+				while not view.telemetry.any(func(t: Dictionary) -> bool: return t.kind == "starvation" and t.get("phase") == "gravity") and Time.get_ticks_msec() < until: await tree.process_frame
+				check(view.session.phase == "gravity" and not view.can_input() and view.session.reservation.is_empty(),"late_gravity_holds_input_without_paid_reservation")
+				check(CanonicalCodec.digest(view.session.mechanical_snapshot()) == checkpoint,"late_gravity_retains_committed_board_rng_and_cost")
+				var records := view.telemetry.filter(func(t: Dictionary) -> bool: return t.kind == "starvation" and t.get("phase") == "gravity")
+				check(records.size() == 1,"late_gravity_records_one_starvation_interval")
+				until = Time.get_ticks_msec()+5000
+				while (view.session.phase == "gravity" or not view.queue.is_empty() or view.player.motion_busy) and Time.get_ticks_msec() < until: await tree.process_frame
+				if view.session.phase == "merge_window":
+					if await window(view,view.session.window_id): check(view.session.clock.tick == 0,"late_gravity_next_window_has_full_duration")
+				check(view.error.is_empty() and view.session.phase in ["ready","merge_window"],"late_gravity_recovers_to_next_input_state")
+	var worker := view.executor
+	view.queue_free(); await tree.process_frame; await tree.process_frame
+	check(worker == null or not worker._thread.is_started(),"late_gravity_worker_released")
+
 func run(scene_tree: SceneTree, report_path: String = "") -> Dictionary:
 	tree = scene_tree
 	var state := InterventionFixture.create(16,"automatic_chain")
@@ -118,5 +153,6 @@ func run(scene_tree: SceneTree, report_path: String = "") -> Dictionary:
 			await tree.process_frame; await tree.process_frame
 			check(menu.visible and not worker._thread.is_started(),"menu_navigation_shuts_down_worker")
 	menu.queue_free(); await tree.process_frame
+	await late_gravity()
 	await tree.create_timer(0.2).timeout
 	return {"observations":observations,"failures":failures}

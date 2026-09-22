@@ -1,0 +1,148 @@
+# Merge-window readiness evidence
+
+Status, 2026-09-22: the successor mechanics and P3 contract reconciliation are
+implemented. **G6/G7 remain open; P3-ready is not declared.** This document records
+the scope of measured results, including failures. The executable decision is in
+[the 30-case ledger](merge-readiness-status.json); exact requirements remain in
+[the acceptance specification](MERGE_WINDOW_ACCEPTANCE.md). Reports and packages
+are local, ignored artifacts and may be absent in a fresh checkout.
+
+## Verified foundation
+
+G0–G5 are checkpointed as `6bba782`, `f683e7c`, `52794e7`, `fee1686`, `33b8d9a`
+and `748d740`. The system supports repeated paid swaps anywhere during merges,
+redirection before pending automatic matches, one isolated default successor,
+fresh move accounting, incremental worker execution, stable live/ghost identity,
+complete session replay/restoration, and the reconciled P3 extension contracts.
+Authored P3 families, expedition, carry/rewards and disk Continue remain future
+implementation work.
+
+`f315041` checkpoints the next verified corrections and release harness. A private
+default no longer overwrites the live expiry clock; unencodable full candidate
+hashes reject; focus loss during motion pauses the following window; terminal
+audio follows committed results. The final source matrix at
+`artifacts/game/merge-readiness/g7-final-controls-r1/run.json` passed all 29
+registered stages with stable source, including the unchanged P1/P2 corpora.
+The strengthened kernel has 697 assertions, including a hand-authored complete
+early-terminal board/ID expectation and an explicit legacy-settling comparison.
+
+The later deadline audit found two more issues. Gravity followers correctly held
+input but did not record starvation without a paid reservation, and the modeled
+delay loop could cross its deadline between two clock reads and request a negative
+sleep. The adapter now records waiting gravity and late arrivals; the diagnostic
+sleep is clamped to a valid range. Focused worker, replay and headless/native
+playback checks passed in `g6-gravity-r1` (82 playback assertions per render mode).
+The packaged witness also forces late gravity, retains the committed board/RNG/
+cost while waiting, records one late interval and restores a full next window.
+
+## CPU measurements and scope
+
+The full normal corpus was measured on immutable package **r4**, using accelerated
+decision clocks and the real worker, copies, admission, hashes and publication.
+It does not represent 1,500 fully animated rooms. The normal run excludes one
+declared warm-up room and retains every subsequent interval.
+
+| r4 normal corpus | Result |
+|---|---|
+| Repetitions / seeds / policies | 3 × 100 × 5; 1,500 rooms, 51,873 batches |
+| Completion / identity | Zero failures; all repeated final digests identical |
+| Command readiness p95 / max | 19.666 / 46.695 ms; interval ratio 0.131107 / 0.3113 |
+| Gravity follower readiness p95 / max | 21.835 / 54.630 ms; ratio 0.057704 / 0.156309 |
+| Default readiness p95 / max | 22.920 / 58.183 ms |
+| Main scheduling per operation p95 / max | 1.640 / 9.729 ms; native per-frame totals are separate |
+| Whole-process peak working set / sampled private peak | 389,197,824 / 282,857,472 bytes |
+
+Authority: `g6-cpu-final-r1/run.json`; raw measurements are in its sibling probe
+JSON/JSONL files. Process memory includes engine/probe/worker/snapshot allocations;
+it is not an isolated worker heap measurement or ordinary-game memory claim.
+
+The first 2× run (`g6-cpu-stress2x-r1`) completed 500 rooms and 17,291 batches
+without deadline misses, but **failed** strict acceptance on 181 negative-delay
+engine errors. Its internal probe status and zero exit code do not override that
+failure. The corrected r5 rerun passed; the failed report remains intact.
+
+| r5 required 2× stress (`g6-cpu-stress2x-r2`) | Result |
+|---|---|
+| Coverage | 100 seeds × five policies; 500 rooms, 17,291 batches |
+| Strict completion | Zero deadline misses, zero engine errors; exact package bytes |
+| Command readiness p95 / max | 32.641 / 57.591 ms; ratio 0.217607 / 0.383940 |
+| Gravity follower readiness p95 / max | 41.487 / 78.953 ms |
+| Default readiness p95 / max | 43.191 / 78.719 ms |
+| Main scheduling per operation p95 / max | 1.874 / 11.700 ms |
+
+The r5 normal smoke passed 15 rooms. All 500 stressed final mechanical states and
+all 15 smoke states match the corresponding normal-corpus reference
+(`g6-r5-cpu-reference.json`). This comparison covers complete final mechanical
+state per seed/policy; it does not claim identical native input transcripts or
+substitute for the separate full replay/restore tests. Modeled delay tests
+scheduling sensitivity, not performance on a specific weaker CPU.
+
+The r5 package changes three exported source files: the diagnostic sleep body,
+the room adapter's deadline reporting, and the fixed release witnesses. Normal
+mode never enters the changed sleep body. Full 1× figures above remain explicitly
+r4 measurements; r5 integration and stress results are recorded separately.
+
+## Native release measurements
+
+Reference machine: i9-14900HX, RTX 4060 Laptop and Intel integrated graphics,
+Godot 4.6.1, Windows Balanced power profile. GPU index 1 explicitly selected Intel
+in these Vulkan runs. It is machine-specific and is not evidence for the default
+NVIDIA path. Original animation/window durations were retained.
+
+| r5 Intel profile | 1280×720 | 1600×900 |
+|---|---:|---:|
+| Normal timing run | **Failed: assisted pause** | Passed this run |
+| Fixed release witnesses | 26 passed | 26 passed |
+| Feedback p95 / max, ms | 8.630 / 8.864 | 8.652 / 8.881 |
+| Default handoff p95 / max, ms | 12.680 / 15.878 | 12.115 / 13.549 |
+| Main-frame work p95 / max, ms | 0.379 / 7.111 | 0.294 / 5.092 |
+| Frame p95 / p99 / max, ms | 9.071 / 12.298 / 1,236.188 | 8.982 / 12.250 / 16.552 |
+| Demand readiness ratio p95 / max | 0.142373 / 0.193633 | 0.140280 / 0.160573 |
+
+Reports: `g6-native-r5-720/run.json` and `g6-native-r5-900/run.json`. All active
+frames are retained, including pauses; fixed assisted/fault cases run separately
+after the unassisted measurements. Earlier r4 had a clean 720 run and failing 900
+runs. Later clean runs do not establish a fix for this intermittent issue.
+
+NVIDIA stalls reproduced in an empty window. Intel's 65-second empty control
+completed 7,761 measured frames with p95 8.581 ms and max 9.613 ms. An editor
+script trace captured a roughly 908 ms frame with about 19 ms measured script
+time; a later pipeline-counter trace reproduced an active roughly 1.047 s pause
+without new pipeline compilations. Removing memory sampling and changing audio
+drivers did not resolve it. The attempted OpenGL GPU override actually selected
+NVIDIA, and the release executable did not execute an external observer script;
+neither is evidence for the intended diagnostic. All reports are retained under
+`artifacts/game/merge-readiness/`. No global driver, graphics or power preference
+was changed. The exact owner of the rare Intel pause remains unproven.
+
+## Characterization and deferred evidence
+
+The r5 release characterization passed mandatory last-Work completion/exhaustion,
+recovery and all tools at 1×/2×, plus supported-board and bounded candidate-dispatch
+cases (`g6-characterization-r5`). Candidate dispatch reports applied and suppressed
+counts separately; repeated scope rejection is not 4×/8× active effect execution.
+
+The separate `test_merge_load` executes independent active waves with full copies,
+admission and hashes per wave. Its six editor cases apply exactly 56/224/448 effects
+on 8×8 and 226/904/1808 on 16×16. The first measured service times were
+28.588/112.495/224.614 ms and 113.713/456.726/916.779 ms. These conservative
+synthetic costs intentionally repeat admission/hashing; they are not authored P3
+content, ordinary release gates or evidence for a particular weaker computer.
+They demonstrate that heavy individual batches can still exceed a swap interval.
+
+All 14 preserved archive hashes were verified and remain unchanged. A current
+documentation check resolved all 134 local links across 16 guides/plans.
+The historical whole-action 5 ms target still failed (retained P2 p95 37.640 ms).
+The successor's 5 ms main-thread-per-frame budget is a different measurement.
+
+The user is the sole optional reviewer. No player session, focus group, adoption
+vote or completed form is a readiness requirement. Fun, learning, reaction
+comfort and balance remain unmeasured; the practice build does not establish them.
+
+## Final closeout still in progress
+
+Required remaining records: native 2× profiles, 4× delay characterization,
+final actual-executable legacy matrix,
+source/package/delivery manifest, and one optional build/form. G6/G7 can close
+only after their exits pass or an explicit revised contract is approved; the
+intermittent native pause must not be silently waived.

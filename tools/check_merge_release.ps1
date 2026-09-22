@@ -58,5 +58,9 @@ else {
 }
 $result = [ordered]@{ schema=1; completed=$checked.completed; check=$checked; same_package_bytes=$sameBytes; errors=$errors; passed=($checked.passed -and $sameBytes -and $errors.Count -eq 0); finished=(Get-Date).ToString('o'); peak_working_set_bytes=$execution.peak_working_set_bytes; sampled_peak_private_bytes=$execution.sampled_peak_private_bytes; memory_scope='Whole process including worker/snapshots and renderer; not an isolated worker allocation count.' }
 $result | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 (Join-Path $outputPath 'run.json')
-if (-not $result.passed) { Write-Output ('FAIL merge_release: '+($errors -join ', ')); exit 1 }
+if (-not $result.passed) {
+    $reasons = @($errors) + @($checked.errors) + @($checked.environment_errors)
+    Write-Output ('FAIL merge_release: '+(($reasons | Select-Object -First 3) -join ', ')+"; full report: $outputPath/run.json")
+    exit 1
+}
 Write-Output "MERGE_RELEASE_COMPLETE: $Mode $outputPath"

@@ -132,6 +132,9 @@ release performance and final readiness. Registered `test_merge_kernel`,
 owners. `test_merge_native` needs `-Gpu` and uses synthetic delivery fixtures;
 it does not substitute for the actual packaged assets.
 
+[Release evidence](MERGE_RELEASE_EVIDENCE.md) records measured scope, retained
+failures, package identity and the remaining engineering exits.
+
 `merge_cpu_smoke` runs 15 editor rooms through the worker with accelerated
 decision clocks. `merge_characterization` measures bounded diagnostic reaction
 dispatch and admitted 8/12/16-cell-wide boards separately from ordinary targets.

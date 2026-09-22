@@ -122,6 +122,9 @@ func _run() -> void:
 		check(room.clock_adapter.pass_now() and room.session.clock.tick == 20,"explicit pass records decision without invented player input")
 	room.queue_free(); await process_frame; await process_frame
 	Engine.max_fps = 120
+	var gravity_fault := MergeReleaseCases.new(); gravity_fault.tree = self
+	await gravity_fault.late_gravity()
+	for observation in gravity_fault.observations: check(observation.passed,"MW29 "+observation.case)
 	# AudioServer releases stopped mixer voices asynchronously after node teardown.
 	await create_timer(0.1).timeout
 	write_report("playback.json",{"checkpoints":checkpoints,"assertions":assertions,"failures":failures})

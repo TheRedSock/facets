@@ -168,6 +168,10 @@ func _process(delta: float) -> void:
 	if not result.is_empty():
 		if not result.ok: _fail(result.code); return
 		if result.status == "committed":
+			# A long frame can cross the deadline and receive the completion in
+			# one poll. Record that miss even without an intervening empty queue.
+			if _motion_deadline > 0 and Time.get_ticks_usec() > _motion_deadline:
+				_starved("gravity" if executor.metrics.back().kind == "gravity" else "command",began)
 			if queue.size() >= 2: _fail("Presentation queue overflow"); return
 			queue.append(result.batch)
 			telemetry.append({"kind":"candidate_ready","us":Time.get_ticks_usec(),"batch":result.batch.batch_id,"deadline_us":_motion_deadline})
@@ -180,7 +184,9 @@ func _process(delta: float) -> void:
 	if not queue.is_empty() and not player.motion_busy and Time.get_ticks_usec() >= _motion_deadline:
 		var batch: Dictionary = queue.pop_front(); _motion_deadline = 0; _waiting_since = 0
 		_present(batch)
-	elif queue.is_empty() and _motion_deadline > 0 and began >= _motion_deadline and not session.reservation.is_empty(): _starved("command",began)
+	elif queue.is_empty() and _motion_deadline > 0 and began >= _motion_deadline:
+		if not session.reservation.is_empty(): _starved("command",began)
+		elif session.phase == "gravity" and executor.busy(): _starved("gravity",began)
 	if session.phase == "merge_window": executor.prepare_default()
 	_refresh()
 	telemetry.append({"kind":"main_frame","us":Time.get_ticks_usec()-began})
