@@ -81,10 +81,10 @@ func _ready() -> void:
 		view.back_requested.connect(func(): visible = true)
 		get_tree().root.add_child(view))
 	vbox.add_child(reactive)
-	var p3 := Button.new(); p3.text = "P3 · family room"; p3.custom_minimum_size.y = 48
+	var p3 := Button.new(); p3.text = "Play · P3 expedition"; p3.custom_minimum_size.y = 48
 	p3.pressed.connect(func():
 		visible = false
-		var view := MergeRoomView.new(); view.p3_mode = true
+		var view := ExpeditionView.new()
 		view.back_requested.connect(func(): visible = true)
 		get_tree().root.add_child(view))
 	vbox.add_child(p3)

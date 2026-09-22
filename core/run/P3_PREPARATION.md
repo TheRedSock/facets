@@ -13,6 +13,13 @@ Settings and uses are part of schema 4. P1/P2 bytes remain unchanged. Preview
 conversion creates no gameplay facts and preserves supply. Reward selection and
 room transitions are owned by subsequent batches, not this content helper.
 
+P3.3: `ExpeditionState` owns briefing, current session, room outcomes, ordered
+carry and detached entry publication. The opening generator preserves staged
+IDs across retries with continuous RNG/allocation. Asset failure may reject a
+prepared entry without changing the prior run. Selection decisions retain
+global revisions/event/action IDs; room sessions start from that run identity.
+Reward/route transitions and whole-expedition external admission follow in P3.5.
+
 G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.
 Replay/restore and P3 seams are verified under the

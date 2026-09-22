@@ -1,6 +1,10 @@
 class_name MergeRoomView
 extends Control
 signal back_requested
+signal room_finished
+signal restart_requested
+var external_session: MergeSession
+var _reported_terminal := false
 var seed_value := 1
 var p3_mode := false
 var initial_override := {}
@@ -49,7 +53,9 @@ func _ready() -> void:
 	var body := VBoxContainer.new(); margin.add_child(body)
 	var bar := HBoxContainer.new(); body.add_child(bar)
 	_button(bar,"Menu",func(): back_requested.emit(); queue_free())
-	_button(bar,"Restart",restart)
+	_button(bar,"Restart expedition" if external_session != null else "Restart",func():
+		if external_session != null: restart_requested.emit()
+		else: restart())
 	var reduced := CheckButton.new(); reduced.text = "Reduced motion"
 	reduced.button_pressed = reduced_motion; bar.add_child(reduced)
 	reduced.toggled.connect(func(value: bool): reduced_motion = value; player.reduced_motion = value)
@@ -125,8 +131,10 @@ func restart() -> void:
 	input_buffer.clear()
 	if executor != null and not executor.shutdown(): _fail("Worker shutdown timed out"); return
 	player.cancel(); audio.cancel()
+	_reported_terminal = false
 	session = MergeSession.new()
 	var initial := initial_override
+	if external_session != null: initial = external_session.initial
 	if initial.is_empty():
 		if p3_mode:
 			var opened := P3Content.room(seed_value)
@@ -137,6 +145,7 @@ func restart() -> void:
 			if not game.start_room(null,seed_value): _fail(game.last_error); return
 			game.apply_action(RoomCommand.begin(0)); initial = game.run_state.to_dict()
 	if not session.start(initial): _fail("Room state could not be admitted"); return
+	if external_session != null: session = external_session
 	executor = MergeExecutor.new(session); clock_adapter = MergeClock.new(session); clock_adapter.automatic = automatic_clock
 	if practice_mode: clock_adapter.automatic = false
 	board.visible = false; _refresh()
@@ -149,6 +158,7 @@ func _assets_loaded(loaded: bool, epoch: int) -> void:
 	if epoch != _epoch or not is_inside_tree(): return
 	if not loaded or not audio.last_error.is_empty(): _fail("Required room presentation could not load"); return
 	player.reset(session.state.board); board.visible = true; _begin.show(); _refresh()
+	if external_session != null: begun = true; _begin.hide(); _refresh()
 
 func request_swap(a: Vector2i, b: Vector2i) -> void:
 	var received := Time.get_ticks_usec()
@@ -293,6 +303,8 @@ func _process(delta: float) -> void:
 	_refresh()
 	telemetry.append({"kind":"main_frame","us":Time.get_ticks_usec()-began})
 	_record_main(Time.get_ticks_usec()-began)
+	if external_session != null and session.phase in ["complete","failed"] and queue.is_empty() and not player.motion_busy and not _reported_terminal:
+		_reported_terminal = true; room_finished.emit()
 
 func _record_main(us: int) -> void:
 	var frame := Engine.get_process_frames()

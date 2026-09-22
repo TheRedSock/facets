@@ -99,7 +99,7 @@ func _run() -> void:
 	check(not legal.is_empty(),"intervention witness has a legal swap")
 	if not legal.is_empty():
 		check(intervened.apply(RoomCommand.exchange(intervened.state,legal[0].origin,legal[0].destination)).ok,"paid intervention before pending automatic match")
-		check(intervened.context.classification == "intervention" and intervened.move_id == 2,"intervention gets fresh family scope")
+		check(intervened.context.classification == "intervention" and intervened.move_id == 3,"intervention gets fresh family scope")
 		check(MergeReplay.restored(intervened.snapshot(),false).ok,"intervention family replay")
 	for seed_value in [1,7,8]:
 		var opened := P3Content.room(seed_value); check(opened.ok,"P3 opening")

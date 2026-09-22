@@ -1473,6 +1473,18 @@
       "timeout_seconds": 300
     },
     {
+      "name": "test_p3_view",
+      "args": ["--headless", "--script", "res://tests/game/test_p3_view.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_p3_view"
+    },
+    {
+      "name": "test_p3_entry",
+      "args": ["--headless", "--script", "res://tests/game/test_p3_entry.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_p3_entry"
+    },
+    {
       "name": "test_p3_settings",
       "args": ["--headless", "--script", "res://tests/game/test_p3_settings.gd"],
       "mode": "cpu",

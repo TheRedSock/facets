@@ -34,6 +34,7 @@ func start(value: Dictionary) -> bool:
 	initial = GameValue.freeze(value)
 	phase = "ready"; context = null; cursor = {"cascade":0,"chain":0}
 	move_id = 0; batch_id = 0; window_id = 0; error = ""; history = []; last_batch = {}
+	if state.rules.is_p3(): move_id = state.revision; batch_id = state.revision; window_id = state.revision
 	clock = {"started":false,"tick":0,"sequence":0,"paused":false,"assisted":false}
 	discount_spent = 0; discount_charges = 0; reward_bonus = 0
 	modifiers = GameValue.freeze(MergeModifiers.DEFAULTS)
@@ -42,7 +43,7 @@ func start(value: Dictionary) -> bool:
 	return true
 
 func configure_modifiers(value: Dictionary) -> bool:
-	if phase != "ready" or batch_id != 0: return false
+	if phase != "ready" or (batch_id != 0 and not state.rules.is_p3()) or not history.is_empty() or context != null: return false
 	var admitted := MergeModifiers.admit(value)
 	if not admitted.ok: return false
 	modifiers = admitted.value; discount_charges = modifiers.discount_charges; reward_bonus = modifiers.reward_bonus
