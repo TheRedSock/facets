@@ -52,10 +52,10 @@ func show_phase() -> void:
 		room_view.presentation_ready.connect(func():
 			if is_instance_valid(retained_room): retained_room.queue_free()
 			retained_room = null)
-		room_view.room_finished.connect(func():
+		room_view.outcome_committed.connect(func():
 			var result := run.finish_room()
-			if not result.ok: error = result.code
-			show_phase.call_deferred())
+			if not result.ok: error = result.code)
+		room_view.room_finished.connect(func(): show_phase.call_deferred())
 		add_child(room_view); return
 	var background := ColorRect.new(); background.color = Color("141a22"); background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); add_child(background)
 	var margin := MarginContainer.new(); margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -73,8 +73,11 @@ func show_phase() -> void:
 	if run.phase in ["briefing","carry_selection","reward_selection","next_room_ready"]:
 		var tiles: Array = []
 		var catalog := run.current().catalog
-		if run.phase == "reward_selection": catalog = P3Content.catalog(run.state.settings+["aquamarine"] if "aquamarine" not in run.state.settings else run.state.settings).catalog
 		for tier in range(1,9): tiles.append({"id":catalog.definition(tier).id,"tier":tier})
+		label("Current collection · tiers 1–8")
+		if run.phase == "reward_selection" and "aquamarine" in run.offers:
+			label("The extra T5 at right previews the offered Aquamarine replacement.")
+			tiles.append({"id":"aquamarine","tier":5})
 		preview_tiles(tiles)
 	match run.phase:
 		"briefing":
@@ -86,14 +89,23 @@ func show_phase() -> void:
 		"carry_selection":
 			selected = []
 			label("Choose up to two remaining T4+ gems in staging order. Choosing none is allowed.")
+			var cells := {}
+			for cell in run.state.board.all_cells():
+				var gem := run.state.board.get_tile(cell)
+				if gem != null: cells[gem.instance_id] = cell
 			for tile in run.eligible_carry():
-				var control := CheckButton.new(); control.text = "T%d %s · %s" % [tile.tier,tile.tile_id,tile.instance_id]
+				var cell: Vector2i = cells[tile.instance_id]
+				var control := CheckButton.new(); control.text = "T%d %s · row %d, column %d" % [tile.tier,str(tile.tile_id).capitalize(),cell.y+1,cell.x+1]
 				control.set_meta("gem_id",tile.instance_id)
+				control.set_meta("label",control.text)
 				control.toggled.connect(func(on: bool):
 					if on:
 						if selected.size() >= 2: control.set_pressed_no_signal(false)
 						else: selected.append(tile.instance_id)
-					else: selected.erase(tile.instance_id))
+					else: selected.erase(tile.instance_id)
+					for choice in panel.find_children("*","CheckButton",true,false):
+						var slot := selected.find(choice.get_meta("gem_id"))
+						choice.text = choice.get_meta("label")+(" → staging %d" % [slot+1] if slot >= 0 else ""))
 				panel.add_child(control)
 			button("Confirm carry",func():
 				var result := run.confirm_carry(selected,run.revision())
@@ -108,7 +120,9 @@ func show_phase() -> void:
 					var text := ""
 					for item in preview.ladder: text += "T%d %s → %s   " % [item.tier,item.before.id,item.after.id]
 					label(text)
-					for converted in preview.carry: label("Carry %s: T%d %s → %s" % [converted.before.instance_id,converted.before.tier,converted.before.tile_id,converted.after.tile_id])
+					for index in preview.carry.size():
+						var converted: Dictionary = preview.carry[index]
+						label("Carry slot %d: T%d %s → %s" % [index+1,converted.before.tier,converted.before.tile_id,converted.after.tile_id])
 				button("Choose "+str(id).capitalize(),choose_reward.bind(id))
 		"route_selection":
 			label("Choose the second room")
@@ -144,6 +158,7 @@ func preview_tiles(tiles: Array) -> void:
 			return
 		for tile in tiles:
 			var gem := TileView.new(); gem.custom_minimum_size = Vector2(72,72)
+			gem.tooltip_text = "T%d %s" % [tile.tier,str(tile.id).capitalize()]
 			holder.add_child(gem); gem.set_tier_visible(true); gem.configure_from_data(StringName(tile.id),tile.tier,Vector2i.ZERO))
 
 func objective_text(data: Dictionary) -> String:
@@ -191,6 +206,9 @@ func save_run() -> void:
 
 func continue_run() -> void:
 	if _loading: return
+	if room_view != null:
+		room_view.input_buffer.clear()
+		room_view.clock_adapter.pause(true,"manual")
 	var result := store.load_slot()
 	if not result.ok:
 		error = "Continue failed: "+result.code

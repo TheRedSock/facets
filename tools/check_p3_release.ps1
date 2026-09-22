@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory)][string]$Output,
     [ValidateSet('native','tuning')][string]$Mode = 'native',
     [int]$Width = 1280, [int]$Height = 720,
-    [int]$GpuIndex = 0, [switch]$AlwaysOnTop
+    [int]$GpuIndex = 0, [switch]$AlwaysOnTop,
+    [string]$TuningProfile = 'p3-production-v1', [string]$SeedList = 'p3-seeds-1-100-v1'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'check_process.ps1')
@@ -28,7 +29,7 @@ $arguments = @('--audio-driver','Dummy','--resolution',"${Width}x${Height}",'--g
 if ($Mode -eq 'tuning') { $arguments += '--headless' }
 if ($AlwaysOnTop) { $arguments += '--always-on-top' }
 $arguments += @('--',"--p3-probe=$($report.Replace('\','/'))","--p3-witnesses=$($witnesses.Replace('\','/'))")
-if ($Mode -eq 'tuning') { $arguments += '--p3-tuning' }
+if ($Mode -eq 'tuning') { $arguments += @('--p3-tuning',"--p3-tuning-profile=$TuningProfile","--p3-seed-list=$SeedList") }
 $execution = Invoke-BoundedCheckProcess -Executable (Join-Path $packagePath 'Facets.exe') -Arguments $arguments -TimeoutSeconds 1800 -WorkingDirectory $packagePath
 $execution.output | Set-Content -Encoding utf8 (Join-Path $outputPath 'probe.process.log')
 $checked = Get-GodotCheckResult -ExitCode $execution.exit_code -Output $execution.output -Completion 'CHECK_COMPLETE: p3_probe'

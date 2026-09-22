@@ -2,16 +2,19 @@ class_name MergeRoomView
 extends Control
 signal back_requested
 signal room_finished
+signal outcome_committed
 signal restart_requested
 signal save_requested
 signal continue_requested
 signal presentation_ready
 var external_session: MergeSession
 var _reported_terminal := false
+var _committed_terminal := false
 var seed_value := 1
 var p3_mode := false
 var initial_override := {}
-var reduced_motion := false
+static var preferred_reduced_motion := false
+var reduced_motion := preferred_reduced_motion
 var automatic_clock := true
 var practice_mode := false
 var begun := false
@@ -63,7 +66,7 @@ func _ready() -> void:
 		else: restart())
 	var reduced := CheckButton.new(); reduced.text = "Reduced motion"
 	reduced.button_pressed = reduced_motion; bar.add_child(reduced)
-	reduced.toggled.connect(func(value: bool): reduced_motion = value; player.reduced_motion = value)
+	reduced.toggled.connect(func(value: bool): reduced_motion = value; preferred_reduced_motion = value; player.reduced_motion = value)
 	_button(bar,"Pause / resume",func():
 		input_buffer.clear()
 		if clock_adapter != null: clock_adapter.pause(not session.clock.paused,"manual"))
@@ -91,6 +94,7 @@ func _ready() -> void:
 	_instructions = instructions
 	_begin = _button(panel,"Begin room",func():
 		_begin.hide(); begun = true
+		board.grab_focus()
 		if session.phase == "gravity": executor.continue_gravity()
 		_refresh())
 	for item in [["Exchange · 2 Craft","action.exchange"],["Clear · 2 Craft","action.clear_target"],["Promote · 3 Craft","action.promote_target"]]:
@@ -145,6 +149,7 @@ func restart() -> void:
 	if executor != null and not executor.shutdown(): _fail("Worker shutdown timed out"); return
 	player.cancel(); audio.cancel()
 	_reported_terminal = false
+	_committed_terminal = false
 	session = MergeSession.new()
 	var initial := initial_override
 	if external_session != null: initial = external_session.initial
@@ -175,6 +180,7 @@ func _assets_loaded(loaded: bool, epoch: int) -> void:
 	board.outlet_tier = session.state.room.definition.data.get("minimum_tier",0)
 	if external_session != null:
 		begun = true; _begin.hide()
+		board.grab_focus()
 		if not session.reservation.is_empty():
 			var command := RoomCommand.parse(session.reservation.command)
 			_motion_deadline = Time.get_ticks_usec()+150000
@@ -316,6 +322,8 @@ func _process(delta: float) -> void:
 		if result.ok: queue.append(result.batch); _waiting_since = 0
 		elif result.get("status") != "waiting": _fail(result.code); return
 		else: _starved("default",began)
+	if external_session != null and session.phase in ["complete","failed"] and not _committed_terminal:
+		_committed_terminal = true; outcome_committed.emit()
 	if not queue.is_empty() and not player.motion_busy and Time.get_ticks_usec() >= _motion_deadline:
 		var batch: Dictionary = queue.pop_front(); _motion_deadline = 0; _waiting_since = 0
 		_present(batch)

@@ -269,6 +269,17 @@ func _native(report: Dictionary) -> void:
 		var forge := get_node("/root/GemForge")
 		var warm_loads: int = forge.delivery_report().page_loads
 		view.executor.compute_multiplier = _multiplier
+		var expedition_owner: ExpeditionState
+		if "--p3-load" in OS.get_cmdline_user_args():
+			# Content-load starts are synthetic, but terminal publication executes
+			# the real expedition owner inside the measured main-frame callback.
+			# Choice preflight is covered separately by the native lifecycle probe.
+			expedition_owner = ExpeditionState.new(); expedition_owner.seed_value = view.seed_value
+			expedition_owner.run_id = "expedition/"+str(view.seed_value)
+			expedition_owner.state = view.session.state; expedition_owner.session = view.session; expedition_owner.phase = "playing"
+			view.external_session = view.session
+			view.outcome_committed.connect(func():
+				if not expedition_owner.finish_room().ok: failures.append("native_expedition_outcome"))
 		var initial_batch := view.session.batch_id
 		view._begin.pressed.emit()
 		var rng := SeededRng.new(); rng.reseed(900000+view.seed_value)

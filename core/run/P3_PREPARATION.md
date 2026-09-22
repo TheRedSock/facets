@@ -45,13 +45,13 @@ the complete replay before replacing a run. All eleven committed phases,
 reservation exactly-once resume, assisted timed restore, signed >2^53 values
 and six interrupted-write points pass `test_p3_save`. Preferences remain separate.
 
-G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
+Historical G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.
 Replay/restore and P3 seams are verified under the
 [merge-window contract](MERGE_WINDOW_PREPARATION.md). G6/G7 engineering readiness
 passes on the [declared profile](../../tests/game/MERGE_FINAL_READINESS.md).
-Families, rooms beyond P2, expedition and
-disk Continue below remain specified P3 work, not implemented gameplay.
+At that checkpoint, families, rooms beyond P2, expedition and disk Continue were
+specified work. Their later implementation is recorded in the batch notes above.
 The earlier atomic specification is checksum-archived locally before this edit.
 The old complete-action 5 ms failure remains historical evidence. The user is
 the sole current reviewer; broader human evaluation remains deferred.

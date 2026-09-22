@@ -15,13 +15,31 @@ func _run() -> void:
 		var command: Dictionary = entry.command
 		match command.kind:
 			"begin_room": run.begin(run.revision())
-			"room_outcome": run.session = MergeReplay.restored(command.resolution,false).session; run.finish_room()
+			"room_outcome":
+				run.session = MergeReplay.restored(command.resolution,false).session
+				var before_terminal := CanonicalCodec.encode(run.snapshot())
+				var terminal_save := ExpeditionSave.decode(ExpeditionSave.encode(run),false)
+				check(terminal_save.ok and terminal_save.run.session == null,"terminal save atomically maps to carry/results before presentation")
+				check(before_terminal == CanonicalCodec.encode(run.snapshot()),"terminal save normalization does not mutate live owner")
+				run.finish_room()
+				check(terminal_save.ok and CanonicalCodec.encode(terminal_save.run.snapshot()) == CanonicalCodec.encode(run.snapshot()),"terminal normalization matches committed outcome exactly")
 			"confirm_carry": run.confirm_carry(command.ids,run.revision())
 			"choose_reward": run.choose_reward(command.id,run.revision())
 			"choose_route": run.choose_route(command.id,run.revision())
 			"enter_room": run.publish_entry(run.prepare_next())
 		roundtrip(run)
 	var timed: ExpeditionState = ExpeditionState.create(1).run; timed.begin(timed.revision())
+	var loss: ExpeditionState = ExpeditionState.create(1).run; loss.begin(loss.revision())
+	for index in 300:
+		var action: RoomCommand
+		if loss.session.phase == "ready":
+			var legal := ActionLegality.enumerate_legal_swaps(loss.session.state.board)
+			action = RoomCommand.exchange(loss.session.state,legal[0].origin,legal[0].destination)
+		elif loss.session.phase == "merge_window": loss.session.presented(); loss.session.tick(20)
+		var step := loss.session.apply(action)
+		if not step.ok or loss.session.phase in ["complete","failed"]: break
+	var lost_save := ExpeditionSave.decode(ExpeditionSave.encode(loss),false)
+	check(loss.session.phase == "failed" and lost_save.ok and lost_save.run.phase == "results" and lost_save.run.session == null,"failed terminal capture maps directly to results")
 	var swaps := ActionLegality.enumerate_legal_swaps(timed.session.state.board)
 	check(timed.session.apply(RoomCommand.exchange(timed.session.state,swaps[0].origin,swaps[0].destination)).ok,"timed save witness")
 	timed.session.presented(); timed.session.tick(7); roundtrip(timed)

@@ -50,6 +50,44 @@ func capture(name: String) -> void:
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(output.get_base_dir().path_join(name+".png"))
 
+func key(code: int) -> void:
+	var event := InputEventKey.new(); event.keycode = code; event.pressed = true; Input.parse_input_event(event)
+	await get_tree().process_frame
+	event = InputEventKey.new(); event.keycode = code; Input.parse_input_event(event)
+	await get_tree().process_frame
+
+func board_gesture(view: MergeRoomView, command: RoomCommand, keyboard: bool) -> bool:
+	var revision := view.session.state.revision
+	if command.data.kind != "swap":
+		for control in view._tool_buttons:
+			if control.get_meta("kind") == command.data.kind: await activate(control); break
+		check(view.board.has_focus(),"tool_returns_keyboard_focus_to_board")
+		if command.data.kind == "action.exchange":
+			view.board.cursor_cell = command.data.origin; await key(KEY_ENTER)
+			view.board.cursor_cell = command.data.destination; await key(KEY_ENTER)
+		else: view.board.cursor_cell = command.data.cell; await key(KEY_ENTER)
+	elif keyboard:
+		view.board.grab_focus(); view.board.cursor_cell = command.data.origin
+		await key(KEY_ENTER)
+		var direction: Vector2i = command.data.destination-command.data.origin
+		await key(KEY_RIGHT if direction.x > 0 else (KEY_LEFT if direction.x < 0 else (KEY_DOWN if direction.y > 0 else KEY_UP)))
+		await key(KEY_ENTER)
+	else:
+		var transform := view.board.get_viewport().get_final_transform()*view.board.get_global_transform()
+		var origin: Vector2 = transform*(view.board._board_offset+view.board._cell_to_pixel(command.data.origin)+Vector2(view.board._cell_size)*0.5)
+		var destination: Vector2 = transform*(view.board._board_offset+view.board._cell_to_pixel(command.data.destination)+Vector2(view.board._cell_size)*0.5)
+		var press_event := InputEventMouseButton.new(); press_event.position = origin; press_event.button_index = MOUSE_BUTTON_LEFT; press_event.pressed = true; Input.parse_input_event(press_event)
+		await get_tree().process_frame
+		var drag := InputEventMouseMotion.new(); drag.position = destination; drag.relative = destination-origin; drag.button_mask = MOUSE_BUTTON_MASK_LEFT; Input.parse_input_event(drag)
+		await get_tree().process_frame
+		press_event = InputEventMouseButton.new(); press_event.position = destination; press_event.button_index = MOUSE_BUTTON_LEFT; Input.parse_input_event(press_event)
+		await get_tree().process_frame
+	return view.session.state.revision > revision or not view.session.reservation.is_empty()
+
+func watch_outcome(view: ExpeditionView, live: MergeRoomView) -> void:
+	live.outcome_committed.connect(func():
+		check(view.run.session == null and view.run.phase in ["carry_selection","results"] and not live.queue.is_empty(),"expedition_outcome_precedes_terminal_presentation"),CONNECT_ONE_SHOT)
+
 func native_route(route: String) -> void:
 	var path := MergeProbe.option("--p3-witnesses","").path_join(route+".fac")
 	var decoded := CanonicalCodec.decode(FileAccess.get_file_as_bytes(path))
@@ -74,6 +112,7 @@ func native_route(route: String) -> void:
 				await capture(route+"-room"+str(room_number))
 			"room_outcome":
 				var live := view.room_view
+				watch_outcome(view,live)
 				var expected: Array = command.resolution.history
 				var issued := 0; var verified := 0
 				var saved_window := false
@@ -91,20 +130,26 @@ func native_route(route: String) -> void:
 							saved_window = true
 							await press(view,"Save")
 							var saved_state := CanonicalCodec.digest(view.run.current().to_dict())
+							var forge := get_node("/root/GemForge"); var budget: int = forge.prefetch_budget_bytes
+							forge.prefetch_budget_bytes = 0
+							await press(view,"Continue")
+							await wait_for(func() -> bool: return not view._loading,"failed_continue")
+							check(view.room_view == live and CanonicalCodec.digest(view.run.current().to_dict()) == saved_state,"failed_continue_preserves_live_board_rng_and_resources")
+							forge.prefetch_budget_bytes = budget
 							await press(view,"Continue")
 							await wait_for(func() -> bool: return not view._loading and is_instance_valid(view.room_view) and view.room_view.board.visible,"parked_continue")
 							live = view.room_view
+							watch_outcome(view,live)
 							check(live.session.clock.paused and live.session.clock.assisted and CanonicalCodec.digest(view.run.current().to_dict()) == saved_state,"native_parked_continue_exact_paused")
 							live.clock_adapter.pause(false,"manual")
 						live.clock_adapter.pass_now(); continue
 					while issued < expected.size() and expected[issued].command.is_empty(): issued += 1
 					if issued >= expected.size(): check(false,"reference_commands_exhausted"); break
 					var action := RoomCommand.parse(expected[issued].command); issued += 1
-					var receipt := MergeProbe.observed_gesture(live,action,issued%2 == 0)
-					check(receipt.accepted,"native_command/"+str(issued))
+					check(await board_gesture(live,action,issued%2 == 0),"native_command/"+str(issued))
 				check(view.run.phase != "playing","room_terminated/"+route)
 				check(live.session.history.size() == expected.size(),"all_batches/"+route+"/"+str(room_number))
-				await get_tree().process_frame
+				await wait_for(func() -> bool: return view.room_view == null,"terminal_presentation")
 				if view.run.phase == "playing": view.queue_free(); await get_tree().process_frame; return
 				check(view.run.history.back().state_digest == entry.state_digest,"room_boundary/"+route+"/"+str(room_number))
 				room_number += 1
@@ -192,6 +237,25 @@ func choice_matrix() -> void:
 		view.queue_free()
 		for frame in 60: await get_tree().process_frame
 		check(not worker._thread.is_started(),"loading_cancel_releases_worker/"+operation)
+	var menu: Control = load("res://scenes/menu/main_menu.tscn").instantiate(); get_tree().root.add_child(menu)
+	var entry: Button
+	for control in menu.find_children("*","Button",true,false):
+		if control.text == "Play · P3 expedition": entry = control
+	check(entry != null,"production_p3_menu_entry")
+	if entry != null:
+		await activate(entry)
+		var entered: ExpeditionView
+		for child in get_tree().root.get_children():
+			if child is ExpeditionView: entered = child
+		check(entered != null and not menu.visible,"production_menu_opens_expedition")
+		if entered != null:
+			await press(entered,"Begin room")
+			await wait_for(func() -> bool: return is_instance_valid(entered.room_view) and entered.room_view.board.visible,"production_menu_room")
+			check(entered.room_view.board.has_focus(),"begin_focuses_keyboard_board")
+			await press(entered,"Menu")
+			await get_tree().process_frame
+			check(menu.visible and not is_instance_valid(entered),"production_menu_return")
+	menu.queue_free(); await get_tree().process_frame
 
 func tuning() -> Array:
 	var records: Array = []
@@ -200,6 +264,7 @@ func tuning() -> Array:
 			var expedition: ExpeditionState = ExpeditionState.create(seed_value).run
 			var rng := SeededRng.new(); rng.reseed(900000+seed_value)
 			var steps := 0; var failure := ""
+			var counters := {"work_spent":0,"craft_earned":0,"craft_clipped":0,"craft_spent":0,"rubble_damage":0,"highest_promoted":0,"highest_extracted":0,"rearrangements":0,"tools":{},"families":{}}
 			while expedition.phase != "results" and steps < 1000:
 				steps += 1; var result := {"ok":true}
 				match expedition.phase:
@@ -209,6 +274,19 @@ func tuning() -> Array:
 						if expedition.session.phase == "ready": command = MergeProbe.choose(expedition.session,"mixed" if policy == "mixed-v1" else "all-pass",rng)
 						elif expedition.session.phase == "merge_window": expedition.session.presented(); expedition.session.tick(20)
 						result = expedition.session.apply(command)
+						if result.ok:
+							for fact in result.facts:
+								match fact.type:
+									"resource_spent":
+										if fact.resource == "resource.action_budget": counters.work_spent += fact.amount
+										else: counters.craft_spent += fact.amount
+									"craft_settled": counters.craft_earned += fact.gain; counters.craft_clipped += fact.eligible_award-fact.gain
+									"obstacle_damaged": counters.rubble_damage += fact.damage
+									"tile_promoted": counters.highest_promoted = maxi(counters.highest_promoted,fact.new.tier)
+									"tile_extracted": counters.highest_extracted = maxi(counters.highest_extracted,fact.tier)
+									"board_rearranged": counters.rearrangements += 1
+									"tool_activated": counters.tools[fact.kind] = counters.tools.get(fact.kind,0)+1
+									"reaction_applied": counters.families[fact.reaction_id] = counters.families.get(fact.reaction_id,0)+1
 						if result.ok and expedition.session.phase in ["complete","failed"]: result = expedition.finish_room()
 					"carry_selection": result = expedition.confirm_carry(expedition.eligible_carry().slice(0,2).map(func(t: Dictionary) -> String: return t.instance_id),expedition.revision())
 					"reward_selection": result = expedition.choose_reward(expedition.offers[0],expedition.revision())
@@ -219,7 +297,7 @@ func tuning() -> Array:
 			check(ExpeditionState.restored(expedition.snapshot(),false).ok,"tuning_full_replay/"+policy+"/"+str(seed_value))
 			var snapshot := CanonicalCodec.encode(expedition.snapshot())
 			var file := FileAccess.open(output.get_base_dir().path_join(policy+"-"+str(seed_value)+".fac"),FileAccess.WRITE); file.store_buffer(snapshot); file.close()
-			records.append({"policy":policy,"seed":seed_value,"steps":steps,"room":expedition.room_index,"outcome":expedition.current().phase,"failure":failure,"digest":CanonicalCodec.digest(expedition.snapshot())})
+			records.append({"policy":policy,"seed":seed_value,"steps":steps,"room":expedition.room_index,"outcome":expedition.current().phase,"failure":failure,"room_failure_reason":expedition.current().room.failure_reason,"counters":counters,"digest":CanonicalCodec.digest(expedition.snapshot())})
 			if seed_value%10 == 0: print("P3_TUNING: ",policy," ",seed_value); await get_tree().process_frame
 	return records
 
@@ -228,7 +306,12 @@ func run(path: String) -> void:
 	if FileAccess.file_exists(path): printerr("FAIL: report exists"); get_tree().quit(1); return
 	var report := {"schema":"facets-p3-probe-v1","profile":P3Content.PROFILE,"content":P3Content.CONTENT,"editor":OS.has_feature("editor"),"executable":OS.get_executable_path(),"display":str(DisplayServer.window_get_size())}
 	if "--p3-tuning" in OS.get_cmdline_user_args():
-		report.mode = "deterministic_tuning"; report.seed_list = "integers 1..100 inclusive; no exclusions"; report.rooms = await tuning()
+		report.mode = "deterministic_tuning"
+		report.rules_profile = MergeProbe.option("--p3-tuning-profile","p3-production-v1")
+		report.seed_list = MergeProbe.option("--p3-seed-list","p3-seeds-1-100-v1")
+		check(report.rules_profile == "p3-production-v1" and report.seed_list == "p3-seeds-1-100-v1","immutable_named_tuning_inputs")
+		report.seed_scope = "integers 1..100 inclusive; no exclusions"; report.rules_digest = CanonicalCodec.digest(RuleSet.for_p3().to_dict())
+		if failures.is_empty(): report.rooms = await tuning()
 	else:
 		report.mode = "native_lifecycle_assisted"
 		for route in ["deep_seam","commission-opening"]: await native_route(route)

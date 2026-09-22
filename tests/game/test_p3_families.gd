@@ -52,6 +52,23 @@ func _run() -> void:
 	var corundum := merge(corundum_state)
 	check(not corundum_state.board.obstacles.has("rubble/contact"),"Corundum replaces base damage with two")
 	check(count(corundum,"obstacle_damaged") == 1 and count(corundum,"obstacle_broken") == 1,"component damage and break deduplicated")
+	# Same tiers, cells and identities, two useful build lines: Sapphire breaks
+	# adjacent two-hit rubble now; Aquamarine leaves one hit but creates a chain.
+	var paired: Array = []
+	for settings in [[],["aquamarine"]]:
+		var board_state := fixture(5); board_state.settings = settings
+		board_state.catalog = P3Content.catalog(settings).catalog
+		for cell in board_state.board.all_cells():
+			var old := board_state.board.get_tile(cell)
+			if old == null: continue
+			var current := board_state.catalog.create_tile(old.tier); current.instance_id = old.instance_id; board_state.board.set_tile(cell,current)
+		board_state.board.remove_tile(Vector2i(1,2))
+		board_state.board.obstacles["paired/rubble"] = {"id":"paired/rubble","cell":Vector2i(1,2),"kind":"rubble","durability":2}
+		for cell in [Vector2i(1,4),Vector2i(3,4)]: board_state.board.set_tile(cell,board_state.catalog.create_tile(3))
+		paired.append(merge(board_state))
+	check(not paired[0].state.board.obstacles.has("paired/rubble") and paired[1].state.board.obstacles["paired/rubble"].durability == 1,"paired Sapphire line immediately clears two-hit rubble")
+	check(paired[0].state.board.get_tile(Vector2i(2,4)).tier == 2 and paired[1].state.board.get_tile(Vector2i(2,4)).tier == 3,"paired Aquamarine line upgrades a planned neighbor")
+	check(MatchDetector.new().find_matches(paired[1].state.board).any(func(m: Dictionary) -> bool: return Vector2i(2,4) in m.cells),"Aquamarine creates the planned next match")
 	var beryl := merge(fixture(6))
 	check(beryl.uses.get("beryl",false) and beryl.state.board.get_tile(Vector2i(2,4)).tier == 3,"Beryl chooses lowest eligible live neighbor")
 	var chain_state := fixture(6)

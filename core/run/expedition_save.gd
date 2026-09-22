@@ -7,6 +7,8 @@ var directory := "user://expeditions"
 
 static func phase_of(run: ExpeditionState) -> String:
 	if run.session == null: return run.phase
+	if run.session.phase in ["complete","failed"]:
+		return "carry_selection" if run.session.phase == "complete" and run.room_index < 2 else "results"
 	if not run.session.reservation.is_empty(): return "reserved_command"
 	return run.session.phase
 
@@ -16,6 +18,13 @@ static func checksum(bytes: PackedByteArray) -> PackedByteArray:
 
 static func encode(run: ExpeditionState) -> PackedByteArray:
 	if run.current() == null: return PackedByteArray()
+	# A caller can capture immediately after a terminal session publication.
+	# Normalize a detached owner so saves never expose transient terminal phases
+	# or depend on presentation completion; the live run remains untouched.
+	if run.session != null and run.session.phase in ["complete","failed"]:
+		var admitted := ExpeditionState.restored(run.snapshot(),false)
+		if not admitted.ok or not admitted.run.finish_room().ok: return PackedByteArray()
+		run = admitted.run
 	var payload := CanonicalCodec.encode({"save":P3Content.SAVE,"content":P3Content.CONTENT,"phase":phase_of(run),"snapshot":run.snapshot()})
 	if payload.is_empty() or payload.size() > CanonicalCodec.MAX_BYTES: return PackedByteArray()
 	var bytes := MAGIC.to_ascii_buffer(); bytes.resize(16); bytes.encode_s64(8,payload.size())
@@ -34,6 +43,7 @@ static func decode(bytes: PackedByteArray, pause_timed: bool = true) -> Dictiona
 	if not StateAdmission.exact(value,["save","content","phase","snapshot"]) or value.save != P3Content.SAVE or value.content != P3Content.CONTENT: return StateAdmission.fail("save_incompatible")
 	var admitted := ExpeditionState.restored(value.snapshot,false)
 	if not admitted.ok: return admitted
+	if admitted.run.session != null and admitted.run.session.phase in ["complete","failed"]: return StateAdmission.fail("save_terminal_transition")
 	if value.phase != phase_of(admitted.run): return StateAdmission.fail("save_phase")
 	if pause_timed and admitted.run.session != null:
 		admitted.run.session = MergeReplay.restored(value.snapshot.session,true).session
