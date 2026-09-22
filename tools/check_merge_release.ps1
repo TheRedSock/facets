@@ -6,6 +6,7 @@ param(
     [int]$Multiplier = 1, [int]$Seeds = 100, [int]$Repetitions = 3,
     [string]$Policies = 'all-pass,first,survivor,remote,mixed',
     [switch]$Reduced,
+    [switch]$CpuPolling,
     [int]$GpuIndex = -1
 )
 $ErrorActionPreference = 'Stop'
@@ -23,7 +24,7 @@ function PackageIdentity {
     return $result
 }
 $identity = PackageIdentity
-$metadata = [ordered]@{ schema=1; mode=$Mode; package=$packagePath; hashes=$identity; started=(Get-Date).ToString('o'); power=(powercfg /getactivescheme | Out-String).Trim(); width=$Width; height=$Height; gpu_index=$GpuIndex; multiplier=$Multiplier; seeds=$Seeds; repetitions=$Repetitions; policies=$Policies }
+$metadata = [ordered]@{ schema=1; mode=$Mode; package=$packagePath; hashes=$identity; started=(Get-Date).ToString('o'); power=(powercfg /getactivescheme | Out-String).Trim(); width=$Width; height=$Height; gpu_index=$GpuIndex; multiplier=$Multiplier; seeds=$Seeds; repetitions=$Repetitions; policies=$Policies; cpu_polling=[bool]$CpuPolling }
 try {
     $metadata.cpu = @(Get-CimInstance Win32_Processor | Select-Object Name,LoadPercentage)
     $metadata.gpu = @(Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion)
@@ -37,6 +38,7 @@ $arguments += @('--',"--merge-probe=$($report.Replace('\','/'))","--merge-multip
 if ($Mode -eq 'native') { $arguments += @('--merge-native','--review') }
 if ($Mode -eq 'characterization') { $arguments += '--merge-characterization' }
 if ($Reduced) { $arguments += '--merge-reduced' }
+if ($CpuPolling) { $arguments += '--merge-cpu-polling' }
 $execution = Invoke-BoundedCheckProcess -Executable (Join-Path $packagePath 'Facets.exe') -Arguments $arguments -TimeoutSeconds 7200 -WorkingDirectory $packagePath
 $execution.output | Set-Content -Encoding utf8 (Join-Path $outputPath 'probe.log')
 $checked = Get-GodotCheckResult -ExitCode $execution.exit_code -Output $execution.output -Completion 'CHECK_COMPLETE: merge_probe'

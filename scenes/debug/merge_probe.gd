@@ -78,6 +78,7 @@ func run(path: String) -> void:
 		failures.append_array(report.characterization.failures)
 	else:
 		report.mode = "accelerated_decision_clock_worker_cpu"
+		report.completion_observer = "poll_sleep_100us" if "--merge-cpu-polling" in OS.get_cmdline_user_args() else "worker_semaphore"
 		_cpu_room(101,"all-pass",-1,false)
 		var count := int(option("--merge-seeds","100")); var repeats := int(option("--merge-repetitions","3"))
 		var policies := option("--merge-policies","all-pass,first,survivor,remote,mixed").split(",")
@@ -104,11 +105,16 @@ func _cpu_room(seed_number: int, policy: String, repetition: int, measured: bool
 	game.apply_action(RoomCommand.begin(0))
 	var session := MergeSession.new()
 	if not session.start(game.run_state.to_dict()): failures.append("session_start"); return
-	var executor := MergeExecutor.new(session); executor.compute_multiplier = _multiplier
+	var polling := "--merge-cpu-polling" in OS.get_cmdline_user_args()
+	var notice := Semaphore.new()
+	var executor := MergeExecutor.new(session,null if polling else notice); executor.compute_multiplier = _multiplier
 	var rng := SeededRng.new(); rng.reseed(900000+seed_number)
 	var tags := {"seed":seed_number,"policy":policy,"repetition":repetition}
 	var prior_gravity := 0; var count := 0; var intervention_count := 0
 	while session.phase in ["ready","merge_window","gravity"] and count < 500:
+		# A completion can be polled before its posted notification is consumed.
+		# Drain only between jobs; a superseded default may also wake the observer.
+		while notice.try_wait(): pass
 		var phase := session.phase
 		var command: RoomCommand
 		var interval := 150000
@@ -135,10 +141,21 @@ func _cpu_room(seed_number: int, policy: String, repetition: int, measured: bool
 		var result := {}
 		var timeout := Time.get_ticks_usec()+10000000
 		var poll_us := 0
+		var sleep_us := 0
+		var sleep_max_us := 0
+		var sleep_count := 0
 		while result.is_empty() and Time.get_ticks_usec() < timeout:
 			var began := Time.get_ticks_usec()
 			result = executor.poll(); poll_us = maxi(poll_us,Time.get_ticks_usec()-began)
-			if result.is_empty(): OS.delay_usec(100)
+			if result.is_empty():
+				var sleep_began := Time.get_ticks_usec()
+				# CPU-only observer: wake on mailbox completion instead of rounding
+				# an arbitrary 100us sleep to the OS timer quantum. The external
+				# process watchdog handles a broken worker; native never waits here.
+				if polling: OS.delay_usec(100)
+				else: notice.wait()
+				var slept := Time.get_ticks_usec()-sleep_began
+				sleep_us += slept; sleep_max_us = maxi(sleep_max_us,slept); sleep_count += 1
 		if result.is_empty(): failures.append(str(tags)+"/timeout"); break
 		if result.get("status") == "default_ready":
 			session.tick(20)
@@ -150,6 +167,8 @@ func _cpu_room(seed_number: int, policy: String, repetition: int, measured: bool
 		metric.next_phase = session.phase; metric.available_us = interval
 		metric.command = command.data.kind if command != null else "pass"
 		metric.main_us = schedule_us+poll_us+default_schedule_us
+		metric.observer_wait_us = sleep_us; metric.observer_wait_max_us = sleep_max_us; metric.observer_wait_count = sleep_count
+		metric.completion_to_publication_us = metric.published_us-metric.ready_us
 		metric.effective_ready_us = metric.latency_us
 		metric.ratio = metric.effective_ready_us/float(maxi(1,interval))
 		metric.scheduled_deadline_us = metric.submitted_us+interval

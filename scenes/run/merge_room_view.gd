@@ -135,7 +135,7 @@ func request_swap(a: Vector2i, b: Vector2i) -> void:
 	input_buffer.clear()
 	clock_adapter.advance(received)
 	var command := RoomCommand.exchange(session.state,a,b)
-	var result := executor.submit(command)
+	var result := executor.submit(command,received)
 	if not result.ok:
 		_notice = "Swap unavailable"; audio.play("ui_reject")
 		telemetry.append({"kind":"rejected","code":result.code,"us":received})
@@ -196,13 +196,13 @@ func _target(pos: Vector2i) -> void:
 	else:
 		var layer := "obstacle" if not session.state.board.obstacle_at(pos).is_empty() else ("lock" if not session.state.board.get_cell(pos).lock.is_empty() else "gem")
 		command = RoomCommand.target(session.state,_tool,pos,layer)
-	var accepted := executor.submit(command)
+	var accepted := executor.submit(command,began)
 	_cancel_selection()
 	if accepted.ok:
 		audio.play("ui_accept")
 		_tool = ""; board.target_mode = false; board.set_input_gate("merge",true)
 		# Tool feedback receives the same fixed calculation interval as a swap.
-		_motion_deadline = Time.get_ticks_usec()+150000
+		_motion_deadline = began+150000
 	else: _notice = "Tool unavailable — choose another target or make a swap"; audio.play("ui_reject")
 	_refresh()
 	_record_main(Time.get_ticks_usec()-began)
@@ -287,7 +287,8 @@ func _starved(kind: String, now: int) -> void:
 	telemetry.append({"kind":"starvation","phase":kind,"us":now})
 
 func _present(batch: Dictionary) -> void:
-	presented_batches.append({"batch":batch.batch_id,"kind":batch.kind,"us":Time.get_ticks_usec(),
+	var presented_us := Time.get_ticks_usec()
+	presented_batches.append({"batch":batch.batch_id,"kind":batch.kind,"us":presented_us,
 		"expiry_us":_window_deadline if batch.command.is_empty() and not executor.metrics.is_empty() and executor.metrics.back().kind == "default" else 0})
 	if presented_batches.size() > 1024: presented_batches.pop_front()
 	board.set_input_gate("merge",true)
@@ -295,9 +296,9 @@ func _present(batch: Dictionary) -> void:
 		player.show_merge(batch)
 		if session.phase == "merge_window": _start_window()
 	elif batch.kind == "gravity":
-		_motion_deadline = Time.get_ticks_usec()+int(player.gravity_seconds(batch)*1000000)
+		_motion_deadline = presented_us+int(player.gravity_seconds(batch)*1000000)
 		player.play_gravity(batch)
-		executor.continue_gravity()
+		executor.continue_gravity(presented_us)
 	else:
 		player.reset(batch.after); _refresh()
 	# Ordinary gravity uses ActionPlayer, which already owns its fact cues.

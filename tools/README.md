@@ -673,6 +673,13 @@ its fixed assisted/fault witnesses are separate from performance samples. Use
 `-Multiplier 2` for required modeled compute stress. `-Mode characterization`
 measures near-cap boards and 1×/4×/8× diagnostic reaction candidate dispatch;
 those are neither ordinary gameplay gates nor future authored content.
+The CPU observer wakes on a worker semaphore and measures through actual
+publication. Its process watchdog catches a worker that never completes; native
+rendering never blocks on this semaphore. `-CpuPolling` retains the old 100 µs
+requested-sleep observer for controlled comparison, with actual wait durations
+and completion-to-publication latency in raw records. OS sleep granularity is
+not a guaranteed microsecond polling rate. Both modes enforce identical targets;
+native frame/input checks remain separate and required.
 Registered `test_merge_load` additionally executes 1×/4×/8× independent active
 promotion waves, with full admission and hashes per wave. Its conservative
 cost characterization is separate from candidate dispatch, whose once-per-scope

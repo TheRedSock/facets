@@ -19,19 +19,24 @@ var _running := false
 var _kind := ""
 var _submitted_us := 0
 var discarded := 0
+## Optional CPU-harness notification. The playable room never blocks on it.
+## Set before thread startup; only the worker posts, after filling the mailbox.
+var _completion_notice: Semaphore
 
-func _init(model: MergeSession) -> void:
+func _init(model: MergeSession, completion_notice: Semaphore = null) -> void:
 	session = model
+	_completion_notice = completion_notice
 	CanonicalCodec.seal_shared_cache()
 	var code := _thread.start(_work)
 	if code != OK: _stopping = true
 
-func submit(command: RoomCommand) -> Dictionary:
+func submit(command: RoomCommand, received_us: int = 0) -> Dictionary:
+	var began := received_us if received_us > 0 else Time.get_ticks_usec()
 	if _stopping: return StateAdmission.fail("executor_stopped")
 	var admitted := session.reserve(command)
 	if not admitted.ok: return admitted
 	default_result = {}
-	_queue("command",command)
+	_queue("command",command,began)
 	return admitted
 
 func prepare_default() -> bool:
@@ -40,13 +45,13 @@ func prepare_default() -> bool:
 	_queue("default",null)
 	return true
 
-func continue_gravity() -> bool:
+func continue_gravity(presented_us: int = 0) -> bool:
 	if _stopping or session.phase != "gravity" or busy(): return false
-	_queue("gravity",null)
+	_queue("gravity",null,presented_us)
 	return true
 
-func _queue(kind: String, command: RoomCommand) -> void:
-	_submitted_us = Time.get_ticks_usec()
+func _queue(kind: String, command: RoomCommand, boundary_us: int = 0) -> void:
+	_submitted_us = boundary_us if boundary_us > 0 else Time.get_ticks_usec()
 	# Immutable catalog/rules/definition may be shared; all mutable state is copied.
 	var source := session._detached()
 	_mutex.lock()
@@ -95,6 +100,7 @@ func _work() -> void:
 			_completed = {"generation":job.generation,"kind":job.kind,"result":result,
 				"submitted_us":job.submitted_us,"service_us":computed,"ready_us":Time.get_ticks_usec(),
 				"command":job.command.to_dict() if job.command != null else {},"injection":job.failure}
+			if _completion_notice != null: _completion_notice.post()
 		else: discarded += 1
 		_mutex.unlock()
 

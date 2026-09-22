@@ -290,6 +290,15 @@ work off the main thread does not authorize omitting it. Maintain one ordered
 input/commit transcript. Diagnostic scheduling, latency and worker telemetry are
 separate from mechanical identity except recorded window/assist decisions.
 
+Readiness telemetry starts at command receipt (before reservation admission), or
+at gravity presentation (before building/starting its animation). Those same
+boundaries fix the presentation deadline. The CPU-only accelerated harness may
+receive a semaphore notification after the worker fills its completion mailbox;
+it still times real main-thread publication, validation and hashing. Native play
+continues to poll once per frame and never blocks on this notification. The CPU
+observer's wait is guarded by the external process watchdog; notification alone
+cannot publish a default or make an invalid/stale candidate authoritative.
+
 ## Compatibility and P3 reconciliation
 
 Implemented profile `p3-ready-merge-v1`, simulation `facets-sim-merge-v1`, content
