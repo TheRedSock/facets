@@ -88,6 +88,19 @@ func _ready() -> void:
 		view.back_requested.connect(func(): visible = true)
 		get_tree().root.add_child(view))
 	vbox.add_child(p3)
+	var continue_button := Button.new(); continue_button.text = "Continue expedition"; continue_button.custom_minimum_size.y = 48
+	continue_button.pressed.connect(func():
+		var saved := ExpeditionSave.new().load_slot()
+		if not saved.ok:
+			var dialog := AcceptDialog.new(); dialog.dialog_text = "Continue unavailable: "+saved.code
+			add_child(dialog); dialog.popup_centered(); dialog.confirmed.connect(dialog.queue_free); dialog.canceled.connect(dialog.queue_free)
+			return
+		visible = false
+		var view := ExpeditionView.new(); view.run = saved.run; view.seed_value = saved.run.seed_value
+		if saved.recovered: view.error = "Recovered last-known-good save: "+saved.warning
+		view.back_requested.connect(func(): visible = true)
+		get_tree().root.add_child(view))
+	vbox.add_child(continue_button)
 	if "--review" in OS.get_cmdline_user_args():
 		var practice := Button.new(); practice.text = "Practice · redirect a merge"; practice.custom_minimum_size.y = 48
 		practice.pressed.connect(func():

@@ -33,6 +33,13 @@ both routes are frozen under `tests/fixtures/p3_expedition_v1`; seed-1 first-swa
 policy witnesses a real loss. `test_p3_flow` covers every reachable reward pair.
 These establish reachability and deterministic execution, not player balance.
 
+P3.6: `ExpeditionSave` implements bounded FAC1 payloads in a length/SHA-256
+envelope, safe slots, verified temporary writes and last-known-good recovery.
+Continue reports invalid/incompatible data or recovery explicitly and admits
+the complete replay before replacing a run. All eleven committed phases,
+reservation exactly-once resume, assisted timed restore, signed >2^53 values
+and six interrupted-write points pass `test_p3_save`. Preferences remain separate.
+
 G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.
 Replay/restore and P3 seams are verified under the

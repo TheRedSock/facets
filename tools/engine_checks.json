@@ -1473,6 +1473,12 @@
       "timeout_seconds": 300
     },
     {
+      "name": "test_p3_save",
+      "args": ["--headless", "--script", "res://tests/game/test_p3_save.gd"],
+      "mode": "cpu", "report_root_arg": true, "timeout_seconds": 600,
+      "completion": "CHECK_COMPLETE: test_p3_save"
+    },
+    {
       "name": "test_p3_replay",
       "args": ["--headless", "--script", "res://tests/game/test_p3_replay.gd"],
       "mode": "cpu", "report_root_arg": true,

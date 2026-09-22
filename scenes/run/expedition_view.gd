@@ -9,6 +9,7 @@ var panel: VBoxContainer
 var error := ""
 var _generation := 0
 var _loading := false
+var store := ExpeditionSave.new()
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -36,6 +37,8 @@ func show_phase() -> void:
 		room_view = MergeRoomView.new(); room_view.p3_mode = true; room_view.external_session = run.session
 		room_view.back_requested.connect(func(): back_requested.emit(); queue_free())
 		room_view.restart_requested.connect(restart)
+		room_view.save_requested.connect(save_run)
+		room_view.continue_requested.connect(continue_run)
 		room_view.room_finished.connect(func():
 			var result := run.finish_room()
 			if not result.ok: error = result.code
@@ -49,6 +52,8 @@ func show_phase() -> void:
 	panel = VBoxContainer.new(); panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL; scroll.add_child(panel)
 	label("FACETS · Expedition")
 	button("Menu",func(): back_requested.emit(); queue_free())
+	if run != null: button("Save expedition",save_run)
+	button("Continue saved expedition",continue_run)
 	if not error.is_empty(): label(error)
 	if run == null: button("Restart expedition",restart); return
 	label("Room %d · %s" % [run.room_index+1,run.current().room.definition.data.id.capitalize()])
@@ -136,3 +141,34 @@ func restart() -> void:
 	if result.ok: run = result.run; error = ""
 	else: error = result.code
 	show_phase.call_deferred()
+
+func save_run() -> void:
+	if run == null: return
+	if room_view != null:
+		room_view.input_buffer.clear()
+		room_view.clock_adapter.pause(true,"manual")
+	var result := store.write_slot(run)
+	error = "Expedition saved" if result.ok else "Save failed: "+result.code
+	if room_view != null: room_view._notice = error; room_view._refresh()
+	else: show_phase()
+
+func continue_run() -> void:
+	if _loading: return
+	var result := store.load_slot()
+	if not result.ok:
+		error = "Continue failed: "+result.code
+		if room_view != null: room_view._notice = error; room_view._refresh()
+		else: show_phase()
+		return
+	_loading = true; var generation := _generation
+	get_node("/root/GemForge").request_required(result.run.current().catalog.roster(),func(ready: bool):
+		if not is_inside_tree() or generation != _generation: return
+		_loading = false
+		if not ready:
+			error = "Continue assets unavailable; current expedition retained."
+			if room_view != null: room_view._notice = error; room_view._refresh()
+			else: show_phase()
+			return
+		run = result.run; seed_value = run.seed_value
+		error = "Recovered last-known-good save: "+result.get("warning","") if result.recovered else ""
+		show_phase())

@@ -3,6 +3,8 @@ extends Control
 signal back_requested
 signal room_finished
 signal restart_requested
+signal save_requested
+signal continue_requested
 var external_session: MergeSession
 var _reported_terminal := false
 var seed_value := 1
@@ -65,6 +67,9 @@ func _ready() -> void:
 	_button(bar,"Pass window",func(): clock_adapter.pass_now() if clock_adapter != null else false)
 	_button(bar,"Sound / mute",func(): audio.set_muted(not RoomAudio.muted))
 	if p3_mode: _button(bar,"Collection / rewards",_show_collection)
+	if external_session != null:
+		_button(bar,"Save",func(): save_requested.emit())
+		_button(bar,"Continue",func(): continue_requested.emit())
 	_cancel_button = _button(bar,"Cancel selection",_cancel_selection)
 	var split := HBoxContainer.new(); split.size_flags_vertical = Control.SIZE_EXPAND_FILL; body.add_child(split)
 	board = load("res://scenes/board/board_scene.tscn").instantiate()
@@ -160,7 +165,15 @@ func _assets_loaded(loaded: bool, epoch: int) -> void:
 	player.reset(session.state.board); board.visible = true; _begin.show(); _refresh()
 	board.outlet_cells = session.state.room.definition.data.get("outlets",[])
 	board.outlet_tier = session.state.room.definition.data.get("minimum_tier",0)
-	if external_session != null: begun = true; _begin.hide(); _refresh()
+	if external_session != null:
+		begun = true; _begin.hide()
+		if not session.reservation.is_empty():
+			var command := RoomCommand.parse(session.reservation.command)
+			_motion_deadline = Time.get_ticks_usec()+150000
+			if command.data.kind == "swap": player.begin_swap(command)
+			executor.resume_reserved()
+		elif session.phase == "gravity": executor.continue_gravity()
+		_refresh()
 
 func request_swap(a: Vector2i, b: Vector2i) -> void:
 	var received := Time.get_ticks_usec()
