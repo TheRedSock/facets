@@ -2,9 +2,10 @@
 
 G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.
-Replay/restore and P3 seams are being verified under the
-[merge-window contract](MERGE_WINDOW_PREPARATION.md). Full readiness still needs
-the G6/G7 release/performance exits. Families, rooms beyond P2, expedition and
+Replay/restore and P3 seams are verified under the
+[merge-window contract](MERGE_WINDOW_PREPARATION.md). G6/G7 engineering readiness
+passes on the [declared profile](../../tests/game/MERGE_FINAL_READINESS.md).
+Families, rooms beyond P2, expedition and
 disk Continue below remain specified P3 work, not implemented gameplay.
 The earlier atomic specification is checksum-archived locally before this edit.
 The old complete-action 5 ms failure remains historical evidence. The user is

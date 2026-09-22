@@ -1,13 +1,14 @@
-# Merge-window resolution — proposed successor contract
+# Merge-window resolution contract
 
-Status: G0-G5 implementation and focused acceptance, 2026-09-22. Incremental
+Status: G0-G7 engineering acceptance complete, 2026-09-22. Incremental
 resolution, repeated paid inputs, worker/default lookahead, streaming presentation
-and replay/restore are implemented. G6 performance and G7 release acceptance are
-still pending; no P3-readiness or human-feel pass is claimed. Existing atomic
+and replay/restore are implemented. [Final readiness evidence](../../tests/game/MERGE_FINAL_READINESS.md)
+records the tested machine/profile, preserved failures and exact delivery.
+P3 content and human feel remain unverified. Existing atomic
 P1/P2 and the one-window trial remain controls.
 Implementation and acceptance belong to [the successor goal](../../plans/P3_READINESS_SUCCESSOR.md).
-This proposal replaces the atomic-only assumption for the next P3-readiness
-experiment; it does not silently change the shipped P2 or frozen P0 behavior.
+This implemented successor replaces the atomic-only assumption for P3;
+the retained atomic P2 control and frozen P0 behavior keep their own identities.
 
 ## User-directed behavior
 

@@ -1,8 +1,9 @@
 # Merge-window successor acceptance specifications
 
-Status: execution underway, 2026-09-22. These are the required fixture
+Status: engineering exits verified, 2026-09-22, on the
+[declared final profile](MERGE_FINAL_READINESS.md). These are the required fixture
 specifications; [the readiness ledger](merge-readiness-status.json) identifies
-implemented checks and outstanding release evidence. Implement and register checks during the
+implemented checks and exact release evidence. Checks were implemented during the
 [successor goal](../../plans/P3_READINESS_SUCCESSOR.md). The
 [owning contract](../../core/run/MERGE_WINDOW_PREPARATION.md) defines behavior.
 Preserve existing P0/P1/P2 and trial goldens unchanged.
@@ -53,7 +54,7 @@ stages only after their implementations and completion markers exist.
 
 The old complete-action 5 ms p95 remains a failed historical metric. It cannot be
 relabelled as passing because a different subset is measured. Successor readiness
-uses the following proposed thresholds, with end-to-end deadlines as the primary
+uses the following frozen thresholds, with end-to-end deadlines as the primary
 responsiveness evidence. These are engineering hypotheses, not player findings.
 
 Reference presentation is 60 Hz, 150 ms swaps, 333.333 ms merge windows and the

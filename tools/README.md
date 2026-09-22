@@ -681,6 +681,19 @@ requested-sleep observer for controlled comparison, with actual wait durations
 and completion-to-publication latency in raw records. OS sleep granularity is
 not a guaranteed microsecond polling rate. Both modes enforce identical targets;
 native frame/input checks remain separate and required.
+Native probes record attempted, accepted and expired gestures separately; only
+accepted swaps start feedback measurements. Completed main-frame samples are
+drained throughout the run, before ordinary-room telemetry retention expires.
+
+`tools/game/check_merge_environment.ps1` wraps CPU/native/characterization runs
+with a temporary display/system awake request and window/desktop observations.
+`-AlwaysOnTop` requests a visible test window for occlusion comparisons; it does
+not alter the shipped game setting or establish physical display latency.
+`-MaxFps` records an explicit diagnostic cap override; omit it for the project's
+default. `-Mode closeout` applies the same environment guard to the actual
+executable legacy/trial/delivery matrix. These flags change no global settings.
+Preserve failed and alternate-profile runs and distinguish environment controls
+from runtime corrections. The wrapper always releases its awake request.
 Registered `test_merge_load` additionally executes 1×/4×/8× independent active
 promotion waves, with full admission and hashes per wave. Its conservative
 cost characterization is separate from candidate dispatch, whose once-per-scope

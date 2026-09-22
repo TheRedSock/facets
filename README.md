@@ -9,8 +9,9 @@ board objectives and branching runs.
 The repository contains an offline gem-authoring/rendering pipeline, runtime
 asset delivery, and playable P2 rooms with rubble, Work, Craft and tools.
 The [merge-window successor](core/run/MERGE_WINDOW_PREPARATION.md) adds repeated
-interventions and incremental resolution; its readiness ledger distinguishes
-implemented behavior from outstanding release gates. Atomic P2 and the earlier
+interventions and incremental resolution. Its [P3 readiness checks](tests/game/MERGE_FINAL_READINESS.md)
+pass on the declared current-machine profile, with one verified build and optional
+review form delivered. Atomic P2 and the earlier
 isolated comparison remain controls; their whole-action CPU target remains open.
 Family reactions, rewards, carryover and
 expedition persistence are specified in the [P3 preparation contract](core/run/P3_PREPARATION.md).

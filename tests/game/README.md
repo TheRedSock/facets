@@ -124,8 +124,9 @@ The actual release matrix is `tools/game/verify_closeout_release.ps1`. It runs
 the shipped executable at both native sizes, compares all frozen P1/P2 action
 pairs, checks trial replay equivalence at 30/60/120 FPS and exercises isolated
 missing/corrupt pack copies. Functional completion, CPU/frame targets and human
-evaluation have separate statuses. The tracked `closeout-status.json` records
-the latest disposition; ignored reports retain exact measurements and failures.
+evaluation have separate statuses. The tracked `closeout-status.json` preserves
+the earlier atomic closeout disposition; the successor ledger below owns current
+readiness. Ignored reports retain exact measurements and failures.
 
 ## Merge-window successor
 
@@ -137,8 +138,8 @@ release performance and final readiness. Registered `test_merge_kernel`,
 owners. `test_merge_native` needs `-Gpu` and uses synthetic delivery fixtures;
 it does not substitute for the actual packaged assets.
 
-[Release evidence](MERGE_RELEASE_EVIDENCE.md) records measured scope, retained
-failures, package identity and the remaining engineering exits.
+[Final readiness evidence](MERGE_FINAL_READINESS.md) records the passing
+engineering exits, measured scope, retained failures and exact package identity.
 
 `merge_cpu_smoke` runs 15 editor rooms through the worker with accelerated
 decision clocks. `merge_characterization` measures bounded diagnostic reaction

@@ -1,15 +1,19 @@
 # Merge-window readiness evidence
 
-The latest [CPU observer and boundary correction](MERGE_HEADROOM_EVIDENCE.md)
-passes the full normal corpus; final r6 release re-verification remains pending.
+The latest [observer, boundary and environment evidence](MERGE_HEADROOM_EVIDENCE.md)
+passes both full CPU corpora and r8 native normal/2x profiles at both sizes,
+including a repeat, with explicit test-window visibility. Final integrated,
+legacy executable, characterization and delivery verification also pass;
+[the final handoff](MERGE_FINAL_READINESS.md) records scope and exact bytes.
 
 Later user-feedback fixes and the power-aware stall investigation are recorded
 in [the follow-up evidence](MERGE_FEEDBACK_EVIDENCE.md). That report supersedes
-the remaining-failure diagnosis below: awake native checks pass, while a fresh
-CPU-only headroom margin remains failed. Earlier reports and metrics are retained.
+the historical stall diagnosis below. Its then-open CPU headroom margin is
+subsequently closed by the evidence linked above. Earlier reports and metrics
+are retained; the r5 sections below are historical, not the latest candidate.
 
 Status, 2026-09-22: the successor mechanics and P3 contract reconciliation are
-implemented. **G6/G7 remain open; P3-ready is not declared.** This document records
+implemented. **G0–G7 engineering readiness passes on the declared profile.** This document records
 the scope of measured results, including failures. The executable decision is in
 [the 30-case ledger](merge-readiness-status.json); exact requirements remain in
 [the acceptance specification](MERGE_WINDOW_ACCEPTANCE.md). Reports and packages

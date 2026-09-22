@@ -7,6 +7,8 @@ param(
     [string]$Policies = 'all-pass,first,survivor,remote,mixed',
     [switch]$Reduced,
     [switch]$CpuPolling,
+    [int]$MaxFps = -1,
+    [switch]$AlwaysOnTop,
     [int]$GpuIndex = -1
 )
 $ErrorActionPreference = 'Stop'
@@ -24,16 +26,19 @@ function PackageIdentity {
     return $result
 }
 $identity = PackageIdentity
-$metadata = [ordered]@{ schema=1; mode=$Mode; package=$packagePath; hashes=$identity; started=(Get-Date).ToString('o'); power=(powercfg /getactivescheme | Out-String).Trim(); width=$Width; height=$Height; gpu_index=$GpuIndex; multiplier=$Multiplier; seeds=$Seeds; repetitions=$Repetitions; policies=$Policies; cpu_polling=[bool]$CpuPolling }
+$metadata = [ordered]@{ schema=1; mode=$Mode; package=$packagePath; hashes=$identity; started=(Get-Date).ToString('o'); power=(powercfg /getactivescheme | Out-String).Trim(); width=$Width; height=$Height; gpu_index=$GpuIndex; multiplier=$Multiplier; seeds=$Seeds; repetitions=$Repetitions; policies=$Policies; cpu_polling=[bool]$CpuPolling; max_fps_override=$MaxFps }
 try {
     $metadata.cpu = @(Get-CimInstance Win32_Processor | Select-Object Name,LoadPercentage)
     $metadata.gpu = @(Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion)
 } catch { $metadata.hardware_query_error = $_.Exception.Message }
+$metadata.always_on_top = [bool]$AlwaysOnTop
 $metadata | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $outputPath 'environment.json')
 $report = Join-Path $outputPath 'probe.json'
 $arguments = @('--audio-driver','Dummy','--resolution',"${Width}x${Height}")
 if ($Mode -ne 'native') { $arguments += '--headless' }
 if ($GpuIndex -ge 0) { $arguments += @('--gpu-index',"$GpuIndex") }
+if ($MaxFps -ge 0) { $arguments += @('--max-fps',"$MaxFps") }
+if ($AlwaysOnTop) { $arguments += '--always-on-top' }
 $arguments += @('--',"--merge-probe=$($report.Replace('\','/'))","--merge-multiplier=$Multiplier","--merge-seeds=$Seeds","--merge-repetitions=$Repetitions","--merge-policies=$Policies")
 if ($Mode -eq 'native') { $arguments += @('--merge-native','--review') }
 if ($Mode -eq 'characterization') { $arguments += '--merge-characterization' }

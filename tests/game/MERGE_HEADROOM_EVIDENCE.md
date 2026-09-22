@@ -1,8 +1,9 @@
 # CPU completion observer and readiness boundaries — 2026-09-22
 
-This correction and the full normal CPU corpus pass; final stress/native/control
-and delivery acceptance is pending. No thresholds, simulation rules, animations or historical results
-have been changed.
+The full normal and 2x CPU corpora, final r8 native/control checks and delivery
+verification pass. See [final readiness](MERGE_FINAL_READINESS.md) for combined
+evidence and scope. The chronology below preserves earlier pending/failed states.
+No thresholds, simulation rules, animations or historical results were changed.
 
 ## Evidence and correction
 
@@ -85,3 +86,103 @@ The fresh normal-profile CPU margin failure is closed on this measured package.
 Full r6 2× stress, final native measurements, integrated affected controls and
 new delivery verification remain pending. Prior reports and failed gates remain
 historical evidence; P3 readiness is not yet declared.
+
+## Full doubled-computation release corpus
+
+`r6-cpu-stress2x/release/run.json` passed all **1,500 rooms / 51,873 batches**
+with zero deadline misses and no engine errors. `r6-cpu-stress2x-audit.json`
+independently checked every raw interval and matched every reference outcome.
+Command ready p95/max was **38.037/82.074 ms**; gravity follower was
+47.522/112.350 ms; default was 50.560/130.204 ms. Command readiness ratios were
+0.253580/0.547160. Those exceed the stricter normal-profile reserve margins,
+but the frozen 2× requirement is zero deadline misses, with margins reported.
+No threshold has been changed. Main scheduling per operation was p95 2.394 ms,
+max 7.026 ms; native per-frame totals remain a separate gate.
+
+Whole-process peak working set was 407,764,992 bytes; sampled private peak was
+302,997,504 bytes. The temporary awake request acquired/released successfully;
+17,032 environment observations are retained. Final r6 native/control checks
+and delivery remain pending.
+
+## Native frame-pacing investigation
+
+The completed r6 native 1280x720 run (`r6-native-720/release/run.json`)
+failed two unchanged normal thresholds: default visible handoff p95 17.932 ms
+versus 16.7 ms, and demand readiness p95 ratio 0.258487 versus 0.25.
+All five policies and 40 fixed release cases completed without starvation or
+deadline misses. Frame p95/max was 16.164/37.026 ms. This is a reserve/pacing
+failure, separate from the historical second-long Modern Standby stalls.
+
+An explicit diagnostic override on the identical r6 package, `-MaxFps 0`,
+passed (`r6-native-720-uncapped-diagnostic/release/run.json`): handoff p95
+8.328 ms, demand readiness ratio p95 0.181187. However, the existing mailbox
+VSync mode rendered 70,713 measured frames, with median 0.654 ms intervals.
+That excessive frame rate is not an adopted default. Its main-thread series
+also reaches the existing 4,096-record per-room limit, so this experiment is
+diagnostic evidence, not complete final performance acceptance.
+
+Pinned Godot 4.6.1 sources show that its software FPS limiter uses
+[`OS::delay_usec`](https://raw.githubusercontent.com/godotengine/godot/4.6.1-stable/core/os/os.cpp),
+whose [Windows implementation](https://raw.githubusercontent.com/godotengine/godot/4.6.1-stable/platform/windows/os_windows.cpp)
+uses `Sleep`, including a one-millisecond request for sub-millisecond delays.
+The comparison implicates pacing/wait overhead; it does not establish the exact
+cause of every historical slow frame. A configuration-only r7 experiment uses
+standard VSync (1) and no extra software cap (0). Godot's
+[VSync contract](https://docs.godotengine.org/en/4.6/classes/class_displayserver.html#enum-displayserver-vsyncmode)
+describes that mode as monitor-refresh limited, unlike mailbox mode (3).
+Its actual frame rate and unchanged timing gates must be measured before adoption.
+No gameplay, animation duration, deadline, rule cap or simultaneous-match
+behavior is changed by this experiment.
+
+The r7 standard-VSync experiment failed: frame p95 18.187 ms, handoff p95
+31.578 ms. The rendering change was reverted. A finite 240 FPS override on r6
+also failed handoff (18.069 ms), so raising the cap was not adopted either.
+
+The r7 feedback outliers exposed a separate probe attribution defect: an
+attempted gesture that arrived after expiry was timed against a gem's later
+gravity motion even though no swap had been admitted. Checkpoint `b0b9437`
+records explicit admission/rejection and retains all attempted/accepted/expired
+counts. Unexpected rejection and lost/superseded accepted feedback fail the
+probe. It also drains completed main-frame telemetry before its ordinary-room
+retention cap, keeping the entire measured population. `receipt-attribution-r1`
+passed source plus 98 assertions each in headless/native input modes, including
+a stale tick-19 observation whose actual receipt correctly rejects at expiry.
+No game rule or timing target changed.
+
+The r8 package (`artifacts/package-build/20260922-115724-0176/report.json`)
+differs from r6 in `scenes/debug/merge_probe.gd` alone among 259 runtime inputs.
+Its native test with an explicitly always-on-top test window, original mailbox
+VSync and original 120 FPS cap passed at 1280x720 (`r8-native-720-visible`):
+frame p95/max 15.066/19.217 ms, handoff 15.196/16.306 ms, feedback
+8.839/11.186 ms, readiness ratio 0.1452/0.182953, main 0.267/4.015 ms.
+All 40 fixed cases passed; all 80 gestures were accepted, so the correction
+did not remove any rejected-input samples from this passing run. All 7,197
+active frames have main-thread samples.
+
+The remaining profiles and a repeated normal 720p run also passed. Independent
+`r8-native-*-audit.json` reports recompute every raw quantile, demand deadline,
+input-attribution count and complete frame population, and verify all 40 fixed
+cases and exact package bytes per run.
+
+| r8 visible profile | Frame p95 | Handoff p95 | Readiness ratio p95 |
+|---|---:|---:|---:|
+| 1280x720 normal | 15.066 ms | 15.196 ms | 0.145200 |
+| 1600x900 normal | 15.134 ms | 14.952 ms | 0.147460 |
+| 1280x720 modeled 2x | 15.254 ms | 15.230 ms | 0.250207 |
+| 1600x900 modeled 2x | 10.608 ms | 11.608 ms | 0.243167 |
+| 1280x720 normal repeat | 13.861 ms | 13.755 ms | 0.190820 |
+
+All runs had zero deadline misses/starvation, and all scoped awake requests
+acquired/released. The 2x profile is judged against its frozen zero-miss criterion;
+its normal reserve ratios are reported, not silently relabelled as normal passes.
+The full summaries retain p50/p95/p99/max for all metrics in
+`artifacts/game/merge-readiness/r8-native-summary.json`.
+
+The window option is a per-test visibility control, not a shipped game setting.
+[Microsoft documents](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod)
+that Windows 11 may stop honoring high-resolution timer requests for occluded
+applications. Visibility is therefore a testable environmental hypothesis,
+not proof of the exact OS mechanism. The expanded observer confirms visible,
+non-minimized, topmost test windows; it does not establish foreground interaction
+(foreground reads succeeded but identified another process). No global timer, power, driver or security setting
+was modified, and no physical-display-latency claim is made.
