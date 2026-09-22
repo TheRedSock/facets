@@ -300,7 +300,9 @@ func _present(batch: Dictionary) -> void:
 		executor.continue_gravity()
 	else:
 		player.reset(batch.after); _refresh()
-	player.present_fact_cues(batch.facts)
+	# Ordinary gravity uses ActionPlayer, which already owns its fact cues.
+	# Reduced gravity is only a fade, so the streaming owner supplies those cues.
+	if batch.kind != "gravity" or reduced_motion: player.present_fact_cues(batch.facts)
 	for fact in batch.facts:
 		if fact.type == "room_result":
 			board.presentation_cue.emit("room_success" if fact.phase == "complete" else "room_failure")
