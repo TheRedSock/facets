@@ -248,7 +248,18 @@ func _play_serial(result: Dictionary, instant: bool = false) -> void:
 	cancel(false)
 	var token := epoch
 	_after = result.after
-	if instant: board.snap_to(_after); _after = null; return
+	if instant:
+		# Reduced/instant presentation summarizes committed sound, rather than
+		# silently dropping every cue along with the animation.
+		var mapping := {"match_committed":"match_commit","tile_promoted":"tile_promoted",
+			"obstacle_damaged":"obstacle_hit","obstacle_broken":"obstacle_broken"}
+		var played := {}
+		if result.command.has("origin"): board.presentation_cue.emit("tile_swap")
+		for fact in result.facts:
+			var cue: String = mapping.get(fact.type,"")
+			if not cue.is_empty() and not played.has(cue):
+				played[cue] = true; board.presentation_cue.emit(cue)
+		board.snap_to(_after); _after = null; return
 	var a: Vector2i = result.command.origin; var b: Vector2i = result.command.destination
 	var view_a: TileView = board._tile_views.get(a); var view_b: TileView = board._tile_views.get(b)
 	if view_a == null or view_b == null: board.snap_to(_after); _after = null; return

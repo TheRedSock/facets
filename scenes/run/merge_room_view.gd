@@ -31,6 +31,8 @@ var _tool_origin := Vector2i(-1,-1)
 var _status: Label
 var _tool_buttons: Array[Button] = []
 var _begin: Button
+var _cancel_button: Button
+var _notice := ""
 var _window_bar: ProgressBar
 
 func _ready() -> void:
@@ -51,6 +53,7 @@ func _ready() -> void:
 	_button(bar,"Pause / resume",func(): clock_adapter.pause(not session.clock.paused,"manual") if clock_adapter != null else false)
 	_button(bar,"Pass window",func(): clock_adapter.pass_now() if clock_adapter != null else false)
 	_button(bar,"Sound / mute",func(): audio.set_muted(not RoomAudio.muted))
+	_cancel_button = _button(bar,"Cancel selection",_cancel_selection)
 	var split := HBoxContainer.new(); split.size_flags_vertical = Control.SIZE_EXPAND_FILL; body.add_child(split)
 	board = load("res://scenes/board/board_scene.tscn").instantiate()
 	board.custom_minimum_size = Vector2(400,400); board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -67,9 +70,11 @@ func _ready() -> void:
 	_begin = _button(panel,"Begin room",func(): _begin.hide(); begun = true; _refresh())
 	for item in [["Exchange · 2 Craft","action.exchange"],["Clear · 2 Craft","action.clear_target"],["Promote · 3 Craft","action.promote_target"]]:
 		var kind: String = item[1]
-		_tool_buttons.append(_button(panel,item[0],func(): _tool = kind; _tool_origin = Vector2i(-1,-1); board.target_mode = true; _refresh()))
+		var button := _button(panel,item[0],_select_tool.bind(kind))
+		button.set_meta("kind",kind); _tool_buttons.append(button)
 	audio = RoomAudio.new(); add_child(audio); board.presentation_cue.connect(audio.play)
 	board.swap_requested.connect(request_swap); board.cell_pressed.connect(_target)
+	board.selection_canceled.connect(_cancel_selection)
 	board.delivery_failed.connect(func(message: String): _fail(message))
 	player = MergePlayer.new(board); player.reduced_motion = reduced_motion
 	player.motion_finished.connect(_motion_done)
@@ -88,6 +93,7 @@ func restart() -> void:
 	_epoch += 1; var epoch := _epoch
 	begun = false; error = ""; queue.clear(); _window_handoff = false; _motion_deadline = 0; _waiting_since = 0
 	_tool = ""; board.target_mode = false; board.set_input_gate("merge",true)
+	_notice = ""; board.set_targets([])
 	if executor != null and not executor.shutdown(): _fail("Worker shutdown timed out"); return
 	player.cancel(); audio.cancel()
 	session = MergeSession.new()
@@ -112,9 +118,11 @@ func request_swap(a: Vector2i, b: Vector2i) -> void:
 	var command := RoomCommand.exchange(session.state,a,b)
 	var result := executor.submit(command)
 	if not result.ok:
+		_notice = "Swap unavailable"; audio.play("ui_reject")
 		telemetry.append({"kind":"rejected","code":result.code,"us":received})
 		_record_main(Time.get_ticks_usec()-received); return
 	board.set_input_gate("merge",true); _waiting_since = 0
+	_notice = ""
 	_motion_deadline = received+150000
 	player.begin_swap(command)
 	telemetry.append({"kind":"input","received_us":received,"feedback_us":Time.get_ticks_usec(),"deadline_us":_motion_deadline})
@@ -139,21 +147,42 @@ func restore_session(value: Dictionary) -> bool:
 	_refresh()
 	return true
 
+func _tool_reason(kind: String) -> String:
+	if not can_input() or session.phase != "ready": return "Tools are available when the board settles"
+	if not session.state.room.tool_available: return "Make a matching swap before another tool"
+	var cost := RoomActionLegality.cost(kind,session.state.rules)
+	if session.state.room.craft < cost: return "Need %d Craft" % cost
+	return ""
+
+func _select_tool(kind: String) -> void:
+	if _tool == kind: _cancel_selection(); return
+	var reason := _tool_reason(kind)
+	_cancel_selection()
+	if not reason.is_empty(): _notice = reason; audio.play("ui_reject"); _refresh(); return
+	_tool = kind; board.target_mode = true; board.grab_focus(); _refresh()
+
+func _cancel_selection() -> void:
+	_tool = ""; _tool_origin = Vector2i(-1,-1); board.target_mode = false
+	board._deselect(); board.set_targets([]); _notice = ""; _refresh()
+
 func _target(pos: Vector2i) -> void:
 	var began := Time.get_ticks_usec()
 	if not can_input() or _tool.is_empty() or session.phase != "ready": return
 	var command: RoomCommand
 	if _tool == "action.exchange":
-		if _tool_origin == Vector2i(-1,-1): _tool_origin = pos; return
+		if _tool_origin == Vector2i(-1,-1): _tool_origin = pos; board.set_targets([pos]); return
 		command = RoomCommand.exchange(session.state,_tool_origin,pos,true)
 	else:
 		var layer := "obstacle" if not session.state.board.obstacle_at(pos).is_empty() else ("lock" if not session.state.board.get_cell(pos).lock.is_empty() else "gem")
 		command = RoomCommand.target(session.state,_tool,pos,layer)
 	var accepted := executor.submit(command)
+	_cancel_selection()
 	if accepted.ok:
+		audio.play("ui_accept")
 		_tool = ""; board.target_mode = false; board.set_input_gate("merge",true)
 		# Tool feedback receives the same fixed calculation interval as a swap.
 		_motion_deadline = Time.get_ticks_usec()+150000
+	else: _notice = "Tool unavailable — choose another target or make a swap"; audio.play("ui_reject")
 	_refresh()
 	_record_main(Time.get_ticks_usec()-began)
 
@@ -219,6 +248,7 @@ func _present(batch: Dictionary) -> void:
 		executor.continue_gravity()
 	else:
 		player.reset(batch.after); _refresh()
+	player.present_fact_cues(batch.facts)
 	for fact in batch.facts:
 		if fact.type == "room_result":
 			board.presentation_cue.emit("room_success" if fact.phase == "complete" else "room_failure")
@@ -252,9 +282,13 @@ func _refresh() -> void:
 	_window_bar.value = 20-session.clock.tick
 	if session.clock.paused: _status.text += "\nPaused — assisted attempt"
 	elif practice_mode: _status.text += "\nPractice — no deadline. Use Pass window to continue.\n\nFirst swap: row 4, column 4 left. Then move the upgraded gem left again. Restart and pass the first window to compare."
-	if not _tool.is_empty(): _status.text += "\nChoose a tool target"
+	if not _tool.is_empty(): _status.text += "\nChoose a tool target · Esc or Cancel to return to swaps"
+	if not _notice.is_empty(): _status.text += "\n"+_notice
+	_cancel_button.disabled = _tool.is_empty()
 	board.set_input_gate("merge",not can_input())
-	for button in _tool_buttons: button.disabled = not can_input() or session.phase != "ready"
+	for button in _tool_buttons:
+		var reason := _tool_reason(button.get_meta("kind"))
+		button.disabled = not reason.is_empty(); button.tooltip_text = reason
 
 func _fail(message: String) -> void:
 	error = message; begun = false

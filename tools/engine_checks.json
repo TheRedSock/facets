@@ -1300,6 +1300,20 @@
         "completion": "CHECK_COMPLETE: test_merge_executor"
       },
       {
+        "name": "test_merge_input",
+        "mode": "cpu",
+        "args": ["--headless", "--script", "res://tests/game/test_merge_input.gd"],
+        "report_root_arg": true,
+        "completion": "CHECK_COMPLETE: test_merge_input"
+      },
+      {
+        "name": "test_merge_input_native",
+        "mode": "gpu",
+        "args": ["--resolution", "1280x720", "--script", "res://tests/game/test_merge_input.gd"],
+        "report_root_arg": true,
+        "completion": "CHECK_COMPLETE: test_merge_input"
+      },
+      {
         "name": "test_merge_playback",
         "args": ["--headless", "--script", "res://tests/game/test_merge_playback.gd"],
         "mode": "cpu",

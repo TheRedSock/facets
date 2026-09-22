@@ -18,7 +18,10 @@ func _run() -> void:
 		var view := InterventionView.new(); view.mode = 2; view.automatic_clock = false; view.reduced_motion = fps == 120
 		root.add_child(view); await _loaded(view)
 		check(view.board._tile_views.size() == 23 and not view.board._layout_refresh_needs_rebuild,"ready publishes every initial view without a pending rebuild")
+		var cues: Array = []
+		view.board.presentation_cue.connect(func(cue: String): cues.append(cue))
 		await view.start_opening()
+		check("tile_swap" in cues and "match_commit" in cues and "tile_promoted" in cues,"trial opening retains sound cues including reduced motion")
 		if not view.reduced_motion: check(view.board._action_player.observations.any(func(o: Dictionary) -> bool: return o.kind == "match"),"opening visibly plays its prefix rather than snapping past missing views")
 		check(view.trial.phase == "window" and view.trial.clock.started and view.trial.clock.tick == 0,"visible boundary hands off clock at %d FPS" % fps)
 		check(view.board._board_state.digest() == view.trial.state.board.digest(),"prefix view equals authoritative parked board")
@@ -47,5 +50,7 @@ func _run() -> void:
 		view.queue_free(); await process_frame; await process_frame
 		check(player._tweens.is_empty() and player._views_by_id.is_empty(),"navigation cancels all prefix playback awaits")
 	Engine.max_fps = 120; Engine.time_scale = 1
-	await create_timer(0.1).timeout
+	# Audio uses real time even while this test accelerates animation by 40x.
+	# Let the mixer drain stopped reduced-motion voices before engine shutdown.
+	await create_timer(0.5).timeout
 	finish("test_intervention_playback")

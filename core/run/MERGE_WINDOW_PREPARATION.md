@@ -106,6 +106,13 @@ The later window begins only when its result and first actionable frame are read
 
 ## Merge animation and buffered targeting
 
+Tool selection in the successor is reversible: unaffordable/unavailable tools
+cannot enter targeting. Selecting the same tool, Escape, or Cancel returns to
+swaps, and rejected targets release selection without cost. Committed batch
+presentation emits coalesced match, promotion and rubble cues in normal and
+reduced motion; speculation emits no effects. The older trial's instant/reduced
+path summarizes the same committed cue types rather than muting all effects.
+
 At the first merge frame, show the survivor's new identity/tier at its final cell
 anchor, even if its material/scale transition is unfinished. Keep departing pieces
 as separately owned noninteractive ghosts. Stationary pieces elsewhere remain

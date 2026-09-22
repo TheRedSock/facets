@@ -98,8 +98,18 @@ func show_merge(batch: Dictionary) -> void:
 				decorations[tile.instance_id] = tween
 				tween.tween_property(view,"scale",Vector2.ONE,1.0/3.0)
 	if board._overlay != null: board._overlay.queue_redraw()
-	board.presentation_cue.emit("match_commit")
 	observations.append({"kind":"merge_presented","us":Time.get_ticks_usec(),"batch":batch.batch_id,"live":live.size(),"ghosts":ghosts.size()})
+
+func present_fact_cues(facts: Array) -> void:
+	# Committed presentation only; never play speculative or rejected effects.
+	# Coalesce simultaneous identical cues, preserving the bounded audio pool.
+	var mapping := {"match_committed":"match_commit","tile_promoted":"tile_promoted",
+		"obstacle_damaged":"obstacle_hit","obstacle_broken":"obstacle_broken"}
+	var played := {}
+	for fact in facts:
+		var cue: String = mapping.get(fact.type,"")
+		if not cue.is_empty() and not played.has(cue):
+			played[cue] = true; board.presentation_cue.emit(cue)
 
 func _release_ghost(id: String) -> void:
 	var view: TileView = ghosts.get(id)
