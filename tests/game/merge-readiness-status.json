@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "P3 readiness under merge-window successor G0-G7",
-  "status": "readiness_not_met_native_timing",
+  "status": "readiness_not_met_current_cpu_headroom",
   "profile": "merge-profile-v1.json",
   "source_baseline": "d5e0445",
   "gates": [
@@ -37,7 +37,7 @@
     },
     {
       "id": "G6",
-      "status": "not_passed",
+      "status": "not_passed_current_cpu_headroom",
       "evidence": [
         "artifacts/game/merge-readiness/g6-cpu-final-r1/run.json",
         "artifacts/game/merge-readiness/g6-cpu-r5-smoke/run.json",
@@ -48,7 +48,15 @@
         "artifacts/game/merge-readiness/g6-native-r5-720/run.json",
         "artifacts/game/merge-readiness/g6-native-r5-900/run.json",
         "artifacts/game/merge-readiness/g6-native-r5-stress2x-720/run.json",
-        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json"
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json",
+        "artifacts/game/merge-readiness/feedback-cpu-smoke/run.json",
+        "artifacts/game/merge-readiness/feedback-old-cpu-control/run.json",
+        "artifacts/game/merge-readiness/feedback-cpu-reference.json",
+        "artifacts/game/merge-readiness/feedback-final-720/release/run.json",
+        "artifacts/game/merge-readiness/feedback-final-900/release/run.json",
+        "artifacts/game/merge-readiness/feedback-native-720-2x/release/run.json",
+        "artifacts/game/merge-readiness/feedback-native-900-2x/release/run.json",
+        "artifacts/game/merge-readiness/stall-power-timeline.json"
       ]
     },
     {
@@ -284,7 +292,7 @@
       "id": "MW28",
       "assertion": "Swap-to-merge, gravity-to-merge, automatic-merge-to-merge and expiry-to-gravity meet the frozen end-to-end deadlines in the release corpus; queue, admission, hashes and publication are included.",
       "owner": "performance",
-      "status": "cpu_verified_native_timing_not_passed",
+      "status": "native_recheck_verified_cpu_headroom_not_passed",
       "evidence": [
         "artifacts/game/merge-readiness/g6-cpu-final-r1/run.json",
         "artifacts/game/merge-readiness/g6-cpu-r5-smoke/run.json",
@@ -295,19 +303,29 @@
         "artifacts/game/merge-readiness/g6-native-r5-720/run.json",
         "artifacts/game/merge-readiness/g6-native-r5-900/run.json",
         "artifacts/game/merge-readiness/g6-native-r5-stress2x-720/run.json",
-        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json"
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json",
+        "artifacts/game/merge-readiness/feedback-cpu-smoke/run.json",
+        "artifacts/game/merge-readiness/feedback-old-cpu-control/run.json",
+        "artifacts/game/merge-readiness/feedback-cpu-reference.json",
+        "artifacts/game/merge-readiness/feedback-final-720/release/run.json",
+        "artifacts/game/merge-readiness/feedback-final-900/release/run.json",
+        "artifacts/game/merge-readiness/feedback-native-720-2x/release/run.json",
+        "artifacts/game/merge-readiness/feedback-native-900-2x/release/run.json",
+        "artifacts/game/merge-readiness/stall-power-timeline.json"
       ]
     },
     {
       "id": "MW29",
       "assertion": "Injected slow computation and cancellation exercise deadline recovery. Normal frozen workloads and required 2x-compute stress have zero starvation; intentionally excessive delays produce honest misses, closed input and later full-duration windows.",
       "owner": "performance",
-      "status": "recovery_and_cpu_stress_verified_native_stress_not_passed",
+      "status": "recovery_and_stress_verified_with_recorded_build_scopes",
       "evidence": [
         "artifacts/game/merge-readiness/g6-gravity-r1/run.json",
         "artifacts/game/merge-readiness/g6-cpu-stress2x-r2/run.json",
         "artifacts/game/merge-readiness/g6-native-r5-stress2x-720/run.json",
-        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json"
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json",
+        "artifacts/game/merge-readiness/feedback-native-720-2x/release/run.json",
+        "artifacts/game/merge-readiness/feedback-native-900-2x/release/run.json"
       ]
     },
     {
@@ -320,13 +338,31 @@
         "artifacts/game/merge-readiness/g6-native-r5-900/probe.json",
         "artifacts/game/merge-readiness/g7-release-r5-intel/release.json",
         "artifacts/game/merge-readiness/g7-source-identity-r5.json",
-        "artifacts/game/merge-readiness/g7-delivery-r5.json"
+        "artifacts/game/merge-readiness/g7-delivery-r5.json",
+        "artifacts/game/merge-readiness/feedback-final-720/release/probe.json",
+        "artifacts/game/merge-readiness/feedback-final-900/release/probe.json",
+        "artifacts/game/merge-readiness/feedback-source-identity.json",
+        "artifacts/game/merge-readiness/feedback-delivery.json"
       ]
     }
   ],
   "human_evaluation": "deferred; sole optional reviewer",
   "historical_complete_action_5ms": "failed; not the successor measurement",
-  "runtime_checkpoint": "71bdf36f3cb6a6537be03159488a3cd786329478",
-  "delivery": "generated/desktop/p3-readiness-review-20260922.zip",
-  "remaining_exit": "Intermittent native stalls interrupt unassisted normal/2x policies. Identify and correct blocking owner, then verify both sizes on declared supported profile. No timing waiver adopted."
+  "runtime_checkpoint": "4cf3aff86cca0552a2b04d5fb4147ba7d3dc0171",
+  "delivery": "generated/desktop/facets-feedback-review-20260922.zip",
+  "remaining_exit": "Awake native profiles pass; prior long-stall measurements overlap Modern Standby. Current CPU command readiness p95 40.454ms exceeds the unchanged 37.5ms headroom target; unchanged r5 control also fails at 40.016ms. No deadline misses. Resolve and reverify the margin before full readiness.",
+  "feedback_update": {
+    "status": "implemented_and_verified",
+    "tool_sound_checkpoint": "d6a5ef7",
+    "buffer_checkpoint": "5a9e3d8",
+    "final_audio_checkpoint": "4cf3aff",
+    "input_assertions_each_mode": 95,
+    "release_cases_each_profile": 40,
+    "source_checks": [
+      "buffer-r5",
+      "buffer-final",
+      "feedback-final-source"
+    ],
+    "details": "tests/game/MERGE_FEEDBACK_EVIDENCE.md"
+  }
 }

@@ -1,5 +1,10 @@
 # Merge-window readiness evidence
 
+Later user-feedback fixes and the power-aware stall investigation are recorded
+in [the follow-up evidence](MERGE_FEEDBACK_EVIDENCE.md). That report supersedes
+the remaining-failure diagnosis below: awake native checks pass, while a fresh
+CPU-only headroom margin remains failed. Earlier reports and metrics are retained.
+
 Status, 2026-09-22: the successor mechanics and P3 contract reconciliation are
 implemented. **G6/G7 remain open; P3-ready is not declared.** This document records
 the scope of measured results, including failures. The executable decision is in

@@ -626,6 +626,18 @@ work/facts and payload estimates; font/scene/driver overhead is not measured.
 that selection. Preserve any failed default-GPU report; an alternative-profile
 pass does not close the default profile's timing gate.
 
+For unattended Windows merge measurements use
+`tools/game/check_merge_environment.ps1 -Package <build> -Output <fresh-report>`.
+It invokes the actual native release probe with a temporary thread-scoped
+display/system keep-awake request and records 100 ms idle/input-desktop/focus/
+screensaver observations. The request is released in `finally`; it changes no
+power plan or user input. `-AllowIdle` is an explicit comparison with no request,
+not a command to turn off the screen. `-GpuIndex`, `-Width`, `-Height` and
+`-Multiplier` select the profile. Read `release/run.json` and the environment
+records together. Missing foreground observations are not evidence of physical
+foreground display latency. Preserve interruption failures and compare Windows
+power/session events before attributing a long frame to simulation or rendering.
+
 Launch `Facets.exe -- --review` for the optional sole-reviewer entries: the
 merge-redirection practice board and the earlier seeds 7/1/8,
 Atomic/Paused/400 ms/800 ms comparison. The menu labels the original P2 room
