@@ -28,7 +28,7 @@ func sync_adapters() -> void:
 	for i in 8: tier_tile_ids[i + 1] = StringName(catalog.roster()[i])
 
 func to_dict() -> Dictionary:
-	var data := {"schema": 2 if room != null else 1, "rules": rules.to_dict(), "catalog": catalog.to_dict(), "board": board.to_dict(),
+	var data := {"schema": 4 if rules.is_p3() else (2 if room != null else 1), "rules": rules.to_dict(), "catalog": catalog.to_dict(), "board": board.to_dict(),
 		"resource.action_budget": moves_remaining, "rng": streams.capture(), "phase": phase,
 		"revision": revision, "next_action": next_action, "next_event": next_event, "next_removal": next_removal,
 		"opening_attempts": opening_attempts, "terminal_recovered": terminal_recovered.duplicate(true)}
@@ -51,11 +51,11 @@ func duplicate_state() -> RunState:
 
 static func restored(data: Variant, require_stable: bool = true) -> Dictionary:
 	var keys := ["schema","rules","catalog","board","resource.action_budget","rng","phase","revision","next_action","next_event","next_removal","opening_attempts","terminal_recovered"]
-	var is_room: bool = data is Dictionary and data.get("schema") is int and data.schema == 2
+	var is_room: bool = data is Dictionary and data.get("schema") is int and data.schema in [2,4]
 	if is_room: keys.append("room")
 	if not StateAdmission.exact(data,keys): return StateAdmission.fail("state_schema")
 	var phases := ["briefing","ready","complete","failed"] if is_room else ["ready","budget_exhausted","no_legal_swaps"]
-	if not data.schema is int or data.schema not in [1,2] or data.phase not in phases: return StateAdmission.fail("state_version_or_phase")
+	if not data.schema is int or data.schema not in [1,2,4] or data.phase not in phases: return StateAdmission.fail("state_version_or_phase")
 	for field in ["resource.action_budget","revision","next_action","next_event","next_removal","opening_attempts"]:
 		if not data[field] is int or data[field] < 0 or data[field] > 1000000000: return StateAdmission.fail("state_counter")
 	if data.next_action < 1 or data.next_event < 1 or data.next_removal < 1 or data.revision != data.next_action - 1 or data.next_event < data.next_action or data.next_removal > data.next_event or data.opening_attempts > 64: return StateAdmission.fail("state_allocator")
@@ -64,6 +64,7 @@ static func restored(data: Variant, require_stable: bool = true) -> Dictionary:
 		if key != "8" or not data.terminal_recovered[key] is int or data.terminal_recovered[key] < 0: return StateAdmission.fail("recovery_records")
 	var rules_result := RuleSet.admit(data.rules)
 	if not rules_result.ok: return rules_result
+	if rules_result.rules.is_p3() != (data.schema == 4): return StateAdmission.fail("state_profile_mismatch")
 	var catalog_result := GameCatalog.admit(data.catalog)
 	if not catalog_result.ok: return catalog_result
 	var streams_result := RngStreamBank.restored(data.rng)

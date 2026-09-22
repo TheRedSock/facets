@@ -28,6 +28,7 @@ static func resolve_match(context: MergeMoveContext, cursor: Dictionary, pair: A
 	context.match_step({"cascade_index":cursor.cascade,"chain_index":cursor.chain,"match_events":match_events,
 		"remove_events":effects.last_remove_events,"upgrade_events":effects.last_upgrade_events})
 	if fail_at == "after_obstacle": return StateAdmission.fail("injected_after_obstacle")
+	if fail_at == "after_family": return StateAdmission.fail("injected_after_family")
 	if not budget.error.is_empty(): return StateAdmission.fail(budget.error)
 	cursor.chain += 1
 	context.settle_increment()

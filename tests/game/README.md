@@ -1,5 +1,11 @@
 # P1 game checks
 
+`test_p3_families` executes the separate P3 profile: frozen source families,
+Quartz clipping/shared entitlement, Corundum replacement/deduplicated contacts,
+Beryl live targeting/ties/no-target/induced chain, T8/suppression, reaction caps,
+unpublished rollback, paid interventions and complete family replay/restore.
+This is behavioral coverage; `test_p3_preparation` remains structural coverage.
+
 Successor input feedback: `test_merge_input` and `test_merge_input_native` verify
 tool cancellation/affordability, committed sound cues, and one identity-following
 buffer during swaps/gravity, with normal admission, replay and lifecycle cleanup.

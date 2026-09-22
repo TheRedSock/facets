@@ -23,7 +23,19 @@ func to_dict() -> Dictionary:
 	return _data.duplicate(true)
 
 func is_room() -> bool:
-	return _data.simulation == "facets-sim-v2"
+	return _data.simulation in ["facets-sim-v2","facets-sim-p3-merge-v1"]
+
+func is_p3() -> bool:
+	return _data.simulation == "facets-sim-p3-merge-v1"
+
+static func p3_defaults() -> Dictionary:
+	var data := room_defaults()
+	data.simulation = "facets-sim-p3-merge-v1"; data.profile = "p3-merge"
+	data.merge({"families":"quartz_corundum_beryl_v1","max_reactions":256})
+	return data
+
+static func for_p3() -> RuleSet:
+	return RuleSet.new(p3_defaults())
 
 static func room_defaults() -> Dictionary:
 	var data := DEFAULTS.duplicate(true)
@@ -38,7 +50,7 @@ static func for_room() -> RuleSet:
 
 static func admit(data: Variant) -> Dictionary:
 	if not data is Dictionary: return {"ok": false, "code": "rules_schema"}
-	var defaults := room_defaults() if data.get("simulation") == "facets-sim-v2" else DEFAULTS
+	var defaults := p3_defaults() if data.get("simulation") == "facets-sim-p3-merge-v1" else (room_defaults() if data.get("simulation") == "facets-sim-v2" else DEFAULTS)
 	if data.size() != defaults.size(): return {"ok": false, "code": "rules_schema"}
 	for key in defaults:
 		if not data.has(key) or typeof(data[key]) != typeof(defaults[key]): return {"ok": false, "code": "rules_field", "field": key}

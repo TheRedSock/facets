@@ -5,7 +5,7 @@ extends RefCounted
 
 static func capture(session: MergeSession) -> Dictionary:
 	if session.state == null: return {}
-	return GameValue.freeze({"schema":1,"version":MergeSession.VERSION,"replay":MergeSession.REPLAY,
+	return GameValue.freeze({"schema":1,"version":MergeSession.VERSION,"replay":P3Content.REPLAY if session.state.rules.is_p3() else MergeSession.REPLAY,
 		"initial":session.initial,"mechanical":session.mechanical_snapshot(),"history":session.history,
 		"clock":session.clock,"reservation":session.reservation,"clock_notes":session.clock_notes,
 		"error":session.error,"failure":session.failure})
@@ -21,7 +21,7 @@ static func _clock_valid(value: Variant, prior: Dictionary) -> bool:
 
 static func restored(value: Variant, pause_timed: bool = true) -> Dictionary:
 	if not StateAdmission.exact(value,["schema","version","replay","initial","mechanical","history","clock","reservation","clock_notes","error","failure"]): return StateAdmission.fail("merge_snapshot_schema")
-	if not value.schema is int or value.schema != 1 or value.version != MergeSession.VERSION or value.replay != MergeSession.REPLAY: return StateAdmission.fail("merge_snapshot_version")
+	if not value.schema is int or value.schema != 1 or value.version != MergeSession.VERSION or value.replay not in [MergeSession.REPLAY,P3Content.REPLAY]: return StateAdmission.fail("merge_snapshot_version")
 	if not value.initial is Dictionary or not value.mechanical is Dictionary or not value.history is Array or value.history.size() > 10000 or not value.clock_notes is Array or value.clock_notes.size() > 10000 or not value.reservation is Dictionary or not value.failure is Dictionary or not value.error is String: return StateAdmission.fail("merge_snapshot_types")
 	var original := CanonicalCodec.encode(value)
 	if original.is_empty(): return StateAdmission.fail("merge_snapshot_codec")

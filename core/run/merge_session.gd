@@ -210,7 +210,7 @@ func _detached() -> MergeSession:
 	return result
 
 func mechanical_snapshot() -> Dictionary:
-	return {"version":VERSION,"simulation":SIMULATION,"profile":PROFILE,"content":CONTENT,"state":state.to_dict(),
+	return {"version":VERSION,"simulation":P3Content.SIMULATION if state.rules.is_p3() else SIMULATION,"profile":P3Content.PROFILE if state.rules.is_p3() else PROFILE,"content":P3Content.CONTENT if state.rules.is_p3() else CONTENT,"state":state.to_dict(),
 		"phase":phase,"cursor":cursor.duplicate(true),"move_id":move_id,"batch_id":batch_id,"window_id":window_id,
 		"context":context.capture() if context != null else {},"discount_spent":discount_spent,
 		"discount_charges":discount_charges,"reward_bonus":reward_bonus,"modifiers":modifiers}

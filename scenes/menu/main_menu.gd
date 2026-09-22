@@ -81,6 +81,13 @@ func _ready() -> void:
 		view.back_requested.connect(func(): visible = true)
 		get_tree().root.add_child(view))
 	vbox.add_child(reactive)
+	var p3 := Button.new(); p3.text = "P3 · family room"; p3.custom_minimum_size.y = 48
+	p3.pressed.connect(func():
+		visible = false
+		var view := MergeRoomView.new(); view.p3_mode = true
+		view.back_requested.connect(func(): visible = true)
+		get_tree().root.add_child(view))
+	vbox.add_child(p3)
 	if "--review" in OS.get_cmdline_user_args():
 		var practice := Button.new(); practice.text = "Practice · redirect a merge"; practice.custom_minimum_size.y = 48
 		practice.pressed.connect(func():

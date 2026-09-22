@@ -2,6 +2,7 @@ class_name MergeRoomView
 extends Control
 signal back_requested
 var seed_value := 1
+var p3_mode := false
 var initial_override := {}
 var reduced_motion := false
 var automatic_clock := true
@@ -112,9 +113,14 @@ func restart() -> void:
 	session = MergeSession.new()
 	var initial := initial_override
 	if initial.is_empty():
-		var game := RunController.new()
-		if not game.start_room(null,seed_value): _fail(game.last_error); return
-		game.apply_action(RoomCommand.begin(0)); initial = game.run_state.to_dict()
+		if p3_mode:
+			var opened := P3Content.room(seed_value)
+			if not opened.ok: _fail(opened.code); return
+			initial = opened.state.to_dict()
+		else:
+			var game := RunController.new()
+			if not game.start_room(null,seed_value): _fail(game.last_error); return
+			game.apply_action(RoomCommand.begin(0)); initial = game.run_state.to_dict()
 	if not session.start(initial): _fail("Room state could not be admitted"); return
 	executor = MergeExecutor.new(session); clock_adapter = MergeClock.new(session); clock_adapter.automatic = automatic_clock
 	if practice_mode: clock_adapter.automatic = false
@@ -340,6 +346,8 @@ func _refresh() -> void:
 	elif practice_mode: _status.text += "\nPractice — no deadline. Use Pass window to continue.\n\nFirst swap: row 4, column 4 left. Then move the upgraded gem left again. Restart and pass the first window to compare."
 	if not _tool.is_empty(): _status.text += "\nChoose a tool target · Esc or Cancel to return to swaps"
 	if not _notice.is_empty(): _status.text += "\n"+_notice
+	if session.state.rules.is_p3():
+		_status.text += "\n\nQuartz (T1–2): +1 Craft once per paid move.\nCorundum (T5/7): 2 rubble damage.\nBeryl (T6): promotes the lowest adjacent T1–3 once per paid move.\nTools suppress families and Craft."
 	_cancel_button.disabled = _tool.is_empty() and input_buffer.pending.is_empty() and input_buffer.selected_id.is_empty()
 	if _buffer_overlay != null: _buffer_overlay.queue_redraw()
 	board.set_input_gate("merge",not can_input())

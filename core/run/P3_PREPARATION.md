@@ -1,4 +1,11 @@
-# P3 preparation contract — reserved, unimplemented
+# P3 implementation contract
+
+P3.1 implementation, 2026-09-22: separate `P3Content` and schema-4 rules/state,
+bounded `FamilyDispatcher`, family accounting and source-family reactions are
+implemented. `test_p3_families` executes these behavioral requirements; the
+original preparation fixture remains a structural specification. A P3 family
+room is accessible beside the unchanged controls. Later expedition/reward/save
+batches and their release-load engineering exits remain open.
 
 G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.

@@ -42,6 +42,13 @@ func match_step(value: Dictionary) -> void:
 	super.match_step(value)
 	for fact in facts.slice(first):
 		if fact.type == "match_committed": MergeReactionScope.reward(self,fact)
+	if state.rules.is_p3(): FamilyDispatcher.dispatch(self,facts.slice(first))
+
+func damage_component(component: Dictionary, source_event: int) -> void:
+	if not state.rules.is_p3():
+		super.damage_component(component,source_event)
+		return
+	FamilyDispatcher.damage(self,component,source_event)
 
 func capture() -> Dictionary:
 	var depths: Array = []

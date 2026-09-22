@@ -68,8 +68,11 @@ func match_step(value: Dictionary) -> void:
 		for promoted in value.upgrade_events:
 			if promoted.instance_id == component.survivor_id:
 				emit("tile_promoted",{"instance_id":promoted.instance_id,"cell":promoted.cell,"old":promoted.old,"new":promoted.new},id)
-		for target in component.obstacle_targets: ObstacleResolver.damage(self,target.id,1,id)
+		damage_component(component,id)
 		parent = id
+
+func damage_component(component: Dictionary, source_event: int) -> void:
+	for target in component.obstacle_targets: ObstacleResolver.damage(self,target.id,1,source_event)
 
 func physical_step(value: Dictionary) -> void:
 	if not budget.error.is_empty(): return
