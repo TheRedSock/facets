@@ -8,7 +8,7 @@ static func build(state: RunState, selected: Vector2i = Vector2i(-1,-1)) -> Dict
 		"reason":state.room.failure_reason,"tools":[],"inspection":"Select a gem to inspect its tier and next upgrade.","collection":[]}
 	var legal := RoomActionLegality.tools(state)
 	for kind in ["action.exchange","action.clear_target","action.promote_target"]:
-		var cost := RoomActionLegality.cost(kind,state.rules)
+		var cost := RoomActionLegality.effective_cost(kind,state)
 		var reason := ""
 		if state.phase != "ready": reason = "Begin the room" if state.phase == "briefing" else "Room finished"
 		elif not state.room.tool_available: reason = "Make a matching swap to use another tool"

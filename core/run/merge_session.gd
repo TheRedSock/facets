@@ -59,10 +59,11 @@ func quote(command: RoomCommand) -> Dictionary:
 	# The small ready view changes only the admission budget; board identity stays exact.
 	var query := RunState.new()
 	query.board = state.board; query.room = state.room; query.rules = state.rules
+	query.settings = state.settings; query.room_uses = state.room_uses
 	query.revision = state.revision; query.phase = "ready"; query.moves_remaining = maxi(state.moves_remaining,1) if cost == 0 else state.moves_remaining
 	var legal := RoomActionLegality.can_apply(query,command)
 	if not legal.ok: return legal
-	return {"ok":true,"cost":cost if command.data.kind == "swap" else RoomActionLegality.cost(command.data.kind,state.rules),
+	return {"ok":true,"cost":cost if command.data.kind == "swap" else RoomActionLegality.effective_cost(command.data.kind,state),
 		"context":"intervention" if phase == "merge_window" else "equilibrium"}
 
 func presented() -> bool:
@@ -107,6 +108,7 @@ func prepare(command: RoomCommand = null, fail_at: String = "", cancelled: Calla
 			copy.context.emit("resource_spent",{"resource":"resource.action_budget","amount":admission.cost,"remaining":copy.state.moves_remaining})
 		else:
 			copy.state.room.craft -= admission.cost; copy.state.room.tool_available = false
+			if copy.state.rules.is_p3() and command.data.kind == "action.clear_target" and "steady_hand" in copy.state.settings: copy.state.room_uses.steady_hand = true
 			copy.context.emit("tool_activated",{"kind":command.data.kind,"cost":admission.cost})
 			copy.context.emit("resource_spent",{"resource":"resource.tactic_charge","amount":admission.cost,"remaining":copy.state.room.craft})
 		copy.context.emit("tool_allowance",{"available":copy.state.room.tool_available})

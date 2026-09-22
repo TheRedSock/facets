@@ -7,6 +7,12 @@ original preparation fixture remains a structural specification. A P3 family
 room is accessible beside the unchanged controls. Later expedition/reward/save
 batches and their release-load engineering exits remain open.
 
+P3.2: Aquamarine replacement and carry/ladder previews, Steady Hand effective
+pricing with accepted-only room use, and Bridge's T4 target range are implemented.
+Settings and uses are part of schema 4. P1/P2 bytes remain unchanged. Preview
+conversion creates no gameplay facts and preserves supply. Reward selection and
+room transitions are owned by subsequent batches, not this content helper.
+
 G5 reconciliation, 2026-09-22: the implemented incremental kernel, repeated-input
 accounting, executor and streaming room now provide the resolution foundation.
 Replay/restore and P3 seams are verified under the

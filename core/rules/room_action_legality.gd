@@ -18,7 +18,7 @@ static func can_apply(state: RunState, command: Variant) -> Dictionary:
 	if state.moves_remaining <= 0: return StateAdmission.fail("budget_exhausted")
 	if data.kind != "swap":
 		if not state.room.tool_available: return StateAdmission.fail("tool_already_used")
-		if state.room.craft < cost(data.kind,state.rules): return StateAdmission.fail("insufficient_craft")
+		if state.room.craft < effective_cost(data.kind,state): return StateAdmission.fail("insufficient_craft")
 	var board := state.board
 	if data.kind in ["swap","action.exchange"]:
 		var a := board.get_tile(data.origin)
@@ -41,6 +41,10 @@ static func can_apply(state: RunState, command: Variant) -> Dictionary:
 	elif data.kind == "action.clear_target" and tile.tier > 3: return StateAdmission.fail("clear_tier_limit")
 	elif data.kind == "action.promote_target" and tile.tier > 4: return StateAdmission.fail("promote_tier_limit")
 	return {"ok":true,"code":""}
+
+static func effective_cost(kind: String, state: RunState) -> int:
+	if state.rules.is_p3() and kind == "action.clear_target" and "steady_hand" in state.settings and not state.room_uses.has("steady_hand"): return 1
+	return cost(kind,state.rules)
 
 static func tools(state: RunState) -> Array[RoomCommand]:
 	var result: Array[RoomCommand] = []

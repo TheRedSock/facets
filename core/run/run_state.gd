@@ -19,6 +19,9 @@ var next_removal := 1
 var opening_attempts := 0
 var terminal_recovered := {}
 var room: RoomState
+var settings: Array = []
+var room_uses := {}
+var run_uses := {}
 
 func sync_adapters() -> void:
 	board_size = board.size
@@ -33,6 +36,7 @@ func to_dict() -> Dictionary:
 		"revision": revision, "next_action": next_action, "next_event": next_event, "next_removal": next_removal,
 		"opening_attempts": opening_attempts, "terminal_recovered": terminal_recovered.duplicate(true)}
 	if room != null: data.room = room.to_dict()
+	if rules.is_p3(): data.merge({"settings":settings.duplicate(),"room_uses":room_uses.duplicate(true),"run_uses":run_uses.duplicate(true)})
 	return data
 
 func digest() -> String:
@@ -46,6 +50,7 @@ func duplicate_state() -> RunState:
 	copy.next_action = next_action; copy.next_event = next_event; copy.next_removal = next_removal
 	copy.opening_attempts = opening_attempts; copy.terminal_recovered = terminal_recovered.duplicate(true)
 	if room != null: copy.room = room.duplicate_state()
+	copy.settings = settings.duplicate(); copy.room_uses = room_uses.duplicate(true); copy.run_uses = run_uses.duplicate(true)
 	copy.sync_adapters()
 	return copy
 
@@ -53,6 +58,7 @@ static func restored(data: Variant, require_stable: bool = true) -> Dictionary:
 	var keys := ["schema","rules","catalog","board","resource.action_budget","rng","phase","revision","next_action","next_event","next_removal","opening_attempts","terminal_recovered"]
 	var is_room: bool = data is Dictionary and data.get("schema") is int and data.schema in [2,4]
 	if is_room: keys.append("room")
+	if data is Dictionary and data.get("schema") == 4: keys.append_array(["settings","room_uses","run_uses"])
 	if not StateAdmission.exact(data,keys): return StateAdmission.fail("state_schema")
 	var phases := ["briefing","ready","complete","failed"] if is_room else ["ready","budget_exhausted","no_legal_swaps"]
 	if not data.schema is int or data.schema not in [1,2,4] or data.phase not in phases: return StateAdmission.fail("state_version_or_phase")
@@ -65,6 +71,11 @@ static func restored(data: Variant, require_stable: bool = true) -> Dictionary:
 	var rules_result := RuleSet.admit(data.rules)
 	if not rules_result.ok: return rules_result
 	if rules_result.rules.is_p3() != (data.schema == 4): return StateAdmission.fail("state_profile_mismatch")
+	if data.schema == 4:
+		if not P3Content.valid_settings(data.settings) or not data.room_uses is Dictionary or not data.run_uses is Dictionary: return StateAdmission.fail("p3_settings")
+		for key in data.room_uses:
+			if key != "steady_hand" or data.room_uses[key] != true or not data.room_uses[key] is bool or "steady_hand" not in data.settings: return StateAdmission.fail("p3_room_uses")
+		if not data.run_uses.is_empty(): return StateAdmission.fail("p3_run_uses")
 	var catalog_result := GameCatalog.admit(data.catalog)
 	if not catalog_result.ok: return catalog_result
 	var streams_result := RngStreamBank.restored(data.rng)
@@ -76,6 +87,8 @@ static func restored(data: Variant, require_stable: bool = true) -> Dictionary:
 	state.streams = streams_result.bank; state.moves_remaining = data["resource.action_budget"]; state.phase = data.phase
 	state.revision = data.revision; state.next_action = data.next_action; state.next_event = data.next_event; state.next_removal = data.next_removal
 	state.opening_attempts = data.opening_attempts; state.terminal_recovered = data.terminal_recovered.duplicate(true)
+	if data.schema == 4:
+		state.settings = data.settings.duplicate(); state.room_uses = data.room_uses.duplicate(true); state.run_uses = data.run_uses.duplicate(true)
 	if state.rules.is_room() != is_room or state.board.room_board != is_room: return StateAdmission.fail("state_profile_mismatch")
 	if is_room:
 		var room_result := RoomState.restored(data.room,state.catalog,state.board)

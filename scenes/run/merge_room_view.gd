@@ -58,6 +58,7 @@ func _ready() -> void:
 		if clock_adapter != null: clock_adapter.pause(not session.clock.paused,"manual"))
 	_button(bar,"Pass window",func(): clock_adapter.pass_now() if clock_adapter != null else false)
 	_button(bar,"Sound / mute",func(): audio.set_muted(not RoomAudio.muted))
+	if p3_mode: _button(bar,"Collection / rewards",_show_collection)
 	_cancel_button = _button(bar,"Cancel selection",_cancel_selection)
 	var split := HBoxContainer.new(); split.size_flags_vertical = Control.SIZE_EXPAND_FILL; body.add_child(split)
 	board = load("res://scenes/board/board_scene.tscn").instantiate()
@@ -101,6 +102,20 @@ func _ready() -> void:
 func _button(parent: Node, label: String, callback: Callable) -> Button:
 	var button := Button.new(); button.text = label; button.custom_minimum_size.y = 40
 	button.pressed.connect(callback); parent.add_child(button); return button
+
+func _show_collection() -> void:
+	if session == null: return
+	if session.phase == "merge_window": clock_adapter.pause(true,"manual")
+	input_buffer.clear()
+	var dialog := AcceptDialog.new(); dialog.title = "Collection and expedition rewards"
+	var preview := P3Content.preview("aquamarine",session.state.settings)
+	var lines := "Current ladder → Aquamarine replacement\n"
+	for item in preview.ladder:
+		lines += "T%d  %s (%s) → %s (%s)\n" % [item.tier,item.before.id,", ".join(item.before.family_tags),item.after.id,", ".join(item.after.family_tags)]
+	for reward in ["aquamarine","steady_hand","beryl_bridge","next_room_craft"]:
+		lines += "\n"+P3Content.preview(reward,session.state.settings).description+"\n"
+	dialog.dialog_text = lines; add_child(dialog); dialog.popup_centered(Vector2i(850,570))
+	dialog.confirmed.connect(dialog.queue_free); dialog.canceled.connect(dialog.queue_free)
 
 func restart() -> void:
 	_epoch += 1; var epoch := _epoch
@@ -176,7 +191,7 @@ func restore_session(value: Dictionary) -> bool:
 func _tool_reason(kind: String) -> String:
 	if not can_input() or session.phase != "ready": return "Tools are available when the board settles"
 	if not session.state.room.tool_available: return "Make a matching swap before another tool"
-	var cost := RoomActionLegality.cost(kind,session.state.rules)
+	var cost := RoomActionLegality.effective_cost(kind,session.state)
 	if session.state.room.craft < cost: return "Need %d Craft" % cost
 	return ""
 
@@ -352,6 +367,8 @@ func _refresh() -> void:
 	if _buffer_overlay != null: _buffer_overlay.queue_redraw()
 	board.set_input_gate("merge",not can_input())
 	for button in _tool_buttons:
+		var kind: String = button.get_meta("kind")
+		button.text = "%s · %d Craft" % [{"action.exchange":"Reposition","action.clear_target":"Chisel","action.promote_target":"Refine"}[kind],RoomActionLegality.effective_cost(kind,session.state)]
 		var reason := _tool_reason(button.get_meta("kind"))
 		button.disabled = not reason.is_empty(); button.tooltip_text = reason
 

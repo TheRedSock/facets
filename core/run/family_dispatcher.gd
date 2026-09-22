@@ -55,7 +55,7 @@ static func dispatch(context: MergeMoveContext, facts: Array) -> void:
 		for family in ["quartz","beryl"]:
 			if not has_family(fact,family): continue
 			var intent := {"reaction_id":family,"source_event_id":fact.event_id,"scope":"move"}
-			if family == "beryl": intent.target = target(context,fact)
+			if family == "beryl": intent.target = target(context,fact,4 if "beryl_bridge" in context.state.settings else 3)
 			intents.append(intent)
 	# Phase priority, then event, scope and reaction identity (fixed per handler).
 	intents.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
@@ -75,7 +75,8 @@ static func apply(context: MergeMoveContext, intent: Dictionary) -> void:
 	if intent.target.is_empty(): record(context,intent,"no_target"); return
 	var chosen: Dictionary = intent.target
 	var tile := context.state.board.get_tile(chosen.cell)
-	if tile == null or tile.instance_id != chosen.target_id or tile.tier != chosen.tier or tile.tier not in range(1,4) or not context.state.board.can_move_occupant(chosen.cell):
+	var maximum := 4 if "beryl_bridge" in context.state.settings else 3
+	if tile == null or tile.instance_id != chosen.target_id or tile.tier != chosen.tier or tile.tier < 1 or tile.tier > maximum or not context.state.board.can_move_occupant(chosen.cell):
 		record(context,intent,"stale_or_ineligible"); return
 	var old := tile.to_dict()
 	if not context.state.catalog.promote(tile): context.budget.error = "family_promotion"; return

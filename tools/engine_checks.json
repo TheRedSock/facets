@@ -1473,6 +1473,12 @@
       "timeout_seconds": 300
     },
     {
+      "name": "test_p3_settings",
+      "args": ["--headless", "--script", "res://tests/game/test_p3_settings.gd"],
+      "mode": "cpu",
+      "completion": "CHECK_COMPLETE: test_p3_settings"
+    },
+    {
       "name": "test_p3_families",
       "args": ["--headless", "--script", "res://tests/game/test_p3_families.gd"],
       "mode": "cpu",
