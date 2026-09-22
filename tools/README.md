@@ -622,6 +622,9 @@ copies and preserve the original package hashes. `release.json` distinguishes
 completed functional checks from the 5 ms CPU and 16.7 ms frame targets. Reports
 include raw frames, input-to-view-change observations (not display latency),
 work/facts and payload estimates; font/scene/driver overhead is not measured.
+`-GpuIndex 1` selects an explicit alternative GPU for every stage and records
+that selection. Preserve any failed default-GPU report; an alternative-profile
+pass does not close the default profile's timing gate.
 
 Launch `Facets.exe -- --review` for the optional sole-reviewer entries: the
 merge-redirection practice board and the earlier seeds 7/1/8,

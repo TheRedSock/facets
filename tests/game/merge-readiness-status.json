@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "P3 readiness under merge-window successor G0-G7",
-  "status": "implementing",
+  "status": "readiness_not_met_native_timing",
   "profile": "merge-profile-v1.json",
   "source_baseline": "d5e0445",
   "gates": [
@@ -37,17 +37,30 @@
     },
     {
       "id": "G6",
-      "status": "in_progress",
+      "status": "not_passed",
       "evidence": [
         "artifacts/game/merge-readiness/g6-cpu-final-r1/run.json",
-        "artifacts/game/merge-readiness/g6-native-720-r2/run.json",
-        "artifacts/game/merge-readiness/g6-native-900-r1/run.json"
+        "artifacts/game/merge-readiness/g6-cpu-r5-smoke/run.json",
+        "artifacts/game/merge-readiness/g6-cpu-stress2x-r2/run.json",
+        "artifacts/game/merge-readiness/g6-r5-cpu-reference.json",
+        "artifacts/game/merge-readiness/g6-characterization-r5/run.json",
+        "artifacts/game/merge-readiness/g6-cpu-characterization4x-r5/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-720/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-900/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-720/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json"
       ]
     },
     {
       "id": "G7",
-      "status": "in_progress",
-      "evidence": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
+      "status": "functional_and_delivery_verified_readiness_pending_G6",
+      "evidence": [
+        "artifacts/game/merge-readiness/g7-final-controls-r1/run.json",
+        "artifacts/game/merge-readiness/g6-gravity-r1/run.json",
+        "artifacts/game/merge-readiness/g7-release-r5-intel/release.json",
+        "artifacts/game/merge-readiness/g7-source-identity-r5.json",
+        "artifacts/game/merge-readiness/g7-delivery-r5.json"
+      ]
     }
   ],
   "cases": [
@@ -56,209 +69,264 @@
       "assertion": "Single legal equilibrium swap publishes exactly one complete merge batch, parks before any newly created match/gravity, and charges normal Work once.",
       "owner": "kernel",
       "status": "kernel_verified",
-      "evidence": "g1-r4/test_merge_kernel"
+      "evidence": "g1-r4/test_merge_kernel",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW02",
       "assertion": "Two disjoint simultaneous matches resolve in canonical order in one batch with one board-wide window; survivor/component identity is fixed before reactions.",
       "owner": "kernel",
       "status": "kernel_verified",
-      "evidence": "g1-r4/test_merge_kernel"
+      "evidence": "g1-r4/test_merge_kernel",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW03",
       "assertion": "Promotion makes an automatic match. Pass resolves it next without gravity and opens another window.",
       "owner": "kernel",
       "status": "kernel_verified",
-      "evidence": "g1-r4/test_merge_kernel"
+      "evidence": "g1-r4/test_merge_kernel",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW04",
       "assertion": "The same promoted survivor can legally move out of that pending match into a hand-authored stronger match. Accepted intervention denies the original automatic match; only the new board's rescan resolves. Compare with MW03.",
       "owner": "commands",
       "status": "reference_verified",
-      "evidence": "g2-r3/test_merge_commands"
+      "evidence": "g2-r3/test_merge_commands",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW05",
       "assertion": "A legal match elsewhere is accepted; an unrelated invalid swap is rejected even though a pending automatic match exists elsewhere. Untouched pending matches belong to the new active move scope when subsequently resolved.",
       "owner": "commands",
       "status": "reference_verified",
-      "evidence": "g2-r3/test_merge_commands"
+      "evidence": "g2-r3/test_merge_commands",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW06",
       "assertion": "A constructed sequence supports at least four successive interventions, including a promoted-gem move and a remote match. Each legal command gets a fresh move ID, normal cost/turn accounting and a new window; no one-window cap.",
       "owner": "commands",
       "status": "reference_verified",
-      "evidence": "g2-r3/test_merge_commands"
+      "evidence": "g2-r3/test_merge_commands",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW07",
       "assertion": "Same occupied match neighborhood and resources in equilibrium versus a parked board with holes elsewhere produce equal default price/base effects. Only admitted context and resulting causal metadata differ. Empty, locked, stale and nonadjacent endpoints reject purely.",
       "owner": "commands",
       "status": "reference_verified",
-      "evidence": "g2-r3/test_merge_commands"
+      "evidence": "g2-r3/test_merge_commands",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW08",
       "assertion": "Where semantics are unchanged, passing all successor windows reaches the legacy board/resources/RNG under the explicit semantic projection. Deliberate early-terminal differences have hand-explained exact successor expectations, never projected-away board mismatches. Original P1/P2 and trial controls still match their own exact bytes.",
       "owner": "compatibility",
       "status": "compatibility_verified",
-      "evidence": "g7-final-controls-r1/test_merge_kernel + frozen test_game_replay/test_game_room_replay"
+      "evidence": "g7-final-controls-r1/test_merge_kernel + frozen test_game_replay/test_game_room_replay",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW09",
       "assertion": "No-input automatic batches share one Craft entitlement cap; repeated paid moves get fresh caps. Capacity-clipped entitlement is consumed, not reclaimed after spending. No duplicate awards at publication/replay.",
       "owner": "accounting",
       "status": "reference_verified",
-      "evidence": "g2-r3/test_merge_commands"
+      "evidence": "g2-r3/test_merge_commands",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW10",
       "assertion": "A tool-caused merge opens a swap window. Pass preserves tool suppression; paid intervention starts fresh normal eligibility/tool allowance without rewarding old tool facts. Tool commands themselves reject in a merge window.",
       "owner": "accounting",
       "status": "reference_verified",
-      "evidence": "g2-r3/test_merge_commands"
+      "evidence": "g2-r3/test_merge_commands",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW11",
       "assertion": "Intervention context propagates through its automatic descendants; direct-batch-only predicates exclude later cascades. A later paid move replaces active context while preserving earlier fact ancestry and room/run uses.",
       "owner": "accounting",
       "status": "reference_verified",
-      "evidence": "g2-r3/test_merge_commands"
+      "evidence": "g2-r3/test_merge_commands",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW12",
       "assertion": "Diagnostic intervention discount consumes a finite charge using integer units; ordinary moves retain base price. Diagnostic reward fires exactly at its declared scope. Missing charge, insufficient funds, stale quote and illegal move consume nothing.",
       "owner": "accounting",
       "status": "reference_verified",
-      "evidence": "g2-r3/test_merge_commands"
+      "evidence": "g2-r3/test_merge_commands",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW13",
       "assertion": "Last-Work completion wins before another decision. Zero-Work nonterminal state finishes required automatic work before loss. Holes never trigger recovery; recovery occurs only at equilibrium. No optional gravity/refill after terminal commitment.",
       "owner": "kernel",
       "status": "kernel_verified",
-      "evidence": "g1-r4/test_merge_kernel"
+      "evidence": "g1-r4/test_merge_kernel",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW14",
       "assertion": "Technical cascade/chain/fact/work limits remain effective across automatic continuations. Injected failure discards the unpublished batch and reservation; prior published states/costs/facts remain intact. New paid moves reset only their specified scopes.",
       "owner": "kernel",
       "status": "kernel_verified",
-      "evidence": "g1-r4/test_merge_kernel"
+      "evidence": "g1-r4/test_merge_kernel",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW15",
       "assertion": "New promoted identity and hit map exist on the first merge frame. A completed gesture before decoration ends can move it; live/ghost ownership remains correct through pooling, overlap and resize. Consumed ghosts cannot be selected.",
       "owner": "playback",
       "status": "native_playback_verified",
-      "evidence": "g4-r6/test_merge_native"
+      "evidence": "g4-r6/test_merge_native",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW16",
       "assertion": "Remote legal swaps work while another merge decorates. Accepted feedback begins promptly without a board-wide decorative wait; competing gestures cannot both consume the same window.",
       "owner": "playback",
       "status": "native_playback_verified",
-      "evidence": "g4-r6/test_merge_native"
+      "evidence": "g4-r6/test_merge_native",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW17",
       "assertion": "Receipt tick 19 accepts; tick 20 expires. Pointer-down at 19 and completion at 20 expires. An on-time receipt survives worker delay; invalid attempts do not reset or freeze the deadline.",
       "owner": "clock",
       "status": "native_playback_verified",
-      "evidence": "g4-r6/test_merge_native"
+      "evidence": "g4-r6/test_merge_native",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW18",
       "assertion": "Identical admitted transcript at 30/60/120 FPS produces identical mechanical checkpoints. Focus/stall pause, restore, reduced motion, practice and skip follow their explicit policies; assisted records cannot appear as unassisted performance evidence.",
       "owner": "clock",
       "status": "native_playback_verified",
-      "evidence": "g4-r6/test_merge_native"
+      "evidence": "g4-r6/test_merge_native",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW19",
       "assertion": "Default automatic-match speculation commits only on pass. On intervention its board, RNG, IDs, Work, Craft, facts and injected branch failure are discarded. Accepted intervention equals the synchronous non-speculative reference; selecting a failed default invokes the specified failure policy.",
       "owner": "executor",
       "status": "executor_verified",
-      "evidence": "g3-r3/test_merge_executor"
+      "evidence": "g3-r3/test_merge_executor",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW20",
       "assertion": "Default gravity/refill speculation has MW19 isolation, including RNG-consuming refills. Clock ticks do not invalidate its mechanical base or get overwritten by it; final publication binds the current decision/transcript digest. A cancelled speculative job yields promptly to paid input at the latest legal receipt tick.",
       "owner": "executor",
       "status": "executor_verified",
-      "evidence": "g3-r3/test_merge_executor"
+      "evidence": "g3-r3/test_merge_executor",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW21",
       "assertion": "Inject delayed, duplicate and wrong-generation completions across restart/menu/restore/room re-entry. None publish or touch freed views. Worker shutdown is bounded; repeated lifecycle cycles leak no jobs.",
       "owner": "executor",
       "status": "executor_verified",
-      "evidence": "g3-r3/test_merge_executor"
+      "evidence": "g3-r3/test_merge_executor",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW22",
       "assertion": "Commit state, charged cost, replay record and batch visibility atomically. Failures before/at publication never leave half a commit; provisional swap feedback visibly returns to the last committed board on failure.",
       "owner": "executor",
       "status": "executor_verified",
-      "evidence": "g3-r3/test_merge_executor"
+      "evidence": "g3-r3/test_merge_executor",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW23",
       "assertion": "Queue capacity never exceeds two committed batches plus one detached default candidate and one reserved command. Underflow holds a coherent state and records starvation; backpressure never crosses an unresolved decision.",
       "owner": "executor",
       "status": "executor_verified",
-      "evidence": "g3-r3/test_merge_executor"
+      "evidence": "g3-r3/test_merge_executor",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW24",
       "assertion": "Restore every committed phase, pending automatic match, gravity boundary and reserved-command snapshot; rebuild a reservation from its immutable command/base, never from serialized worker objects. Replay also covers multiple interventions, expiry, terminal and diagnostic failure.",
       "owner": "persistence",
       "status": "restore_and_seams_verified",
-      "evidence": "g5-r4"
+      "evidence": "g5-r4",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW25",
       "assertion": "Corrupt/missing context, wrong profile, allocator collision, stale window and truncated transcript reject without live-state mutation. Preserve exact integers above 2^53 and complete RNG state. Altered assist/tick decisions change the relevant identity.",
       "owner": "persistence",
       "status": "restore_and_seams_verified",
-      "evidence": "g5-r4"
+      "evidence": "g5-r4",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW26",
       "assertion": "Diagnostic dispatcher verifies move/room/run scopes, frozen source family, live target revalidation, tool suppression and intervention context.",
       "owner": "p3_contract",
       "status": "restore_and_seams_verified",
-      "evidence": "g5-r4/test_merge_seams"
+      "evidence": "g5-r4/test_merge_seams",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW27",
       "assertion": "Every successor phase has an explicit P3 objective, carry and save disposition; future fixture inventory remains structural.",
       "owner": "p3_contract",
       "status": "restore_and_seams_verified",
-      "evidence": "g5-r4/test_p3_preparation"
+      "evidence": "g5-r4/test_p3_preparation",
+      "latest_regression": "artifacts/game/merge-readiness/g7-final-controls-r1/run.json"
     },
     {
       "id": "MW28",
       "assertion": "Swap-to-merge, gravity-to-merge, automatic-merge-to-merge and expiry-to-gravity meet the frozen end-to-end deadlines in the release corpus; queue, admission, hashes and publication are included.",
       "owner": "performance",
-      "status": "pending"
+      "status": "cpu_verified_native_timing_not_passed",
+      "evidence": [
+        "artifacts/game/merge-readiness/g6-cpu-final-r1/run.json",
+        "artifacts/game/merge-readiness/g6-cpu-r5-smoke/run.json",
+        "artifacts/game/merge-readiness/g6-cpu-stress2x-r2/run.json",
+        "artifacts/game/merge-readiness/g6-r5-cpu-reference.json",
+        "artifacts/game/merge-readiness/g6-characterization-r5/run.json",
+        "artifacts/game/merge-readiness/g6-cpu-characterization4x-r5/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-720/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-900/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-720/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json"
+      ]
     },
     {
       "id": "MW29",
       "assertion": "Injected slow computation and cancellation exercise deadline recovery. Normal frozen workloads and required 2x-compute stress have zero starvation; intentionally excessive delays produce honest misses, closed input and later full-duration windows.",
       "owner": "performance",
-      "status": "pending"
+      "status": "recovery_and_cpu_stress_verified_native_stress_not_passed",
+      "evidence": [
+        "artifacts/game/merge-readiness/g6-gravity-r1/run.json",
+        "artifacts/game/merge-readiness/g6-cpu-stress2x-r2/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-720/run.json",
+        "artifacts/game/merge-readiness/g6-native-r5-stress2x-900/run.json"
+      ]
     },
     {
       "id": "MW30",
       "assertion": "Actual packaged executable verifies keyboard/mouse, terminal/restart/menu, reduced motion, focus loss, repeated windows, automatic redirection and gravity default at both native display sizes. Package manifest matches tested source and delivered bytes.",
       "owner": "release",
-      "status": "pending"
+      "status": "release_and_delivery_verified",
+      "evidence": [
+        "artifacts/game/merge-readiness/g6-native-r5-720/probe.json",
+        "artifacts/game/merge-readiness/g6-native-r5-900/probe.json",
+        "artifacts/game/merge-readiness/g7-release-r5-intel/release.json",
+        "artifacts/game/merge-readiness/g7-source-identity-r5.json",
+        "artifacts/game/merge-readiness/g7-delivery-r5.json"
+      ]
     }
   ],
   "human_evaluation": "deferred; sole optional reviewer",
-  "historical_complete_action_5ms": "failed; not the successor measurement"
+  "historical_complete_action_5ms": "failed; not the successor measurement",
+  "runtime_checkpoint": "71bdf36f3cb6a6537be03159488a3cd786329478",
+  "delivery": "generated/desktop/p3-readiness-review-20260922.zip",
+  "remaining_exit": "Intermittent native stalls interrupt unassisted normal/2x policies. Identify and correct blocking owner, then verify both sizes on declared supported profile. No timing waiver adopted."
 }

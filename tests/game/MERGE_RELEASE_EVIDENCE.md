@@ -26,7 +26,7 @@ registered stages with stable source, including the unchanged P1/P2 corpora.
 The strengthened kernel has 697 assertions, including a hand-authored complete
 early-terminal board/ID expectation and an explicit legacy-settling comparison.
 
-The later deadline audit found two more issues. Gravity followers correctly held
+Commit `71bdf36` checkpoints the later deadline audit corrections. Gravity followers correctly held
 input but did not record starvation without a paid reservation, and the modeled
 delay loop could cross its deadline between two clock reads and request a negative
 sleep. The adapter now records waiting gravity and late arrivals; the diagnostic
@@ -104,6 +104,15 @@ frames are retained, including pauses; fixed assisted/fault cases run separately
 after the unassisted measurements. Earlier r4 had a clean 720 run and failing 900
 runs. Later clean runs do not establish a fix for this intermittent issue.
 
+Required native 2× reports are `g6-native-r5-stress2x-720` and
+`g6-native-r5-stress2x-900`. The 720 run failed on assisted pauses/nonterminal
+all-pass and survivor policies; the 900 run passed its checks. All 26 fixed
+release witnesses passed in both. Frame p95/max were 9.091/1,265.834 ms and
+9.075/1,233.055 ms respectively. Main-frame p95/max were 0.509/8.133 ms and
+0.370/7.722 ms; demand readiness ratios were 0.217200/0.277620 and
+0.239380/0.400780. A passing aggregate is not proof of a stall-free run: the
+900 maximum remains visible. The required native stress exit is still open.
+
 NVIDIA stalls reproduced in an empty window. Intel's 65-second empty control
 completed 7,761 measured frames with p95 8.581 ms and max 9.613 ms. An editor
 script trace captured a roughly 908 ms frame with about 19 ms measured script
@@ -130,6 +139,11 @@ synthetic costs intentionally repeat admission/hashing; they are not authored P3
 content, ordinary release gates or evidence for a particular weaker computer.
 They demonstrate that heavy individual batches can still exceed a swap interval.
 
+The r5 4× delay characterization (`g6-cpu-characterization4x-r5`) completed
+three seeds × five policies, 15 rooms in 38.951 seconds, with zero recorded
+failures or engine errors and unchanged package bytes. This small characterization
+does not establish the full normal-corpus headroom at fourfold load.
+
 All 14 preserved archive hashes were verified and remain unchanged. A current
 documentation check resolved all 134 local links across 16 guides/plans.
 The historical whole-action 5 ms target still failed (retained P2 p95 37.640 ms).
@@ -139,10 +153,40 @@ The user is the sole optional reviewer. No player session, focus group, adoption
 vote or completed form is a readiness requirement. Fun, learning, reaction
 comfort and balance remain unmeasured; the practice build does not establish them.
 
-## Final closeout still in progress
+## Release handoff and remaining exit
 
-Required remaining records: native 2× profiles, 4× delay characterization,
-final actual-executable legacy matrix,
-source/package/delivery manifest, and one optional build/form. G6/G7 can close
-only after their exits pass or an explicit revised contract is approved; the
-intermittent native pause must not be silently waived.
+The r5 actual-executable legacy matrix `g7-release-r5-intel/release.json`
+completed all ten stages: lifecycle, both native sizes, 2,000 P1 pairs, 1,194
+P2 pairs, equivalent trial transcripts at 30/60/120 FPS, and missing/corrupt
+asset-pack handling in isolated copies. This is a functional pass on the explicit
+Intel profile. It separately reports the old whole-action target as failed
+(fresh P1/P2 p95 32.627/36.343 ms). The earlier default-NVIDIA matrix
+`g7-release-r5` failed the trial's real 800 ms expiry witness; that failure is
+preserved. The GPU selector changes no global settings or test expectations.
+
+The delivered candidate is
+`generated/desktop/p3-readiness-review-20260922.zip`, with one executable build,
+two explicit launch profiles, an optional form, this evidence, and a byte
+manifest. Runtime checkpoint: `71bdf36`; build manifest:
+`artifacts/package-build/20260922-021057-0440/report.json`.
+`g7-source-identity-r5.json` verifies all 257 source hashes against that build.
+`g7-delivery-r5.json` records copied-byte and ZIP-entry verification. The PCK is
+`e4a84f96d864391686bcd7ebcbf56fd89396f56e0ed34123dadbcd7a9100c41b`.
+
+G6 is **not passed**; G7 functional checks and delivery are complete, but its
+readiness declaration remains dependent on G6. MW28/MW29 remain open on native
+timing. No gameplay/accounting/replay contract question or human-review gate is
+pending. P3 content implementation has not begun.
+
+The next correction checkpoint must capture an engine/native thread and graphics
+trace across the intermittent pause, identify its blocking owner, apply a scoped
+fix, and rerun the failing native policies plus both sizes at 1×/2× on the
+declared supported profile. Keep all failed runs. A clean repeat alone is not a
+fix; the current measurements do not justify further simulation shortcuts.
+
+If the user wants P3 content work to proceed before that diagnosis, the concrete
+alternative is an **explicit, unapproved contract amendment**: permit P3 logic
+development on the verified simulation foundation while carrying MW28/MW29 and
+native timing forward as an open presentation milestone, retaining coherent
+holds/assisted-pause behavior and all original thresholds. Call that conditional
+development entry, not full P3 readiness. No such waiver has been applied here.

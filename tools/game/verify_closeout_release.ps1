@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$Package,
-    [Parameter(Mandatory)][string]$OutputRoot
+    [Parameter(Mandatory)][string]$OutputRoot,
+    [int]$GpuIndex = -1
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -17,7 +18,8 @@ function Invoke-ReleaseWitness {
     param([string]$Name,[string[]]$UserArgs,[string]$Marker,[string[]]$EngineArgs=@(),[string]$Directory=$packageRoot,[string]$ExpectedError='')
     $reportPath = Join-Path $evidenceRoot ($Name+'.json')
     $logPath = Join-Path $evidenceRoot ($Name+'.godot.log')
-    $args = @('--audio-driver','Dummy','--log-file',$logPath) + $EngineArgs + @('--')
+    $graphicsArgs = if ($GpuIndex -ge 0) { @('--gpu-index',"$GpuIndex") } else { @() }
+    $args = @('--audio-driver','Dummy','--log-file',$logPath) + $graphicsArgs + $EngineArgs + @('--')
     foreach ($arg in $UserArgs) { $args += $arg.Replace('{report}',$reportPath.Replace('\','/')) }
     $started = Get-Date
     $execution = Invoke-BoundedCheckProcess -Executable (Join-Path $Directory 'Facets.exe') -Arguments $args -TimeoutSeconds 1200 -WorkingDirectory $Directory
@@ -78,5 +80,5 @@ foreach ($case in 'missing','corrupt') {
 foreach ($file in $packageHashes.Keys) {
     if ((Get-FileHash -LiteralPath (Join-Path $packageRoot $file)).Hash.ToLower() -cne $packageHashes[$file]) { throw 'Package changed during release verification' }
 }
-[ordered]@{schema=1;status='passed';package=$packageRoot;package_hashes=$packageHashes;completed_stages=$results.Count;p1_pairs=2000;p2_pairs=1194;trial_fps_equivalence=$true;cpu_target_ms=5;p1_cpu=$p1.simulation;p2_cpu=$p2.simulation;cpu_target_met=($p1.target_5ms_met -and $p2.target_5ms_met);frames=@($native | ForEach-Object {$_.frames});frame_target_met=(@($native | Where-Object {-not $_.target_16_7ms_met}).Count -eq 0);human_evaluation='deferred by user'} | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $evidenceRoot 'release.json') -Encoding utf8
+[ordered]@{schema=1;status='passed';package=$packageRoot;gpu_index=$GpuIndex;package_hashes=$packageHashes;completed_stages=$results.Count;p1_pairs=2000;p2_pairs=1194;trial_fps_equivalence=$true;cpu_target_ms=5;p1_cpu=$p1.simulation;p2_cpu=$p2.simulation;cpu_target_met=($p1.target_5ms_met -and $p2.target_5ms_met);frames=@($native | ForEach-Object {$_.frames});frame_target_met=(@($native | Where-Object {-not $_.target_16_7ms_met}).Count -eq 0);human_evaluation='deferred by user'} | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $evidenceRoot 'release.json') -Encoding utf8
 Write-Output 'CHECK_COMPLETE: verify_closeout_release'
