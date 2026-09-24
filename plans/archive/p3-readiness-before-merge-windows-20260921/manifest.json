@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "reason": "Preserve prior atomic P3 preparation and failed CPU gate before recording user-directed merge-window successor",
+  "files": [
+    {
+      "sha256": "ceb42327dd662025a1bb8720c11e4c488e62df66ca7b8015e268c2b84ed81ad5",
+      "path": "plans/P3_IMPLEMENTATION_PLAN.md"
+    },
+    {
+      "sha256": "43b302629cfebd21d496e4da2222ac29c89f308ffdb8d316b28ea2a8199b0b67",
+      "path": "plans/P2_FINALIZATION_AND_P3_PREPARATION.md"
+    },
+    {
+      "sha256": "7f5b0815d0c8154cfd1c4bbdcdc0b1ea7f0d72ceade7575688cceaa7206c4219",
+      "path": "plans/P2_CPU_DECISION.md"
+    },
+    {
+      "sha256": "013bcc25b235cfd5faeecc71ea586242f115feabafff49e22b78b25b5f4965ca",
+      "path": "docs/PROTOTYPE_BUILD_PLAN.md"
+    },
+    {
+      "sha256": "bc61ec9d3f3d86441cde857cf810f7a7c25ece2b909826e28e01f18a32fba659",
+      "path": "docs/GAME_DESIGN.md"
+    },
+    {
+      "sha256": "dda16c4f2c3666fc0c14db2981286b590edc1cb26d6021b2af2c064936d9a7df",
+      "path": "docs/CONTENT_SYSTEMS.md"
+    },
+    {
+      "sha256": "85333763fc73b76ebef599e1806978cb38ec7bd92dc32a561efa79086322e520",
+      "path": "docs/README.md"
+    },
+    {
+      "sha256": "16b5e9376c36fea00e8ad17a4571d5da2b470fdf522236495b4c3d83ec0c43a1",
+      "path": "core/run/P3_PREPARATION.md"
+    },
+    {
+      "sha256": "b3893cbf00798b2009bf51e2035818334ef932531a7d908a51bd987fc66c71fd",
+      "path": "core/run/INTERVENTION_CONTRACT.md"
+    },
+    {
+      "sha256": "5f7a2893004abcfcd3931fbb379d582062fd16407bdf00439409b54077f602e3",
+      "path": "tests/game/closeout-status.json"
+    }
+  ],
+  "head": "cbea046ca4a83a9129d4517dd08c06ec2cbdd2c5"
+}

@@ -85,8 +85,12 @@ static func run(test: SceneTree) -> void:
 	physics.resolve_gravity(board)
 	var elapsed := Time.get_ticks_usec() - started
 	test.check(physics.last_result.ok and physics.last_move_events.size() == 240 and board.get_tile(Vector2i(15,15)) != null, "16x16 converges with exact segment count")
-	var stress := FileAccess.open("res://artifacts/game/p1-implementation/stress.json",FileAccess.WRITE)
-	stress.store_string(JSON.stringify({"size":[16,16],"segments":physics.last_move_events.size(),"rounds":physics.last_result.get("rounds"),"elapsed_ms":elapsed/1000.0,"ok":physics.last_result.ok},"\t")); stress.close()
+	var report_directory := "res://artifacts/game/p1-implementation"
+	test.check(DirAccess.make_dir_recursive_absolute(report_directory) == OK, "stress report directory available")
+	var stress := FileAccess.open(report_directory + "/stress.json",FileAccess.WRITE)
+	test.check(stress != null, "stress report writable")
+	if stress != null:
+		stress.store_string(JSON.stringify({"size":[16,16],"segments":physics.last_move_events.size(),"rounds":physics.last_result.get("rounds"),"elapsed_ms":elapsed/1000.0,"ok":physics.last_result.ok},"\t")); stress.close()
 	var limits := RuleSet.DEFAULTS.duplicate(); limits.max_settle = 0
 	board = BoardState.new(Vector2i(1,2)); board.set_tile(Vector2i.ZERO,catalog.create_tile(1))
 	test.check(not physics.settle(board,ResolutionBudget.new(RuleSet.new(limits))).ok, "settle cap is failure with work remaining")

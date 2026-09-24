@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "created": "2026-09-24",
+  "reason": "Preserve guidance before tracking the documentation package, adding fresh-machine setup and clarifying the project codename.",
+  "entries": [
+    {
+      "source": "README.md",
+      "archived": "docs/archive/2026-09-24-portability/README.md",
+      "sha256": "ccd6d95013ed3d81d039af2d16c6d3c16935ad08d0cf3b89e65d6bf6544d364f",
+      "bytes": 3516
+    },
+    {
+      "source": "AGENTS.md",
+      "archived": "docs/archive/2026-09-24-portability/AGENTS.md",
+      "sha256": "9f2e4817b849c698babaf41ebd739b2a8fc2a5c1992a2b40a12ffe7eeeb4a5ac",
+      "bytes": 4366
+    },
+    {
+      "source": "docs/README.md",
+      "archived": "docs/archive/2026-09-24-portability/docs/README.md",
+      "sha256": "c3c71bdf4dd198cc4c8379b65ba5f89ec720441bec761680158404d9a41247f5",
+      "bytes": 3433
+    },
+    {
+      "source": "docs/design/USER_ANCHORS.md",
+      "archived": "docs/archive/2026-09-24-portability/docs/design/USER_ANCHORS.md",
+      "sha256": "5a4702cd8ac8c75bd105312ff9a8540b0a1a119e4831c076c3fb040f1044f4ea",
+      "bytes": 6241
+    },
+    {
+      "source": "docs/design/VISION.md",
+      "archived": "docs/archive/2026-09-24-portability/docs/design/VISION.md",
+      "sha256": "574ae0c7a6e67e0d628b5a19b97d78f20bfdc5b18d369bba95e19d959dbb0c5b",
+      "bytes": 6145
+    },
+    {
+      "source": "plans/prototype/EXPLORATION.md",
+      "archived": "docs/archive/2026-09-24-portability/plans/prototype/EXPLORATION.md",
+      "sha256": "2e676fa8c619ebc02e025380aac669aff35b15ba849d6ac8f69eb2316d32c91a",
+      "bytes": 8692
+    },
+    {
+      "source": "docs/maintenance/README.md",
+      "archived": "docs/archive/2026-09-24-portability/docs/maintenance/README.md",
+      "sha256": "4aab8fbce59e8aae507c58da4adb9a0b40b76ac2592627f00a4938abd85fe1ea",
+      "bytes": 2698
+    }
+  ]
+}

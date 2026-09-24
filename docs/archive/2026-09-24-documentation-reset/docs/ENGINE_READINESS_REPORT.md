@@ -1,0 +1,75 @@
+# Engine readiness implementation report — 2026-09-13
+
+**P0–P5 complete and accepted.** All seven appearance cases are reviewed and strict current-source acceptance passes. The authoring-to-delivery foundation is implemented; final game art, content and broader mineral calibration remain separate work.
+
+Final tracked checkpoint: `6aa7da1`. All phase exit criteria have implementation and validation evidence; the final source-delta audit accounts for 21 tracked paths after the integrated checkpoint.
+
+The approved scope is [archived approved plan](archive/2026-09-13/lapidary-engine-readiness-plan-2026-09-13.md). Baseline is `2dc22c7`; integrated optical validation is bound to `ac58ff7`, with later tool, presentation and unused-schema changes validated explicitly below. The engine supports the authoring-to-delivery loop; final game aesthetics, progression and broad mineral calibration are separate work.
+
+## Requirement audit
+
+| Requirement | Implementation and evidence | Current result |
+|---|---|---|
+| P0.1 maintained public surface | `engine_checks.json` binds maintained gates to arguments, execution mode and positive completion; `test_authoring_surface` verifies registered paths and invalid public inputs. Public inspection and rotation tools use the production planner/worker; explicit CLI planning and cache evidence accompany the suite. | Passed; maintained tool execution and final public-field audit consolidated |
+| P0.2 remove inactive fields and tools | Fluorescence knobs/packing, inclusion archetypes, unused print/polish metadata, old clip enums, performance monitor, obsolete Atelier harness and unused dual-illuminant rig field removed. Deleted-symbol audit and source parsing pass. | Passed |
+| P0.3 explicit material scattering | All25 captured compiled material digests match pre/post migration; three affected saved resource roots migrated. Negative inheritance sentinel now rejected. | Passed |
+| P0.4 one clip sampler/factory path | `GemClipSampler` serves preview and planning. Synchronous baker removed. Factory clip tests exercise actual jobs. | Passed |
+| P0.5 replace misleading inspection | Planner-based inspector replaces old ladder/grain/noise/aggregate tools. Trace-only board-live policy removed. Rotation no-op compatibility flag removed; positive current CLI planning, explicit retired-option rejection and encoder tests pass. | Passed |
+| P0.6 trustworthy runner/contracts | Completion markers, environmental error separation and bounded process-tree termination; ten result cases and actual timeout/success tests pass. AGENTS and active contracts describe current paths. | Passed |
+| P0.7 docs archive | Eleven historical records retain exact original checksums in ignored `docs/archive/2026-09-13`; active documentation index and local links checked. | Passed: 11 archived records, 3 current documents, all local links checked |
+| P1 shared admission/capabilities | One authoring admission calls production validators and compiles actual geometry. Capability results separate support, approximation, device requirements and appearance review. Unsupported previews clear stale images. | Passed |
+| P1 durable editing/provenance | Detached resources, undo/redo, dirty comparison, save/reload, Save As, explicit replace, conflict detection and binary freeze. Physical edits invalidate optical work; labels/evidence reuse it while appearance evidence changes. Measured derivatives retain parent provenance. | Passed |
+| P1 ownership/public build | Generator writes49 detached candidates and a diff; original hashes unchanged. Saved new specimen public workflow performs two optical renders, one reprint and one metadata-only hit. | Passed |
+| P2 sole declarative grammar | Named groups/index sets/angles/offsets/meets; independent termination and authored girdle. Old crown-row/table/culet/step branches removed. Unsupported meets/topology reject. | Passed |
+| P2 required examples/inspection | Catalog plus pointed/flat, independent pavilion, mixed rows and custom convex girdle examples; dimensions, facets and sections. Stable IDs, vanished-meet diagnostics and deterministic manufacture independently tested. | Passed |
+| P2 migration/backend agreement | Sixteen old/new plane sets retain counts, max error1.1921e-7 against2e-6 gate. Sixteen catalog image differences below paired-stream noise. Active convex/general backend foundation gates pass. | Passed |
+| P3 print and honest views | Signed-RGB gamut mapping in GPU/offline print;401 hues/view, neutral/alpha checks, byte parity, unchanged linear XYZ and reprint-only edits. House print and display preview named accurately. | Passed |
+| P3 seven-case still/motion/feature corpus | Frozen specimen seeds, two rigs,112/256/512px, three backgrounds, four matched poses, independent streams and raw references. Native chronological/browser review and exact causal masks. | Passed: all 930 records and 180 strict comparisons |
+| P3 profiles/thresholds/cost | Seven case decisions and21 cost rows recorded with hashes; spatial/bias/temporal/seam/feature metrics.512px reprints clearly separated. No automatic adaptive or grading claim. | Passed: seven profiles, 21 cost rows and strict combined acceptance |
+| P4 one asynchronous execution owner | Detached immutable requests, child-process worker, latest-request-wins, stale rejection, bounded response images, cancellation with resumed estimator samples, explicit errors and clean shutdown. Actual worker/UI tests pass. | Passed |
+| P4 complete authoring controls | Resource-oriented material/units/size/condition/cut/crystal frame/rig/print/style/presentation/clip controls; save/reopen/comparison/native size/estimate/build. Actual new gem, new cut and16-frame clip built. | Passed |
+| P4 generic clips | Orientation keys, orientation-time/rig/power/exposure curves through one sampler; unit quaternions, interval/endpoint admission, fixed framing/pivot. Game translations/convergence remain in renderer. | Passed |
+| P4 responsive budget/device accounting | All20 edit acknowledgements≤39.649ms against100ms. Cold, changed geometry/material/pose and print completion separated. Device limits and allocator metrics recorded; unavailable GPU timestamps labeled unavailable. | Passed on measured workstation/workload |
+| P5 explicit delivery contract | Logical tile→asset/semantic-role catalog, build/preflight validation, actual completion/restart/interruption/rest. No production tier-color substitution or runtime optics. Failed awaited delivery leaves board hidden and input locked; simulation unchanged. | Passed |
+| P5 clean package/real UI | Three-file isolated non-ASCII/space path; main and gem PCK inventories, all16 bindings/64 views, actual release Play/invalid swap/merge/Menu/replay and missing/corrupt errors. | Passed |
+| P5 prefetch/performance/memory | All declared pages prefetched before bursts; no animation cold loads. All active texture ownership counted,6,170,368bytes in the final rebuild.1080p p95 timing below16.7ms in probe and external release capture. | Passed; P3 dependency satisfied |
+
+The [requirement evidence index](../artifacts/readiness-review-2026-09-13/closure-evidence-index.json) binds inspected coverage to sources and logs. The [source-delta audit](../artifacts/readiness-review-2026-09-13/source-delta-audit.json) accounts for every later tracked change. Counts alone are not the acceptance argument.
+
+## Validation and desktop results
+
+The stable-source integrated run has107 passing records, including106 Godot stages and print analysis. Eleven independent Python reference stages pass against the fresh exported numerical data. The registry has109 Godot stages: Atelier latency was measured separately with the GPU idle, appearance is the separately completed corpus, and the optional `-CrystalPrecision` stress mode was not selected. Standard crystal transport/interface tests and the independent crystal reference stages did pass. Appearance acceptance is not included in the107 count. Later completion-wrapper/parameter changes, presentation pacing, review output and retired rotation option have separate positive and negative evidence.
+
+The final production bake has176 optical masters,48 reprints,224 displays,304 requested frames,48 clips and16 pages. All304 delivered frames were inspected at native112px. The current clean release is [Final readiness ø package](../artifacts/export-audit/Final%20readiness%20%C3%B8%20package). It was freshly rebuilt after the last schema cleanup. The earlier paced package remains historical timing evidence.
+
+On the measured RTX4060 Laptop GPU workstation at1920×1080, the earlier actual paced release recorded3595 present intervals in30seconds: p95=16.5176ms, p99=16.6837ms, maximum19.8881ms. The agreed p95 target passes; this is not a maximum-frame guarantee. The all-catalog probe measured burst p95=16.296ms and rest p95=15.724ms, with cold board readiness228.004ms and remaining-catalog prefetch127.927ms. All16 texture pages account for6,053,312 resident payload bytes including live references outside the cache; this is not total driver/system VRAM usage.
+
+Atelier acknowledgement p95 by edit kind: material33.221ms, geometry39.649ms, pose36.425ms, print34.295ms. Completion p95 is separately2.364s,2.463s,2.361s and0.282s. Cold first image1.782s; cold completion3.758s. The device reported no GPU timestamp samples, so worker timings are wall times.
+
+## Final source and appearance qualification
+
+The last cleanup deletes one unused `GemLightRig` declaration and two saved inert values. All executable optical methods are unchanged. Nine affected CPU stages and three GPU stages pass. All 930 regenerated corpus jobs have identical active stored values and compiled lighting. The integrated suite and independent references remain applicable through this source/input proof; they are not represented as newly rerun.
+
+The [reuse qualification](../artifacts/readiness-review-2026-09-13/rig-schema-cleanup/reuse-qualification.json) records 17 fresh display comparisons: all are pixel-identical; 15 raw masters are byte-identical. Two rounded raw views differ by at most 4.7684e-7. Controlled identical-sample dispatch grouping reproduces the existing floating summation effect. The timing-adaptive dispatcher preserves sample selection, not bit-exact float grouping. Appearance thresholds and production cache identity/admission are unchanged.
+
+A one-time ignored offline operation retained original master/display payloads, producer metadata and measured wall times under explicitly qualified current compatibility keys. All 930 entries pass ordinary current-worker cache reads; the normal corpus command regenerated current-schema jobs and verified source/input hashes. Original evidence remains in `artifacts/appearance-corpus-pre-rig-cleanup`. No migration loader, schema alias or production fallback was added.
+
+[Strict current-source analysis](../artifacts/readiness-review-2026-09-13/appearance-final-current.json) passes all 180 comparisons. Metrics and costs are exactly unchanged from the accepted original images. Seven cases were reviewed under two rigs, three output sizes, three backgrounds and four motion poses, with independent streams and raw references. Feature comparisons preserve localized volume, resolved inclusion and thin-boundary signals; this does not imply that physical gap thickness is spatially resolved at 112px. Rounded selects `detail`; rough selects `refined`; the other five select `draft`. These are specimen-specific tested choices, not a universal quality controller or mineral grade.
+
+The [21-row cost table](../artifacts/readiness-review-2026-09-13/appearance-selected-costs.md) retains original producer measurements. 112px outputs use 224px internal renders; 256px and 512px outputs share 512px masters. The 512px rows measure reprinting only. Worker wall time includes setup and earlier overlapping validation; it is not uncontended GPU throughput. Profile-to-request settings are documented in the authoring guide.
+
+## Final rebuilt desktop package
+
+[Package inventory](../artifacts/package-build/20260913-225207-2593/report.json) passes for exactly `Facets.exe`, `Facets.pck` and `gem-assets.pck` in a path with spaces and a non-ASCII character. All runtime source hashes and the executable match the previously measured release. Assets were freshly rendered: 176 masters, 48 reprints, 224 displays, 304 requested frames, 48 clips and 16 pages. Each of the 224 jobs matches the accepted active inputs and has the current actual producer. All 304 frames were visually reinspected; 295 match the earlier delivery exactly and nine differ by at most 1 LSB (maximum frame RMSE 0.006314 LSB).
+
+The [current isolated 1080p probe](../artifacts/export-audit/final-readiness-isolated.json) passes with p95 15.352ms during eight animation bursts and 15.608ms at rest, against the agreed 16.7ms limit. All 64 views and 16 bindings load; no pages load during prefetched bursts. Cold board readiness is 224.949ms and remaining-catalog prefetch 132.720ms. Total active texture payload ownership is 6,170,368 bytes, including references outside the cache. The first probe invocation correctly failed its isolation check because its working directory was the source tree; it is retained as failed evidence and excluded from acceptance.
+
+[Actual current release UI](../artifacts/readiness-review-2026-09-13/rig-schema-cleanup/release-ui.json) passes Play, a valid three-gem merge, invalid-swap recovery, Menu and a second run. Prior actual missing/corrupt-pack error screens remain applicable to unchanged runtime source through the [package delta](../artifacts/readiness-review-2026-09-13/rig-schema-cleanup/package-delta.json). The earlier actual-release ETW p95 of 16.5176ms is retained honestly; it was not recaptured for this data-only cleanup. Current packaged playback/performance was remeasured as described above.
+
+## Using the foundation next
+
+Use [the authoring workflow](AUTHORING_WORKFLOW.md) for the implemented path: detached edit→shared admission→save/reopen→frozen job→factory→review→presentation catalog→clean package. Choose clips and physical variants explicitly; retain measured/published evidence separately from authored appearance choices. New cut examples are data, not compiler branches.
+
+Use a small playable group of visually distinct gems to decide native-size recognition, rest poses, selected/upgrade motion and family/tier binding. Keep board movement, scale pulses, convergence and removal in game animation. Bake optical rotation/light changes only where they improve that slice, then expand the catalog from those decisions.
+
+Connected/healed fracture morphology, directional silk, selected scratches/films, broader anisotropy, fluorescence, universal grading, calibrated scintillation and remote-farm deployment remain explicitly outside this approved milestone. Internal contribution passes are a useful later addition only if the chosen art direction needs physical internal-feature emphasis. None should return as an inert public knob or hidden fallback.

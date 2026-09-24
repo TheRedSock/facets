@@ -1,0 +1,68 @@
+[
+  {
+    "original": "C:\\GIT\\facets\\docs\\engine-foundation-acceptance.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\engine-foundation-acceptance.md",
+    "sha256": "164BD5D1846D1C1EE4E669B33AC8E5192A936F29960A6E5E220A2968437A7FE6",
+    "reason": "Superseded engine snapshot or pre-readiness documentation; retained as historical evidence."
+  },
+  {
+    "original": "C:\\GIT\\facets\\docs\\engine-state-phase48.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\engine-state-phase48.md",
+    "sha256": "7E1D1299359034B81F44F8F8E0D3DD797A270353F469CA72FE7F0D4D35356F57",
+    "reason": "Superseded engine snapshot or pre-readiness documentation; retained as historical evidence."
+  },
+  {
+    "original": "C:\\GIT\\facets\\docs\\engine-state-phase49.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\engine-state-phase49.md",
+    "sha256": "8314BFF4E710A757B3B3EB9778BF48EA07BE6397046227C46FB4FF5BB56F67C3",
+    "reason": "Superseded engine snapshot or pre-readiness documentation; retained as historical evidence."
+  },
+  {
+    "original": "C:\\GIT\\facets\\docs\\gemstone-engine-implementation-report-2026-09-11.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\gemstone-engine-implementation-report-2026-09-11.md",
+    "sha256": "AE77D322C974E99EC4FBC2D23726E1D038A7A1D1898135D04523DD5025332394",
+    "reason": "Superseded engine snapshot or pre-readiness documentation; retained as historical evidence."
+  },
+  {
+    "original": "C:\\GIT\\facets\\docs\\lapidary-architecture.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\lapidary-architecture.md",
+    "sha256": "D6F2ABD8D0BE4CD1D2DD5EFFDF75A9BA373D9DAF12F706AFBF4D6160F63FAA51",
+    "reason": "Superseded engine snapshot or pre-readiness documentation; retained as historical evidence."
+  },
+  {
+    "original": "C:\\GIT\\facets\\docs\\lapidary-audit-2026-09-10.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\lapidary-audit-2026-09-10.md",
+    "sha256": "A5EA95CCABC92A279B79F6E67A4909EFB80A476EFA37129F0BE2BAC5389789D9",
+    "reason": "Superseded engine snapshot or pre-readiness documentation; retained as historical evidence."
+  },
+  {
+    "original": "C:\\GIT\\facets\\docs\\lapidary-spectra-sources.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\lapidary-spectra-sources.md",
+    "sha256": "B781D00045F19744BCE168E9A31E189BC16E8CEDC4A61B38A8DD9CCFF91A5CCE",
+    "reason": "Superseded engine snapshot or pre-readiness documentation; retained as historical evidence."
+  },
+  {
+    "original": "C:\\GIT\\facets\\docs\\lapidary-engine-readiness-plan-2026-09-13.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\lapidary-readiness-original-review.md",
+    "sha256": "F04913287E792DC555FA008F74343C5860D457974CF0672D5F2C49452AE42EED",
+    "reason": "Original readiness review findings superseded by phase implementation; active file now maintains approved scope."
+  },
+  {
+    "original": "C:\\GIT\\facets\\scenes\\design\\atelier\\TRACER_NEEDS.md",
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\atelier-tracer-needs-v1.md",
+    "sha256": "B0484DEEF10F0B5E821950A585BB31E61CD2E20E1754389B66E38214B37A286E",
+    "reason": "Obsolete kernel-v1 synchronous Atelier notes; superseded by scenes/design/atelier/CONTRACT.md and the worker-process implementation."
+  },
+  {
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\lapidary-engine-readiness-plan-2026-09-13.md",
+    "sha256": "4D99CD03B92BF976B66D7DBACB8AB8EA92C4E247E6DD25FA9F8FB07F2AC74C48",
+    "reason": "Completed readiness working scope/journal superseded by ENGINE_READINESS_REPORT.md; retained as historical evidence.",
+    "original": "C:\\GIT\\facets\\docs\\lapidary-engine-readiness-plan-2026-09-13.md"
+  },
+  {
+    "archived": "C:\\GIT\\facets\\docs\\archive\\2026-09-13\\READINESS_PROGRESS.md",
+    "sha256": "41160F55E5DCA0ED34CF07893E3E69E72A9B96CA97A9313AD6007D70451B2185",
+    "reason": "Completed readiness working scope/journal superseded by ENGINE_READINESS_REPORT.md; retained as historical evidence.",
+    "original": "C:\\GIT\\facets\\docs\\READINESS_PROGRESS.md"
+  }
+]

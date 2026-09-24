@@ -1,5 +1,9 @@
 # Engine tools
 
+For installation, complete baseline assets and a source-only checkout, start with
+the [fresh-machine build guide](../docs/BUILDING.md). This guide lists specialist
+commands; single-specimen examples are not a complete default gameplay pack.
+
 ## Runtime delivery and desktop export
 
 `validate_gem_delivery.gd -- --library=... --catalog=...` checks every logical tile

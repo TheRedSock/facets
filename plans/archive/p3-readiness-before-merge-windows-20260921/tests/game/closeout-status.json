@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "started_from": "43ab9c9",
+  "review_policy": "User is sole reviewer; one build and form. Human sessions and acceptance deferred, potentially until after P5. No human learning, difficulty or feel claim.",
+  "baseline": {
+    "evidence": "artifacts/game/p2-closeout/20260921-implementation/s0-baseline/run.json",
+    "completed_stages": 18,
+    "source_stable": true,
+    "p1_checkpoints": 2000,
+    "p2_gameplay_actions": 1194,
+    "p2_begin_commands": 100,
+    "p2_outcomes": {
+      "complete": 77,
+      "failed": 23
+    },
+    "p1_debug_action_p95_ms": 47.6,
+    "p2_debug_action_p95_ms": 53.71,
+    "performance_target_met": false
+  },
+  "steps": {
+    "S0.1": "preserved baseline; unique output routing; frozen P2 characterization",
+    "S0.2": "current documentation reconciled; frozen baseline untouched",
+    "S0.3-S0.4": "complete: source/invariant audit and cumulative 63-field ownership; see closeout-audit-fields.json",
+    "C1": "complete: focused and integrated 19-stage run pass; all P1/P2 frozen checkpoints preserved; RoomProbe quantiles corrected",
+    "C2": "complete measured decision package: ten executable witnesses pass; CPU target fails and milestone disposition is pending",
+    "C3": "complete under user amendment: one verified r3 build/form and three recorded seed witnesses; human findings deferred",
+    "T0-T2": "complete: real resumable trial, transactional replay, paused/24/48 clocks, native 30/60/120 FPS equivalence and corrected restart view ownership",
+    "T3": "complete under user amendment: one optional paired comparison form; human findings deferred",
+    "T4": "decline adoption into P3 production for this milestone; retain isolated comparison for later review; no player preference claim",
+    "R0": "complete preparation: tracked contract, four room layouts, 14 acceptance specifications and 112 structural assertions; P3 activation awaits CPU disposition"
+  },
+  "c1_evidence": "artifacts/game/p2-closeout/20260921-implementation/c1-integrated/run.json",
+  "optimization_evidence": "artifacts/game/p2-closeout/20260921-implementation/trial-corpus/run.json",
+  "final_integrated": {
+    "source_stable": true,
+    "evidence": "artifacts/game/p2-closeout/20260921-implementation/final-integrated/run.json",
+    "stages": 22
+  },
+  "playback_correction": {
+    "evidence": "artifacts/game/p2-closeout/20260921-implementation/expiry-corrected/run.json",
+    "retained_failure": "artifacts/game/p2-closeout/20260921-implementation/release-r2/trial-30.godot.log",
+    "commit": "2defe1a",
+    "stages": 5,
+    "source_stable": true,
+    "trial_assertions": 37
+  },
+  "release": {
+    "p1_cpu": {
+      "count": 2000,
+      "max": 73.181,
+      "over_16_7": 685,
+      "p50": 14.162,
+      "p95": 32.637,
+      "quantile": "nearest_rank"
+    },
+    "package_hashes": {
+      "gem-assets.pck": "78c87eb8fafa5e844e219c2f0f138b08821ef77ba139c2e3975818110938f284",
+      "Facets.pck": "906ad1dee785c0e263ee9df440f85ff450a282c3ac4e8744bf1d8dfb5adb3794",
+      "Facets.exe": "6a0266cb7571aa4d437a32094acd353f020c77dcf7ff5a3305ae45d0609e5c20"
+    },
+    "stages": 10,
+    "checkpoint": "f36ef46",
+    "p2_cpu": {
+      "count": 1194,
+      "max": 77.164,
+      "over_16_7": 653,
+      "p50": 17.308,
+      "p95": 37.64,
+      "quantile": "nearest_rank"
+    },
+    "frame_target_met": true,
+    "cpu_target_met": false,
+    "evidence": "artifacts/game/p2-closeout/20260921-implementation/release-r3/release.json"
+  },
+  "preparation_checkpoint": "e0bf129",
+  "review": {
+    "sha256": "16b1444f565cec2b2ed41e449f8dbe3878b68e96fc2abefe6630808cfa7b617f",
+    "bundle": "generated/reviews/Facets-P2-Review-20260921.zip",
+    "seed_witnesses": "artifacts/game/p2-closeout/20260921-implementation/review/teaching-witnesses.json",
+    "form": "generated/reviews/Facets-P2-Review-20260921/REVIEW_FORM.md"
+  },
+  "preservation": "artifacts/game/p2-closeout/20260921-implementation/preservation-final.json",
+  "p3_readiness": {
+    "activation": "awaiting explicit CPU milestone decision",
+    "engineering_deliverables": "complete",
+    "owner": "User milestone decision; P3 implementer owns remediation",
+    "decision_package": "plans/P2_CPU_DECISION.md",
+    "cpu_decision": "pending",
+    "human_testing": "deferred by user, potentially until after P5"
+  },
+  "completion_audit": {
+    "identity_evidence": "artifacts/game/p2-closeout/20260921-implementation/current-identity-audit.json",
+    "current_runtime_sources": 231,
+    "package_copies_match": 2,
+    "review_zip_matches": true,
+    "legacy_gpu_evidence": "artifacts/game/p2-closeout/20260921-implementation/final-legacy-gpu/run.json",
+    "legacy_gpu_actions": 20,
+    "legacy_gpu_functional_pass": true,
+    "process_control": "artifacts/game/p2-closeout/20260921-implementation/final-process-control.log",
+    "completion_classifier": "artifacts/game/p2-closeout/20260921-implementation/final-result-classifier.log",
+    "cpu_decision": "still pending; no inferred waiver"
+  }
+}

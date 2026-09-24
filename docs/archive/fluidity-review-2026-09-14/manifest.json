@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-14",
+  "reason": "Preserve P1 checkpoint documents before fluidity assessment and proposed amendments",
+  "files": [
+    {
+      "original_path": "docs/README.md",
+      "archived_path": "docs/README.md",
+      "sha256": "B45377EE45CD6BAAF6E61FFD468C7A3912B2CF38272BABBC4847A303280DB253"
+    },
+    {
+      "original_path": "docs/GAME_DESIGN.md",
+      "archived_path": "docs/GAME_DESIGN.md",
+      "sha256": "B8F3469464043D80AFFA2D6826A5B818EABADAD08610A85AA0D4B979B5127C89"
+    },
+    {
+      "original_path": "docs/CONTENT_SYSTEMS.md",
+      "archived_path": "docs/CONTENT_SYSTEMS.md",
+      "sha256": "E55B753F92E33009ACFFB8385AFB821B3D068C2CE0C9F13DB648DB22B499B463"
+    },
+    {
+      "original_path": "docs/ARCHITECTURE_HARDENING.md",
+      "archived_path": "docs/ARCHITECTURE_HARDENING.md",
+      "sha256": "9880D75CF8D28D870B41C0AEC384D3B0E53854B1D106FE4BF7244BA609E6443F"
+    },
+    {
+      "original_path": "docs/PRESENTATION_ASSETS.md",
+      "archived_path": "docs/PRESENTATION_ASSETS.md",
+      "sha256": "D1E5C6893790F928BDB2976AAF2D559ED5A030599E9537763A0182AD254FCF16"
+    },
+    {
+      "original_path": "docs/PROTOTYPE_BUILD_PLAN.md",
+      "archived_path": "docs/PROTOTYPE_BUILD_PLAN.md",
+      "sha256": "6BF5152872C18F390E05534EA6DD97D345AE0599C00F6C267F7805AE6EB13E93"
+    },
+    {
+      "original_path": "plans/P1_IMPLEMENTATION_PLAN.md",
+      "archived_path": "plans/P1_IMPLEMENTATION_PLAN.md",
+      "sha256": "B9C7C5D8DAADA0183CF956A243A2C88C5A78300AC5D28D6D34804F1AFBEA2B2E"
+    },
+    {
+      "original_path": "plans/P1_HANDOFF.md",
+      "archived_path": "plans/P1_HANDOFF.md",
+      "sha256": "B12249BEDEDB9424CC4E0E988097531A59DE2C9DBE15DAD6490B24BBEDA20205"
+    },
+    {
+      "original_path": "core/run/CONTRACT.md",
+      "archived_path": "core/run/CONTRACT.md",
+      "sha256": "273EC0B8B67B7676D8A63491F16B591A12345B65050CEFCCDC45AAD5C8B99CDB"
+    }
+  ]
+}

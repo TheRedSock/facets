@@ -9,12 +9,8 @@ export_credentials.cfg
 # Imported translations (automatically generated from CSV files)
 *.translation
 
-# Plans, concept, archive
-plans
-
-# Local reports, working notes, and regenerable render output.
-docs/
-docs/archive/
+# Design, plans and historical documentation are versioned.
+# Local reports, tool installations and regenerable render output stay local.
 generated/
 artifacts/**
 !artifacts/.gdignore
@@ -22,3 +18,7 @@ __pycache__/
 *.pyc
 # GLSL kernels are runtime-compiled source, not editor-imported resources.
 *.glsl.import
+
+# Optional Python tooling environments.
+.venv/
+.venv-reference/

@@ -14,3 +14,12 @@ assets/ui/**/*.svg text eol=lf
 assets/ui/themes/*.tres text eol=lf
 data/localization/en.tres text eol=lf
 tests/game/p2-reference.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+
+# Archived documentation and frozen reports retain checksum-identical bytes.
+docs/archive/** -text -whitespace
+plans/archive/** -text -whitespace
+docs/P0_BASELINE.md -text whitespace=cr-at-eol
+docs/ENGINE_READINESS_REPORT.md -text whitespace=cr-at-eol
+
+# User-authored worksheet answers retain their original formatting.
+docs/design/USER_ANCHORS.md -whitespace

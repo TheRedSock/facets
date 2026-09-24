@@ -1,0 +1,37 @@
+[
+  {
+    "source": "AGENTS.md",
+    "archived": "docs/archive/before-root-guide-rewrite-2026-09-14/AGENTS.md",
+    "sha256": "1b1631900f57cff5c9efd18d4e8332b23cf5b57ff44f08971ac2aa303615f352"
+  },
+  {
+    "source": "README.md",
+    "archived": "docs/archive/before-root-guide-rewrite-2026-09-14/README.md",
+    "sha256": "ad2cb491ed77c45360bad764d8a305b6de8fe1acb74356973f3ba724a735088d"
+  },
+  {
+    "source": "docs/P0_BASELINE.md",
+    "archived": "docs/archive/before-root-guide-rewrite-2026-09-14/docs/P0_BASELINE.md",
+    "sha256": "5128ba4e7de6f4c7dbc80852dad897dd013a5472f679c2851a70781570bbcee8"
+  },
+  {
+    "source": "docs/ARCHITECTURE_HARDENING.md",
+    "archived": "docs/archive/before-root-guide-rewrite-2026-09-14/docs/ARCHITECTURE_HARDENING.md",
+    "sha256": "2a3bd953baa6f4a3ea35006990b5c93fc9beb91e1ee03ad757ffa0769767c821"
+  },
+  {
+    "source": "docs/GAMEPLAY_REWRITE_REVIEW.md",
+    "archived": "docs/archive/before-root-guide-rewrite-2026-09-14/docs/GAMEPLAY_REWRITE_REVIEW.md",
+    "sha256": "80f4da9bb4ff88d043f038fccaf877435eafd7e75c45b43bf5fec0fc5d4f2dab"
+  },
+  {
+    "source": "docs/PROTOTYPE_BUILD_PLAN.md",
+    "archived": "docs/archive/before-root-guide-rewrite-2026-09-14/docs/PROTOTYPE_BUILD_PLAN.md",
+    "sha256": "f642d55cea6d67be9c3c6923e6f599a88848d6727c2df72b6054af86dd93bfce"
+  },
+  {
+    "source": "docs/README.md",
+    "archived": "docs/archive/before-root-guide-rewrite-2026-09-14/docs/README.md",
+    "sha256": "4e6b279fff99f13d4746a354b54aa3ff98ea13f9314aa66a1e25a9f351991280"
+  }
+]

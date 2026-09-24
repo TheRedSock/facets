@@ -1,0 +1,22 @@
+# Engine scope audit after phase 48
+
+This is a local implementation audit, not a claim of universal gemstone simulation. Phase 48 verification and delivery passed: 96 regression stages, 224 cached display frames, 176 cached geometry companions and 64/64 board tiles. Consult artifacts/ENGINE_PROGRESS.md for commit evidence.
+
+| Requested outcome | Implemented foundation | Remaining acceptance work |
+|---|---|---|
+| Physical material specifications | Principal dispersion resources, spectral absorber mixtures with units/provenance, physical scale, spatial absorption/scattering, separate crystal frames | Most catalog colors remain authored. Unsupported special phenomena are not inferred from mineral names. |
+| Validated optical transport | Scalar spectral mode; persistent polarized isotropic mode; explicit uniaxial Maxwell mode; independent numerical and renderer comparisons | Maxwell currently excludes rough/scattering/biaxial media. Full universal optical coverage is not claimed. |
+| Practical smooth milky renders | Repeated scattering, spatial optical-depth integration, separated sharp/residual reconstruction, measured low-sample comparisons | Approximation error and rare outliers remain specimen dependent. Quality policies should continue to be evaluated on actual requested assets. |
+| Procedural shapes/cuts | Facet programs, explicit manufacturing deviations, analytic cabochons, convex continuous rounding, general closed mesh/BVH, concave polygon lofts | Arbitrary feature scales and all analytic contact configurations are not certified. |
+| Real physical degradation | Explicit spatial finish, actual rounded/chipped/cleaved boundaries, filled internal regions, volume fields and foreign crystal habits/populations | Automatic grade-to-condition authoring remains missing. Fracture morphology has failed visual acceptance and stays disabled. |
+| Extensible specimen authoring | Reusable material/shape/cut/condition resources; stable physical microstructure realization into ordinary specimens; explicit specimen CLI | A unified preset/condition realization workflow should replace disconnected demos. Grade labels must select explicit realized recipes, not become hidden shader knobs. |
+| Separate game art direction | Optional deterministic style after output-size mastering; independent style identity; headless cached-print restyling; exact alpha preservation | The example is illustrative. Hard tonal bands amplify noise; internal optical-path visibility is not available in primary geometry AOVs. No finished grading readability system. |
+| Scalable generation and delivery | Explicit requested animation frames, master deduplication, resumable jobs, portable source/data ZIP, shard claims/transfer, selective bounded pages/PCK/LRU | Linux/render-farm/network-filesystem operation is not validated. No automatic rotation-by-cell lighting lattice. Requested rig/pose variants remain explicit. |
+| Storage discipline | Optical/print/display separation, optional unstyled retention without shipping references, cache collection and SHA verification | Intermediate prints are opportunistic unless explicitly requested. Loose delivery-page garbage collection is separate from store collection. |
+| Source control | Baseline and phased commits; generated assets, local documents and test evidence ignored | Phase 48 is verified and ready to commit with current delivery. |
+
+## Next implementation priority
+
+Finish a coherent authoring path for procedural condition presets and independent quality axes. Realize explicit immutable GemStone inputs before rendering, use bounded seeded variation with stable independent channels, and retain source/provenance. Start with mechanisms the transport already supports: workmanship, finish and one geometric damage mechanism, with a volume/crystal alternative. Evaluate unstyled outputs across multiple views and rigs, at hero and sprite sizes. Select plausible authored parameter ranges without claiming measured geological or wear-history calibration. Reject/defer poor-looking profiles instead of enabling a universal grade-to-haze/scratch ramp.
+
+The separate art pass can help a later game aesthetic, but it cannot establish physical grade realism. Biaxial transport, anisotropic silk, fluorescence and structural color remain distinct unsupported mechanisms rather than hidden approximations. Do not treat these notes as authorization to restart completed numerical work without a demonstrated need.

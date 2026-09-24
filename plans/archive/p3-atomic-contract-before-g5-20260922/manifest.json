@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "reason": "G5 reconciliation of reserved atomic P3 contract with user-approved merge-window foundation",
+  "files": [
+    {
+      "path": "core/run/P3_PREPARATION.md",
+      "sha256": "d5de16c0cee8d52344c16dff013c6b5e752f2ec9f8eafb2ce5bce0d939f0aa34"
+    },
+    {
+      "path": "tests/game/p3-preparation.json",
+      "sha256": "a939f2c36710fd89f2f282b6e6deb773fe8f6588979baee7477ce56e059df135"
+    },
+    {
+      "path": "tests/game/test_p3_preparation.gd",
+      "sha256": "0dd04aa8b60543f984d79511cb1156fa321f319863e47507f94516ace58d4d91"
+    },
+    {
+      "path": "plans/P3_IMPLEMENTATION_PLAN.md",
+      "sha256": "2b2824e946f4932db1a7cdf2cf9ad7f2bd00b8d3c95265ead69955fef0de8e00"
+    }
+  ]
+}

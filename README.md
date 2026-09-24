@@ -1,8 +1,9 @@
 # Facets
 
-Facets is a gemstone match-3 merge roguelike in development, built with Godot and
+Facets is the working codename for a gemstone match-3 merge roguelike, built with Godot and
 GDScript. The intended game combines an evolving collection of real gems with tactical
-board objectives and branching runs.
+board objectives and branching runs. The codename does not constrain the game's
+story, aesthetic or final title; those should follow the chosen experience.
 
 ## What is here
 
@@ -18,16 +19,18 @@ comparison remain controls; their whole-action CPU target remains open.
 Player learning, difficulty and feel remain unmeasured; the user is the sole
 reviewer during this stage, with broader testing deferred.
 
-The [documentation index](docs/README.md) routes the current design and engine
-reports. The [prototype build plan](docs/PROTOTYPE_BUILD_PLAN.md) records phase
-status, dependencies and acceptance criteria. Its [P0 baseline](docs/P0_BASELINE.md)
-preserves the initial rules and review evidence.
+Start with the [documentation index](docs/README.md), then
+[current state](docs/current/STATE.md), [game vision](docs/design/VISION.md) and
+[remaining prototype plan](plans/prototype/README.md). The next planned work is
+to explore and prove the presentation direction before full production. Historical
+plans and frozen evidence are reached through the [history index](docs/history/README.md).
 
 ## Run and develop
 
-Open `project.godot` in Godot 4.6. The project menu provides the tactical room and Gem
-Atelier. Tool scripts specify their tested Godot executable and export-template
-requirements; check them when configuring another workstation.
+Start with the [fresh-machine build guide](docs/BUILDING.md) for pinned tools,
+source-only setup, the complete gem bake and Windows packaging. The tested editor
+is Godot 4.6.1 standard (GDScript). The project menu provides the tactical room and
+Gem Atelier; gameplay requires the generated gem pack before launch.
 
 Gameplay uses prebuilt gem assets. Follow the [tools guide](tools/README.md) for
 asset generation, delivery validation and desktop packaging, and the
@@ -50,13 +53,12 @@ readability or completeness.
 | `scenes/` | Gameplay views, application UI and authoring tools |
 | `tools/`, `tests/` | Build, validation and test entry points |
 
-For upcoming architecture and workspace changes, see the
-[architecture guide](docs/ARCHITECTURE_HARDENING.md). The
-[presentation specification](docs/PRESENTATION_ASSETS.md) defines UI, background,
-audio and effects production. [AGENTS.md](AGENTS.md) is the agent routing and
-collaboration guide.
+Use [engineering boundaries](docs/engineering/BOUNDARIES.md) for subsystem
+ownership, [the presentation brief](docs/design/PRESENTATION.md) for design work,
+and [production guidance](docs/production/README.md) for assets and integration.
+[AGENTS.md](AGENTS.md) is the agent routing and collaboration guide.
 
-`docs/`, `plans/`, `generated/` and review artifacts follow the repository's local,
-gitignored workflow and may not exist in a fresh clone. Tracked subsystem contracts,
-source and tests remain available; obtain the local design package when working
-on the proposed prototype. Archived documents are historical references.
+Design documentation, user anchors, plans, authored inputs and accepted runtime
+UI/audio assets are versioned. Generated gem packs, caches, tool binaries and raw
+review artifacts stay ignored. The [build guide](docs/BUILDING.md#what-travels-with-git)
+explains what to regenerate or transfer. Archived documents are historical references.

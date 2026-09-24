@@ -1,0 +1,206 @@
+{
+  "schema": 1,
+  "created": "2026-09-24",
+  "reason": "Separate current state, game intent, production guidance and remaining prototype work; preserve superseded narratives verbatim.",
+  "git_head": "31ce6bfb4fe3faa4805538339c860d2d4206f90f",
+  "entries": [
+    {
+      "source": "README.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/README.md",
+      "sha256": "a3a35adb69960deb127a3f82867ac14a175f108e8af8960f21a9760544a07a55",
+      "bytes": 3391
+    },
+    {
+      "source": "AGENTS.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/AGENTS.md",
+      "sha256": "8460b87581221bcbd46d3ed76f8f74b664c6d798efb999324d991c473052dbee",
+      "bytes": 4162
+    },
+    {
+      "source": "docs/ARCHITECTURE_HARDENING.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/ARCHITECTURE_HARDENING.md",
+      "sha256": "7cb48f519225d6cd512b6f7ea9b023d108d6109cbc8ad68a72504e2011452223",
+      "bytes": 30385
+    },
+    {
+      "source": "docs/AUTHORING_WORKFLOW.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/AUTHORING_WORKFLOW.md",
+      "sha256": "0fedf78033b5569817fb8707e5c1390b3cddbfaee4482bd120fab8ab26e3fde7",
+      "bytes": 6491
+    },
+    {
+      "source": "docs/CONTENT_SYSTEMS.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/CONTENT_SYSTEMS.md",
+      "sha256": "0108f483985ca7bc6e44d423e727ede6d0cd3654b2dbfcf48ac08b91eb8ddff9",
+      "bytes": 56210
+    },
+    {
+      "source": "docs/ENGINE_READINESS_REPORT.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/ENGINE_READINESS_REPORT.md",
+      "sha256": "430ff610ba59dbbd37baea954ecea35b1fbedd71a0321f821bb45cb2d499555f",
+      "bytes": 15176
+    },
+    {
+      "source": "docs/FLUIDITY_AND_REACTIVE_PLAY.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/FLUIDITY_AND_REACTIVE_PLAY.md",
+      "sha256": "4ec1c6f381a1348d987b2c7226f6a39a6a3c0b3dc055ab40a6be488e942b61d2",
+      "bytes": 19354
+    },
+    {
+      "source": "docs/GAME_DESIGN.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/GAME_DESIGN.md",
+      "sha256": "91437f87b83c0a0ffcac1176ef13a787518bb27bdfaca10d675701f30ac0722f",
+      "bytes": 36468
+    },
+    {
+      "source": "docs/GAME_ENGINE_INTEGRATION.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/GAME_ENGINE_INTEGRATION.md",
+      "sha256": "b4cb769924b56581e886159402a7698ae36a4c4fb76113908f0da719ab2ac9f7",
+      "bytes": 18786
+    },
+    {
+      "source": "docs/GAMEPLAY_REWRITE_REVIEW.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/GAMEPLAY_REWRITE_REVIEW.md",
+      "sha256": "ca77fed3abf539032965dd660fd8707f6886f95f19e47f52b27d7520ae98476d",
+      "bytes": 22916
+    },
+    {
+      "source": "docs/GEM_ART_REVIEW.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/GEM_ART_REVIEW.md",
+      "sha256": "904f2ff322e204f4f2a35750b5f5eadb7e80900c212c6079d7e30e274e92402a",
+      "bytes": 22325
+    },
+    {
+      "source": "docs/P0_BASELINE.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/P0_BASELINE.md",
+      "sha256": "d8ae5b6880bebd3ac2401d9a71167bb959aa048144025e7be76caf7e296a1d84",
+      "bytes": 18926
+    },
+    {
+      "source": "docs/PRESENTATION_ASSETS.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/PRESENTATION_ASSETS.md",
+      "sha256": "7bc37766434e6966ee83df7ad16cb32d0a278d817777e8fadcca0f5a19ceaedb",
+      "bytes": 20488
+    },
+    {
+      "source": "docs/PROTOTYPE_BUILD_PLAN.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/PROTOTYPE_BUILD_PLAN.md",
+      "sha256": "c772d690e868028d506e9abd42e4251bf1f511c84f53118278d6823a7781d626",
+      "bytes": 28051
+    },
+    {
+      "source": "docs/README.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/docs/README.md",
+      "sha256": "920d276f3566eaf4dd3e245eb9913df200ad80e2ba8a77b4b54a56fbeb753f47",
+      "bytes": 6738
+    },
+    {
+      "source": "plans/P1_FLUIDITY_AMENDMENT.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P1_FLUIDITY_AMENDMENT.md",
+      "sha256": "da6200289b4c17d454ec1b76220658ad45218db50896afbfabe73bfca621e83b",
+      "bytes": 12212
+    },
+    {
+      "source": "plans/P1_HANDOFF.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P1_HANDOFF.md",
+      "sha256": "80d21c2ac663f4a821746e8a35c43422d08e5416c6695dbbc750be26ccffd47f",
+      "bytes": 12783
+    },
+    {
+      "source": "plans/P1_IMPLEMENTATION_PLAN.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P1_IMPLEMENTATION_PLAN.md",
+      "sha256": "1e35e5649c91b59c42fb8eeb73a3023f7e7fe2e1f37ec244b91bd649fb0fa131",
+      "bytes": 35380
+    },
+    {
+      "source": "plans/P1A_HANDOFF.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P1A_HANDOFF.md",
+      "sha256": "ca485fa4d87818ff4597ee8a5844c08a9842ec1e01dbd75fffa7fef168732211",
+      "bytes": 10949
+    },
+    {
+      "source": "plans/P2_CLOSEOUT_AUDIT.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P2_CLOSEOUT_AUDIT.md",
+      "sha256": "6d9bb6421931c4875e1566b47d72369c6f8470c0ecafdd05aafb19634b3e7faa",
+      "bytes": 5769
+    },
+    {
+      "source": "plans/P2_CLOSEOUT_JOURNAL.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P2_CLOSEOUT_JOURNAL.md",
+      "sha256": "374cdcdd92a6e41e1f0ccb5f04a67dd8ab671be9664434ab4f9596c48de4235b",
+      "bytes": 7946
+    },
+    {
+      "source": "plans/P2_CPU_DECISION.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P2_CPU_DECISION.md",
+      "sha256": "dae79d7bdf0065976b2f623c900e29a75221ad1ac67e4623fdbacfb256c64dc4",
+      "bytes": 4496
+    },
+    {
+      "source": "plans/P2_FINALIZATION_AND_P3_PREPARATION.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P2_FINALIZATION_AND_P3_PREPARATION.md",
+      "sha256": "f5102c516843b0be872d301acbfe39201c425eca218c6e202311304eeb262c98",
+      "bytes": 39952
+    },
+    {
+      "source": "plans/P2_HANDOFF.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P2_HANDOFF.md",
+      "sha256": "bdd6d2ee1861567ba976ea881fa848eb5189997131dbab669b9cee58abbaf900",
+      "bytes": 9739
+    },
+    {
+      "source": "plans/P2_IMPLEMENTATION_PLAN.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P2_IMPLEMENTATION_PLAN.md",
+      "sha256": "a0762adcd7c0c231bac171bde7b92f0f335c624f69c125c083df752c37ad8d0d",
+      "bytes": 46027
+    },
+    {
+      "source": "plans/P2_INTERVENTION_TRIAL.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P2_INTERVENTION_TRIAL.md",
+      "sha256": "d03afc8efb6885b0312456304d224367313b95920dcc7ad9458f30f1dbc3ceac",
+      "bytes": 6995
+    },
+    {
+      "source": "plans/P2_TRIAL_PROTOCOL.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P2_TRIAL_PROTOCOL.md",
+      "sha256": "75a5467d398f9e00b45c58bdf9fac120e6ccb40399edcc3d51c5b5b8af21fe4e",
+      "bytes": 4145
+    },
+    {
+      "source": "plans/P3_EXECUTION_JOURNAL.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P3_EXECUTION_JOURNAL.md",
+      "sha256": "742082eec52e14b786e6d143c9b09fa64bfdd18b976e7f1f46f1c5fd3fa21e4e",
+      "bytes": 14141
+    },
+    {
+      "source": "plans/P3_FEEDBACK_REVIEW_FORM.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P3_FEEDBACK_REVIEW_FORM.md",
+      "sha256": "f10332ad948cb9ed7a83171e483954ac363b829235c6d7a0e2949713cd967888",
+      "bytes": 3795
+    },
+    {
+      "source": "plans/P3_IMPLEMENTATION_PLAN.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P3_IMPLEMENTATION_PLAN.md",
+      "sha256": "204765751a5b06b998b03267a01323e72d8d18f25285858c6d6d6a516fb91cfe",
+      "bytes": 3806
+    },
+    {
+      "source": "plans/P3_READINESS_JOURNAL.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P3_READINESS_JOURNAL.md",
+      "sha256": "1c87a0ef3b5ee0ebb154af87f42a7a9cbf2739fab44cc55571020478c820d222",
+      "bytes": 37018
+    },
+    {
+      "source": "plans/P3_READINESS_REVIEW_FORM.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P3_READINESS_REVIEW_FORM.md",
+      "sha256": "0d87c9d87773606a403880e1d742404e4b8ec0f859211ab964ae3b039913d9c1",
+      "bytes": 3013
+    },
+    {
+      "source": "plans/P3_READINESS_SUCCESSOR.md",
+      "archived": "docs/archive/2026-09-24-documentation-reset/plans/P3_READINESS_SUCCESSOR.md",
+      "sha256": "dc66c4119f9c585724f4453c728ad6f7218ace99bdf894220260e78b2ea2ddb4",
+      "bytes": 18282
+    }
+  ]
+}

@@ -25,7 +25,12 @@ func _run() -> void:
 	while not input.eof_reached():
 		var row := input.get_csv_line()
 		if row.size() == 2 and tr(row[0]) != row[1]: failures.append("compiled vocabulary mismatch/"+row[0])
-	var output := FileAccess.open("res://artifacts/game/p2/presentation-content.json",FileAccess.WRITE)
+	var output_directory := "res://artifacts/game/p2"
+	if DirAccess.make_dir_recursive_absolute(output_directory) != OK:
+		printerr("FAIL: cannot create presentation report directory"); quit(1); return
+	var output := FileAccess.open(output_directory + "/presentation-content.json",FileAccess.WRITE)
+	if output == null:
+		printerr("FAIL: cannot write presentation report"); quit(1); return
 	output.store_string(JSON.stringify({"failures":failures,"non_gem_texture_bytes":texture_bytes,
 		"runtime_audio_bytes":audio_bytes,"audio_acceptance":manifest.audio_acceptance,"font_scene_decode_overhead":"not measured"},"\t"))
 	for failure in failures: printerr("FAIL: "+failure)

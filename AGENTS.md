@@ -19,18 +19,21 @@ for current work. Follow the route for the task; the entire archive is not requi
 
 | Task | Start here |
 |---|---|
-| Game direction, scope or phase work | [Prototype plan](docs/PROTOTYPE_BUILD_PLAN.md), then its linked design and baseline |
-| Gameplay architecture or repository organization | [Architecture guide](docs/ARCHITECTURE_HARDENING.md), [source review](docs/GAMEPLAY_REWRITE_REVIEW.md), then `core/board/`, `core/run/`, `core/rules/` and relevant tests |
-| Mechanics, triggers, families or tuning | [Game design](docs/GAME_DESIGN.md), [content systems](docs/CONTENT_SYSTEMS.md), `resources/definitions/` and `data/tiles/` |
-| UI, terminology, non-gem art, sound or effects | [Presentation specification](docs/PRESENTATION_ASSETS.md), `scenes/` and `data/presentation/` |
+| Project status, game direction or phase work | [Current state](docs/current/STATE.md), [vision](docs/design/VISION.md), [remaining prototype plan](plans/prototype/README.md) |
+| Gameplay architecture or repository organization | [Engineering boundaries](docs/engineering/BOUNDARIES.md), then the linked owner contracts/source and relevant tests |
+| Mechanics, triggers, families or tuning | [Current mechanics](docs/design/MECHANICS.md), then `core/run/P3_PREPARATION.md`, `core/run/MERGE_WINDOW_PREPARATION.md` and relevant content/source |
+| UI, terminology, non-gem art, sound or effects | [Presentation brief](docs/design/PRESENTATION.md), [user anchors](docs/design/USER_ANCHORS.md), then the current prototype task and affected scenes |
 | Gem authoring, cuts, clips or rendering | [Authoring workflow](docs/AUTHORING_WORKFLOW.md); the relevant contract in [core/lapidary](core/lapidary/) |
-| Asset integration, loading or packaging | [Integration plan](docs/GAME_ENGINE_INTEGRATION.md), [delivery contract](core/delivery/CONTRACT.md) and [tools guide](tools/README.md) |
+| Asset integration, loading or packaging | [Production guide](docs/production/README.md), [delivery contract](core/delivery/CONTRACT.md) and [tools guide](tools/README.md) |
 | Validation or an existing command | [Tests guide](tests/README.md), [tools guide](tools/README.md) and the relevant registered check |
+| Optional future content concepts | [Possible routes](docs/design/POSSIBLE_ROUTES.md); these are not the active prototype queue |
 
-`docs/`, `plans/` and generated review artifacts are local and gitignored. They may
-be absent in a fresh checkout. Use tracked contracts/source/tests for existing
-behavior; request missing design context before inferring a planned feature.
-Archived proposals are historical input, not current requirements.
+`docs/` and `plans/` are versioned, including the user anchors and historical
+archives. Generated assets and raw review artifacts remain ignored; use the
+[fresh-machine guide](docs/BUILDING.md) to restore the working environment.
+Missing historical artifacts do not erase recorded results or prove a new pass.
+Archived proposals are historical input, not current requirements. Facets is a
+working codename, not a constraint on the game's theme, aesthetic or final title.
 
 ## Durable engineering principles
 

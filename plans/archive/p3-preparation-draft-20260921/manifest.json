@@ -1,0 +1,6 @@
+{
+  "source": "plans/P3_IMPLEMENTATION_PLAN.md",
+  "archived": "P3_IMPLEMENTATION_PLAN.md",
+  "sha256": "9072eaf301fe603bacb7351b082945b1734fa3049be7f5ff5bbde7d9b5c75611",
+  "reason": "Move detailed proposed behavior to source-adjacent owning contract; preserve the initial draft"
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "source": "docs/GAME_DESIGN.md",
+    "archived": "docs/archive/game-design-2026-09-13/GAME_DESIGN.md",
+    "sha256": "C9F15BCA7CD8E7FCF292A7370860CA24DC1D2B2E65CAA04FBD8EA442461CBCAB"
+  },
+  {
+    "source": "docs/GAMEPLAY_REWRITE_REVIEW.md",
+    "archived": "docs/archive/game-design-2026-09-13/GAMEPLAY_REWRITE_REVIEW.md",
+    "sha256": "F61F4B20B8BF9E9D46BD438043024B2089BE127A8111E359DF0586B541ED80C6"
+  },
+  {
+    "source": "docs/GAME_ENGINE_INTEGRATION.md",
+    "archived": "docs/archive/game-design-2026-09-13/GAME_ENGINE_INTEGRATION.md",
+    "sha256": "B8E41CF8622186C5122EEA8284F0B9B83044F7B189F35C5D2F3F6105247FEC1F"
+  },
+  {
+    "source": "docs/GEM_ART_REVIEW.md",
+    "archived": "docs/archive/game-design-2026-09-13/GEM_ART_REVIEW.md",
+    "sha256": "417B3F847E51F93EFE51EFB9C17188720710EB243EED0D1F5225FAFA1683E812"
+  },
+  {
+    "source": "docs/PROTOTYPE_BUILD_PLAN.md",
+    "archived": "docs/archive/game-design-2026-09-13/PROTOTYPE_BUILD_PLAN.md",
+    "sha256": "68B4E815A6976C4EF797DAC2BCA03C03374C947682F5A424059B081FE8EED9C5"
+  },
+  {
+    "source": "docs/README.md",
+    "archived": "docs/archive/game-design-2026-09-13/README.md",
+    "sha256": "B42422F025CDAEA89A7A80DC36E1F71A62B4C037487781226A88818F08AE72C2"
+  }
+]

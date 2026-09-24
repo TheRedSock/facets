@@ -1,0 +1,37 @@
+[
+  {
+    "source": "docs/GAME_DESIGN.md",
+    "archived": "docs/archive/before-foundation-audit-2026-09-14/GAME_DESIGN.md",
+    "sha256": "c23a9c7d101ece2dafebe03620aae8682781eaa768009c5d2d89d2868367f709"
+  },
+  {
+    "source": "docs/CONTENT_SYSTEMS.md",
+    "archived": "docs/archive/before-foundation-audit-2026-09-14/CONTENT_SYSTEMS.md",
+    "sha256": "42b34029d6c30b27ab085bfaf8f58da9f791f8f729bc11a6bacfa541df115ea5"
+  },
+  {
+    "source": "docs/GAME_ENGINE_INTEGRATION.md",
+    "archived": "docs/archive/before-foundation-audit-2026-09-14/GAME_ENGINE_INTEGRATION.md",
+    "sha256": "a6924c4fc41bdc30f6f53144908739b1ea72e1ed8478612bf1d746e233da2e2f"
+  },
+  {
+    "source": "docs/GAMEPLAY_REWRITE_REVIEW.md",
+    "archived": "docs/archive/before-foundation-audit-2026-09-14/GAMEPLAY_REWRITE_REVIEW.md",
+    "sha256": "88af624f080fe78536dd071fed537e75b3489468f7f360940eaca411b78f5ff6"
+  },
+  {
+    "source": "docs/PROTOTYPE_BUILD_PLAN.md",
+    "archived": "docs/archive/before-foundation-audit-2026-09-14/PROTOTYPE_BUILD_PLAN.md",
+    "sha256": "eac230897754d98a370f753ec45a198c2c1238661485079c8cc7d980c7f1cb7a"
+  },
+  {
+    "source": "docs/P0_BASELINE.md",
+    "archived": "docs/archive/before-foundation-audit-2026-09-14/P0_BASELINE.md",
+    "sha256": "8f2dab8ddaa9e7520f8c17722f3bc0cb2af22dfd6f5fe29b5e271a5ac2a2801f"
+  },
+  {
+    "source": "docs/README.md",
+    "archived": "docs/archive/before-foundation-audit-2026-09-14/README.md",
+    "sha256": "1610fdd2d59a0baa800c74c4f1732e013ede90742ee17c7c11243e9cfab76b3f"
+  }
+]

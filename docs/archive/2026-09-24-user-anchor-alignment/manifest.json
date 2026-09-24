@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "created": "2026-09-24",
+  "reason": "Preserve the initial continuation brief before aligning it with user-authored aesthetic, collection, redesign and performance anchors. USER_ANCHORS is reference-only and will remain unchanged.",
+  "entries": [
+    {
+      "source": "docs/design/USER_ANCHORS.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/docs/design/USER_ANCHORS.md",
+      "sha256": "5a4702cd8ac8c75bd105312ff9a8540b0a1a119e4831c076c3fb040f1044f4ea",
+      "bytes": 6241
+    },
+    {
+      "source": "docs/design/VISION.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/docs/design/VISION.md",
+      "sha256": "0ba026e3379269bf16803e5592dda3c1ccd467b11e46cdb13e5f690a568fc4e0",
+      "bytes": 4233
+    },
+    {
+      "source": "docs/design/PRESENTATION.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/docs/design/PRESENTATION.md",
+      "sha256": "16e7f8653292ea0436c479394c5518950bce036ade432caa51a23ba34aec020a",
+      "bytes": 4878
+    },
+    {
+      "source": "docs/design/POSSIBLE_ROUTES.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/docs/design/POSSIBLE_ROUTES.md",
+      "sha256": "cb68a711aa3a739900d64de569f7112727a3e690b743c43e4ef7b025eeaf4169",
+      "bytes": 4620
+    },
+    {
+      "source": "docs/engineering/BOUNDARIES.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/docs/engineering/BOUNDARIES.md",
+      "sha256": "6ee7738328ed8153d7a61b9b1a03b486e534a9630f76c92b867a0d8d0eb6ed04",
+      "bytes": 6095
+    },
+    {
+      "source": "docs/production/README.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/docs/production/README.md",
+      "sha256": "9b774c4f26de10ca5bae2af8c13aebddcece6c77167813607a142f86ff732d3d",
+      "bytes": 5200
+    },
+    {
+      "source": "docs/current/STATE.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/docs/current/STATE.md",
+      "sha256": "473b85778c62676322f7f79425e878ef24b6cda7c9ae28880b81a58ea643620d",
+      "bytes": 4919
+    },
+    {
+      "source": "plans/prototype/README.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/plans/prototype/README.md",
+      "sha256": "486d6249e31098c3f6c2ef91a70af315bdf1b6f775be229459f49a7436902bb5",
+      "bytes": 6971
+    },
+    {
+      "source": "plans/prototype/EXPLORATION.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/plans/prototype/EXPLORATION.md",
+      "sha256": "849a11b4d21ea6bd83cd87091c553d259aac625014dbc4d33b7237c8f0df7984",
+      "bytes": 5967
+    },
+    {
+      "source": "plans/prototype/ACCEPTANCE.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/plans/prototype/ACCEPTANCE.md",
+      "sha256": "91f0d74133139a23dcb39acb523d11d6d8936534c474815f5abe6b8836535fc6",
+      "bytes": 6733
+    },
+    {
+      "source": "docs/history/README.md",
+      "archived": "docs/archive/2026-09-24-user-anchor-alignment/docs/history/README.md",
+      "sha256": "cb36a893baf6db1a5d4c8d0caf426eb0d37db88fcab3600a73e0664e51424233",
+      "bytes": 3695
+    }
+  ]
+}
